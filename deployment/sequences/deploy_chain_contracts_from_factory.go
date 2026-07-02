@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
+	"github.com/smartcontractkit/chainlink-canton/deployment/utils/nativeinstrument"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
@@ -99,6 +100,29 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		proposalOutputs = appendExerciseOutput(proposalOutputs, deployTokenAdminRegistryReport.Output, input.ProposalDriven)
 		tokenAdminRegistryRawInstanceAddress := tokenAdminRegistryInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), tokenAdminRegistryRawInstanceAddress, token_admin_registry.ContractType, token_admin_registry.Version, ""))
+
+		// Native fee token (Amulet) TAR registration is skipped in proposal-driven factory
+		// deploy: timelock-execute resolves TAR from ledger before the batch creates it.
+		// Registered during lane configure Run 1 (configureChainForLanes) after TAR exists.
+		if !input.ProposalDriven {
+			nativeInstrumentID, err := resolveNativeInstrumentID(b, deps, input.NativeInstrumentId)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to resolve native fee token instrument: %w", err)
+			}
+			feeTokenConfigOutputs, err := ensureNativeFeeTokenConfig(
+				b,
+				deps,
+				tokenAdminRegistryRawInstanceAddress.InstanceAddress(),
+				tokenAdminRegistryRawInstanceAddress,
+				input.CCIPOwnerParty,
+				nativeInstrumentID,
+				input.ProposalDriven,
+			)
+			if err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure native fee token config: %w", err)
+			}
+			proposalOutputs = append(proposalOutputs, feeTokenConfigOutputs...)
+		}
 
 		feeQuoterInstanceID, err := ensureInstanceID(input.FeeQuoterConfig.Template.InstanceId, "feequoter")
 		if err != nil {
@@ -564,4 +588,19 @@ func rawInstanceAddressFromAddressRef(ref datastore.AddressRef) (contracts.RawIn
 	}
 
 	return rawInstanceAddress, nil
+}
+
+func resolveNativeInstrumentID(
+	b operations.Bundle,
+	deps canton.Chain,
+	instrumentID splice_api_token_holding_v1.InstrumentId,
+) (splice_api_token_holding_v1.InstrumentId, error) {
+	if instrumentID.Admin != "" && instrumentID.Id != "" {
+		return instrumentID, nil
+	}
+	if len(deps.Participants) == 0 {
+		return instrumentID, nil
+	}
+
+	return nativeinstrument.LookupNativeInstrumentID(b.GetContext(), deps.Participants[0])
 }

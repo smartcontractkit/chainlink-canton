@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-committee-verifier"
-	PackageID   = "577deff47c57e028675bfd493b7f38ecade7f10b98f1e6592cc42ea59f7e4723"
+	PackageID   = "5ae7d01fcbf94b3a26bb9b5b8c8d1431eeebb652a951d3f6cbdf4d8991e62499"
 	SDKVersion  = "3.4.11"
 )
 
@@ -196,7 +196,7 @@ func (t *ApplyAllowListUpdates) UnmarshalHex(data string) error {
 }
 
 // ApplyAllowListUpdatesMCMSParams is ApplyAllowListUpdates without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type ApplyAllowListUpdatesMCMSParams struct {
 	AllowListConfigArgsItems []AllowListConfigArgs `json:"allowListConfigArgsItems"`
 }
@@ -487,10 +487,9 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 }
 
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type CalculateFeeMCMSParams struct {
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -1233,12 +1232,10 @@ func (t *ForwardToVerifier) UnmarshalHex(data string) error {
 }
 
 // ForwardToVerifierMCMSParams is ForwardToVerifier without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type ForwardToVerifierMCMSParams struct {
-	RmnRemoteCid      types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
+	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	VerifierArgs types.TEXT                                 `json:"verifierArgs"`
 }
 
 // MarshalHex encodes ForwardToVerifierMCMSParams to hex string for MCMS operationData.
@@ -1255,9 +1252,8 @@ func (t *ForwardToVerifierMCMSParams) UnmarshalHex(data string) error {
 
 // GetFee is a Record type
 type GetFee struct {
-	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller            types.PARTY                                `json:"caller"`
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	Caller            types.PARTY   `json:"caller"`
 }
 
 // ToMap converts GetFee to a map for DAML arguments
@@ -1265,8 +1261,6 @@ func (t GetFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1296,10 +1290,9 @@ func (t *GetFee) UnmarshalHex(data string) error {
 }
 
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeMCMSParams struct {
-	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
 }
 
 // MarshalHex encodes GetFeeMCMSParams to hex string for MCMS operationData.
@@ -1823,12 +1816,10 @@ func (t *VerifyMessage) UnmarshalHex(data string) error {
 }
 
 // VerifyMessageMCMSParams is VerifyMessage without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type VerifyMessageMCMSParams struct {
-	RmnRemoteCid        types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext        splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
-	VerifierResults     types.TEXT                                 `json:"verifierResults"`
+	ExtraContext    splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	VerifierResults types.TEXT                                 `json:"verifierResults"`
 }
 
 // MarshalHex encodes VerifyMessageMCMSParams to hex string for MCMS operationData.

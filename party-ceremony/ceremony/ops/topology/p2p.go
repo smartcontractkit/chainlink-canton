@@ -381,3 +381,78 @@ var ProposeRotationP2POp = operations.NewOperation(
 		}, nil
 	},
 )
+
+// ProposeAddP2PWithOnboardingOp authorizes the updated PartyToParticipant
+// mapping with the new participant added and its onboarding flag set.
+// Setting the onboarding flag tells Canton to defer ACS replication until the
+// flag is explicitly cleared (after manual ACS import).
+var ProposeAddP2PWithOnboardingOp = operations.NewOperation(
+	"canton-ceremony/topology/propose-add-p2p-with-onboarding",
+	semver.MustParse("1.0.0"),
+	"Propose updated PartyToParticipant mapping with new participant added (onboarding flag set)",
+	func(b operations.Bundle, deps ceremony.CantonDeps, in ProposeAddP2PWithOnboardingInput) (ProposeAddP2PWithOnboardingOutput, error) {
+		if in.ParticipantID == "" || in.PartyID == "" || len(in.AllParticipantUIDs) == 0 || in.NewParticipantUID == "" {
+			return ProposeAddP2PWithOnboardingOutput{}, operations.NewUnrecoverableError(
+				errors.New("propose-add-p2p-with-onboarding: participant_id, party_id, all_participant_uids, and new_participant_uid are required"),
+			)
+		}
+
+		ctx := b.GetContext()
+
+		currentUID, err := deps.Client.GetParticipantUID(ctx)
+		if err != nil {
+			return ProposeAddP2PWithOnboardingOutput{}, fmt.Errorf("getting participant UID: %w", err)
+		}
+		if currentUID != in.ParticipantID {
+			return ProposeAddP2PWithOnboardingOutput{}, fmt.Errorf(
+				"participant ID mismatch: expected %s, got %s", in.ParticipantID, currentUID,
+			)
+		}
+
+		hostingParticipants := make([]*protov30.PartyToParticipant_HostingParticipant, len(in.AllParticipantUIDs))
+		for i, uid := range in.AllParticipantUIDs {
+			hp := &protov30.PartyToParticipant_HostingParticipant{
+				ParticipantUid: uid,
+				Permission:     protov30.Enums_PARTICIPANT_PERMISSION_CONFIRMATION,
+			}
+			// Set the onboarding flag on the new participant only.
+			if uid == in.NewParticipantUID {
+				hp.Onboarding = &protov30.PartyToParticipant_HostingParticipant_Onboarding{}
+			}
+			hostingParticipants[i] = hp
+		}
+
+		partySigningKeys, err := signingKeysWithThreshold(in.PartySigningKeysB64, uint32(in.NewP2PThreshold))
+		if err != nil {
+			return ProposeAddP2PWithOnboardingOutput{}, fmt.Errorf("building add party signing keys: %w", err)
+		}
+
+		mapping := &protov30.TopologyMapping{
+			Mapping: &protov30.TopologyMapping_PartyToParticipant{
+				PartyToParticipant: &protov30.PartyToParticipant{
+					Party:            in.PartyID,
+					Threshold:        uint32(in.NewP2PThreshold),
+					Participants:     hostingParticipants,
+					PartySigningKeys: partySigningKeys,
+				},
+			},
+		}
+
+		_, err = deps.Client.Authorize(ctx, uint32(in.CurrentP2PSerial+1), mapping, in.SynchronizerID, false)
+		if err != nil {
+			return ProposeAddP2PWithOnboardingOutput{}, fmt.Errorf("authorizing add P2P proposal with onboarding: %w", err)
+		}
+
+		deps.Logger.Infow("Add P2P proposal with onboarding flag submitted",
+			"participant", in.ParticipantID,
+			"party", in.PartyID,
+			"new_participant", in.NewParticipantUID,
+			"total_participants", len(in.AllParticipantUIDs),
+		)
+
+		return ProposeAddP2PWithOnboardingOutput{
+			ParticipantID: in.ParticipantID,
+			Proposed:      true,
+		}, nil
+	},
+)

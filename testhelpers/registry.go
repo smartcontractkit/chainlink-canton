@@ -263,7 +263,6 @@ func GetTransferFactoryV2(
 					"admin": string(transfer.InstrumentId.Admin),
 					"id":    string(transfer.InstrumentId.Id),
 				},
-				"lock":             nil,
 				"requestedAt":      now.Add(time.Hour * -1).Format(time.RFC3339),
 				"executeBefore":    now.Add(time.Hour * 24).Format(time.RFC3339),
 				"inputHoldingCids": inputCids,
@@ -286,7 +285,7 @@ func GetTransferFactoryV2(
 		return nil, fmt.Errorf("get transfer factory: %w", err)
 	}
 	if transferFactoryResponse.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("get transfer factory: status %d: %v", transferFactoryResponse.StatusCode(), transferFactoryResponse.Body)
+		return nil, fmt.Errorf("get transfer factory: status %d: %v", transferFactoryResponse.StatusCode(), string(transferFactoryResponse.Body))
 	}
 	if transferFactoryResponse.JSON200 == nil {
 		return nil, fmt.Errorf("get transfer factory: empty response body")

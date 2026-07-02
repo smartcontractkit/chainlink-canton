@@ -56,8 +56,9 @@ var UpdatePrices = contract.NewExercise(contract.ExerciseParams[core.UpdatePrice
 		return nil
 	},
 	Modifier: func(chain canton.Chain, input core.UpdatePrices) (core.UpdatePrices, error) {
-		// Automatically set the caller
-		input.Caller = types.PARTY(chain.Participants[0].PartyID)
+		if input.Caller == "" {
+			input.Caller = types.PARTY(chain.Participants[0].PartyID)
+		}
 
 		return input, nil
 	},

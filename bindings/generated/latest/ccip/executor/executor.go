@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
+	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "39c01ae7504adde662c313ca6a9b5b8641c6bb01e84af598a6e5c7bef168f5ec"
+	PackageID   = "df2d8d8f288b160402feee5f8d056e7c776b5c9a99eab50afc1e6e5f8d6d428a"
 	SDKVersion  = "3.4.11"
 )
 
@@ -315,12 +315,11 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 }
 
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type CalculateFeeMCMSParams struct {
-	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
-	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	ExpectedExecutor chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
+	ExecutorArgs     types.TEXT                                 `json:"executorArgs"`
+	ExtraContext     splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -337,9 +336,9 @@ func (t *CalculateFeeMCMSParams) UnmarshalHex(data string) error {
 
 // DynamicConfig is a Record type
 type DynamicConfig struct {
-	FeeAggregator         *types.PARTY             `json:"feeAggregator" hex:"optional"`
-	AllowedFinalityConfig ccipcodec.FinalityConfig `json:"allowedFinalityConfig"`
-	CcvAllowlistEnabled   types.BOOL               `json:"ccvAllowlistEnabled"`
+	FeeAggregator         *types.PARTY        `json:"feeAggregator" hex:"optional"`
+	AllowedFinalityConfig core.FinalityConfig `json:"allowedFinalityConfig"`
+	CcvAllowlistEnabled   types.BOOL          `json:"ccvAllowlistEnabled"`
 }
 
 // ToMap converts DynamicConfig to a map for DAML arguments
@@ -846,7 +845,7 @@ func (t *GetAllowedCCVs) UnmarshalHex(data string) error {
 }
 
 // GetAllowedCCVsMCMSParams is GetAllowedCCVs without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetAllowedCCVsMCMSParams struct {
 }
 
@@ -899,7 +898,7 @@ func (t *GetAllowedFinalityConfig) UnmarshalHex(data string) error {
 }
 
 // GetAllowedFinalityConfigMCMSParams is GetAllowedFinalityConfig without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetAllowedFinalityConfigMCMSParams struct {
 }
 
@@ -952,7 +951,7 @@ func (t *GetDestChains) UnmarshalHex(data string) error {
 }
 
 // GetDestChainsMCMSParams is GetDestChains without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetDestChainsMCMSParams struct {
 }
 
@@ -1005,7 +1004,7 @@ func (t *GetDynamicConfig) UnmarshalHex(data string) error {
 }
 
 // GetDynamicConfigMCMSParams is GetDynamicConfig without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetDynamicConfigMCMSParams struct {
 }
 
@@ -1073,7 +1072,7 @@ func (t *GetFee) UnmarshalHex(data string) error {
 }
 
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeMCMSParams struct {
 	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
 	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
@@ -1129,7 +1128,7 @@ func (t *GetMaxCCVsPerMessage) UnmarshalHex(data string) error {
 }
 
 // GetMaxCCVsPerMessageMCMSParams is GetMaxCCVsPerMessage without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetMaxCCVsPerMessageMCMSParams struct {
 }
 

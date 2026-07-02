@@ -34,6 +34,10 @@ type CantonClient interface {
 	// Returns the public key proto for the registered key.
 	RegisterKmsSigningKey(ctx context.Context, kmsKeyID string, name string, usage []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error)
 
+	// LookupKmsSigningKey returns the public key for a KMS key already
+	// registered in the participant vault. usage filters vault keys by purpose.
+	LookupKmsSigningKey(ctx context.Context, kmsKeyID string, usage []cryptov30.SigningKeyUsage) (*cryptov30.SigningPublicKey, error)
+
 	// GetNamespaceFingerprint returns the namespace fingerprint for a named
 	// key by cross-referencing the vault (ListMyKeys) with namespace
 	// delegations (ListNamespaceDelegation).
@@ -116,4 +120,42 @@ type CantonClient interface {
 	// The DAR is vetted and vetting is synchronised before returning.
 	// Returns the main package ID from the uploaded DAR.
 	UploadDar(ctx context.Context, darBytes []byte) (string, error)
+
+	// ── ACS Replication (ParticipantRepairService) ───────────────────────
+
+	// ExportAcs exports the Active Contract Set for the given parties and
+	// synchronizer at the specified ledger offset. The returned bytes are the
+	// concatenated ACS snapshot chunks.
+	ExportAcs(ctx context.Context, partyIDs []string, synchronizerID string, ledgerOffset int64) ([]byte, error)
+
+	// ImportAcs imports an ACS snapshot into the participant for the given
+	// synchronizer. The participant must be disconnected from the synchronizer
+	// before calling this.
+	ImportAcs(ctx context.Context, acsSnapshot []byte, synchronizerID string) error
+
+	// ── Synchronizer Connectivity ────────────────────────────────────────
+
+	// DisconnectSynchronizer disconnects the participant from the given
+	// synchronizer alias.
+	DisconnectSynchronizer(ctx context.Context, synchronizerAlias string) error
+
+	// ReconnectSynchronizer reconnects the participant to the given
+	// synchronizer alias.
+	ReconnectSynchronizer(ctx context.Context, synchronizerAlias string) error
+
+	// ListConnectedSynchronizers returns the aliases and IDs of all currently
+	// connected synchronizers.
+	ListConnectedSynchronizers(ctx context.Context) ([]SynchronizerInfo, error)
+
+	// ── Party Management ─────────────────────────────────────────────────
+
+	// ClearPartyOnboardingFlag clears the onboarding flag for a party on the
+	// given synchronizer. Returns true if the flag was successfully cleared.
+	ClearPartyOnboardingFlag(ctx context.Context, partyID string, synchronizerID string, beginOffsetExclusive int64) (bool, error)
+
+	// ── Inspection ───────────────────────────────────────────────────────
+
+	// LookupOffsetByTime returns the ledger offset at the given timestamp.
+	// Used to record a reference point before topology changes.
+	LookupOffsetByTime(ctx context.Context, timestamp int64) (int64, error)
 }

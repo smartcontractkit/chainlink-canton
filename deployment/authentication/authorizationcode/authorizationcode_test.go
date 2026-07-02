@@ -279,3 +279,130 @@ func TestNewProvider_FlowCompletes(t *testing.T) {
 	require.NoError(t, err, "requesting token")
 	require.Equal(t, "auth-code-token", token.AccessToken)
 }
+
+// TestNewProvider_WithAudience verifies that an audience configured via WithAudience is
+// appended as an "audience" query parameter on the authorization URL.
+func TestNewProvider_WithAudience(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	callbackHost := freePort(t)
+
+	tokenServer := newTokenServer(t)
+	t.Cleanup(tokenServer.Close)
+
+	output, restore := captureStdout(t)
+	defer restore()
+
+	expectedAudience := "https://ledger.example.com"
+
+	resultCh := make(chan struct {
+		provider *Provider
+		err      error
+	}, 1)
+
+	go func() {
+		provider, err := NewProvider(
+			ctx,
+			tokenServer.URL+"/auth",
+			tokenServer.URL+"/token",
+			"client-id",
+			WithCallbackURL("http://"+callbackHost+"/callback"),
+			WithOpenBrowser(false),
+			WithTimeout(5*time.Second),
+			WithAudience(expectedAudience),
+		)
+		resultCh <- struct {
+			provider *Provider
+			err      error
+		}{provider: provider, err: err}
+	}()
+
+	var authCodeURL string
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		authCodeURL = extractFirstURL(output.String())
+		if authCodeURL != "" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.NotEmpty(t, authCodeURL, "auth code URL not found in output")
+
+	parsed, err := url.Parse(authCodeURL)
+	require.NoError(t, err, "parsing auth URL")
+	require.Equal(t, []string{expectedAudience}, parsed.Query()["audience"], "audience parameter in auth URL")
+
+	state := parsed.Query().Get("state")
+	require.NotEmpty(t, state, "state not found in auth URL")
+
+	callbackURL := "http://" + callbackHost + "/callback?code=code123&state=" + url.QueryEscape(state)
+	response, err := http.Get(callbackURL) //nolint:noctx
+	require.NoError(t, err, "requesting callback")
+	require.NoError(t, response.Body.Close())
+
+	result := <-resultCh
+	require.NoError(t, result.err)
+	require.NotNil(t, result.provider)
+}
+
+// TestNewProvider_WithoutAudience verifies that no "audience" query parameter is set on the
+// authorization URL when WithAudience is not used.
+func TestNewProvider_WithoutAudience(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	callbackHost := freePort(t)
+
+	tokenServer := newTokenServer(t)
+	t.Cleanup(tokenServer.Close)
+
+	output, restore := captureStdout(t)
+	defer restore()
+
+	resultCh := make(chan struct {
+		provider *Provider
+		err      error
+	}, 1)
+
+	go func() {
+		provider, err := NewProvider(
+			ctx,
+			tokenServer.URL+"/auth",
+			tokenServer.URL+"/token",
+			"client-id",
+			WithCallbackURL("http://"+callbackHost+"/callback"),
+			WithOpenBrowser(false),
+			WithTimeout(5*time.Second),
+		)
+		resultCh <- struct {
+			provider *Provider
+			err      error
+		}{provider: provider, err: err}
+	}()
+
+	var authCodeURL string
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		authCodeURL = extractFirstURL(output.String())
+		if authCodeURL != "" {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	require.NotEmpty(t, authCodeURL, "auth code URL not found in output")
+
+	parsed, err := url.Parse(authCodeURL)
+	require.NoError(t, err, "parsing auth URL")
+	require.Empty(t, parsed.Query()["audience"], "no audience parameters expected in auth URL")
+
+	state := parsed.Query().Get("state")
+	require.NotEmpty(t, state, "state not found in auth URL")
+
+	callbackURL := "http://" + callbackHost + "/callback?code=code123&state=" + url.QueryEscape(state)
+	response, err := http.Get(callbackURL) //nolint:noctx
+	require.NoError(t, err, "requesting callback")
+	require.NoError(t, response.Body.Close())
+
+	result := <-resultCh
+	require.NoError(t, result.err)
+	require.NotNil(t, result.provider)
+}

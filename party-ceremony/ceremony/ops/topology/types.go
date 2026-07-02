@@ -232,6 +232,28 @@ type ProposeAddP2POutput struct {
 	Proposed      bool   `json:"proposed"`
 }
 
+// ── ProposeAddP2PWithOnboarding ──────────────────────────────────────────────
+
+// ProposeAddP2PWithOnboardingInput is the input to [ProposeAddP2PWithOnboardingOp].
+// It is identical to ProposeAddP2PInput but additionally marks the new participant
+// with the onboarding flag so Canton holds ACS replication until the flag is cleared.
+type ProposeAddP2PWithOnboardingInput struct {
+	ParticipantID       string   `json:"participant_id"`
+	PartyID             string   `json:"party_id"`
+	AllParticipantUIDs  []string `json:"all_participant_uids"`
+	NewParticipantUID   string   `json:"new_participant_uid"`
+	NewP2PThreshold     int      `json:"new_p2p_threshold"`
+	CurrentP2PSerial    int      `json:"current_p2p_serial"`
+	SynchronizerID      string   `json:"synchronizer_id"`
+	PartySigningKeysB64 []string `json:"party_signing_keys_b64,omitempty"`
+}
+
+// ProposeAddP2PWithOnboardingOutput is the output of [ProposeAddP2PWithOnboardingOp].
+type ProposeAddP2PWithOnboardingOutput struct {
+	ParticipantID string `json:"participant_id"`
+	Proposed      bool   `json:"proposed"`
+}
+
 // ── ProposeRotationP2P ───────────────────────────────────────────────────────
 
 // ProposeRotationP2PInput is the input to [ProposeRotationP2POp].

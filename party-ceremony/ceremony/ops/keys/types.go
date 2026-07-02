@@ -3,6 +3,10 @@ package keys
 // CreateMemberKeyInput is the input to [CreateMemberKeyOp].
 type CreateMemberKeyInput struct {
 	NamespaceName string `json:"namespace_name"`
+	// KmsVaultName optionally overrides NamespaceName when registering or
+	// looking up KMS keys in the participant vault. Leave empty to use
+	// NamespaceName (legacy behaviour).
+	KmsVaultName  string `json:"kms_vault_name,omitempty"`
 	ParticipantID string `json:"participant_id"`
 }
 

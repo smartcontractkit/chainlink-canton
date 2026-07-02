@@ -16,6 +16,7 @@ import (
 
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
+	linkregistry "github.com/smartcontractkit/chainlink-canton/deployment/operations/linkregistry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
@@ -238,6 +239,72 @@ func (d DeployCCVFromFactory) Apply(e cldf.Environment, config CantonCSDeps[Depl
 	)
 }
 
+// --- DeployLinkTokenFromFactory ---
+
+type DeployLinkTokenFromFactoryConfig struct {
+	OwnerParty     string        `json:"ownerParty" yaml:"ownerParty"`
+	CCIPOwnerParty string        `json:"ccipOwnerParty" yaml:"ccipOwnerParty"`
+	MinDelay       time.Duration `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
+	Description    string        `json:"description,omitempty" yaml:"description,omitempty"`
+	Params         sequences.DeployLinkTokenFromFactoryParams
+}
+
+type DeployLinkTokenFromFactory struct{}
+
+var _ cldf.ChangeSetV2[CantonCSDeps[DeployLinkTokenFromFactoryConfig]] = DeployLinkTokenFromFactory{}
+
+func (d DeployLinkTokenFromFactory) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployLinkTokenFromFactoryConfig]) error {
+	if err := requireFactoryDeployOwnerParties(config.Config.OwnerParty, config.Config.CCIPOwnerParty); err != nil {
+		return err
+	}
+	_, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
+	if err != nil {
+		return fmt.Errorf("core CCIPFactory must be deployed first: %w", err)
+	}
+	if _, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		config.ChainSelector,
+		datastore.ContractType(linkregistry.ContractType),
+		linkregistry.Version,
+		"",
+	)); err == nil {
+		return fmt.Errorf("LinkRegistry is already deployed for chain %d", config.ChainSelector)
+	}
+
+	return nil
+}
+
+func (d DeployLinkTokenFromFactory) Apply(e cldf.Environment, config CantonCSDeps[DeployLinkTokenFromFactoryConfig]) (cldf.ChangesetOutput, error) {
+	ds := datastore.NewMemoryDataStore()
+	chain := e.BlockChains.CantonChains()[config.ChainSelector]
+	participant := chain.Participants[config.Participant]
+
+	factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
+	if err != nil {
+		return cldf.ChangesetOutput{}, err
+	}
+
+	params := config.Config.Params
+	params.CCIPOwnerParty = config.Config.CCIPOwnerParty
+	params.FactoryAddressRef = factoryRef
+	params.ProposalDriven = len(participant.ReadAsPartyIDs) > 0
+
+	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployLinkTokenFromFactory, chain, params)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("deploy link token from factory: %w", err)
+	}
+
+	for _, addrRef := range out.Output.Addresses {
+		if err := ds.AddressRefStore.Add(addrRef); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("store address ref %v: %w", addrRef, err)
+		}
+	}
+
+	return buildFactoryDeployChangesetOutput(
+		e, chain, config.ChainSelector, config.Participant, params.ProposalDriven,
+		cantonmcms.QualifierCCIPOwner, config.Config.MinDelay, config.Config.Description, ds, out.Output.BatchOps,
+	)
+}
+
 // --- SetFactoryOwnerToMCMS ---
 
 type SetFactoryOwnerToMCMSConfig struct {
@@ -423,6 +490,9 @@ func buildFactoryDeployChangesetOutput(
 	ds *datastore.MemoryDataStore,
 	batchOps []mcms_types.BatchOperation,
 ) (cldf.ChangesetOutput, error) {
+	if ds == nil {
+		ds = datastore.NewMemoryDataStore()
+	}
 	output := cldf.ChangesetOutput{
 		DataStore: ds,
 		Reports:   []operations.Report[any, any]{},

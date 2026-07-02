@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	apiv2admin "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
@@ -154,6 +155,83 @@ func (c *GRPCLedgerClient) GetActiveContractsByTemplate(
 	}
 
 	return contracts, nil
+}
+
+// GetActiveContractsByTemplateForParty queries the ACS using FiltersByParty,
+// which authorizes against CanReadAs rights for the given party — sufficient
+// for users granted per-party rights via [GRPCLedgerClient.GrantPartyRights].
+// FiltersForAnyParty (used by [GRPCLedgerClient.GetActiveContractsByTemplate])
+// requires participant/IDP admin claims, which per-party-granted users lack.
+//
+// packageName is the Daml package name (without the "#" prefix); Canton encodes
+// package names in Identifier.package_id as "#<name>" for FiltersByParty filters.
+func (c *GRPCLedgerClient) GetActiveContractsByTemplateForParty(
+	ctx context.Context,
+	partyID string,
+	packageName string,
+	moduleName string,
+	entityName string,
+) ([]*apiv2.CreatedEvent, error) {
+	// active_at_offset is required; per proto, zero returns the empty set.
+	// Use the current ledger end so we evaluate "active now".
+	endResp, err := c.state.GetLedgerEnd(ctx, &apiv2.GetLedgerEndRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("GetLedgerEnd: %w", err)
+	}
+	activeAtOffset := endResp.GetOffset()
+
+	stream, err := c.state.GetActiveContracts(ctx, &apiv2.GetActiveContractsRequest{
+		ActiveAtOffset: activeAtOffset,
+		EventFormat: &apiv2.EventFormat{
+			FiltersByParty: map[string]*apiv2.Filters{
+				partyID: {
+					Cumulative: []*apiv2.CumulativeFilter{{
+						IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
+							TemplateFilter: &apiv2.TemplateFilter{
+								TemplateId: &apiv2.Identifier{
+									PackageId:  ledgerPackageNameRef(packageName),
+									ModuleName: moduleName,
+									EntityName: entityName,
+								},
+								IncludeCreatedEventBlob: true,
+							},
+						},
+					}},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("GetActiveContracts: %w", err)
+	}
+
+	var contracts []*apiv2.CreatedEvent
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("GetActiveContracts stream: %w", err)
+		}
+		if ac := resp.GetActiveContract(); ac != nil {
+			if ce := ac.GetCreatedEvent(); ce != nil {
+				contracts = append(contracts, ce)
+			}
+		}
+	}
+
+	return contracts, nil
+}
+
+// ledgerPackageNameRef encodes a Daml package name for Identifier.package_id when
+// FiltersByParty requires a package-name reference (#<name> per ledger API v2).
+func ledgerPackageNameRef(name string) string {
+	if strings.HasPrefix(name, "#") {
+		return name
+	}
+
+	return "#" + name
 }
 
 // ExecuteSubmission calls InteractiveSubmissionService.ExecuteSubmissionAndWaitForTransaction

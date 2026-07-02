@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -22,6 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
@@ -30,7 +32,7 @@ import (
 )
 
 // cantonFeeQuoterUSDPerUnitGas formats V2Params.USDPerUnitGas for Canton FeeQuoter UpdatePrices.
-// DAML stores this as Decimal (CCIP.FeeQuoterTypes.GasPriceUpdate). chainlink-ccip models it as *big.Int
+// DAML stores usdPerUnitGas as Decimal (e.g. 0.0000000038). chainlink-ccip models it as *big.Int
 // for cross-family tooling; on Canton that integer is scaled by 1e10 USD per gas unit (integration
 // parity: 38 -> 0.0000000038, matching historical ApplyFeeTokenUpdates+UpdatePrices tests).
 func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
@@ -40,6 +42,23 @@ func cantonFeeQuoterUSDPerUnitGas(v *big.Int) types.NUMERIC {
 	const scale int64 = 10_000_000_000 // 1e10
 	r := new(big.Rat).SetFrac(new(big.Int).Set(v), big.NewInt(scale))
 	s := strings.TrimRight(strings.TrimRight(r.FloatString(20), "0"), ".")
+	if s == "" || s == "-" {
+		return types.NUMERIC("0")
+	}
+
+	return types.NUMERIC(s)
+}
+
+// cantonFeeQuoterUsdPerToken formats lane TokenPrices for Canton FeeQuoter UpdatePrices.
+// DAML stores usdPerToken as Decimal USD per whole token (FeeQuoter.daml tests use 20.0 for $20/LINK).
+// Lane params carry USD*1e8; divide by 1e8 before encoding (e.g. 1_000_000_000 -> "10").
+func cantonFeeQuoterUsdPerToken(v *big.Int) types.NUMERIC {
+	if v == nil || v.Sign() <= 0 {
+		return types.NUMERIC("0")
+	}
+	const scale int64 = 100_000_000 // 1e8
+	r := new(big.Rat).SetFrac(new(big.Int).Set(v), big.NewInt(scale))
+	s := strings.TrimRight(strings.TrimRight(r.FloatString(8), "0"), ".")
 	if s == "" || s == "-" {
 		return types.NUMERIC("0")
 	}
@@ -122,6 +141,11 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		}
 		defaultOutboundCCVs = append(defaultOutboundCCVs, outboundCCV.Binding())
 	}
+	// Default to false if not specified
+	tokenReceiverAllowed := false
+	if destChain.TokenReceiverAllowed != nil {
+		tokenReceiverAllowed = *destChain.TokenReceiverAllowed
+	}
 	destChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[core.ApplyDestChainConfigUpdates]{
 		InstanceAddress:    globalConfigRaw.InstanceAddress(),
 		RawInstanceAddress: globalConfigRaw.String(),
@@ -132,7 +156,7 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 					DestChainSelector:         types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
 					IsEnabled:                 types.BOOL(isEnabled),
 					AddressBytesLength:        types.INT64(destChain.AddressBytesLength),
-					TokenReceiverAllowed:      true, // TODO: missing from input
+					TokenReceiverAllowed:      types.BOOL(tokenReceiverAllowed),
 					BaseExecutionGasCost:      types.INT64(destChain.BaseExecutionGasCost),
 					OffRampAddress:            types.TEXT(hex.EncodeToString(destChain.OffRamp)),
 					DefaultExecutor:           new(defaultExecutor.Binding()),
@@ -211,12 +235,17 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 		proposalOutputs = append(proposalOutputs, feeQuoterDestConfigReport.Output)
 	}
 
+	ccipOwnerParty, err := resolveCcipOwnerPartyFromFeeQuoterRef(feeQuoterRef)
+	if err != nil {
+		return sequences.OnChainOutput{}, fmt.Errorf("resolve ccipOwner for fee quoter price updates: %w", err)
+	}
+
 	priceUpdatersReport, err := operations.ExecuteOperation(b, feequoterop.ApplyPriceUpdatersUpdate, chain, contract.ChoiceInput[core.ApplyPriceUpdatersUpdate]{
 		InstanceAddress:    feeQuoterRaw.InstanceAddress(),
 		RawInstanceAddress: feeQuoterRaw.String(),
 		MCMSEnabled:        mcmsEnabled,
 		Args: core.ApplyPriceUpdatersUpdate{
-			AddedPriceUpdaters:   []types.PARTY{types.PARTY(participant.PartyID)},
+			AddedPriceUpdaters:   []types.PARTY{types.PARTY(ccipOwnerParty)},
 			RemovedPriceUpdaters: nil,
 		},
 	})
@@ -248,6 +277,7 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 					},
 				},
 			},
+			Caller: types.PARTY(ccipOwnerParty),
 		},
 	})
 	if err != nil {
@@ -289,6 +319,116 @@ func configureLaneLegAsSource(b operations.Bundle, deps chain.BlockChains, input
 	}
 
 	return sequences.OnChainOutput{BatchOps: batchOps}, nil
+}
+
+// CantonOutboundDestFeeInput carries resolved lane legs for Canton→remote outbound dest fee hardening.
+type CantonOutboundDestFeeInput struct {
+	Source *lanes.ChainDefinition
+	Dest   *lanes.ChainDefinition
+}
+
+// appendCantonOutboundDestFeeProposalOutputs emits GlobalConfig and FeeQuoter dest updates only
+// (no Executor, price updater, or UpdatePrices ops).
+func appendCantonOutboundDestFeeProposalOutputs(
+	b operations.Bundle,
+	chain canton.Chain,
+	mcmsEnabled bool,
+	globalConfigRaw, feeQuoterRaw contracts.RawInstanceAddress,
+	input CantonOutboundDestFeeInput,
+) ([]contract.ExerciseOutput, error) {
+	if input.Source == nil || input.Dest == nil {
+		return nil, fmt.Errorf("source and dest chain definitions are required")
+	}
+	sourceChain := input.Source
+	destChain := input.Dest
+
+	var proposalOutputs []contract.ExerciseOutput
+
+	isEnabled := len(destChain.Router) > 0
+	defaultExecutor, err := dsutils.GetRawInstanceAddressFromAddressRef(sourceChain.DefaultExecutor)
+	if err != nil {
+		return nil, fmt.Errorf("getting default executor: %w", err)
+	}
+	laneMandatedOutboundCCVs := make([]chainlinkapi.RawInstanceAddress, 0, len(sourceChain.LaneMandatedOutboundCCVs))
+	for _, ccv := range sourceChain.LaneMandatedOutboundCCVs {
+		outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
+		if err != nil {
+			return nil, fmt.Errorf("getting lane mandated outbound CCV: %w", err)
+		}
+		laneMandatedOutboundCCVs = append(laneMandatedOutboundCCVs, outboundCCV.Binding())
+	}
+	defaultOutboundCCVs := make([]chainlinkapi.RawInstanceAddress, 0, len(sourceChain.DefaultOutboundCCVs))
+	for _, ccv := range sourceChain.DefaultOutboundCCVs {
+		outboundCCV, err := dsutils.GetRawInstanceAddressFromAddressRef(ccv)
+		if err != nil {
+			return nil, fmt.Errorf("getting default outbound CCV: %w", err)
+		}
+		defaultOutboundCCVs = append(defaultOutboundCCVs, outboundCCV.Binding())
+	}
+	tokenReceiverAllowed := false
+	if destChain.TokenReceiverAllowed != nil {
+		tokenReceiverAllowed = *destChain.TokenReceiverAllowed
+	}
+	destChainConfigReport, err := operations.ExecuteOperation(b, global_config.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[core.ApplyDestChainConfigUpdates]{
+		InstanceAddress:    globalConfigRaw.InstanceAddress(),
+		RawInstanceAddress: globalConfigRaw.String(),
+		MCMSEnabled:        mcmsEnabled,
+		Args: core.ApplyDestChainConfigUpdates{
+			DestChainConfigUpdates: []core.DestChainConfigArgs{
+				{
+					DestChainSelector:         types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
+					IsEnabled:                 types.BOOL(isEnabled),
+					AddressBytesLength:        types.INT64(destChain.AddressBytesLength),
+					TokenReceiverAllowed:      types.BOOL(tokenReceiverAllowed),
+					BaseExecutionGasCost:      types.INT64(destChain.BaseExecutionGasCost),
+					OffRampAddress:            types.TEXT(hex.EncodeToString(destChain.OffRamp)),
+					DefaultExecutor:           new(defaultExecutor.Binding()),
+					LaneMandatedCCVs:          laneMandatedOutboundCCVs,
+					DefaultCCVs:               defaultOutboundCCVs,
+					MessageNetworkFeeUSDCents: types.NUMERIC(strconv.FormatUint(uint64(destChain.MessageNetworkFeeUSDCents), 10)),
+					TokenNetworkFeeUSDCents:   types.NUMERIC(strconv.FormatUint(uint64(destChain.TokenNetworkFeeUSDCents), 10)),
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("applying dest chain config updates to global config: %w", err)
+	}
+	if mcmsEnabled && !destChainConfigReport.Output.Executed() {
+		proposalOutputs = append(proposalOutputs, destChainConfigReport.Output)
+	}
+
+	feeQuoterDestConfigReport, err := operations.ExecuteOperation(b, feequoterop.ApplyDestChainConfigUpdates, chain, contract.ChoiceInput[core.ApplyFeeQuoterDestChainConfigUpdates]{
+		InstanceAddress:    feeQuoterRaw.InstanceAddress(),
+		RawInstanceAddress: feeQuoterRaw.String(),
+		MCMSEnabled:        mcmsEnabled,
+		Args: core.ApplyFeeQuoterDestChainConfigUpdates{
+			DestChainConfigArgs: []core.FeeQuoterDestChainConfigArgs{
+				{
+					DestChainSelector: types.NUMERIC(strconv.FormatUint(destChain.Selector, 10)),
+					DestChainConfig: core.FeeQuoterDestChainConfig{
+						IsEnabled:                   types.BOOL(destChain.FeeQuoterDestChainConfig.IsEnabled),
+						MaxDataBytes:                types.INT64(destChain.FeeQuoterDestChainConfig.MaxDataBytes),
+						MaxPerMsgGasLimit:           types.INT64(destChain.FeeQuoterDestChainConfig.MaxPerMsgGasLimit),
+						DestGasOverhead:             types.INT64(destChain.FeeQuoterDestChainConfig.DestGasOverhead),
+						DestGasPerPayloadByteBase:   types.INT64(destChain.FeeQuoterDestChainConfig.DestGasPerPayloadByteBase),
+						DefaultTxGasLimit:           types.INT64(destChain.FeeQuoterDestChainConfig.DefaultTxGasLimit),
+						LinkFeeMultiplierPercent:    types.NUMERIC(strconv.FormatUint(uint64(destChain.FeeQuoterDestChainConfig.V2Params.LinkFeeMultiplierPercent), 10)),
+						DefaultTokenFeeUSD:          types.NUMERIC(strconv.FormatUint(uint64(destChain.FeeQuoterDestChainConfig.DefaultTokenFeeUSDCents), 10)),
+						DefaultTokenDestGasOverhead: types.INT64(destChain.FeeQuoterDestChainConfig.DefaultTokenDestGasOverhead),
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("applying dest chain config updates to fee quoter: %w", err)
+	}
+	if mcmsEnabled && !feeQuoterDestConfigReport.Output.Executed() {
+		proposalOutputs = append(proposalOutputs, feeQuoterDestConfigReport.Output)
+	}
+
+	return proposalOutputs, nil
 }
 
 func resolveFeeQuoterRef(input ConfigureLaneLegInput, chainSelector uint64) (datastore.AddressRef, error) {
@@ -404,6 +544,36 @@ var ConfigureLaneLegAsDest = operations.NewSequence(
 	},
 )
 
+func resolveCcipOwnerPartyFromFeeQuoterRef(feeQuoterRef datastore.AddressRef) (string, error) {
+	for _, label := range feeQuoterRef.Labels.List() {
+		at := strings.LastIndex(label, "@")
+		if at < 0 || at+1 >= len(label) {
+			continue
+		}
+		party := label[at+1:]
+		if strings.Contains(party, "::") {
+			return party, nil
+		}
+	}
+
+	return "", fmt.Errorf("ccipOwner party not found in FeeQuoter labels")
+}
+
+func parseInstrumentPriceKey(instrument string) (admin, id string, err error) {
+	instrument = strings.TrimSpace(instrument)
+	lastColon := strings.LastIndex(instrument, ":")
+	if lastColon <= 0 || lastColon+1 >= len(instrument) {
+		return "", "", fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+	}
+	admin = strings.TrimSpace(instrument[:lastColon])
+	id = strings.TrimSpace(instrument[lastColon+1:])
+	if admin == "" || id == "" {
+		return "", "", fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+	}
+
+	return admin, id, nil
+}
+
 func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]core.TokenPriceUpdate, error) {
 	if len(tokenPrices) == 0 {
 		return nil, nil
@@ -413,16 +583,16 @@ func tokenPriceUpdatesFromParams(tokenPrices map[string]*big.Int) ([]core.TokenP
 		if price == nil {
 			continue
 		}
-		parts := strings.SplitN(instrument, ":", 2)
-		if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" || strings.TrimSpace(parts[1]) == "" {
-			return nil, fmt.Errorf("invalid token price instrument key %q, expected format <admin>:<id>", instrument)
+		admin, id, err := parseInstrumentPriceKey(instrument)
+		if err != nil {
+			return nil, err
 		}
 		updates = append(updates, core.TokenPriceUpdate{
 			InstrumentId: splice_api_token_holding_v1.InstrumentId{
-				Admin: types.PARTY(strings.TrimSpace(parts[0])),
-				Id:    types.TEXT(strings.TrimSpace(parts[1])),
+				Admin: types.PARTY(admin),
+				Id:    types.TEXT(id),
 			},
-			UsdPerToken: types.NUMERIC(price.String()),
+			UsdPerToken: cantonFeeQuoterUsdPerToken(price),
 		})
 	}
 
