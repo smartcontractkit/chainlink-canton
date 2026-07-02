@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - sish/bump-ccv
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -42,6 +43,7 @@ jobs:
             public.ecr.aws/w0i8p0z9/chainlink-canton-committee-verifier:${{ github.sha }}
 
   build-eds:
+    if: github.ref == 'refs/heads/main'
     name: Build and publish EDS image
     permissions:
       id-token: write
