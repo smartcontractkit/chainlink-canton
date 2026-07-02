@@ -34,13 +34,13 @@ require (
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/smartcontractkit/chain-selectors v1.0.104
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260626191803-b2c751b7f789
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260626191803-b2c751b7f789
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260701162830-b85afc4a2ec5
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260701162830-b85afc4a2ec5
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260701162830-b85afc4a2ec5
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260702144426-865f1e5fe90d
+	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260702152557-9ff466b332f8
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260702152557-9ff466b332f8
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260702152557-9ff466b332f8
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
 	github.com/smartcontractkit/chainlink-deployments-framework v0.114.2
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260623160408-12abc7b173d8
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260630120514-36abe27604df
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260630200614-6e739bf6e282
 	github.com/spf13/viper v1.21.0
