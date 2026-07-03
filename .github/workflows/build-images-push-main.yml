@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - tt/bump
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -43,6 +44,7 @@ jobs:
 
   build-eds:
     name: Build and publish EDS image
+    if: github.ref == 'refs/heads/main'
     permissions:
       id-token: write
       contents: read
