@@ -834,9 +834,7 @@ func encodeUint256Bytes(value uint64) []byte {
 }
 
 func findActiveRateLimiterByInstanceID(ctx context.Context, participant canton.Participant, instanceID string) (*apiv2.ActiveContract, error) {
-	rateLimiters, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, &apiv2.Identifier{
-		PackageId: "#" + core.PackageName, ModuleName: "CCIP.RateLimiter", EntityName: "RateLimiter",
-	})
+	rateLimiters, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, contracts.IdentifierFromBinding(ratelimiter.RateLimiter{}))
 	if err != nil {
 		return nil, err
 	}
