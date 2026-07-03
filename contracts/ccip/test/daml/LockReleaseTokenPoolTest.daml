@@ -17,12 +17,13 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 
+import qualified CCIP.API.FeeQuoterV1
 import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.EventsV1.Events
 
 import qualified CCIP.CCVCodec
 
 import qualified CCIP.Utils.Context
-import CCIP.Events qualified as Events
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.FeeQuoter qualified as FeeQuoter
@@ -980,13 +981,13 @@ testReleaseFromTicket = script do
             receiverH.owner === receiver
         _ -> abort "Expected completed result"
 
-    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId Events.TokenReceiveTicketClaimed)
+    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.EventsV1.Events.TokenReceiveTicketClaimed)
     assertMsg "Claimed event should exist" (isSome claimedEvent)
     let claimed = fromSome claimedEvent
-    claimed.tokenReceiveTicketCid === tokenReceiveTicket
+    claimed.tokenReceiveTicketCid === coerceContractId tokenReceiveTicket
     claimed.event.messageId === "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     case claimed.event.output of
-        Events.TokenReceiveTicketClaimed_Completed receiverCids ->
+        CCIP.EventsV1.Events.TokenReceiveTicketClaimed_Completed receiverCids ->
             length receiverCids === 1
         _ -> abort "Expected completed claimed event output"
 
@@ -1642,11 +1643,11 @@ testReleaseFromTicketDecimalConversion = script do
             receiverH.amount === 1.2345678901
         _ -> abort "Expected completed result"
 
-    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId Events.TokenReceiveTicketClaimed)
+    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.EventsV1.Events.TokenReceiveTicketClaimed)
     let claimed = fromSome claimedEvent
     claimed.event.messageId === "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     case claimed.event.output of
-        Events.TokenReceiveTicketClaimed_Completed receiverCids ->
+        CCIP.EventsV1.Events.TokenReceiveTicketClaimed_Completed receiverCids ->
             length receiverCids === 1
         _ -> abort "Expected completed claimed event output"
 
@@ -1787,7 +1788,7 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
             receiverH.amount === 1.0
         _ -> abort "Expected completed result"
 
-    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId Events.TokenReceiveTicketClaimed)
+    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.EventsV1.Events.TokenReceiveTicketClaimed)
     let claimed = fromSome claimedEvent
     claimed.event.sourceAmount === sourceAmount
     claimed.event.localAmount === 10000000000.0
@@ -3860,9 +3861,10 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
             priceUpdaters = [owner]
 
     (feeUSD, destGasOverhead, destBytesOverhead) <- submit owner do
-        exerciseCmd feeQuoter FeeQuoter.GetTokenTransferFee with
+        exerciseCmd (coerceContractId @_ @CCIP.API.FeeQuoterV1.FeeQuoter feeQuoter) CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
             destChainSelector = destChainSelector
             token = testInstrumentId
+            context = MetadataV1.emptyChoiceContext
             caller = owner
 
     feeUSD === usdToCents 0.75
@@ -3908,14 +3910,16 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
             priceUpdaters = [owner]
 
     (fee1, gas1, bytes1) <- submit owner do
-        exerciseCmd feeQuoter FeeQuoter.GetTokenTransferFee with
+        exerciseCmd (coerceContractId @_ @CCIP.API.FeeQuoterV1.FeeQuoter feeQuoter) CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
             destChainSelector = destChainSelector1
             token = testInstrumentId
+            context = MetadataV1.emptyChoiceContext
             caller = owner
     (fee2, gas2, bytes2) <- submit owner do
-        exerciseCmd feeQuoter FeeQuoter.GetTokenTransferFee with
+        exerciseCmd (coerceContractId @_ @CCIP.API.FeeQuoterV1.FeeQuoter feeQuoter) CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
             destChainSelector = destChainSelector2
             token = testInstrumentId
+            context = MetadataV1.emptyChoiceContext
             caller = owner
 
     fee1 === usdToCents 1.0

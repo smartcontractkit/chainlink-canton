@@ -15,7 +15,7 @@ import Chainlink.InstanceAddress (assertValidInstanceId)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
 import qualified CCIP.Utils.Context
-import qualified CCIP.Events
+import qualified CCIP.EventsV1.Events
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
@@ -405,5 +405,5 @@ data ExecuteFromRouterResult = ExecuteFromRouterResult
         sourceChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         tokenReceiveTicket : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
-        executionStateChanged : ContractId CCIP.Events.ExecutionStateChanged
+        executionStateChanged : ContractId CCIP.EventsV1.Events.ExecutionStateChanged
     deriving (Eq, Show)

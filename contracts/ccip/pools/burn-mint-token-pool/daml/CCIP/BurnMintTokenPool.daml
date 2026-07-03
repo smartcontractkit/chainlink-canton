@@ -30,15 +30,15 @@ import qualified Chainlink.InstanceAddress
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 import qualified CCIP.API.ExecutingMessageV1
+import qualified CCIP.API.FeeQuoterV1
 import qualified CCIP.API.RMNRemoteV1
 import qualified CCIP.API.SendingMessageV1
 import qualified CCIP.API.TokenAdminRegistryV1
+import qualified CCIP.EventsV1.Events
 import qualified CCIP.Tickets
 import qualified CCIP.Utils.Context
 
-import qualified CCIP.Events
 import qualified CCIP.FinalityConfig
-import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
@@ -885,16 +885,16 @@ template BurnMintTokenPool
                 let receiverCids = [receiverCid]
                 let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
                         receiverHoldingCids = receiverCids
-                let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Completed with
+                let claimedOutput = CCIP.EventsV1.Events.TokenReceiveTicketClaimed_Completed with
                         receiverHoldingCids = receiverCids
-                claimedEventCid <- create CCIP.Events.TokenReceiveTicketClaimed with
+                claimedEventCid <- create CCIP.EventsV1.Events.TokenReceiveTicketClaimed with
                     ccipOwner = ticket.ccipOwner
                     ccvOwners = ticket.ccvOwners
                     poolOwner = ticket.poolOwner
                     receiver = ticket.receiver
                     tokenReceiver = ticket.tokenReceiver
-                    tokenReceiveTicketCid = tokenReceiveTicketImplementation
-                    event = CCIP.Events.TokenReceiveTicketClaimedEvent with
+                    tokenReceiveTicketCid = coerceContractId tokenReceiveTicketImplementation
+                    event = CCIP.EventsV1.Events.TokenReceiveTicketClaimedEvent with
                         verifiedCCVs = ticket.verifiedCCVs
                         tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
                         poolAddress = ticket.poolAddress
@@ -920,7 +920,7 @@ template BurnMintTokenPool
                 tokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
-                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                feeQuoterCid : ContractId CCIP.API.FeeQuoterV1.FeeQuoter
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
@@ -939,9 +939,12 @@ template BurnMintTokenPool
                     (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
                 assertMsg "pool: tokenInstrumentId mismatch"
                     (tokenInstrumentId == instrumentId)
-                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
+                feeQuoterView <- exercise feeQuoterCid CCIP.API.FeeQuoterV1.FeeQuoter_PublicFetch
+                    with
+                        expectedAddress = deps.feeQuoter
+                        caller = caller
                 Chainlink.InstanceAddress.assertEqual "pool: feeQuoter mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoterView.instanceId feeQuoterView.ccipOwner deps.feeQuoter
                 assertMsg "pool: sending message feeQuoter mismatch"
                     (sendingMsgView.feeQuoter == deps.feeQuoter)
                 -- Check if fee config is enabled for the destination chain.
@@ -954,9 +957,10 @@ template BurnMintTokenPool
                             , feeConfig.destBytesOverhead
                             )
                     _ ->
-                        exercise feeQuoterCid CCIP.FeeQuoter.GetTokenTransferFee with
+                        exercise feeQuoterCid CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
                             destChainSelector = sendingMsgView.destChainSelector
                             token = tokenInstrumentId
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                             caller = poolOwner
 
                 exercise tokenAdminRegistryCid
@@ -973,7 +977,7 @@ template BurnMintTokenPool
         nonconsuming choice GetFee
                 : CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
             with
-                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                feeQuoterCid : ContractId CCIP.API.FeeQuoterV1.FeeQuoter
                 destChainSelector : Numeric 0
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
@@ -982,9 +986,11 @@ template BurnMintTokenPool
                 assertMsg "pool: tokenInstrumentId mismatch"
                     (tokenInstrumentId == instrumentId)
 
-                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
+                feeQuoterView <- exercise feeQuoterCid CCIP.API.FeeQuoterV1.FeeQuoter_PublicFetch with
+                    expectedAddress = deps.feeQuoter
+                    caller
                 Chainlink.InstanceAddress.assertEqual "pool: feeQuoter mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoterView.instanceId feeQuoterView.ccipOwner deps.feeQuoter
 
                 case Map.lookup destChainSelector tokenTransferFeeConfigs of
                     Some feeConfig | feeConfig.isEnabled ->
@@ -998,9 +1004,10 @@ template BurnMintTokenPool
                             isEnabled = True
                     _ -> do
                         (feeUSDCents, destGasOverhead, destBytesOverhead) <- exercise feeQuoterCid
-                            CCIP.FeeQuoter.GetTokenTransferFee with
+                            CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
                                 destChainSelector = destChainSelector
                                 token = tokenInstrumentId
+                                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                                 caller = poolOwner
                         pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
                             poolInstanceId = instanceId

@@ -10,7 +10,6 @@ import qualified Splice.Api.Token.BurnMintV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
-import qualified CCIP.API.SendingMessageV1
 import qualified CCIP.API.TokenAdminRegistryV1
 import qualified CCIP.Utils.Context
 

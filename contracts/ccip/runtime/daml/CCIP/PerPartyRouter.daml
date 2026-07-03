@@ -20,7 +20,7 @@ import qualified CCIP.Utils.Context
 
 import qualified CCIP.Client
 import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.Events
+import qualified CCIP.EventsV1.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
@@ -927,7 +927,7 @@ template PerPartyRouter
 data CCIPSendResult = CCIPSendResult
     with
         router : ContractId PerPartyRouter
-        ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
+        ccipMessageSent : ContractId CCIP.EventsV1.Events.CCIPMessageSent
         messageId : BytesHex
         feeChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         pendingFeeInstructions : [ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction]
@@ -937,7 +937,7 @@ data ExecuteResult = ExecuteResult
     with
         router : ContractId PerPartyRouter
         tokenReceiveTicket : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
-        executionStateChanged : ContractId CCIP.Events.ExecutionStateChanged
+        executionStateChanged : ContractId CCIP.EventsV1.Events.ExecutionStateChanged
         messageId : BytesHex
         message : CCIP.MessageCodecV1.MessageV1
         state : CCIP.API.ExecutingMessageV1.MessageExecutionState

@@ -8,7 +8,8 @@ import DA.Optional (fromSome, fromSomeNote, isSome)
 import DA.TextMap qualified as TextMap
 
 import qualified CCIP.Utils.Context
-import qualified CCIP.Events
+import qualified CCIP.EventsV1.Events
+
 import CCIP.BurnMintTokenPool qualified as BurnMintTokenPool
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityConfig
@@ -887,7 +888,7 @@ testBurnMintPoolReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = scrip
       receiverHolding.holdingAmount === 1.0
     _ -> abort "expected completed release result"
 
-  Some claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.Events.TokenReceiveTicketClaimed)
+  Some claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.EventsV1.Events.TokenReceiveTicketClaimed)
   claimedEvent.event.sourceAmount === sourceAmount
   claimedEvent.event.localAmount === 10000000000.0
 

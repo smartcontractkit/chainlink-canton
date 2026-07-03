@@ -9,6 +9,7 @@ import (
 	ccipapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	events "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
@@ -31,7 +32,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "4629d0db325ebb44c6f5f2438a026071bd30b8daa9eb06075cb2d8fc5d8cd013"
+	PackageID   = "0b86ad371629a0868db9958f95dd12808b9ad06f07e1c082a355236ce1982653"
 	SDKVersion  = "3.4.11"
 )
 
@@ -415,7 +416,7 @@ type CCIPSendFromRouterResult struct {
 	CcipMessageSent      types.CONTRACT_ID `json:"ccipMessageSent"`
 	VerifierBlobs        []types.TEXT      `json:"verifierBlobs"`
 	MessageSentObservers []types.PARTY     `json:"messageSentObservers"`
-	Receipts             []core.Receipt    `json:"receipts"`
+	Receipts             []events.Receipt  `json:"receipts"`
 }
 
 // ToMap converts CCIPSendFromRouterResult to a map for DAML arguments

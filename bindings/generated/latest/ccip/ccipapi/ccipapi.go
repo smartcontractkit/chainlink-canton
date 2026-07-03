@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-api"
-	PackageID   = "78dcbd60e8aa4c6d967656ac8e23d587b2c0ea4cca4ab52391abc1733444856e"
+	PackageID   = "eff963070c5b755f04100ac8d90c4863164373af6ae233c9104353766fe45e6f"
 	SDKVersion  = "3.4.11"
 )
 
@@ -44,6 +44,19 @@ type IExecutingMessage interface {
 
 	// Archive executes the Archive choice
 	Archive(contractID string) *model.ExerciseCommand
+}
+
+// IFeeQuoter is a DAML interface
+type IFeeQuoter interface {
+
+	// Archive executes the Archive choice
+	Archive(contractID string) *model.ExerciseCommand
+
+	// FeeQuoterPublicFetch executes the FeeQuoter_PublicFetch choice
+	FeeQuoterPublicFetch(contractID string, args FeeQuoterPublicFetch) *model.ExerciseCommand
+
+	// FeeQuoterGetTokenTransferFee executes the FeeQuoter_GetTokenTransferFee choice
+	FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand
 }
 
 // IRMNRemote is a DAML interface
@@ -281,6 +294,129 @@ func (t ExecutingMessageAddCCVVerification) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes ExecutingMessageAddCCVVerification from hex string (Canton MCMS format)
 func (t *ExecutingMessageAddCCVVerification) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FeeQuoterView is a Record type
+type FeeQuoterView struct {
+	CcipOwner  types.PARTY `json:"ccipOwner"`
+	InstanceId types.TEXT  `json:"instanceId"`
+}
+
+// ToMap converts FeeQuoterView to a map for DAML arguments
+func (t FeeQuoterView) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["ccipOwner"] = t.CcipOwner.ToMap()
+
+	m["instanceId"] = string(t.InstanceId)
+
+	return m
+}
+
+func (t FeeQuoterView) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeQuoterView) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeQuoterView to hex string (Canton MCMS format)
+func (t FeeQuoterView) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterView from hex string (Canton MCMS format)
+func (t *FeeQuoterView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FeeQuoterGetTokenTransferFee is a Record type
+type FeeQuoterGetTokenTransferFee struct {
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Token             splice_api_token_holding_v1.InstrumentId   `json:"token"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts FeeQuoterGetTokenTransferFee to a map for DAML arguments
+func (t FeeQuoterGetTokenTransferFee) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["token"] = model.NestedToDAMLValue(t.Token)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t FeeQuoterGetTokenTransferFee) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeQuoterGetTokenTransferFee) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeQuoterGetTokenTransferFee to hex string (Canton MCMS format)
+func (t FeeQuoterGetTokenTransferFee) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterGetTokenTransferFee from hex string (Canton MCMS format)
+func (t *FeeQuoterGetTokenTransferFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FeeQuoterPublicFetch is a Record type
+type FeeQuoterPublicFetch struct {
+	ExpectedAddress chainlinkapi.RawInstanceAddress `json:"expectedAddress"`
+	Caller          types.PARTY                     `json:"caller"`
+}
+
+// ToMap converts FeeQuoterPublicFetch to a map for DAML arguments
+func (t FeeQuoterPublicFetch) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["expectedAddress"] = model.NestedToDAMLValue(t.ExpectedAddress)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t FeeQuoterPublicFetch) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeQuoterPublicFetch) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeQuoterPublicFetch to hex string (Canton MCMS format)
+func (t FeeQuoterPublicFetch) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterPublicFetch from hex string (Canton MCMS format)
+func (t *FeeQuoterPublicFetch) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1377,6 +1513,16 @@ func IExecutingMessageInterfaceID() string {
 // IExecutingMessageInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IExecutingMessageInterfaceIDWithPackageID(packageID string) string {
 	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.API.ExecutingMessageV1", "ExecutingMessage")
+}
+
+// IFeeQuoterInterfaceID returns the interface ID for the IFeeQuoter interface using the package name
+func IFeeQuoterInterfaceID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.API.FeeQuoterV1", "FeeQuoter")
+}
+
+// IFeeQuoterInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
+func IFeeQuoterInterfaceIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.API.FeeQuoterV1", "FeeQuoter")
 }
 
 // IRMNRemoteInterfaceID returns the interface ID for the IRMNRemote interface using the package name

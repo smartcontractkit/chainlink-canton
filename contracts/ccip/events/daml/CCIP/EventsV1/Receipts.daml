@@ -1,5 +1,5 @@
 -- | Ticket contracts for cross-participant CCIP communication.
-module CCIP.Receipts where
+module CCIP.EventsV1.Receipts where
 
 import DA.Crypto.Text (BytesHex)
 

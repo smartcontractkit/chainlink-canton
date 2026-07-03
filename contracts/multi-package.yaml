@@ -15,6 +15,7 @@ packages:
   - ccip/codec
   - ccip/core
   - ccip/extension-api
+  - ccip/events
   - ccip/runtime
   - ccip/sender
   - ccip/receiver

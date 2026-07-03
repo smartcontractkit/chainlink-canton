@@ -19,7 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -459,7 +459,7 @@ func GetMessageIdFromTransaction(tx *apiv2.Transaction) (string, error) {
 		if e.Created.GetTemplateId().GetEntityName() != "CCIPMessageSent" {
 			continue
 		}
-		msg, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](e.Created)
+		msg, err := bindings.UnmarshalCreatedEvent[events.CCIPMessageSent](e.Created)
 		if err != nil {
 			return "", fmt.Errorf("unmarshal CCIPMessageSent: %w", err)
 		}

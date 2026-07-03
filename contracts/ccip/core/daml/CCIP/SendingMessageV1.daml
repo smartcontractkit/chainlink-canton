@@ -11,20 +11,21 @@ import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome, fromSome, fromOptional)
 import DA.Text qualified as Text
 
-import qualified CCIP.Events
-import qualified CCIP.FinalityConfig
-import qualified CCIP.CCVCodec
-import qualified CCIP.Math
-import qualified CCIP.MessageCodecV1
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import qualified CCIP.Receipts
-
 import MCMS.Crypto (isValidHex)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 
 import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.EventsV1.Events
+import qualified CCIP.EventsV1.Receipts
+
+import qualified CCIP.FinalityConfig
+import qualified CCIP.CCVCodec
+import qualified CCIP.Math
+import qualified CCIP.MessageCodecV1
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
 
 data CCVFee = CCVFee
     with
@@ -614,19 +615,19 @@ template SendingMessageV1
                 messageSender : Party
                 messageSentObservers : [Party]
                 verifierBlobs : [BytesHex]
-                receipts : [CCIP.Receipts.Receipt]
+                receipts : [CCIP.EventsV1.Receipts.Receipt]
             controller ccipOwner
             do
                 assertMsg "finalizeSend: only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
                 assertMsg "finalizeSend: message not yet constructed" (isSome message)
                 assertMsg "finalizeSend: sender mismatch" (messageSender == sender)
 
-                eventCid <- create CCIP.Events.CCIPMessageSent with
+                eventCid <- create CCIP.EventsV1.Events.CCIPMessageSent with
                     ccipOwner = ccipOwner
                     ccvOwners = ccvOwners
                     sender = messageSender
                     observers = messageSentObservers
-                    event = CCIP.Events.CCIPMessageSentEvent with
+                    event = CCIP.EventsV1.Events.CCIPMessageSentEvent with
                         destChainSelector = destChainSelector
                         sequenceNumber = sequenceNumber
                         messageId = messageId
@@ -653,5 +654,5 @@ template SendingMessageV1
 
 data FinalizeSendResult = FinalizeSendResult
     with
-        ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
+        ccipMessageSent : ContractId CCIP.EventsV1.Events.CCIPMessageSent
     deriving (Eq, Show)

@@ -15,6 +15,7 @@ data-dependencies:
   - ../tickets/.daml/dist/ccip-tickets-2.0.0.dar
   - ../codec/.daml/dist/ccip-codec-2.0.0.dar
   - ../utils/.daml/dist/ccip-utils-2.0.0.dar
+  - ../events/.daml/dist/ccip-events-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

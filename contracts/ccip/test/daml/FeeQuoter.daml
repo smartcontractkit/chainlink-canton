@@ -16,6 +16,7 @@ import qualified Splice.Api.Token.MetadataV1
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
 import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.EventsV1.Receipts
 
 import CCIP.Client qualified as Client
 import CCIP.FeeQuoter
@@ -25,7 +26,6 @@ import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.OnRamp qualified as OnRamp
 import CCIP.OnRampTypes qualified as OnRampTypes
-import qualified CCIP.Receipts
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 usd : Decimal -> Decimal
@@ -112,29 +112,29 @@ sumQuoteCalldataSize sm =
             None -> 0)
         + sm.executorDestBytesOverhead
 
-sumReceiptNonNetworkGas : [CCIP.Receipts.Receipt] -> Int
+sumReceiptNonNetworkGas : [CCIP.EventsV1.Receipts.Receipt] -> Int
 sumReceiptNonNetworkGas receipts =
     foldl
         (\acc r ->
             case r.issuerType of
-                CCIP.Receipts.IssuerType_Network -> acc
+                CCIP.EventsV1.Receipts.IssuerType_Network -> acc
                 _ -> acc + r.destGasLimit)
         0
         receipts
 
-sumReceiptNonNetworkBytes : [CCIP.Receipts.Receipt] -> Int
+sumReceiptNonNetworkBytes : [CCIP.EventsV1.Receipts.Receipt] -> Int
 sumReceiptNonNetworkBytes receipts =
     foldl
         (\acc r ->
             case r.issuerType of
-                CCIP.Receipts.IssuerType_Network -> acc
+                CCIP.EventsV1.Receipts.IssuerType_Network -> acc
                 _ -> acc + r.destBytesOverhead)
         0
         receipts
 
 assertReceiptSumsMatchQuoteInputs
     : SendingMessageV1.SendingMessageV1
-    -> [CCIP.Receipts.Receipt]
+    -> [CCIP.EventsV1.Receipts.Receipt]
     -> Script ()
 assertReceiptSumsMatchQuoteInputs sm receipts = do
     sumQuoteNonCalldataGas sm === sumReceiptNonNetworkGas receipts
@@ -1441,10 +1441,10 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
 
     assertReceiptSumsMatchQuoteInputs sm receipts
     map (.issuerType) receipts ===
-        [ CCIP.Receipts.IssuerType_CCV
-        , CCIP.Receipts.IssuerType_Pool
-        , CCIP.Receipts.IssuerType_Executor
-        , CCIP.Receipts.IssuerType_Network
+        [ CCIP.EventsV1.Receipts.IssuerType_CCV
+        , CCIP.EventsV1.Receipts.IssuerType_Pool
+        , CCIP.EventsV1.Receipts.IssuerType_Executor
+        , CCIP.EventsV1.Receipts.IssuerType_Network
         ]
 
     debug "testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees: PASSED"
@@ -1562,9 +1562,9 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_CCVAndExecutor = script do
 
     assertReceiptSumsMatchQuoteInputs sm receipts
     map (.issuerType) receipts ===
-        [ CCIP.Receipts.IssuerType_CCV
-        , CCIP.Receipts.IssuerType_Executor
-        , CCIP.Receipts.IssuerType_Network
+        [ CCIP.EventsV1.Receipts.IssuerType_CCV
+        , CCIP.EventsV1.Receipts.IssuerType_Executor
+        , CCIP.EventsV1.Receipts.IssuerType_Network
         ]
 
     debug "testFinalizeFee_ReceiptSumsMatchQuoteInputs_CCVAndExecutor: PASSED"
@@ -1692,8 +1692,8 @@ testFinalizeFee_PayloadBytesCountedOnce = script do
     let receipts = OnRamp.assembleReceipts sm
     assertReceiptSumsMatchQuoteInputs sm receipts
     map (.issuerType) receipts ===
-        [ CCIP.Receipts.IssuerType_Executor
-        , CCIP.Receipts.IssuerType_Network
+        [ CCIP.EventsV1.Receipts.IssuerType_Executor
+        , CCIP.EventsV1.Receipts.IssuerType_Network
         ]
     case receipts of
         [executorReceipt, networkReceipt] -> do
