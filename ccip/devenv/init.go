@@ -3,6 +3,8 @@ package devenv
 import (
 	chain_selectors "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/chainreg"
+
+	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters" // Canton JD chain type + signing identity readers
 )
 
 func init() {
@@ -16,5 +18,4 @@ func init() {
 		panic("canton chainreg: " + err.Error())
 	}
 
-	// The other Canton adapters are registered via the init function in the adapters package
 }
