@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-tickets"
-	PackageID   = "5e43d1257621aa7800a178df1f4f6febb2dca892a258804e40003dd52eaec410"
+	PackageID   = "0fdec3d34bfa43ef48e9439840ba3b13b6ffecca7a209b29135452944b841e3c"
 	SDKVersion  = "3.4.11"
 )
 

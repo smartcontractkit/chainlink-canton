@@ -6,7 +6,7 @@ import DA.Assert
 import DA.Optional (fromSome)
 import DA.Time (seconds)
 
-import CCIP.RateLimiter qualified as RateLimiter
+import qualified CCIP.RateLimiterV1 as RateLimiter
 
 testRateLimiterConsumeAndRefill = script do
     poolOwner <- allocateParty "pool-owner"

@@ -30,7 +30,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "6c957fd3f80bd344917d6588906f2063919602852b7defcfd362e25fa05de070"
+	PackageID   = "8b874f28ecbc8a8d4a1c3c3b007fdbaf1f14491b5dde092a2ad6426e1bbae195"
 	SDKVersion  = "3.4.11"
 )
 
@@ -40,22 +40,12 @@ type Template interface {
 }
 
 const (
-	TokenConfigKey         = types.TEXT("token-config")
-	TokenAdminRegistryKey  = types.TEXT("token-admin-registry")
-	RmnRemoteContextKey    = types.TEXT("rmn-remote")
-	GlobalCurseSubject     = types.TEXT("01000000000000000000000000000001")
-	UsdPerUsdCent          = types.NUMERIC("100000000.")
-	PremiumIdentity        = types.NUMERIC("10000000000.")
-	MinTokenDecimals       = types.INT64(0)
-	MaxTokenDecimals       = types.INT64(37)
-	E10PerPercent          = types.NUMERIC("100000000.")
-	BaseNumeric            = types.NUMERIC("100000000.")
-	BaseInt                = types.INT64(100000000)
-	MaxUint256DecimalText  = types.TEXT("115792089237316195423570985008687907853269984665640564039457584007913129639935")
-	MaxNumeric0DecimalText = types.TEXT("99999999999999999999999999999999999999")
-	FeeQuoterKey           = types.TEXT("fee-quoter")
-	GlobalConfigKey        = types.TEXT("global-config")
-	RateLimiterKey         = types.TEXT("rate-limiter")
+	TokenConfigKey        = types.TEXT("token-config")
+	TokenAdminRegistryKey = types.TEXT("token-admin-registry")
+	RmnRemoteContextKey   = types.TEXT("rmn-remote")
+	GlobalCurseSubject    = types.TEXT("01000000000000000000000000000001")
+	FeeQuoterKey          = types.TEXT("fee-quoter")
+	GlobalConfigKey       = types.TEXT("global-config")
 )
 
 func argsToMap(args any) map[string]any {
@@ -1298,84 +1288,6 @@ func (t Canton2AnyMessage) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes Canton2AnyMessage from hex string (Canton MCMS format)
 func (t *Canton2AnyMessage) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ConsumeCapacity is a Record type
-type ConsumeCapacity struct {
-	Requested types.NUMERIC `json:"requested"`
-}
-
-// ToMap converts ConsumeCapacity to a map for DAML arguments
-func (t ConsumeCapacity) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["requested"] = t.Requested
-
-	return m
-}
-
-func (t ConsumeCapacity) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ConsumeCapacity) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ConsumeCapacity to hex string (Canton MCMS format)
-func (t ConsumeCapacity) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ConsumeCapacity from hex string (Canton MCMS format)
-func (t *ConsumeCapacity) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// ConsumeCapacityResult is a Record type
-type ConsumeCapacityResult struct {
-	RateLimiterCid         types.CONTRACT_ID `json:"rateLimiterCid"`
-	AvailableBeforeConsume types.NUMERIC     `json:"availableBeforeConsume"`
-	Consumed               types.NUMERIC     `json:"consumed"`
-}
-
-// ToMap converts ConsumeCapacityResult to a map for DAML arguments
-func (t ConsumeCapacityResult) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["rateLimiterCid"] = model.NestedToDAMLValue(t.RateLimiterCid)
-
-	m["availableBeforeConsume"] = t.AvailableBeforeConsume
-
-	m["consumed"] = t.Consumed
-
-	return m
-}
-
-func (t ConsumeCapacityResult) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *ConsumeCapacityResult) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes ConsumeCapacityResult to hex string (Canton MCMS format)
-func (t ConsumeCapacityResult) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes ConsumeCapacityResult from hex string (Canton MCMS format)
-func (t *ConsumeCapacityResult) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -4752,48 +4664,6 @@ func (t *IsCursedForChainMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// LocalAmountConversionResult is a Record type
-type LocalAmountConversionResult struct {
-	LocalAmount        types.NUMERIC `json:"localAmount"`
-	TruncatedRemainder types.TEXT    `json:"truncatedRemainder"`
-	WasTruncated       types.BOOL    `json:"wasTruncated"`
-}
-
-// ToMap converts LocalAmountConversionResult to a map for DAML arguments
-func (t LocalAmountConversionResult) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["localAmount"] = t.LocalAmount
-
-	m["truncatedRemainder"] = string(t.TruncatedRemainder)
-
-	m["wasTruncated"] = bool(t.WasTruncated)
-
-	return m
-}
-
-func (t LocalAmountConversionResult) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *LocalAmountConversionResult) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes LocalAmountConversionResult to hex string (Canton MCMS format)
-func (t LocalAmountConversionResult) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes LocalAmountConversionResult from hex string (Canton MCMS format)
-func (t *LocalAmountConversionResult) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // PoolRegistration is a Record type
 type PoolRegistration struct {
 	PoolOwner      types.PARTY `json:"poolOwner"`
@@ -5679,389 +5549,6 @@ func (t RMNRemote) RMNRemoteGetCursedSubjectsWithPackageID(contractID string, pa
 var _ api.IMCMSReceiver = (*RMNRemote)(nil)
 
 var _ ccipapi.IRMNRemote = (*RMNRemote)(nil)
-
-// RateLimitDirection is an enum type
-type RateLimitDirection string
-
-const (
-	RateLimitDirectionRateLimitDirection_Outbound RateLimitDirection = "RateLimitDirection_Outbound"
-
-	RateLimitDirectionRateLimitDirection_Inbound RateLimitDirection = "RateLimitDirection_Inbound"
-)
-
-func (e RateLimitDirection) GetEnumConstructor() string { return string(e) }
-
-func (e RateLimitDirection) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "RateLimitDirection")
-}
-
-// GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
-func (e RateLimitDirection) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "RateLimitDirection")
-}
-
-func (e RateLimitDirection) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(e)
-}
-
-func (e *RateLimitDirection) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, e)
-}
-
-// MarshalHex encodes RateLimitDirection to hex string (Canton MCMS format)
-func (e RateLimitDirection) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(e)
-}
-
-// UnmarshalHex decodes RateLimitDirection from hex string (Canton MCMS format)
-func (e *RateLimitDirection) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, e)
-}
-
-var _ types.ENUM = RateLimitDirection("")
-
-// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
-func (e RateLimitDirection) GetEnumTagByte() byte {
-
-	if string(e) == "RateLimitDirection_Outbound" {
-		return 0
-	}
-
-	if string(e) == "RateLimitDirection_Inbound" {
-		return 1
-	}
-
-	return 0xFF // Invalid/unknown constructor
-}
-
-// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
-func (e RateLimitDirection) EnumConstructorForTagByte(tag byte) (string, bool) {
-
-	if tag == 0 {
-		return "RateLimitDirection_Outbound", true
-	}
-
-	if tag == 1 {
-		return "RateLimitDirection_Inbound", true
-	}
-
-	return "", false
-}
-
-var _ types.EnumWithTagByte = RateLimitDirection("")
-
-// RateLimitMode is an enum type
-type RateLimitMode string
-
-const (
-	RateLimitModeRateLimitMode_DefaultFinality RateLimitMode = "RateLimitMode_DefaultFinality"
-
-	RateLimitModeRateLimitMode_CustomFinality RateLimitMode = "RateLimitMode_CustomFinality"
-)
-
-func (e RateLimitMode) GetEnumConstructor() string { return string(e) }
-
-func (e RateLimitMode) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "RateLimitMode")
-}
-
-// GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
-func (e RateLimitMode) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "RateLimitMode")
-}
-
-func (e RateLimitMode) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(e)
-}
-
-func (e *RateLimitMode) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, e)
-}
-
-// MarshalHex encodes RateLimitMode to hex string (Canton MCMS format)
-func (e RateLimitMode) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(e)
-}
-
-// UnmarshalHex decodes RateLimitMode from hex string (Canton MCMS format)
-func (e *RateLimitMode) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, e)
-}
-
-var _ types.ENUM = RateLimitMode("")
-
-// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
-func (e RateLimitMode) GetEnumTagByte() byte {
-
-	if string(e) == "RateLimitMode_DefaultFinality" {
-		return 0
-	}
-
-	if string(e) == "RateLimitMode_CustomFinality" {
-		return 1
-	}
-
-	return 0xFF // Invalid/unknown constructor
-}
-
-// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
-func (e RateLimitMode) EnumConstructorForTagByte(tag byte) (string, bool) {
-
-	if tag == 0 {
-		return "RateLimitMode_DefaultFinality", true
-	}
-
-	if tag == 1 {
-		return "RateLimitMode_CustomFinality", true
-	}
-
-	return "", false
-}
-
-var _ types.EnumWithTagByte = RateLimitMode("")
-
-// RateLimiter is a Template type
-type RateLimiter struct {
-	InstanceId          types.TEXT         `json:"instanceId"`
-	PoolInstanceId      types.TEXT         `json:"poolInstanceId"`
-	PoolOwner           types.PARTY        `json:"poolOwner"`
-	RemoteChainSelector types.NUMERIC      `json:"remoteChainSelector"`
-	Direction           RateLimitDirection `json:"direction"`
-	Mode                RateLimitMode      `json:"mode"`
-	IsEnabled           types.BOOL         `json:"isEnabled"`
-	Capacity            types.NUMERIC      `json:"capacity"`
-	Rate                types.NUMERIC      `json:"rate"`
-	Tokens              types.NUMERIC      `json:"tokens"`
-	LastUpdated         types.TIMESTAMP    `json:"lastUpdated"`
-}
-
-// GetTemplateID returns the template ID for this template using the package name
-func (t RateLimiter) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "RateLimiter")
-}
-
-// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
-func (t RateLimiter) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.RateLimiter", "RateLimiter")
-}
-
-// CreateCommand returns a CreateCommand for this template using the package name
-func (t RateLimiter) CreateCommand() *model.CreateCommand {
-	args := make(map[string]any)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["poolInstanceId"] = string(t.PoolInstanceId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["poolOwner"] = t.PoolOwner.ToMap()
-
-	if t.RemoteChainSelector != "" {
-		args["remoteChainSelector"] = t.RemoteChainSelector
-	}
-
-	if t.Direction != "" {
-		args["direction"] = model.NestedToDAMLValue(t.Direction)
-	}
-
-	if t.Mode != "" {
-		args["mode"] = model.NestedToDAMLValue(t.Mode)
-	}
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["isEnabled"] = bool(t.IsEnabled)
-
-	if t.Capacity != "" {
-		args["capacity"] = t.Capacity
-	}
-
-	if t.Rate != "" {
-		args["rate"] = t.Rate
-	}
-
-	if t.Tokens != "" {
-		args["tokens"] = t.Tokens
-	}
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["lastUpdated"] = t.LastUpdated
-
-	return &model.CreateCommand{
-		TemplateID: t.GetTemplateID(),
-		Arguments:  args,
-	}
-}
-
-// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
-func (t RateLimiter) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]any)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["instanceId"] = string(t.InstanceId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["poolInstanceId"] = string(t.PoolInstanceId)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["poolOwner"] = t.PoolOwner.ToMap()
-
-	if t.RemoteChainSelector != "" {
-		args["remoteChainSelector"] = t.RemoteChainSelector
-	}
-
-	if t.Direction != "" {
-		args["direction"] = model.NestedToDAMLValue(t.Direction)
-	}
-
-	if t.Mode != "" {
-		args["mode"] = model.NestedToDAMLValue(t.Mode)
-	}
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["isEnabled"] = bool(t.IsEnabled)
-
-	if t.Capacity != "" {
-		args["capacity"] = t.Capacity
-	}
-
-	if t.Rate != "" {
-		args["rate"] = t.Rate
-	}
-
-	if t.Tokens != "" {
-		args["tokens"] = t.Tokens
-	}
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["lastUpdated"] = t.LastUpdated
-
-	return &model.CreateCommand{
-		TemplateID: t.GetTemplateIDWithPackageID(packageID),
-		Arguments:  args,
-	}
-}
-
-func (t RateLimiter) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *RateLimiter) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes RateLimiter to hex string (Canton MCMS format)
-func (t RateLimiter) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes RateLimiter from hex string (Canton MCMS format)
-func (t *RateLimiter) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// Choice methods for RateLimiter
-
-// ConsumeCapacity exercises the ConsumeCapacity choice on this RateLimiter contract
-// This method uses the package name in the template ID
-func (t RateLimiter) ConsumeCapacity(contractID string, args ConsumeCapacity) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "RateLimiter"),
-		ContractID: contractID,
-		Choice:     "ConsumeCapacity",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// ConsumeCapacityWithPackageID exercises the ConsumeCapacity choice using the provided package ID instead of package name
-func (t RateLimiter) ConsumeCapacityWithPackageID(contractID string, packageID string, args ConsumeCapacity) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "RateLimiter"),
-		ContractID: contractID,
-		Choice:     "ConsumeCapacity",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetConfig exercises the SetConfig choice on this RateLimiter contract
-// This method uses the package name in the template ID
-func (t RateLimiter) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "RateLimiter"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
-func (t RateLimiter) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "RateLimiter"),
-		ContractID: contractID,
-		Choice:     "SetConfig",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// Archive exercises the Archive choice on this RateLimiter contract via the IMCMSReceiver interface
-// This method uses the package name in the template ID
-func (t RateLimiter) Archive(contractID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
-func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this RateLimiter contract via the IMCMSReceiver interface
-// This method uses the package name in the template ID
-func (t RateLimiter) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiter", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_Entrypoint",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
-func (t RateLimiter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiter", "MCMSReceiver"),
-		ContractID: contractID,
-		Choice:     "MCMSReceiver_Entrypoint",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// Verify interface implementations for RateLimiter
-
-var _ api.IMCMSReceiver = (*RateLimiter)(nil)
 
 // RemoveCustomObservers is a Record type
 type RemoveCustomObservers struct {
@@ -7401,48 +6888,6 @@ func (t SetBurnMintFactoryParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetBurnMintFactoryParams from hex string (Canton MCMS format)
 func (t *SetBurnMintFactoryParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// SetConfig is a Record type
-type SetConfig struct {
-	NewIsEnabled types.BOOL    `json:"newIsEnabled"`
-	NewCapacity  types.NUMERIC `json:"newCapacity"`
-	NewRate      types.NUMERIC `json:"newRate"`
-}
-
-// ToMap converts SetConfig to a map for DAML arguments
-func (t SetConfig) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["newIsEnabled"] = bool(t.NewIsEnabled)
-
-	m["newCapacity"] = t.NewCapacity
-
-	m["newRate"] = t.NewRate
-
-	return m
-}
-
-func (t SetConfig) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *SetConfig) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes SetConfig to hex string (Canton MCMS format)
-func (t SetConfig) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes SetConfig from hex string (Canton MCMS format)
-func (t *SetConfig) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -9633,7 +9078,6 @@ type MCMSEncoder interface {
 	BuildMessage(args BuildMessage) (*bind.EncodedChoice, error)
 	CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
 	CancelExecuteMCMSParams(args CancelExecuteMCMSParams) (*bind.EncodedChoice, error)
-	ConsumeCapacity(args ConsumeCapacity) (*bind.EncodedChoice, error)
 	ConsumeReceiveTicket(args ConsumeReceiveTicket) (*bind.EncodedChoice, error)
 	ConsumeReceiveTicketMCMSParams(args ConsumeReceiveTicketMCMSParams) (*bind.EncodedChoice, error)
 	Curse(args Curse) (*bind.EncodedChoice, error)
@@ -9683,7 +9127,6 @@ type MCMSEncoder interface {
 	SetBurnMintFactory(args SetBurnMintFactory) (*bind.EncodedChoice, error)
 	SetBurnMintFactoryMCMSParams(args SetBurnMintFactoryMCMSParams) (*bind.EncodedChoice, error)
 	SetBurnMintFactoryParams(args SetBurnMintFactoryParams) (*bind.EncodedChoice, error)
-	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
 	SetInboundPoolCCVs(args SetInboundPoolCCVs) (*bind.EncodedChoice, error)
 	SetOutboundPoolCCVs(args SetOutboundPoolCCVs) (*bind.EncodedChoice, error)
 	SetPool(args SetPool) (*bind.EncodedChoice, error)
@@ -9856,11 +9299,6 @@ func (e *encoder) CancelExecute(args CancelExecute) (*bind.EncodedChoice, error)
 // CancelExecuteMCMSParams encodes MCMS parameters (without Caller) for the CancelExecute choice.
 func (e *encoder) CancelExecuteMCMSParams(args CancelExecuteMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("CancelExecute", args)
-}
-
-// ConsumeCapacity encodes parameters for the ConsumeCapacity choice.
-func (e *encoder) ConsumeCapacity(args ConsumeCapacity) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("ConsumeCapacity", args)
 }
 
 // ConsumeReceiveTicket encodes parameters for the ConsumeReceiveTicket choice.
@@ -10106,11 +9544,6 @@ func (e *encoder) SetBurnMintFactoryMCMSParams(args SetBurnMintFactoryMCMSParams
 // SetBurnMintFactoryParams encodes parameters for the SetBurnMintFactory choice.
 func (e *encoder) SetBurnMintFactoryParams(args SetBurnMintFactoryParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetBurnMintFactory", args)
-}
-
-// SetConfig encodes parameters for the SetConfig choice.
-func (e *encoder) SetConfig(args SetConfig) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetConfig", args)
 }
 
 // SetInboundPoolCCVs encodes parameters for the SetInboundPoolCCVs choice.

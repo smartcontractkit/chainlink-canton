@@ -31,7 +31,7 @@ import CCIP.FactoryTest.FactoryCodecTest
   , encodeDeployRateLimiterParams
   )
 
-import CCIP.RateLimiter (RateLimitDirection(..), RateLimitMode(..))
+import CCIP.RateLimiterV1 (RateLimitDirection(..), RateLimitMode(..))
 import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
 import qualified CCIP.BurnMintTokenPoolTypes
 

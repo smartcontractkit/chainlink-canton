@@ -35,6 +35,7 @@ import qualified CCIP.API.RMNRemoteV1
 import qualified CCIP.API.SendingMessageV1
 import qualified CCIP.API.TokenAdminRegistryV1
 import qualified CCIP.EventsV1.Events
+import qualified CCIP.RateLimiterV1
 
 import qualified CCIP.Utils.Context
 import qualified CCIP.FinalityConfig
@@ -42,7 +43,6 @@ import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
 import qualified CCIP.Uint256
-import qualified CCIP.RateLimiter
 import qualified CCIP.Tickets
 
 import CCIP.LockReleaseTokenPoolCodecGen (
@@ -206,12 +206,12 @@ assertPoolConfiguredRateLimiter
     : Text
     -> Party
     -> Map.Map (Numeric 0) RemoteChainConfig
-    -> ContractId CCIP.RateLimiter.RateLimiter
+    -> ContractId CCIP.RateLimiterV1.RateLimiter
     -> Update ()
 assertPoolConfiguredRateLimiter poolInstanceId poolOwner remoteChainConfigs rateLimiterCid = do
     rl <- fetch rateLimiterCid
     assertMsg "SetRateLimitConfig: rate limiter not configured on pool"
-        (CCIP.RateLimiter.rawInstanceAddress rl `elem` remoteChainRateLimiterAddresses remoteChainConfigs)
+        (CCIP.RateLimiterV1.rawInstanceAddress rl `elem` remoteChainRateLimiterAddresses remoteChainConfigs)
     assertMsg "SetRateLimitConfig: pool instance mismatch" (rl.poolInstanceId == poolInstanceId)
     assertMsg "SetRateLimitConfig: pool owner mismatch" (rl.poolOwner == poolOwner)
 
@@ -219,10 +219,10 @@ assertRateLimiter
     : Text
     -> Text
     -> Numeric 0
-    -> CCIP.RateLimiter.RateLimitDirection
-    -> CCIP.RateLimiter.RateLimitMode
+    -> CCIP.RateLimiterV1.RateLimitDirection
+    -> CCIP.RateLimiterV1.RateLimitMode
     -> Chainlink.InstanceAddress.RawInstanceAddress
-    -> CCIP.RateLimiter.RateLimiter
+    -> CCIP.RateLimiterV1.RateLimiter
     -> Update ()
 assertRateLimiter prefix poolInstanceId remoteChainSelector direction mode expected limiter = do
     Chainlink.InstanceAddress.assertEqual (prefix <> ": instance address mismatch")
@@ -422,7 +422,7 @@ template LockReleaseTokenPool
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
                     assertMsg "ApplyChainUpdates: BlockDepth finality must be positive" (CCIP.FinalityConfig.isValidFinalityConfig finalityConfig)
                     -- Validate rate limiters
-                    CCIP.RateLimiter.assertDistinctRateLimiters "ApplyChainUpdates"
+                    CCIP.RateLimiterV1.assertDistinctRateLimiters "ApplyChainUpdates"
                         inboundRateLimiter
                         outboundRateLimiter
                         (if customFinalityRateLimiterRequired finalityConfig
@@ -493,10 +493,10 @@ template LockReleaseTokenPool
 
         -- Tunes capacity/rate/isEnabled on a rate limiter already referenced by this pool's remote chain config.
         -- Callable by poolOwner; caller must be poolOwner or rateLimitAdmin (admin does not sign—owner executes on their behalf).
-        nonconsuming choice SetRateLimitConfig : ContractId CCIP.RateLimiter.RateLimiter
+        nonconsuming choice SetRateLimitConfig : ContractId CCIP.RateLimiterV1.RateLimiter
             with
                 caller : Party
-                rateLimiterCid : ContractId CCIP.RateLimiter.RateLimiter
+                rateLimiterCid : ContractId CCIP.RateLimiterV1.RateLimiter
                 newIsEnabled : Bool
                 newCapacity : Numeric 0
                 newRate : Numeric 0
@@ -505,7 +505,7 @@ template LockReleaseTokenPool
                 assertMsg "SetRateLimitConfig: unauthorized caller"
                     (caller == poolOwner || rateLimitAdmin == Some caller)
                 assertPoolConfiguredRateLimiter instanceId poolOwner remoteChainConfigs rateLimiterCid
-                exercise rateLimiterCid CCIP.RateLimiter.SetConfig with
+                exercise rateLimiterCid CCIP.RateLimiterV1.SetConfig with
                     newIsEnabled
                     newCapacity
                     newRate
@@ -523,7 +523,7 @@ template LockReleaseTokenPool
                     cfg <- case Map.lookup arg.remoteChainSelector remoteChainConfigs of
                         None -> abort ("SetRateLimiterReferences: unsupported chain selector: " <> show arg.remoteChainSelector)
                         Some cfg -> pure cfg
-                    CCIP.RateLimiter.assertDistinctRateLimiters "SetRateLimitConfig"
+                    CCIP.RateLimiterV1.assertDistinctRateLimiters "SetRateLimitConfig"
                         arg.inboundRateLimiter
                         arg.outboundRateLimiter
                         (if customFinalityRateLimiterRequired cfg.finalityConfig
@@ -787,18 +787,18 @@ template LockReleaseTokenPool
                         ticket.finality /= CCIP.FinalityConfig.WaitForFinality
                         && CCIP.FinalityConfig.customFinalityRateLimiterRequired remoteChainCfg.finalityConfig
                 let expectedRateLimitMode = if useCustomFinalityRateLimiter
-                        then CCIP.RateLimiter.RateLimitMode_CustomFinality
-                        else CCIP.RateLimiter.RateLimitMode_DefaultFinality
+                        then CCIP.RateLimiterV1.RateLimitMode_CustomFinality
+                        else CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
                 let expectedRateLimiter = if useCustomFinalityRateLimiter
                         then remoteChainCfg.inboundCustomBlockConfirmationsRateLimiter
                         else remoteChainCfg.inboundRateLimiter
-                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
+                rateLimiterCid <- CCIP.RateLimiterV1.lookupRateLimiterCid extraContext
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "ReleaseFromTicket: rateLimiter"
                     instanceId
                     ticket.sourceChainSelector
-                    CCIP.RateLimiter.RateLimitDirection_Inbound
+                    CCIP.RateLimiterV1.RateLimitDirection_Inbound
                     expectedRateLimitMode
                     expectedRateLimiter
                     rateLimiter
@@ -813,7 +813,7 @@ template LockReleaseTokenPool
                 assertMsg "ReleaseFromTicket: local amount rounds down to zero"
                     (conversion.localAmount > 0.0)
                 let localAmount = conversion.localAmount
-                _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
+                _ <- exercise rateLimiterCid CCIP.RateLimiterV1.ConsumeCapacity with
                     requested = localAmount
 
                 -- Consume ticket via TAR after validating the disclosed TAR identity.
@@ -1109,17 +1109,17 @@ template LockReleaseTokenPool
                 let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
 
                 let expectedRateLimiter = remoteChainCfg.outboundRateLimiter
-                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
+                rateLimiterCid <- CCIP.RateLimiterV1.lookupRateLimiterCid extraContext
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "LockOrBurn: rateLimiter"
                     instanceId
                     sendingMsgView.destChainSelector
-                    CCIP.RateLimiter.RateLimitDirection_Outbound
-                    CCIP.RateLimiter.RateLimitMode_DefaultFinality
+                    CCIP.RateLimiterV1.RateLimitDirection_Outbound
+                    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
                     expectedRateLimiter
                     rateLimiter
-                _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
+                _ <- exercise rateLimiterCid CCIP.RateLimiterV1.ConsumeCapacity with
                     requested = amountAfterFeeBps
 
                 -- Get inputs from extraContext
@@ -1257,7 +1257,7 @@ template LockReleaseTokenPool
                             let limiterAddr = Chainlink.InstanceAddress.toText rateLimiterInstanceAddress
                             rateLimiterCid <- case Map.lookup limiterAddr contractIds of
                                 None -> abort ("E_RATE_LIMITER_NOT_IN_MAP: " <> limiterAddr)
-                                Some c -> pure (coerceContractId c : ContractId CCIP.RateLimiter.RateLimiter)
+                                Some c -> pure (coerceContractId c : ContractId CCIP.RateLimiterV1.RateLimiter)
                             updatedLimiterCid <- exercise selfCid SetRateLimitConfig with
                                 caller
                                 rateLimiterCid

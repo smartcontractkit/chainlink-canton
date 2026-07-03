@@ -1,4 +1,4 @@
-module CCIP.RateLimiter where
+module CCIP.RateLimiterV1 where
 
 import DA.Map qualified as Map
 import DA.Time (convertRelTimeToMicroseconds, subTime)

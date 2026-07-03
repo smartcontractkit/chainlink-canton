@@ -27,7 +27,7 @@ import CCIP.BurnMintTokenPoolCodecGen (
 
 import CCIP.Utils.Context (encodeAnyValue)
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
-import qualified CCIP.RateLimiter
+import qualified CCIP.RateLimiterV1
 
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
@@ -332,13 +332,13 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
 
     now <- getTime
     rlCid <- submit poolOwner do
-        createCmd CCIP.RateLimiter.RateLimiter with
+        createCmd CCIP.RateLimiterV1.RateLimiter with
             instanceId = rlInstanceId
             poolInstanceId = instanceId
             poolOwner
             remoteChainSelector = 123.0
-            direction = CCIP.RateLimiter.RateLimitDirection_Inbound
-            mode = CCIP.RateLimiter.RateLimitMode_DefaultFinality
+            direction = CCIP.RateLimiterV1.RateLimitDirection_Inbound
+            mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
             isEnabled = True
             capacity = 100.0
             rate = 10.0
@@ -390,7 +390,7 @@ testBurnMintTokenPoolMCMSEntrypoint_SetRateLimitConfig = script do
                 , (instAddr, toAnyContractId rlCid)
                 ]
 
-    rlContracts <- query @CCIP.RateLimiter.RateLimiter poolOwner
+    rlContracts <- query @CCIP.RateLimiterV1.RateLimiter poolOwner
     case filter (\(_, rl) -> rl.instanceId == rlInstanceId) rlContracts of
         [(_, rl)] -> do
             rl.capacity === 50.0

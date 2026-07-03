@@ -23,6 +23,7 @@ packages:
   - ccip/committee-verifier
   - ccip/pools/lock-release-token-pool
   - ccip/pools/burn-mint-token-pool
+  - ccip/rate-limiter
   - ccip/factory
   - ccip/test
   - ccip/tickets
