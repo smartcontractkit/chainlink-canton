@@ -8,9 +8,15 @@ import DA.Crypto.Text (byteCount)
 import DA.Foldable (forA_)
 import DA.Map qualified as Map
 
-import Splice.Api.Token.MetadataV1 (ChoiceContext)
+import qualified Splice.Api.Token.MetadataV1
 
-import qualified CCIP.Utils.Context
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Crypto (assertValidHex)
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.API.GlobalConfigV1
+
 import CCIP.GlobalConfigTypes (
     DestChainConfig(..),
     DestChainConfigArgs(..),
@@ -21,16 +27,6 @@ import CCIP.GlobalConfigTypes (
     validateDefaultAndMandatedCCVs,
     )
 import CCIP.GlobalConfigCodecGen (decodeApplyDestChainConfigUpdatesParamsAt, decodeApplySourceChainConfigUpdatesParamsAt)
-import Chainlink.InstanceAddress (assertValidInstanceId)
-
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import MCMS.Crypto (assertValidHex)
-
-globalConfigKey : Text
-globalConfigKey = "global-config"
-
-lookupGlobalConfigCid : ChoiceContext -> Update (ContractId GlobalConfig)
-lookupGlobalConfigCid ctx = CCIP.Utils.Context.getFromContextU ctx globalConfigKey
 
 template GlobalConfig
     with
@@ -44,10 +40,39 @@ template GlobalConfig
     where
         signatory ccipOwner
 
-        ensure assertValidInstanceId instanceId
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
             && chainSelector > 0.0 -- Local chain selector must be greater than zero
             && all (\destChainSelector -> destChainSelector > 0.0 && destChainSelector /= chainSelector) (Map.keys destChainConfigs)  -- All destination chain selectors must be greater than zero and not equal to the local chain selector
             && all (\sourceChainSelector -> sourceChainSelector > 0.0 && sourceChainSelector /= chainSelector) (Map.keys sourceChainConfigs)  -- All source chain selectors must be greater than zero and not equal to the local chain selector
+
+        interface instance CCIP.API.GlobalConfigV1.GlobalConfig for GlobalConfig where
+            view = CCIP.API.GlobalConfigV1.GlobalConfigView with
+                ccipOwner
+
+            globalConfig_publicFetchImpl self arg = do
+                Chainlink.InstanceAddress.assertEqual "GlobalConfig: expectedAddress mismatch" instanceId ccipOwner arg.expectedAddress
+                pure CCIP.API.GlobalConfigV1.GlobalConfigView with
+                    ccipOwner
+
+            globalConfig_getDestChainConfigImpl self arg = do
+                config <- exercise (fromInterfaceContractId @GlobalConfig self) GetDestChainConfig with
+                    destChainSelector = arg.destChainSelector
+                    caller = arg.caller
+                case config of
+                    None -> pure None
+                    Some destChainConfig -> pure (Some CCIP.API.GlobalConfigV1.DestChainConfig with
+                        isEnabled = destChainConfig.isEnabled
+                        addressBytesLength = destChainConfig.addressBytesLength
+                        tokenReceiverAllowed = destChainConfig.tokenReceiverAllowed
+                        baseExecutionGasCost = destChainConfig.baseExecutionGasCost
+                        offRampAddress = destChainConfig.offRampAddress
+                        defaultExecutor = destChainConfig.defaultExecutor
+                        laneMandatedCCVs = destChainConfig.laneMandatedCCVs
+                        defaultCCVs = destChainConfig.defaultCCVs
+                        messageNetworkFeeUSDCents = destChainConfig.messageNetworkFeeUSDCents
+                        tokenNetworkFeeUSDCents = destChainConfig.tokenNetworkFeeUSDCents
+                        context = Splice.Api.Token.MetadataV1.emptyChoiceContext -- Return an empty context for now; can be extended in the future if needed
+                            )
 
         nonconsuming choice GetDestChainConfig : Optional DestChainConfig
             with

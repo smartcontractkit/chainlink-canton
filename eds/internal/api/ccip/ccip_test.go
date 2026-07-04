@@ -444,7 +444,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				InstanceId:    "globalconfig",
 				CcipOwner:     "owner",
 				ChainSelector: types.NUMERIC(sourceSelector),
-				DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+				DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 					types.NUMERIC(destSelector): {
 						IsEnabled:       true,
 						DefaultExecutor: new(defaultExecutor.Binding()),
@@ -982,7 +982,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 false,
 							MessageNetworkFeeUSDCents: "0",
@@ -1012,7 +1012,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1043,7 +1043,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1074,7 +1074,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1110,7 +1110,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1140,7 +1140,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1179,7 +1179,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1217,7 +1217,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",

@@ -39,6 +39,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
@@ -863,25 +864,25 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Message: core.Canton2AnyMessage{
+		Message: client.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
-			TokenTransfer: &core.TokenTransfer{
+			TokenTransfer: &client.TokenTransfer{
 				Token:  linkInstrumentId,
 				Amount: types.NUMERIC(tokenTransferAmountDecimal),
 			},
 			FeeToken: nativeInstrumentId,
-			ExtraArgs: core.ExtraArgs{
-				V3: &core.GenericExtraArgsV3{
+			ExtraArgs: client.ExtraArgs{
+				V3: &client.GenericExtraArgsV3{
 					GasLimit: 0,
-					Ccvs: []core.CCVExtraArg{
+					Ccvs: []client.CCVExtraArg{
 						{
 							CcvAddress: committeeVerifierAddress.Binding(),
 							CcvArgs:    types.TEXT(""),
 						},
 					},
-					Executor: core.ExecutorExtraArg{
-						ExecutorWithAddress: &core.ExecutorWithAddress{
+					Executor: client.ExecutorExtraArg{
+						ExecutorWithAddress: &client.ExecutorWithAddress{
 							ExecutorAddress: executorAddress.Binding(),
 							ExecutorArgs:    types.TEXT(""),
 						},

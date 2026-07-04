@@ -9,6 +9,7 @@ import qualified Splice.Api.Token.TransferInstructionV1
 import Chainlink.InstanceAddress (RawInstanceAddress)
 
 import qualified CCIP.API.ExecutingMessageV1
+import qualified CCIP.API.FeeQuoterV1
 import qualified CCIP.API.RMNRemoteV1
 import qualified CCIP.API.SendingMessageV1
 import qualified CCIP.API.TokenAdminRegistryV1
@@ -101,7 +102,7 @@ interface ITokenPool where
             tokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
             extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
-            feeQuoterCid : ContractId ()
+            feeQuoterCid : ContractId CCIP.API.FeeQuoterV1.FeeQuoter
             tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
             caller : Party
         controller caller
@@ -110,7 +111,7 @@ interface ITokenPool where
     -- Quote-only fee path for outbound token transfers.
     nonconsuming choice TokenPool_GetFee : TokenPoolFeeQuote
         with
-            feeQuoterCid : ContractId ()
+            feeQuoterCid : ContractId CCIP.API.FeeQuoterV1.FeeQuoter
             destChainSelector : Numeric 0
             tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
             caller : Party

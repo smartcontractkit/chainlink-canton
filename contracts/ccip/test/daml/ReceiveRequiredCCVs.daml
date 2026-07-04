@@ -9,6 +9,10 @@ import DA.Optional (fromSome)
 import DA.Set qualified as Set
 import qualified DA.TextMap as TextMap
 
+import qualified CCIP.API.GlobalConfigV1
+import qualified CCIP.API.RMNRemoteV1
+import qualified CCIP.API.TokenAdminRegistryV1
+
 import qualified CCIP.CCIPReceiver
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
@@ -55,10 +59,10 @@ mkContext
 mkContext rmnRemoteCid tokenAdminRegistryCid globalConfigCid offRampCid =
     MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId (coerceContractId rmnRemoteCid))
-            , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId (coerceContractId tokenAdminRegistryCid))
-            , (CCIP.GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId (coerceContractId globalConfigCid))
-            , (CCIP.OffRamp.offRampKey, MetadataV1.AV_ContractId (coerceContractId offRampCid))
+            [ (CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId (coerceContractId rmnRemoteCid))
+            , (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId (coerceContractId tokenAdminRegistryCid))
+            , (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId (coerceContractId globalConfigCid))
+            , (CCIP.OffRamp.offRampContextKey, MetadataV1.AV_ContractId (coerceContractId offRampCid))
             ]
 
 testReceiverGetRequiredCCVsMatchesPrepareExecute : Script ()
@@ -175,7 +179,7 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
     helperRequired <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig) do
         exerciseCmd receiverCid CCIP.CCIPReceiver.GetRequiredCCVs with
             context = context
-            routerCid = routerCid
+            routerCid = coerceContractId routerCid
             encodedMessage = encodedMessage
             tokenPoolCid = None
 
@@ -310,7 +314,7 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
     helperRequired <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig) do
         exerciseCmd receiverCid CCIP.CCIPReceiver.GetRequiredCCVs with
             context = context
-            routerCid = routerCid
+            routerCid = coerceContractId routerCid
             encodedMessage = encodedMessage
             tokenPoolCid = None
 

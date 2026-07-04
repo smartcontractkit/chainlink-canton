@@ -15,11 +15,10 @@ data-dependencies:
   - ../codec/.daml/dist/ccip-codec-2.0.0.dar
   - ../utils/.daml/dist/ccip-utils-2.0.0.dar
   - ../events/.daml/dist/ccip-events-2.0.0.dar
+  - ../client/.daml/dist/ccip-client-2.0.0.dar
+  - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
+  - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
+  - ../extension-api/.daml/dist/ccip-extension-api-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib
-  - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
-  - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
-  - ../core/.daml/dist/ccip-core-2.0.0.dar
-  - ../extension-api/.daml/dist/ccip-extension-api-2.0.0.dar
-  - ../runtime/.daml/dist/ccip-runtime-2.0.0.dar

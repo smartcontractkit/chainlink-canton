@@ -16,11 +16,10 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Chainlink.InstanceAddress (assertValidInstanceId)
 
 import qualified CCIP.Interfaces.CrossChainVerifier
-import qualified CCIP.Utils.Context
 import qualified CCIP.EventsV1.Events
 import qualified CCIP.EventsV1.Receipts
+import qualified CCIP.ClientV1
 
-import qualified CCIP.Client
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Interfaces.Executor
@@ -69,19 +68,16 @@ noExecutionAddressBytes : BytesHex
 noExecutionAddressBytes =
     "eba517d200000000000000000000000000000000000000000000000000000000"
 
-onRampKey : Text
-onRampKey = "on-ramp"
-
-lookupOnRampCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId OnRamp)
-lookupOnRampCid ctx = CCIP.Utils.Context.getFromContextU ctx onRampKey
+onRampContextKey : Text
+onRampContextKey = "on-ramp"
 
 rawInstanceAddress : OnRamp -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress onRamp = RawInstanceAddress.make onRamp.instanceId onRamp.ccipOwner
 
 computeRequiredCCVsForSend
     : CCIP.GlobalConfig.DestChainConfig
-    -> CCIP.Client.Canton2AnyMessage
-    -> CCIP.Client.GenericExtraArgsV3
+    -> CCIP.ClientV1.Canton2AnyMessage
+    -> CCIP.ClientV1.GenericExtraArgsV3
     -> [RawInstanceAddress.RawInstanceAddress]
     -> [RawInstanceAddress.RawInstanceAddress]
 computeRequiredCCVsForSend destConfig message extraArgs senderRequestedCCVs =
@@ -102,15 +98,15 @@ computeRequiredCCVsForSend destConfig message extraArgs senderRequestedCCVs =
     in dedup (resolvedSenderRequiredCCVs ++ destConfig.laneMandatedCCVs)
 
 validateExecutorFeeQuote
-    : CCIP.Client.ExecutorExtraArg
+    : CCIP.ClientV1.ExecutorExtraArg
     -> Optional RawInstanceAddress.RawInstanceAddress
     -> Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
     -> Update ()
 validateExecutorFeeQuote executorArg defaultExecutor executorFeeQuote =
     let expectedExecutor = case executorArg of
-            CCIP.Client.Executor_NoExecutor -> None
-            CCIP.Client.Executor_UseDefault _ -> defaultExecutor
-            CCIP.Client.Executor_WithAddress executorAddress _ -> Some executorAddress
+            CCIP.ClientV1.Executor_NoExecutor -> None
+            CCIP.ClientV1.Executor_UseDefault _ -> defaultExecutor
+            CCIP.ClientV1.Executor_WithAddress executorAddress _ -> Some executorAddress
     in case (expectedExecutor, executorFeeQuote) of
         (None, None) -> pure ()
         (None, Some _) ->
@@ -277,7 +273,7 @@ template OnRamp
             with
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
+                message : CCIP.ClientV1.Canton2AnyMessage
                 poolReportedCCVs : [RawInstanceAddress.RawInstanceAddress]
             controller ccipOwner
             do
@@ -293,7 +289,7 @@ template OnRamp
                     None -> pure []
                     Some config -> do
                         extraArgs <- case message.extraArgs of
-                                CCIP.Client.V3 v3 -> pure v3
+                                CCIP.ClientV1.V3 v3 -> pure v3
                                 _ -> abort "onramp: unsupported extraArgs version"
                         let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
                         CCIP.CCVCodec.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
@@ -321,7 +317,7 @@ template OnRamp
         nonconsuming choice PrepareSendFromRouter : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
+                message : CCIP.ClientV1.Canton2AnyMessage
 
                 routerPartyOwner : Party
                 routerInstanceId : Text
@@ -372,7 +368,7 @@ template OnRamp
 
                 -- Parse extraArgs and validate fields
                 extraArgs <- case message.extraArgs of
-                        CCIP.Client.V3 v3 -> pure v3
+                        CCIP.ClientV1.V3 v3 -> pure v3
                 let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
                 CCIP.CCVCodec.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
                 assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
@@ -384,10 +380,10 @@ template OnRamp
                 assertMsg "onramp: CCVs cannot contain duplicates"
                     (unique senderRequestedCCVs)
                 case extraArgs.executor of
-                    CCIP.Client.Executor_NoExecutor -> pure ()
-                    CCIP.Client.Executor_UseDefault executorArgs ->
+                    CCIP.ClientV1.Executor_NoExecutor -> pure ()
+                    CCIP.ClientV1.Executor_UseDefault executorArgs ->
                         assertValidHex "executorArgs" executorArgs
-                    CCIP.Client.Executor_WithAddress _ executorArgs ->
+                    CCIP.ClientV1.Executor_WithAddress _ executorArgs ->
                         assertValidHex "executorArgs" executorArgs
 
                 case Map.lookup destChainSelector feeQuoter.destChainConfigs of
@@ -434,11 +430,11 @@ template OnRamp
                         None ->
                             (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
                 let (resolvedRequiredExecutor, resolvedExecutorAddress, executionMode) = case extraArgs.executor of
-                        CCIP.Client.Executor_UseDefault _ ->
+                        CCIP.ClientV1.Executor_UseDefault _ ->
                             resolveDefault
-                        CCIP.Client.Executor_NoExecutor ->
+                        CCIP.ClientV1.Executor_NoExecutor ->
                             (None, noExecutionAddressBytes, Some CCIP.SendingMessageV1.ExecutionMode_NoExecutor)
-                        CCIP.Client.Executor_WithAddress executorAddress _ ->
+                        CCIP.ClientV1.Executor_WithAddress executorAddress _ ->
                             ( Some executorAddress
                             , RawInstanceAddress.toInstanceAddress executorAddress
                             , Some CCIP.SendingMessageV1.ExecutionMode_Executor
@@ -504,24 +500,24 @@ template OnRamp
                 globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
                 destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
+                message : CCIP.ClientV1.Canton2AnyMessage
                 ccvFeeQuotes : [CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote]
                 tokenPoolFeeQuote : Optional CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
                 executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
             controller ccipOwner
             do
                 extraArgs <- case message.extraArgs of
-                    CCIP.Client.V3 v3 -> pure v3
+                    CCIP.ClientV1.V3 v3 -> pure v3
                 let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
                 CCIP.CCVCodec.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
                 CCIP.CCVCodec.assertMaxCCVListLength "onramp: CCV fee quotes" ccvFeeQuotes
                 assertMsg "onramp: CCVs cannot contain duplicates"
                     (unique senderRequestedCCVs)
                 let executorArgs = case extraArgs.executor of
-                        CCIP.Client.Executor_NoExecutor -> ""
-                        CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
+                        CCIP.ClientV1.Executor_NoExecutor -> ""
+                        CCIP.ClientV1.Executor_UseDefault expectedExecutorArgs ->
                             expectedExecutorArgs
-                        CCIP.Client.Executor_WithAddress _ expectedExecutorArgs ->
+                        CCIP.ClientV1.Executor_WithAddress _ expectedExecutorArgs ->
                             expectedExecutorArgs
                 assertValidHex "payload" message.payload
                 assertValidHex "executorArgs" executorArgs
@@ -531,13 +527,13 @@ template OnRamp
                         Some _ -> True)
                 assertMsg "onramp: executor quote inconsistent with extraArgs"
                     (case extraArgs.executor of
-                        CCIP.Client.Executor_NoExecutor ->
+                        CCIP.ClientV1.Executor_NoExecutor ->
                             isNone executorFeeQuote && executorArgs == ""
-                        CCIP.Client.Executor_UseDefault expectedExecutorArgs ->
+                        CCIP.ClientV1.Executor_UseDefault expectedExecutorArgs ->
                             case executorFeeQuote of
                                 None -> executorArgs == ""
                                 Some _ -> executorArgs == expectedExecutorArgs
-                        CCIP.Client.Executor_WithAddress _ expectedExecutorArgs ->
+                        CCIP.ClientV1.Executor_WithAddress _ expectedExecutorArgs ->
                             isSome executorFeeQuote && executorArgs == expectedExecutorArgs)
 
                 globalConfig <- fetch globalConfigCid

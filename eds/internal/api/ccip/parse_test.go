@@ -30,7 +30,7 @@ func TestParseGlobalConfig(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "ccipOwner",
 					ChainSelector: "1",
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC("111"): {
 							IsEnabled:            true,
 							AddressBytesLength:   32,

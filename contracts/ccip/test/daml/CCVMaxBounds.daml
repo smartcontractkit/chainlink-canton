@@ -9,7 +9,14 @@ import DA.Optional
 import DA.Set qualified as Set
 import qualified DA.TextMap as TextMap
 
-import qualified CCIP.Client
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+import qualified CCIP.API.FeeQuoterV1
+import qualified CCIP.API.GlobalConfigV1
+import qualified CCIP.API.RMNRemoteV1
+import qualified CCIP.API.TokenAdminRegistryV1
+
+import qualified CCIP.ClientV1
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
 import qualified CCIP.FinalityConfig
@@ -26,7 +33,6 @@ import qualified CCIP.PerPartyRouterTypes
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified Splice.Api.Token.HoldingV1 as HoldingV1
 import qualified Splice.Api.Token.MetadataV1 as MetadataV1
 
@@ -40,9 +46,9 @@ mkRawCCVs : Text -> Party -> Int -> [RawInstanceAddress.RawInstanceAddress]
 mkRawCCVs prefix owner count =
     [ RawInstanceAddress.make (prefix <> show i) owner | i <- [0..(count - 1)] ]
 
-mkCCVExtraArgs : Text -> Party -> Int -> [CCIP.Client.CCVExtraArg]
+mkCCVExtraArgs : Text -> Party -> Int -> [CCIP.ClientV1.CCVExtraArg]
 mkCCVExtraArgs prefix owner count =
-    [ CCIP.Client.CCVExtraArg with
+    [ CCIP.ClientV1.CCVExtraArg with
         ccvAddress = RawInstanceAddress.make (prefix <> show i) owner
         ccvArgs = ""
     | i <- [0..(count - 1)]
@@ -59,11 +65,11 @@ mkFeeQuotes prefix owner count =
     | i <- [0..(count - 1)]
     ]
 
-basicExtraArgs : [CCIP.Client.CCVExtraArg] -> CCIP.Client.ExtraArgs
-basicExtraArgs ccvs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+basicExtraArgs : [CCIP.ClientV1.CCVExtraArg] -> CCIP.ClientV1.ExtraArgs
+basicExtraArgs ccvs = CCIP.ClientV1.V3 CCIP.ClientV1.GenericExtraArgsV3 with
     gasLimit = 0
     ccvs = ccvs
-    executor = CCIP.Client.Executor_NoExecutor
+    executor = CCIP.ClientV1.Executor_NoExecutor
     tokenReceiver = ""
     tokenArgs = ""
 
@@ -86,28 +92,28 @@ outboundContext : OutboundFixture -> MetadataV1.ChoiceContext
 outboundContext f =
     MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
-            , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
-            , (CCIP.FeeQuoter.feeQuoterKey, MetadataV1.AV_ContractId $ coerceContractId f.feeQuoter)
-            , (CCIP.GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
-            , (CCIP.OnRamp.onRampKey, MetadataV1.AV_ContractId $ coerceContractId f.onRamp)
+            [ (CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
+            , (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
+            , (CCIP.API.FeeQuoterV1.feeQuoterContextKey, MetadataV1.AV_ContractId $ coerceContractId f.feeQuoter)
+            , (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
+            , (CCIP.OnRamp.onRampContextKey, MetadataV1.AV_ContractId $ coerceContractId f.onRamp)
             ]
 
-messageOnly : OutboundFixture -> [CCIP.Client.CCVExtraArg] -> CCIP.Client.Canton2AnyMessage
+messageOnly : OutboundFixture -> [CCIP.ClientV1.CCVExtraArg] -> CCIP.ClientV1.Canton2AnyMessage
 messageOnly f ccvs =
-    CCIP.Client.Canton2AnyMessage with
+    CCIP.ClientV1.Canton2AnyMessage with
         receiver = "0000000000000000000000000000000000000001"
         payload = "abcd"
         tokenTransfer = None
         feeToken = f.feeToken
         extraArgs = basicExtraArgs ccvs
 
-tokenOnlyClientMessage : OutboundFixture -> CCIP.Client.Canton2AnyMessage
+tokenOnlyClientMessage : OutboundFixture -> CCIP.ClientV1.Canton2AnyMessage
 tokenOnlyClientMessage f =
-    CCIP.Client.Canton2AnyMessage with
+    CCIP.ClientV1.Canton2AnyMessage with
         receiver = "0000000000000000000000000000000000000001"
         payload = ""
-        tokenTransfer = Some (CCIP.Client.TokenTransfer with
+        tokenTransfer = Some (CCIP.ClientV1.TokenTransfer with
             token = f.feeToken
             amount = 1.0)
         feeToken = f.feeToken
@@ -406,10 +412,10 @@ executeContext : ExecuteFixture -> MetadataV1.ChoiceContext
 executeContext f =
     MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
-            , (CCIP.TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
-            , (CCIP.GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
-            , (CCIP.OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId f.offRamp)
+            [ (CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
+            , (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
+            , (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
+            , (CCIP.OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId f.offRamp)
             ]
 
 setupExecuteFixture : Text -> [RawInstanceAddress.RawInstanceAddress] -> Script ExecuteFixture

@@ -230,7 +230,7 @@ func (s Server) lockReleaseTokenPoolSend(
 
 	// The ChoiceContext that will be passed to the Token Pool
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
-		string(ratelimiter.RateLimiterKey):                       {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(ratelimiter.RateLimiterContextKey):                {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
 		string(lockreleasetokenpool.TokenPoolHoldingsContextKey): {AVList: new(tokenPoolHoldings)},
 	}}
 
@@ -343,7 +343,7 @@ func (s Server) burnMintTokenPoolSend(
 
 	// The ChoiceContext that will be passed to the Token Pool
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
-		string(ratelimiter.RateLimiterKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(ratelimiter.RateLimiterContextKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
 	}}
 
 	// The ChoiceContext that will be passed to the BurnMintFactory by the Token Pool
@@ -536,7 +536,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 
 	// The ChoiceContext that will be passed to the Token Pool
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
-		string(ratelimiter.RateLimiterKey):                       {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(ratelimiter.RateLimiterContextKey):                {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
 		string(lockreleasetokenpool.TokenPoolHoldingsContextKey): {AVList: new(tokenPoolHoldings)},
 	}}
 
@@ -646,7 +646,7 @@ func (s Server) burnMintTokenPoolExecute(
 
 	// The ChoiceContext that will be passed to the Token Pool
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
-		string(ratelimiter.RateLimiterKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
+		string(ratelimiter.RateLimiterContextKey): {AVContractId: new(types.CONTRACT_ID(rateLimiter.GetCreatedEvent().GetContractId()))},
 	}}
 
 	// The ChoiceContext that will be passed to the BurnMintFactory by the Token Pool

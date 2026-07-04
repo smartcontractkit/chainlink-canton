@@ -21,7 +21,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
@@ -759,7 +759,7 @@ func cantonSend(
 	var (
 		executorInput       *sender.ExecutorInput
 		executorDisclosures []*apiv2.DisclosedContract
-		executorExtraArg    core.ExecutorExtraArg
+		executorExtraArg    client.ExecutorExtraArg
 	)
 	switch executorMode {
 	case "default":
@@ -776,25 +776,25 @@ func cantonSend(
 			ExecutorExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
 		}
 		executorDisclosures = execDisc.DisclosedContracts
-		executorExtraArg = core.ExecutorExtraArg{
-			ExecutorUseDefault: &core.ExecutorUseDefault{ExecutorArgs: ""},
+		executorExtraArg = client.ExecutorExtraArg{
+			ExecutorUseDefault: &client.ExecutorUseDefault{ExecutorArgs: ""},
 		}
 	case "none":
 		// No executor — message will not be auto-executed on the destination.
 		executorInput = nil
 		executorDisclosures = nil
-		executorExtraArg = core.ExecutorExtraArg{
+		executorExtraArg = client.ExecutorExtraArg{
 			ExecutorNoExecutor: &types.UNIT{},
 		}
 	}
 
 	// --- Build sendArgs ---
-	canton2Any := core.Canton2AnyMessage{
+	canton2Any := client.Canton2AnyMessage{
 		Receiver: types.TEXT(msg.Receiver),
 		Payload:  types.TEXT(msg.Payload),
 		FeeToken: *feeTokenInstrumentId,
-		ExtraArgs: core.ExtraArgs{
-			V3: &core.GenericExtraArgsV3{
+		ExtraArgs: client.ExtraArgs{
+			V3: &client.GenericExtraArgsV3{
 				GasLimit:      types.INT64(msg.GasLimit),
 				Ccvs:          nil,
 				Executor:      executorExtraArg,
@@ -804,7 +804,7 @@ func cantonSend(
 		},
 	}
 	if withToken {
-		canton2Any.TokenTransfer = &core.TokenTransfer{
+		canton2Any.TokenTransfer = &client.TokenTransfer{
 			Token:  *linkInstrumentId,
 			Amount: types.NUMERIC(msg.TokenTransfer.Amount),
 		}

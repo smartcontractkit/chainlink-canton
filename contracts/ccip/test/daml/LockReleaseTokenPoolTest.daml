@@ -81,7 +81,7 @@ mkPoolContext rateLimiterCid burnMintFactoryCid tokenPoolHoldings preapprovals =
         _  -> [(LockReleaseTokenPool.transferFactoryExtraArgsContextValuesContextKey, MetadataV1.AV_Map preapprovalMap)]
   in MetadataV1.ChoiceContext with
        values = TextMap.fromList (
-         [ (CCIP.RateLimiterV1.rateLimiterKey, CCIP.Utils.Context.toAnyValue rateLimiterCid)
+         [ (CCIP.RateLimiterV1.rateLimiterContextKey, CCIP.Utils.Context.toAnyValue rateLimiterCid)
          , (LockReleaseTokenPool.transferFactoryContextKey, CCIP.Utils.Context.toAnyValue burnMintFactoryCid)
          , (LockReleaseTokenPool.tokenPoolHoldingsContextKey, CCIP.Utils.Context.toAnyValue tokenPoolHoldings)
          ] ++ extraArgsContextEntry)

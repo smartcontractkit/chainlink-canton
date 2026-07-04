@@ -15,32 +15,39 @@ import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
+import qualified Chainlink.InstanceAddress
+
 import qualified CCIP.API.ExecutingMessageV1
+import qualified CCIP.API.FeeQuoterV1
+import qualified CCIP.API.GlobalConfigV1
+import qualified CCIP.API.RMNRemoteV1
+import qualified CCIP.API.TokenAdminRegistryV1
+
+import qualified CCIP.ClientV1
 import qualified CCIP.Utils.Context
 
-import qualified CCIP.Client
+import qualified CCIP.Interfaces.CrossChainVerifier
+
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.EventsV1.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
-import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
 import qualified CCIP.RMNRemote
-import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.CCVCodec
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
 import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..), AddCustomObserversParams(..), RemoveCustomObserversParams(..))
 import CCIP.PerPartyRouterCodecGen (decodeSetDepsParamsAt, decodeAddCustomObserversParamsAt, decodeRemoveCustomObserversParamsAt)
-
 
 -- | Far-future time used as "never expires" for pending transfers.
 -- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
@@ -176,7 +183,7 @@ template PerPartyRouterFactory
         registeredRouters : Map.Map Party Text  -- partyOwner -> router instanceId
     where
         signatory ccipOwner
-        ensure assertValidInstanceId instanceId
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
 
         choice FactorySetDeps : ContractId PerPartyRouterFactory
             with
@@ -296,33 +303,126 @@ template PerPartyRouter
     where
         signatory ccipOwner
         observer partyOwner :: customObservers
-        ensure assertValidInstanceId instanceId && unique customObservers
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId && unique customObservers
+
+        interface instance CCIP.ClientV1.PerPartyRouter for PerPartyRouter where
+            view = CCIP.ClientV1.PerPartyRouterView with
+                ccipOwner
+                owner = partyOwner
+
+            perPartyRouter_getSequenceNumberImpl self arg = do
+                exercise (fromInterfaceContractId @PerPartyRouter self) GetSequenceNumber with
+                    destChainSelector = arg.destChainSelector
+                    context = arg.context
+
+            perPartyRouter_getRequiredCCVsForSendImpl self arg = do
+                exercise (fromInterfaceContractId @PerPartyRouter self) GetRequiredCCVsForSend with
+                    context = arg.context
+                    destChainSelector = arg.destChainSelector
+                    message = arg.message
+                    poolReportedCCVs = arg.poolReportedCCVs
+
+            perPartyRouter_getFeeImpl self arg = do
+                result <- exercise (fromInterfaceContractId @PerPartyRouter self) GetFee with
+                    context = arg.context
+                    destChainSelector = arg.destChainSelector
+                    message = arg.message
+                    ccvFeeQuotes = arg.ccvFeeQuotes
+                    tokenPoolFeeQuote = arg.tokenPoolFeeQuote
+                    executorFeeQuote = arg.executorFeeQuote
+                pure CCIP.ClientV1.GetFeeResult with
+                    feeTokenAmount = result.feeTokenAmount
+
+            perPartyRouter_prepareSendImpl self arg = do
+                coerceContractId <$> exercise (fromInterfaceContractId @PerPartyRouter self) PrepareSend with
+                    destinationChainSelector = arg.destinationChainSelector
+                    message = arg.message
+                    context = arg.context
+
+            perPartyRouter_finalizeFeeImpl self arg = do
+                coerceContractId <$> exercise (fromInterfaceContractId @PerPartyRouter self) FinalizeFee with
+                    sendingMessageCid = coerceContractId arg.sendingMessageCid
+                    context = arg.context
+
+            perPartyRouter_ccipSendImpl self arg = do
+                result <- exercise (fromInterfaceContractId @PerPartyRouter self) CCIPSend with
+                    sendingMessageCid = coerceContractId arg.sendingMessageCid
+                    feeTokenHoldingCids = arg.feeTokenHoldingCids
+                    feeTokenConfigCid = coerceContractId arg.feeTokenConfigCid
+                    feeTokenTransferFactory = arg.feeTokenTransferFactory
+                    feeTokenExtraArgs = arg.feeTokenExtraArgs
+                    context = arg.context
+                pure CCIP.ClientV1.CCIPSendResult with
+                    router = coerceContractId result.router
+                    ccipMessageSent = result.ccipMessageSent
+                    messageId = result.messageId
+                    feeChangeCids = result.feeChangeCids
+                    pendingFeeInstructions = result.pendingFeeInstructions
+
+            perPartyRouter_getExecutionStateImpl self arg = do
+                exercise (fromInterfaceContractId @PerPartyRouter self) GetExecutionState with
+                    messageHash = arg.messageHash
+                    context = arg.context
+                    caller = arg.caller
+
+            perPartyRouter_getRequiredCCVsForExecuteImpl self arg = do
+                exercise (fromInterfaceContractId @PerPartyRouter self) GetRequiredCCVsForExecute with
+                    context = arg.context
+                    message = arg.message
+                    receiverRequiredCCVs = arg.receiverRequiredCCVs
+                    receiverOptionalCCVs = arg.receiverOptionalCCVs
+                    receiverOptionalThreshold = arg.receiverOptionalThreshold
+                    tokenPoolRequiredCCVs = arg.tokenPoolRequiredCCVs
+
+            perPartyRouter_prepareExecuteImpl self arg = do
+                coerceContractId <$> exercise (fromInterfaceContractId @PerPartyRouter self) PrepareExecute with
+                    context = arg.context
+                    encodedMessage = arg.encodedMessage
+                    receiverParty = arg.receiverParty
+                    tokenReceiverParty = arg.tokenReceiverParty
+                    receiverRequiredCCVs = arg.receiverRequiredCCVs
+                    receiverOptionalCCVs = arg.receiverOptionalCCVs
+                    receiverOptionalThreshold = arg.receiverOptionalThreshold
+                    receiverFinalityConfig = arg.receiverFinalityConfig
+                    caller = arg.caller
+
+            perPartyRouter_executeImpl self arg = do
+                result <- exercise (fromInterfaceContractId @PerPartyRouter self) Execute with
+                    context = arg.context
+                    executingMessageCid = coerceContractId arg.executingMessageCid
+                pure CCIP.ClientV1.ExecuteResult with
+                    router = coerceContractId result.router
+                    tokenReceiveTicket = result.tokenReceiveTicket
+                    executionStateChanged = result.executionStateChanged
+                    messageId = result.messageId
+                    message = result.message
+                    state = result.state
 
         nonconsuming choice GetFee : CCIP.OnRamp.GetFeeFromRouterResult
             with
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
                 destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
-                ccvFeeQuotes : [ICCV.CrossChainVerifierFeeQuote]
+                message : CCIP.ClientV1.Canton2AnyMessage
+                ccvFeeQuotes : [CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote]
                 tokenPoolFeeQuote : Optional CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
                 executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
             controller partyOwner
             do
                 CCIP.CCVCodec.assertMaxCCVListLength "router: CCV fee quotes" ccvFeeQuotes
-                onRampCid <- CCIP.OnRamp.lookupOnRampCid context
-                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
-                feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
+                onRampCid : ContractId CCIP.OnRamp.OnRamp <- CCIP.Utils.Context.getFromContextU context CCIP.OnRamp.onRampContextKey
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig <- CCIP.Utils.Context.getFromContextU context CCIP.API.GlobalConfigV1.globalConfigContextKey
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter <- CCIP.Utils.Context.getFromContextU context CCIP.API.FeeQuoterV1.feeQuoterContextKey
 
                 onRamp <- fetch onRampCid
-                RawInstanceAddress.assertEqual "router: onramp mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 feeQuoter <- fetch feeQuoterCid
-                RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: feequoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
                 exercise onRampCid CCIP.OnRamp.GetFeeFromRouter with
@@ -372,34 +472,34 @@ template PerPartyRouter
         nonconsuming choice PrepareSend : ContractId CCIP.SendingMessageV1.SendingMessageV1
             with
                 destinationChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
+                message : CCIP.ClientV1.Canton2AnyMessage
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller partyOwner
             do
-                onRampCid <- CCIP.OnRamp.lookupOnRampCid context
-                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
-                tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
-                feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                onRampCid : ContractId CCIP.OnRamp.OnRamp <- CCIP.Utils.Context.getFromContextU context CCIP.OnRamp.onRampContextKey
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig <- CCIP.Utils.Context.getFromContextU context CCIP.API.GlobalConfigV1.globalConfigContextKey
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry <- CCIP.Utils.Context.getFromContextU context CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter <- CCIP.Utils.Context.getFromContextU context CCIP.API.FeeQuoterV1.feeQuoterContextKey
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote <- CCIP.Utils.Context.getFromContextU context CCIP.API.RMNRemoteV1.rmnRemoteContextKey
 
                 onRamp <- fetch onRampCid
-                RawInstanceAddress.assertEqual "router: onramp mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 feeQuoter <- fetch feeQuoterCid
-                RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: feequoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
                 rmnRemote <- fetch rmnRemoteCid
-                RawInstanceAddress.assertEqual "router: rmn mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 let currentSeqNum = fromOptional 0.0
@@ -423,26 +523,26 @@ template PerPartyRouter
                 sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
             controller partyOwner
             do
-                onRampCid <- CCIP.OnRamp.lookupOnRampCid context
-                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
-                feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
+                onRampCid : ContractId CCIP.OnRamp.OnRamp <- CCIP.Utils.Context.getFromContextU context CCIP.OnRamp.onRampContextKey
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig <- CCIP.Utils.Context.getFromContextU context CCIP.API.GlobalConfigV1.globalConfigContextKey
+                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter <- CCIP.Utils.Context.getFromContextU context CCIP.API.FeeQuoterV1.feeQuoterContextKey
 
                 onRamp <- fetch onRampCid
-                RawInstanceAddress.assertEqual "router: onramp mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 feeQuoter <- fetch feeQuoterCid
-                RawInstanceAddress.assertEqual "router: feequoter mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: feequoter mismatch"
                     feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
 
                 sendingMsg <- fetch sendingMessageCid
-                RawInstanceAddress.assertEqual "router instance mismatch"
+                Chainlink.InstanceAddress.assertEqual "router instance mismatch"
                     instanceId partyOwner sendingMsg.deps.router
-                RawInstanceAddress.assertEqual "router: onramp sending message mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: onramp sending message mismatch"
                     onRamp.instanceId onRamp.ccipOwner sendingMsg.deps.onRamp
                 assertMsg "router: feequoter sending message mismatch"
                     (sendingMsg.deps.feeQuoter == deps.feeQuoter)
@@ -476,26 +576,26 @@ template PerPartyRouter
                 feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
             controller partyOwner
             do
-                onRampCid <- CCIP.OnRamp.lookupOnRampCid context
-                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
-                tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
-                tokenConfigCid <- CCIP.TokenAdminRegistry.lookupOptionalTokenConfigCid context
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                onRampCid : ContractId CCIP.OnRamp.OnRamp <- CCIP.Utils.Context.getFromContextU context CCIP.OnRamp.onRampContextKey
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig <- CCIP.Utils.Context.getFromContextU context CCIP.API.GlobalConfigV1.globalConfigContextKey
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry <- CCIP.Utils.Context.getFromContextU context CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey
+                tokenConfigCid : Optional (ContractId CCIP.TokenAdminRegistry.TokenConfig) <- CCIP.Utils.Context.lookupFromContextU context CCIP.API.TokenAdminRegistryV1.tokenConfigContextKey
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote <- CCIP.Utils.Context.getFromContextU context CCIP.API.RMNRemoteV1.rmnRemoteContextKey
 
                 onRamp <- fetch onRampCid
-                RawInstanceAddress.assertEqual "router: onramp mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
-                RawInstanceAddress.assertEqual "router: rmn mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 sendingMsg <- fetch sendingMessageCid
@@ -682,32 +782,32 @@ template PerPartyRouter
                 encodedMessage : BytesHex
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
-                receiverRequiredCCVs : [RawInstanceAddress.RawInstanceAddress]
-                receiverOptionalCCVs : [RawInstanceAddress.RawInstanceAddress]
+                receiverRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+                receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
                 receiverFinalityConfig : CCIP.FinalityConfig.FinalityConfig
                 caller : Party
             controller partyOwner
             do
-                offRampCid <- CCIP.OffRamp.lookupOffRampCid context
-                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
-                tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                offRampCid : ContractId CCIP.OffRamp.OffRamp <- CCIP.Utils.Context.getFromContextU context CCIP.OffRamp.offRampContextKey
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig <- CCIP.Utils.Context.getFromContextU context CCIP.API.GlobalConfigV1.globalConfigContextKey
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry <- CCIP.Utils.Context.getFromContextU context CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote <- CCIP.Utils.Context.getFromContextU context CCIP.API.RMNRemoteV1.rmnRemoteContextKey
 
                 offRamp <- fetch offRampCid
-                RawInstanceAddress.assertEqual "router: offramp mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
 
                 globalConfig <- fetch globalConfigCid
-                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
-                RawInstanceAddress.assertEqual "router: rmn mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 -- Early replay check (informational; Execute is authoritative)
@@ -742,26 +842,26 @@ template PerPartyRouter
                 executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
             controller partyOwner
             do
-                offRampCid <- CCIP.OffRamp.lookupOffRampCid context
-                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
-                tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
-                tokenConfigCid <- CCIP.TokenAdminRegistry.lookupOptionalTokenConfigCid context
-                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
+                offRampCid : ContractId CCIP.OffRamp.OffRamp <- CCIP.Utils.Context.getFromContextU context CCIP.OffRamp.offRampContextKey
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig <- CCIP.Utils.Context.getFromContextU context CCIP.API.GlobalConfigV1.globalConfigContextKey
+                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry <- CCIP.Utils.Context.getFromContextU context CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey
+                tokenConfigCid : Optional (ContractId CCIP.TokenAdminRegistry.TokenConfig) <- CCIP.Utils.Context.lookupFromContextU context CCIP.API.TokenAdminRegistryV1.tokenConfigContextKey
+                rmnRemoteCid : ContractId CCIP.RMNRemote.RMNRemote <- CCIP.Utils.Context.getFromContextU context CCIP.API.RMNRemoteV1.rmnRemoteContextKey
 
                 offRamp <- fetch offRampCid
-                RawInstanceAddress.assertEqual "router: offramp mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
 
                 globalConfig <- fetch globalConfigCid
-                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
-                RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: tokenadminregistry mismatch"
                     tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
-                RawInstanceAddress.assertEqual "router: rmn mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: rmn mismatch"
                     rmnRemote.instanceId rmnRemote.rmnOwner deps.rmnRemote
 
                 execMsg <- fetch executingMessageCid
@@ -809,6 +909,7 @@ template PerPartyRouter
         nonconsuming choice GetExecutionState : CCIP.API.ExecutingMessageV1.MessageExecutionState
             with
                 messageHash : BytesHex
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -823,28 +924,29 @@ template PerPartyRouter
         nonconsuming choice GetSequenceNumber : Numeric 0
             with
                 destChainSelector : Numeric 0
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller partyOwner
             do
                 pure (fromOptional 0.0 (Map.lookup destChainSelector outboundSequenceNumbers))
 
         -- | Get all required CCV raw instance addresses for sending a message.
-        nonconsuming choice GetRequiredCCVsForSend : [RawInstanceAddress]
+        nonconsuming choice GetRequiredCCVsForSend : [Chainlink.InstanceAddress.RawInstanceAddress]
             with
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
                 destChainSelector : Numeric 0
-                message : CCIP.Client.Canton2AnyMessage
-                poolReportedCCVs : [RawInstanceAddress]
+                message : CCIP.ClientV1.Canton2AnyMessage
+                poolReportedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             controller partyOwner
             do
-                onRampCid <- CCIP.OnRamp.lookupOnRampCid context
-                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
+                onRampCid : ContractId CCIP.OnRamp.OnRamp <- CCIP.Utils.Context.getFromContextU context CCIP.OnRamp.onRampContextKey
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig <- CCIP.Utils.Context.getFromContextU context CCIP.API.GlobalConfigV1.globalConfigContextKey
 
                 onRamp <- fetch onRampCid
-                RawInstanceAddress.assertEqual "router: onramp mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: onramp mismatch"
                     onRamp.instanceId onRamp.ccipOwner deps.onRamp
 
                 globalConfig <- fetch globalConfigCid
-                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 exercise onRampCid CCIP.OnRamp.GetRequiredCCVsForSendFromRouter with
@@ -854,25 +956,25 @@ template PerPartyRouter
                     poolReportedCCVs = poolReportedCCVs
 
         -- | Get all required CCV raw instance addresses for executing a message.
-        nonconsuming choice GetRequiredCCVsForExecute : [RawInstanceAddress]
+        nonconsuming choice GetRequiredCCVsForExecute : [Chainlink.InstanceAddress.RawInstanceAddress]
             with
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
                 message : CCIP.MessageCodecV1.MessageV1
-                receiverRequiredCCVs : [RawInstanceAddress]
-                receiverOptionalCCVs : [RawInstanceAddress]
+                receiverRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+                receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
-                tokenPoolRequiredCCVs : [RawInstanceAddress]
+                tokenPoolRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             controller partyOwner
             do
-                offRampCid <- CCIP.OffRamp.lookupOffRampCid context
-                globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
+                offRampCid : ContractId CCIP.OffRamp.OffRamp <- CCIP.Utils.Context.getFromContextU context CCIP.OffRamp.offRampContextKey
+                globalConfigCid : ContractId CCIP.GlobalConfig.GlobalConfig <- CCIP.Utils.Context.getFromContextU context CCIP.API.GlobalConfigV1.globalConfigContextKey
 
                 offRamp <- fetch offRampCid
-                RawInstanceAddress.assertEqual "router: offramp mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: offramp mismatch"
                     offRamp.instanceId offRamp.ccipOwner deps.offRamp
 
                 globalConfig <- fetch globalConfigCid
-                RawInstanceAddress.assertEqual "router: globalconfig mismatch"
+                Chainlink.InstanceAddress.assertEqual "router: globalconfig mismatch"
                     globalConfig.instanceId globalConfig.ccipOwner deps.globalConfig
 
                 exercise offRampCid CCIP.OffRamp.GetRequiredCCVsForExecuteFromRouter with

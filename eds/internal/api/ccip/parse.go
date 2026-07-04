@@ -108,7 +108,7 @@ func parseSourceChainConfig(sourceChainConfig core.SourceChainConfig) (SourceCha
 	}, nil
 }
 
-func parseDestChainConfig(destChainConfig core.DestChainConfig) (DestChainConfig, error) {
+func parseDestChainConfig(destChainConfig core.DestChainConfig2) (DestChainConfig, error) {
 	laneMandatedCCVs, err := parse.RawInstanceAddressList(destChainConfig.LaneMandatedCCVs)
 	if err != nil {
 		return DestChainConfig{}, fmt.Errorf("failed to parse lane mandated CCVs: %w", err)

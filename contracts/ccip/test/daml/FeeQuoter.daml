@@ -18,7 +18,7 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.API.SendingMessageV1
 import qualified CCIP.EventsV1.Receipts
 
-import CCIP.Client qualified as Client
+import CCIP.ClientV1
 import CCIP.FeeQuoter
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.GlobalConfig qualified as GlobalConfig
@@ -1274,15 +1274,15 @@ testCalculateFeeResult_CCVRoundingMatchesFinalizeFee = script do
             globalConfigCid = globalConfig
             feeQuoterCid = feeQuoter
             destChainSelector = 456.0
-            message = Client.Canton2AnyMessage with
+            message = CCIP.ClientV1.Canton2AnyMessage with
                 receiver = "cbabbd0f4cddee14bc07072de46d2a78a2ed3f17"
                 payload = ""
                 tokenTransfer = None
                 feeToken = feeToken
-                extraArgs = Client.V3 Client.GenericExtraArgsV3 with
+                extraArgs = CCIP.ClientV1.V3 CCIP.ClientV1.GenericExtraArgsV3 with
                     gasLimit = 0
                     ccvs = []
-                    executor = Client.Executor_NoExecutor
+                    executor = CCIP.ClientV1.Executor_NoExecutor
                     tokenReceiver = ""
                     tokenArgs = ""
             ccvFeeQuotes =

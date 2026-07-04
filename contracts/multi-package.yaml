@@ -12,6 +12,7 @@ packages:
   - mcms/test/globalconfig-v1-upgraded
 
   - ccip/api
+  - ccip/client
   - ccip/codec
   - ccip/core
   - ccip/extension-api

@@ -6,6 +6,9 @@ import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
 
+rmnRemoteContextKey : Text
+rmnRemoteContextKey = "rmn-remote"
+
 interface RMNRemote where
     viewtype RMNRemoteView
 

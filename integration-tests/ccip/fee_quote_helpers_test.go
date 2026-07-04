@@ -34,7 +34,7 @@ func quoteCCIPSenderFee(
 	ccipSenderCid string,
 	sendArgs sender.Send,
 	disclosures []*apiv2.DisclosedContract,
-) sender.GetFeeResult {
+) sender.GetFeeResult2 {
 	t.Helper()
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -79,7 +79,7 @@ func quoteCCIPSenderFee(
 	fields := resultRecord.GetFields()
 	require.NotEmpty(t, fields, "GetFee should return fee fields")
 
-	quote := sender.GetFeeResult{
+	quote := sender.GetFeeResult2{
 		FeeTokenAmount: types.NUMERIC(fields[0].GetValue().GetNumeric()),
 	}
 	if len(fields) > 1 {

@@ -4,10 +4,6 @@ import DA.Map qualified as Map
 import DA.Time (convertRelTimeToMicroseconds, subTime)
 import DA.Crypto.Text (BytesHex, byteCount)
 
-import Splice.Api.Token.MetadataV1 (ChoiceContext)
-
-import qualified CCIP.Utils.Context
-
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Chainlink.InstanceAddress (assertValidInstanceId)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
@@ -36,11 +32,8 @@ assertDistinctRateLimiters label inbound outbound maybeCustom = do
             assertMsg (label <> ": custom finality inbound rate limiter must be distinct from the outbound limiter")
                 (custom /= outbound)
 
-rateLimiterKey : Text
-rateLimiterKey = "rate-limiter"
-
-lookupRateLimiterCid : ChoiceContext -> Update (ContractId RateLimiter)
-lookupRateLimiterCid ctx = CCIP.Utils.Context.getFromContextU ctx rateLimiterKey
+rateLimiterContextKey : Text
+rateLimiterContextKey = "rate-limiter"
 
 rawInstanceAddress : RateLimiter -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress rl = RawInstanceAddress.make rl.instanceId rl.poolOwner
