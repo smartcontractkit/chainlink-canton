@@ -9,18 +9,21 @@ import DA.Optional (fromSomeNote)
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.BurnMintV1
 import qualified Splice.Api.Token.TransferInstructionV1
+
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import CCIP.TokenAdminRegistry
-import CCIP.TokenAdminRegistryCodecGen (encodeSetPoolParams, encodeSetTransferFactoryParams, encodeSetBurnMintFactoryParams, encodeProposeAdminParams, encodeTransferAdminParams, encodeAcceptAdminParams)
-import CCIP.TokenAdminRegistryTypes (PoolRegistration(..), SetPoolParams(..), SetTransferFactoryParams(..), SetBurnMintFactoryParams(..), ProposeAdminParams(..), TransferAdminParams(..), AcceptAdminParams(..))
+
+import qualified CCIP.CoreV1.TokenAdminRegistry
+import qualified CCIP.CoreV1.TokenAdminRegistryCodecGen
+
 import qualified TestToken
 
 toAnyContractId : ContractId a -> ContractId ()
 toAnyContractId = coerceContractId
 
 tokenConfigAddr : Party -> Splice.Api.Token.HoldingV1.InstrumentId -> Text
-tokenConfigAddr owner instrumentId = RawInstanceAddress.makeText (tokenConfigInstanceId instrumentId) owner
+tokenConfigAddr owner instrumentId = RawInstanceAddress.makeText (CCIP.CoreV1.TokenAdminRegistry.tokenConfigInstanceId instrumentId) owner
 
 createRegistryAndConfig
     : Party
@@ -28,18 +31,18 @@ createRegistryAndConfig
     -> Splice.Api.Token.HoldingV1.InstrumentId
     -> Optional Party
     -> Optional Party
-    -> Optional PoolRegistration
-    -> Script (ContractId TokenAdminRegistry, ContractId TokenConfig)
+    -> Optional CCIP.CoreV1.TokenAdminRegistry.PoolRegistration
+    -> Script (ContractId CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry, ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig)
 createRegistryAndConfig ccipOwner instanceId instrumentId admin pendingAdmin tokenPool = do
   tarCid <- submit ccipOwner do
-    createCmd TokenAdminRegistry with
+    createCmd CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry with
       instanceId
       ccipOwner
       entryCount = 1
 
   configCid <- submit ccipOwner do
-    createCmd TokenConfig with
-      instanceId = tokenConfigInstanceId instrumentId
+    createCmd CCIP.CoreV1.TokenAdminRegistry.TokenConfig with
+      instanceId = CCIP.CoreV1.TokenAdminRegistry.tokenConfigInstanceId instrumentId
       registryInstanceId = instanceId
       registryOwner = ccipOwner
       index = 0
@@ -53,7 +56,7 @@ createRegistryAndConfig ccipOwner instanceId instrumentId admin pendingAdmin tok
 
   pure (tarCid, configCid)
 
-mcmsIds : Party -> Text -> Splice.Api.Token.HoldingV1.InstrumentId -> ContractId TokenAdminRegistry -> ContractId TokenConfig -> Map.Map Text (ContractId ())
+mcmsIds : Party -> Text -> Splice.Api.Token.HoldingV1.InstrumentId -> ContractId CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry -> ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig -> Map.Map Text (ContractId ())
 mcmsIds owner instanceId instrumentId tarCid configCid =
   Map.fromList
     [ (RawInstanceAddress.makeText instanceId owner, toAnyContractId tarCid)
@@ -72,11 +75,11 @@ testTokenAdminRegistryMCMSEntrypoint_SetPool = script do
 
   let instanceId = "tar-test-instance"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
-      poolReg = PoolRegistration poolOwner "pool-v1"
+      poolReg = CCIP.CoreV1.TokenAdminRegistry.PoolRegistration poolOwner "pool-v1"
 
   (tarCid, configCid0) <- createRegistryAndConfig ccipOwner instanceId instrumentId (Some ccipOwner) None None
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-      encoded = encodeSetPoolParams (SetPoolParams with instrumentId, tokenPool = Some poolReg)
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetPoolParams (CCIP.CoreV1.TokenAdminRegistry.SetPoolParams with instrumentId, tokenPool = Some poolReg)
 
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -84,7 +87,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPool = script do
       operationData = encoded
       contractIds = mcmsIds ccipOwner instanceId instrumentId tarCid configCid0
 
-  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId TokenConfig
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig
   Some config <- queryContractId ccipOwner configCid1
   config.tokenPool === Some poolReg
 
@@ -96,11 +99,11 @@ testTokenAdminRegistryMCMSEntrypoint_SetPoolNone = script do
 
   let instanceId = "tar-test-instance"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-      existingPool = PoolRegistration poolOwner "old-pool"
+      existingPool = CCIP.CoreV1.TokenAdminRegistry.PoolRegistration poolOwner "old-pool"
 
   (tarCid, configCid0) <- createRegistryAndConfig ccipOwner instanceId instrumentId (Some ccipOwner) None (Some existingPool)
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-      encoded = encodeSetPoolParams (SetPoolParams with instrumentId, tokenPool = None)
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetPoolParams (CCIP.CoreV1.TokenAdminRegistry.SetPoolParams with instrumentId, tokenPool = None)
 
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -108,7 +111,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetPoolNone = script do
       operationData = encoded
       contractIds = mcmsIds ccipOwner instanceId instrumentId tarCid configCid0
 
-  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId TokenConfig
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig
   Some config <- queryContractId ccipOwner configCid1
   config.tokenPool === None
 
@@ -126,7 +129,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetTransferFactory = script do
       admin = ccipOwner
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-      encoded = encodeSetTransferFactoryParams (SetTransferFactoryParams with
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetTransferFactoryParams (CCIP.CoreV1.TokenAdminRegistry.SetTransferFactoryParams with
         instrumentId
         transferFactoryAddress = Some transferFactoryAddr)
       contractIds = Map.insert
@@ -140,7 +143,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetTransferFactory = script do
       operationData = encoded
       contractIds
 
-  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId TokenConfig
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig
   Some config <- queryContractId ccipOwner configCid1
   config.transferFactory === Some (toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory factoryCid)
 
@@ -157,14 +160,14 @@ testTokenAdminRegistryMCMSEntrypoint_SetTransferFactoryNone = script do
     createCmd TestToken.TestTransferFactory with
       admin = ccipOwner
   configCid1 <- submit ccipOwner do
-    exerciseCmd tarCid SetTransferFactory with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.SetTransferFactory with
       tokenConfigCid = configCid0
       instrumentId
       transferFactory = Some (toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory factoryCid)
       caller = ccipOwner
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-      encoded = encodeSetTransferFactoryParams (SetTransferFactoryParams with
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetTransferFactoryParams (CCIP.CoreV1.TokenAdminRegistry.SetTransferFactoryParams with
         instrumentId
         transferFactoryAddress = None)
 
@@ -177,7 +180,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetTransferFactoryNone = script do
         (toAnyContractId factoryCid)
         (mcmsIds ccipOwner instanceId instrumentId tarCid configCid1)
 
-  let configCid2 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId TokenConfig
+  let configCid2 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig
   Some config <- queryContractId ccipOwner configCid2
   config.transferFactory === None
 
@@ -196,7 +199,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetBurnMintFactory = script do
       outputs = []
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-      encoded = encodeSetBurnMintFactoryParams (SetBurnMintFactoryParams with
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetBurnMintFactoryParams (CCIP.CoreV1.TokenAdminRegistry.SetBurnMintFactoryParams with
         instrumentId
         burnMintFactoryAddress = Some burnMintFactoryAddr)
       contractIds = Map.insert
@@ -210,7 +213,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetBurnMintFactory = script do
       operationData = encoded
       contractIds
 
-  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId TokenConfig
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig
   Some config <- queryContractId ccipOwner configCid1
   config.burnMintFactory === Some (toInterfaceContractId @Splice.Api.Token.BurnMintV1.BurnMintFactory factoryCid)
 
@@ -225,13 +228,13 @@ testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator = script do
       instAddr = RawInstanceAddress.makeText instanceId ccipOwner
 
   tarCid <- submit ccipOwner do
-    createCmd TokenAdminRegistry with
+    createCmd CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry with
       instanceId
       ccipOwner = ccipOwner
       entryCount = 0
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-      encoded = encodeProposeAdminParams (ProposeAdminParams with instrumentId, newAdmin)
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeProposeAdminParams (CCIP.CoreV1.TokenAdminRegistry.ProposeAdminParams with instrumentId, newAdmin)
 
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -239,8 +242,8 @@ testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator = script do
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
 
-  let newTarCid = coerceContractId (lookupContractId instAddr newContractIds) : ContractId TokenAdminRegistry
-      configCid = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId TokenConfig
+  let newTarCid = coerceContractId (lookupContractId instAddr newContractIds) : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry
+      configCid = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig
   Some tar <- queryContractId ccipOwner newTarCid
   tar.entryCount === 1
   Some config <- queryContractId ccipOwner configCid
@@ -259,7 +262,7 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
 
   (tarCid, configCid0) <- createRegistryAndConfig ccipOwner instanceId instrumentId (Some ccipOwner) None None
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-      encoded = encodeTransferAdminParams (TransferAdminParams with instrumentId, newAdmin)
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeTransferAdminParams (CCIP.CoreV1.TokenAdminRegistry.TransferAdminParams with instrumentId, newAdmin)
 
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -267,7 +270,7 @@ testTokenAdminRegistryMCMSEntrypoint_TransferAdminRole = script do
       operationData = encoded
       contractIds = mcmsIds ccipOwner instanceId instrumentId tarCid configCid0
 
-  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId TokenConfig
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig
   Some config <- queryContractId ccipOwner configCid1
   config.admin === Some ccipOwner
   config.pendingAdmin === Some newAdmin
@@ -282,7 +285,7 @@ testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
 
   (tarCid, configCid0) <- createRegistryAndConfig ccipOwner instanceId instrumentId None (Some ccipOwner) None
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-      encoded = encodeAcceptAdminParams (AcceptAdminParams with instrumentId)
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeAcceptAdminParams (CCIP.CoreV1.TokenAdminRegistry.AcceptAdminParams with instrumentId)
 
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -290,7 +293,7 @@ testTokenAdminRegistryMCMSEntrypoint_AcceptAdminRole = script do
       operationData = encoded
       contractIds = mcmsIds ccipOwner instanceId instrumentId tarCid configCid0
 
-  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId TokenConfig
+  let configCid1 = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig
   Some config <- queryContractId ccipOwner configCid1
   config.admin === Some ccipOwner
   config.pendingAdmin === None
@@ -300,7 +303,7 @@ testTokenAdminRegistryMCMSEntrypoint_UnknownFunction = script do
   ccipOwner <- allocateParty "ccip_owner"
   let instanceId = "tar-error-test"
   tarCid <- submit ccipOwner do
-    createCmd TokenAdminRegistry with
+    createCmd CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry with
       instanceId
       ccipOwner = ccipOwner
       entryCount = 0
@@ -317,7 +320,7 @@ testTokenAdminRegistryMCMSEntrypoint_InvalidParams = script do
   ccipOwner <- allocateParty "ccip_owner"
   let instanceId = "tar-invalid-test"
   tarCid <- submit ccipOwner do
-    createCmd TokenAdminRegistry with
+    createCmd CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry with
       instanceId
       ccipOwner = ccipOwner
       entryCount = 0
@@ -336,12 +339,12 @@ testTokenAdminRegistryMCMSEntrypoint_MissingSelfCid = script do
   let instanceId = "tar-missing-cid-test"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TEST"
   tarCid <- submit ccipOwner do
-    createCmd TokenAdminRegistry with
+    createCmd CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry with
       instanceId
       ccipOwner = ccipOwner
       entryCount = 0
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid
-      encoded = encodeAcceptAdminParams (AcceptAdminParams with instrumentId)
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeAcceptAdminParams (CCIP.CoreV1.TokenAdminRegistry.AcceptAdminParams with instrumentId)
   submitMustFail ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "AcceptAdminRole"

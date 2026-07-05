@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "ccip-codec"
-	PackageID   = "5f3b07df1bd1d9ea3dc0acae29c4bfaf72e7a9c5531a2becdc015b1a513a0a1c"
+	PackageID   = "77de627f9b3ef15a9d21ea36aff1a4cb88f82a43ae289003fd7c46bff2a54e9a"
 	SDKVersion  = "3.4.11"
 )
 
@@ -33,6 +33,14 @@ type Template interface {
 }
 
 const (
+	MaxCCVsPerMessage        = types.INT64(255)
+	WaitForFinalityFlag      = types.TEXT("00000000")
+	MinBlockDepth            = types.INT64(1)
+	MaxBlockDepth            = types.INT64(65535)
+	FinalityConfigByteLength = types.INT64(4)
+	MaxNumeric0IntegerText   = types.TEXT("99999999999999999999999999999999999999")
+	MaxUint256DecimalText    = types.TEXT("115792089237316195423570985008687907853269984665640564039457584007913129639935")
+	MaxNumeric0DecimalText   = types.TEXT("99999999999999999999999999999999999999")
 	UsdPerUsdCent            = types.NUMERIC("100000000.")
 	PremiumIdentity          = types.NUMERIC("10000000000.")
 	MinTokenDecimals         = types.INT64(0)
@@ -40,14 +48,6 @@ const (
 	E10PerPercent            = types.NUMERIC("100000000.")
 	BaseNumeric              = types.NUMERIC("100000000.")
 	BaseInt                  = types.INT64(100000000)
-	MaxUint256DecimalText    = types.TEXT("115792089237316195423570985008687907853269984665640564039457584007913129639935")
-	MaxNumeric0DecimalText   = types.TEXT("99999999999999999999999999999999999999")
-	MaxCCVsPerMessage        = types.INT64(255)
-	WaitForFinalityFlag      = types.TEXT("00000000")
-	MinBlockDepth            = types.INT64(1)
-	MaxBlockDepth            = types.INT64(65535)
-	FinalityConfigByteLength = types.INT64(4)
-	MaxNumeric0IntegerText   = types.TEXT("99999999999999999999999999999999999999")
 )
 
 func argsToMap(args any) map[string]any {
@@ -176,26 +176,6 @@ func (v FinalityConfig) GetVariantValue() any {
 }
 
 var _ types.VARIANT = (*FinalityConfig)(nil)
-
-// GetVariantTagByte implements types.VariantWithTagByte interface for MCMS numeric tag encoding
-func (v FinalityConfig) GetVariantTagByte() byte {
-
-	if v.WaitForFinality != nil {
-		return 0
-	}
-
-	if v.WaitForSafe != nil {
-		return 1
-	}
-
-	if v.BlockDepth != nil {
-		return 2
-	}
-
-	return 0xFF // Invalid/unknown variant
-}
-
-var _ types.VariantWithTagByte = (*FinalityConfig)(nil)
 
 // LocalAmountConversionResult is a Record type
 type LocalAmountConversionResult struct {

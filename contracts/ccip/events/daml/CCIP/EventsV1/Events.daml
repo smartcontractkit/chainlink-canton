@@ -8,10 +8,9 @@ import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.API.ExecutingMessageV1
+import qualified CCIP.APIV1.ExecutingMessage
+import qualified CCIP.CodecV1.FinalityConfig
 import qualified CCIP.EventsV1.Receipts
-
-import qualified CCIP.FinalityConfig
 
 template CCIPMessageSent
     with
@@ -49,7 +48,7 @@ data ExecutionStateChangedEvent = ExecutionStateChangedEvent
         sourceChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         messageId : BytesHex
-        state : CCIP.API.ExecutingMessageV1.MessageExecutionState
+        state : CCIP.APIV1.ExecutingMessage.MessageExecutionState
         returnData : BytesHex
     deriving (Eq, Show)
 
@@ -60,7 +59,7 @@ template TokenReceiveTicketClaimed
         poolOwner : Party
         receiver : Party
         tokenReceiver : Party
-        tokenReceiveTicketCid : ContractId CCIP.API.ExecutingMessageV1.TokenReceiveTicket
+        tokenReceiveTicketCid : ContractId CCIP.APIV1.ExecutingMessage.ITokenReceiveTicket
         event : TokenReceiveTicketClaimedEvent
     where
         signatory poolOwner
@@ -77,7 +76,7 @@ data TokenReceiveTicketClaimedEvent = TokenReceiveTicketClaimedEvent
         sourcePoolData : BytesHex
         messageId : BytesHex
         sourceChainSelector : Numeric 0
-        finality : CCIP.FinalityConfig.FinalityConfig
+        finality : CCIP.CodecV1.FinalityConfig.FinalityConfig
         output : TokenReceiveTicketClaimed_Output
     deriving (Eq, Show)
 
