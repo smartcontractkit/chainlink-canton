@@ -8,6 +8,8 @@ import qualified Splice.Api.Token.TransferInstructionV1
 
 import Chainlink.InstanceAddress (RawInstanceAddress)
 
+import qualified CCIP.API.SendingMessageV1
+
 -- | Direction of token transfer for CCV requirement lookup.
 data TransferDirection = Outbound | Inbound
     deriving (Eq, Show)
@@ -17,10 +19,10 @@ interface ITokenPool where
 
     tokenPool_getRequiredCCVsImpl : ContractId ITokenPool -> TokenPool_GetRequiredCCVs -> Update [RawInstanceAddress]
     tokenPool_verifyInboundMessageImpl : ContractId ITokenPool -> TokenPool_VerifyInboundMessage -> Update (ContractId ())
-    tokenPool_verifyOutboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyOutboundCCVs -> Update (ContractId ())
+    tokenPool_verifyOutboundCCVsImpl : ContractId ITokenPool -> TokenPool_VerifyOutboundCCVs -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
     tokenPool_releaseFromTicketImpl : ContractId ITokenPool -> TokenPool_ReleaseFromTicket -> Update ReleaseOrMintResult
     tokenPool_lockOrBurnImpl : ContractId ITokenPool -> TokenPool_LockOrBurn -> Update LockOrBurnResult
-    tokenPool_calculateFeeImpl : ContractId ITokenPool -> TokenPool_CalculateFee -> Update (ContractId ())
+    tokenPool_calculateFeeImpl : ContractId ITokenPool -> TokenPool_CalculateFee -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
     tokenPool_getFeeImpl : ContractId ITokenPool -> TokenPool_GetFee -> Update TokenPoolFeeQuote
 
     -- Get required CCV raw instance addresses for a transfer based on direction, amount, finality, etc.
@@ -48,12 +50,12 @@ interface ITokenPool where
         do tokenPool_verifyInboundMessageImpl this self arg
 
     -- Verify outbound CCVs and record pool-required CCVs on SendingMessageV1 via TAR.
-    nonconsuming choice TokenPool_VerifyOutboundCCVs : ContractId ()
+    nonconsuming choice TokenPool_VerifyOutboundCCVs : ContractId CCIP.API.SendingMessageV1.SendingMessage
         with
             tokenAdminRegistryCid : ContractId ()
             tokenConfigCid : ContractId ()
             extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
-            sendingMessageCid : ContractId ()
+            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
             amount : Decimal
             caller : Party
         controller caller
@@ -81,7 +83,7 @@ interface ITokenPool where
             tokenConfigCid : ContractId ()
             rmnRemoteCid : ContractId ()
             extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
-            sendingMessageCid : ContractId ()
+            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
             senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
             amount : Decimal
             caller : Party
@@ -90,12 +92,12 @@ interface ITokenPool where
 
     -- Calculate fee for outbound token transfer, which it records on
     -- SendingMessageV1 through TAR after pool-registration validation.
-    nonconsuming choice TokenPool_CalculateFee : ContractId ()
+    nonconsuming choice TokenPool_CalculateFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
         with
             tokenAdminRegistryCid : ContractId ()
             tokenConfigCid : ContractId ()
             extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
-            sendingMessageCid : ContractId ()
+            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
             feeQuoterCid : ContractId ()
             tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
             caller : Party
@@ -138,7 +140,7 @@ data LockOrBurnResult = LockOrBurnResult
     with
         poolChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         senderChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-        sendingMessageCid : ContractId ()
+        sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
     deriving (Eq, Show)
 
 data TokenPoolFeeQuote = TokenPoolFeeQuote

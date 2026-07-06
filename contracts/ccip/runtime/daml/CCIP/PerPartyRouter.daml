@@ -455,7 +455,7 @@ template PerPartyRouter
                 sm <- fetch smCid
                 if isNone sm.expectedTokenInstrumentId
                     then exercise smCid CCIP.SendingMessageV1.BuildMessage with
-                        caller = partyOwner
+                        context = context
                     else pure smCid
 
         -- | Finalize a CCIP send. Collects total fee from sender, delegates to

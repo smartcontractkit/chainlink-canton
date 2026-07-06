@@ -6,8 +6,12 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Map qualified as Map
 
+import qualified Splice.Api.Token.MetadataV1
+
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+import qualified Chainlink.InstanceAddress
+
 import CCIP.RMNRemote
 import CCIP.RMNRemoteCodecGen
 import CCIP.RMNRemoteTypes
@@ -34,7 +38,7 @@ testRMNRemoteMCMSEntrypoint_Curse = script do
       customObservers = []
       cursedSubjects = []
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode Curse params
@@ -75,7 +79,7 @@ testRMNRemoteMCMSEntrypoint_Uncurse = script do
       customObservers = []
       cursedSubjects = [subject]
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode Uncurse params
@@ -118,7 +122,7 @@ testRMNRemoteMCMSEntrypoint_CurseChain = script do
       customObservers = []
       cursedSubjects = []
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode CurseChain params
@@ -139,8 +143,9 @@ testRMNRemoteMCMSEntrypoint_CurseChain = script do
       -- Verify IsCursedForChain returns True
       isCursed <- submit rmnOwner do
         exerciseCmd newCid IsCursedForChain with
-          caller = rmnOwner
           chainSelector = chainSelector
+          context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+          caller = rmnOwner
       isCursed === True
     _ -> abort "Expected exactly one RMNRemote contract"
 
@@ -165,7 +170,7 @@ testRMNRemoteMCMSEntrypoint_UncurseChain = script do
       customObservers = []
       cursedSubjects = [chainSubject]
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode UncurseChain params
@@ -212,7 +217,7 @@ testRMNRemoteMCMSEntrypoint_CurseMultiple = script do
       customObservers = []
       cursedSubjects = []
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode CurseMultiple params
@@ -254,7 +259,7 @@ testRMNRemoteMCMSEntrypoint_UncurseMultiple = script do
       customObservers = []
       cursedSubjects = subjects
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode UncurseMultiple params
@@ -298,7 +303,7 @@ testRMNRemoteMCMSEntrypoint_AddCustomObservers = script do
       customObservers = []
       cursedSubjects = []
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode AddCustomObservers params
@@ -338,7 +343,7 @@ testRMNRemoteMCMSEntrypoint_RemoveCustomObservers = script do
       customObservers = [observer1, observer2]
       cursedSubjects = []
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode RemoveCustomObservers params (remove observer1)
@@ -381,7 +386,7 @@ testRMNRemoteMCMSEntrypoint_UnknownFunction = script do
       customObservers = []
       cursedSubjects = []
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Call with unknown function name - should fail
@@ -409,7 +414,7 @@ testRMNRemoteMCMSEntrypoint_InvalidParams = script do
       customObservers = []
       cursedSubjects = []
 
-  let instAddr = RawInstanceAddress.makeText instanceId rmnOwner
+  let instAddr = Chainlink.InstanceAddress.makeText instanceId rmnOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Call Curse with empty operationData - should fail

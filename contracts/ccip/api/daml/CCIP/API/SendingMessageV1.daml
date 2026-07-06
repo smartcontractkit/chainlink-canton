@@ -1,0 +1,71 @@
+module CCIP.API.SendingMessageV1 where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+interface SendingMessage where
+    viewtype SendingMessageView
+
+    sendingMessage_addCCVFeeImpl : ContractId SendingMessage -> SendingMessage_AddCCVFee -> Update (ContractId SendingMessage)
+    sendingMessage_addVerifierDataImpl : ContractId SendingMessage -> SendingMessage_AddVerifierData -> Update (ContractId SendingMessage)
+    sendingMessage_addExecutorFeeImpl : ContractId SendingMessage -> SendingMessage_AddExecutorFee -> Update (ContractId SendingMessage)
+
+    -- CCVs
+
+    nonconsuming choice SendingMessage_AddCCVFee : ContractId SendingMessage
+        with
+            ccvInstanceId : Text
+            feeUSDCents : Numeric 0
+            destGasLimit : Int
+            destBytesOverhead : Int
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do sendingMessage_addCCVFeeImpl this self arg
+
+    nonconsuming choice SendingMessage_AddVerifierData : ContractId SendingMessage
+        with
+            ccvInstanceId : Text
+            versionTag : Text
+            verifierBlob : BytesHex
+            messageSentObservers : [Party]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do sendingMessage_addVerifierDataImpl this self arg
+
+    -- Executors
+
+    nonconsuming choice SendingMessage_AddExecutorFee : ContractId SendingMessage
+        with
+            executorInstanceId : Text
+            executorArgs : BytesHex
+            feeUSDCents : Numeric 0
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do sendingMessage_addExecutorFeeImpl this self arg
+
+
+data SendingMessageView = SendingMessageView
+    with
+        ccipOwner : Party
+        sender : Party
+        destChainSelector : Numeric 0
+
+        -- CCVs
+        requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        outboundPoolCCVs : Optional [Chainlink.InstanceAddress.RawInstanceAddress]
+
+        router : Chainlink.InstanceAddress.RawInstanceAddress
+        onRamp : Chainlink.InstanceAddress.RawInstanceAddress
+        globalConfig : Chainlink.InstanceAddress.RawInstanceAddress
+        rmnRemote : Chainlink.InstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : Chainlink.InstanceAddress.RawInstanceAddress
+        feeQuoter : Chainlink.InstanceAddress.RawInstanceAddress
+
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)

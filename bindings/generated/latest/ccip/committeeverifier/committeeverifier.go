@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-committee-verifier"
-	PackageID   = "6205e5225b69dd35d89a85aa180864fd9aadc3605aa8579aadb08d66830317b5"
+	PackageID   = "6798bdcaa5e9b69f9f20f41971572e16441c51ac0dd3fd63ac133a3e6288e337"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1252,8 +1252,9 @@ func (t *ForwardToVerifierMCMSParams) UnmarshalHex(data string) error {
 
 // GetFee is a Record type
 type GetFee struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
-	Caller            types.PARTY   `json:"caller"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GetFee to a map for DAML arguments
@@ -1261,6 +1262,8 @@ func (t GetFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1292,7 +1295,8 @@ func (t *GetFee) UnmarshalHex(data string) error {
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeMCMSParams struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetFeeMCMSParams to hex string for MCMS operationData.

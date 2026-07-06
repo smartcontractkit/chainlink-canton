@@ -3,12 +3,14 @@ module CCIP.Events where
 import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified Chainlink.InstanceAddress
+
 import qualified CCIP.FinalityConfig
 import qualified CCIP.Internal
 import qualified CCIP.Tickets
-import qualified Splice.Api.Token.HoldingV1
-import qualified Splice.Api.Token.TransferInstructionV1
-import qualified Chainlink.InstanceAddress
 
 template CCIPMessageSent
     with

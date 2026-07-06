@@ -5,9 +5,11 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Either (isLeft)
 
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
 import qualified CCIP.SendingMessageV1
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 
 -- | Two CCVs with the same instance id but different owners can both record verifier data.
 testDistinctCcvOwnersWithSameInstanceId : Script ()
@@ -78,7 +80,7 @@ testDistinctCcvOwnersWithSameInstanceId = script do
 
     sendingMessageCid <- submit ccipOwner do
         exerciseCmd sendingMessageCid CCIP.SendingMessageV1.BuildMessage with
-            caller = ccipOwner
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
     sendingMessageCid <- submit (actAs ccvOwnerA) do
         exerciseCmd sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with
@@ -86,6 +88,7 @@ testDistinctCcvOwnersWithSameInstanceId = script do
             versionTag = "00000001"
             verifierBlob = "aaaa"
             messageSentObservers = []
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwnerA
 
     sendingMessageCid <- submit (actAs ccvOwnerB) do
@@ -94,6 +97,7 @@ testDistinctCcvOwnersWithSameInstanceId = script do
             versionTag = "00000002"
             verifierBlob = "bbbb"
             messageSentObservers = []
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwnerB
 
     Some sm <- queryContractId ccipOwner sendingMessageCid
@@ -173,6 +177,7 @@ testSameOwnerDistinctInstanceIds = script do
             feeUSDCents = 0.0
             destGasLimit = 0
             destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     sendingMessageCid <- submit (actAs ccvOwner) do
@@ -181,6 +186,7 @@ testSameOwnerDistinctInstanceIds = script do
             feeUSDCents = 0.0
             destGasLimit = 0
             destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     Some sm <- queryContractId ccipOwner sendingMessageCid

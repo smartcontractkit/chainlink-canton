@@ -10,6 +10,13 @@ import DA.Optional (fromSome)
 import DA.Set qualified as Set
 import DA.Time (time)
 
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+import qualified CCIP.API.SendingMessageV1
+
 import CCIP.Client qualified as Client
 import CCIP.FeeQuoter
 import CCIP.FinalityConfig qualified as FinalityCodec
@@ -19,10 +26,7 @@ import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.OnRamp qualified as OnRamp
 import CCIP.OnRampTypes qualified as OnRampTypes
 import CCIP.Tickets qualified as Tickets
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
-
-import Splice.Api.Token.HoldingV1
 
 usd : Decimal -> Decimal
 usd d = d
@@ -669,19 +673,21 @@ testAddCCVFeeRejectsWrongRawInstanceAddress = script do
 
     disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
     submitMustFail (actAs ccvOwner <> disclose disclosedSm) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddCCVFee with
             ccvInstanceId = "ccv-wrong"
             feeUSDCents = cents 1.0
             destGasLimit = 10000
             destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddCCVFee with
             ccvInstanceId = "ccv-allowed"
             feeUSDCents = cents 1.0
             destGasLimit = 10000
             destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     assertMsg "allowed raw instance should be accepted" True
@@ -770,21 +776,23 @@ testFinalizeFee_PremiumAndExecutor = script do
     -- Add CCV fee: 200 USD cents ($2.00)
     disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddCCVFee with
             ccvInstanceId = "ccv-premium"
             feeUSDCents = cents 200.0
             destGasLimit = 10000
             destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     -- AddExecutorFee: 300 USD cents ($3.00)
     -- After AddCCVFee, ccvOwner is a signatory so query from ccvOwner
     disclosedSm2 <- fromSome <$> queryDisclosure ccvOwner sendingMessageCid
     sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSm2) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddExecutorFee with
             executorInstanceId = "executor-premium"
             executorArgs = ""
             feeUSDCents = cents 300.0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = executorOwner
 
     -- Finalize using QuoteGasForExec + SendingMessageV1.FinalizeFee.
@@ -887,10 +895,11 @@ testFinalizeFee_SmallFee = script do
 
     disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
     sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSm) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddExecutorFee with
             executorInstanceId = "executor-small"
             executorArgs = ""
             feeUSDCents = cents 1.0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = executorOwner
 
     sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
@@ -1166,11 +1175,12 @@ testFinalizeFee_LinkCapMixedFees = script do
 
     disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddCCVFee with
             ccvInstanceId = "ccv-link-mixed-cap"
             feeUSDCents = cents 100.0
             destGasLimit = 10000
             destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     sendingMessageCid <- submit owner do
@@ -1180,13 +1190,15 @@ testFinalizeFee_LinkCapMixedFees = script do
             feeUSDCents = cents 100.0
             destGasOverhead = 50000
             destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
     disclosedSm <- fromSome <$> queryDisclosure ccvOwner sendingMessageCid
     sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSm) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddExecutorFee with
             executorInstanceId = "executor-link-mixed-cap"
             executorArgs = ""
             feeUSDCents = cents 100.0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = executorOwner
 
     sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
@@ -1386,11 +1398,12 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
 
     disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddCCVFee with
             ccvInstanceId = "ccv-receipt-mixed"
             feeUSDCents = cents 100.0
             destGasLimit = 10000
             destBytesOverhead = 111
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     sendingMessageCid <- submit owner do
@@ -1400,13 +1413,15 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
             feeUSDCents = cents 100.0
             destGasOverhead = 50000
             destBytesOverhead = 222
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
     disclosedSm2 <- fromSome <$> queryDisclosure ccvOwner sendingMessageCid
     sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSm2) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddExecutorFee with
             executorInstanceId = "executor-receipt-mixed"
             executorArgs = "beef"
             feeUSDCents = cents 100.0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = executorOwner
 
     sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid
@@ -1419,6 +1434,7 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
             amount = fromSome (MessageCodecV1.encodeUint256 1.0)
             destTokenAddress = "c5eca3e3acae6461d1f3f7f01fb60993c4b129e3"
             extraData = ""
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
     Some sm <- queryContractId owner sendingMessageCid
     let receipts = OnRamp.assembleReceipts sm
@@ -1522,19 +1538,21 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_CCVAndExecutor = script do
 
     disclosedSm <- fromSome <$> queryDisclosure owner sendingMessageCid
     sendingMessageCid <- submit (actAs ccvOwner <> disclose disclosedSm) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddCCVFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddCCVFee with
             ccvInstanceId = "ccv-receipt-msg"
             feeUSDCents = cents 25.0
             destGasLimit = 1234
             destBytesOverhead = 44
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     disclosedSm2 <- fromSome <$> queryDisclosure ccvOwner sendingMessageCid
     sendingMessageCid <- submit (actAs executorOwner <> disclose disclosedSm2) do
-        exerciseCmd sendingMessageCid SendingMessageV1.AddExecutorFee with
+        coerceContractId @_ @SendingMessageV1.SendingMessageV1 <$> exerciseCmd (toInterfaceContractId @CCIP.API.SendingMessageV1.SendingMessage sendingMessageCid) CCIP.API.SendingMessageV1.SendingMessage_AddExecutorFee with
             executorInstanceId = "executor-receipt-msg"
             executorArgs = "00"
             feeUSDCents = cents 50.0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = executorOwner
 
     sendingMessageCid <- finalizeUsingQuote owner feeQuoter sendingMessageCid

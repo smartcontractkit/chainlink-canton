@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-extension-api"
-	PackageID   = "abf82ef630cd2f176e69385616004d4a5012a1d1ed2a4d5552560acc2351d21b"
+	PackageID   = "9d7f9669d099a9c6479d67ffd9059a426894caf08830924ff3fb5edda3dfd667"
 	SDKVersion  = "3.4.11"
 )
 
@@ -305,8 +305,9 @@ func (t *CrossChainVerifierForwardToVerifier) UnmarshalHex(data string) error {
 
 // CrossChainVerifierGetFee is a Record type
 type CrossChainVerifierGetFee struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
-	Caller            types.PARTY   `json:"caller"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CrossChainVerifierGetFee to a map for DAML arguments
@@ -314,6 +315,8 @@ func (t CrossChainVerifierGetFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 

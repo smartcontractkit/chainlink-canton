@@ -22,6 +22,9 @@ import qualified CCIP.Tickets
 import MCMS.Crypto (isValidHex)
 
 import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified CCIP.API.SendingMessageV1
 
 data CCVFee = CCVFee
     with
@@ -285,12 +288,62 @@ template SendingMessageV1
                     None -> True
                     Some tsd -> isValidHex tsd.destTokenAddress && byteCount tsd.destTokenAddress == destAddressBytesLength)
 
+        interface instance CCIP.API.SendingMessageV1.SendingMessage for SendingMessageV1 where
+            view = CCIP.API.SendingMessageV1.SendingMessageView with
+                ccipOwner = ccipOwner
+                destChainSelector = destChainSelector
+                sender = sender
+
+                -- CCVs
+                requiredCCVs = requiredCCVs
+                outboundPoolCCVs = outboundPoolCCVs
+
+                -- deps
+                router = deps.router
+                onRamp = deps.onRamp
+                globalConfig = deps.globalConfig
+                rmnRemote = deps.rmnRemote
+                tokenAdminRegistry = deps.tokenAdminRegistry
+                feeQuoter = deps.feeQuoter
+
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+            sendingMessage_addCCVFeeImpl self arg = do
+                coerceContractId <$> exercise (fromInterfaceContractId @SendingMessageV1 self) AddCCVFee
+                    with
+                        ccvInstanceId = arg.ccvInstanceId
+                        feeUSDCents = arg.feeUSDCents
+                        destGasLimit = arg.destGasLimit
+                        destBytesOverhead = arg.destBytesOverhead
+                        context = arg.context
+                        caller = arg.caller
+
+            sendingMessage_addVerifierDataImpl self arg = do
+                coerceContractId <$> exercise (fromInterfaceContractId @SendingMessageV1 self) AddVerifierData
+                    with
+                        ccvInstanceId = arg.ccvInstanceId
+                        versionTag = arg.versionTag
+                        verifierBlob = arg.verifierBlob
+                        messageSentObservers = arg.messageSentObservers
+                        context = arg.context
+                        caller = arg.caller
+
+            sendingMessage_addExecutorFeeImpl self arg = do
+                coerceContractId <$> exercise (fromInterfaceContractId @SendingMessageV1 self) AddExecutorFee
+                    with
+                        executorInstanceId = arg.executorInstanceId
+                        executorArgs = arg.executorArgs
+                        feeUSDCents = arg.feeUSDCents
+                        context = arg.context
+                        caller = arg.caller
+
         choice AddCCVFee : ContractId SendingMessageV1
             with
                 ccvInstanceId : Text
                 feeUSDCents : Numeric 0
                 destGasLimit : Int
                 destBytesOverhead : Int
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -318,16 +371,20 @@ template SendingMessageV1
                 feeUSDCents : Numeric 0
                 destGasOverhead : Int
                 destBytesOverhead : Int
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller ccipOwner
             do
                 assertMsg "sendingMessage: AddTokenSendFee only allowed after pool CCVs are resolved" (state == SendingMessageState_Prepared)
                 assertMsg "sendingMessage: AddTokenSendFee only valid for token sends" (isSome expectedTokenInstrumentId)
                 assertMsg "token send fee already set" (isNone tokenSendFee)
 
-                let fee = TokenSendFee with
-                        poolInstanceId, poolOwner
-                        feeUSDCents, destGasOverhead, destBytesOverhead
-                create this with tokenSendFee = Some fee
+                create this with
+                    tokenSendFee = Some TokenSendFee with
+                        poolInstanceId
+                        poolOwner
+                        feeUSDCents
+                        destGasOverhead
+                        destBytesOverhead
 
         -- TAR-authorized outbound pool CCV requirements.
         choice SetOutboundPoolCCVs : ContractId SendingMessageV1
@@ -356,6 +413,7 @@ template SendingMessageV1
                 executorInstanceId : Text
                 executorArgs : BytesHex
                 feeUSDCents : Numeric 0
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -459,8 +517,8 @@ template SendingMessageV1
 
         choice BuildMessage : ContractId SendingMessageV1
             with
-                caller : Party
-            controller caller
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
+            controller ccipOwner
             do
                 assertMsg "sendingMessage: BuildMessage only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)
                 assertMsg "sendingMessage: message already built" (isNone message)
@@ -483,6 +541,7 @@ template SendingMessageV1
                 versionTag : BytesHex
                 verifierBlob : BytesHex
                 messageSentObservers : [Party]
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -517,6 +576,7 @@ template SendingMessageV1
                 amount : BytesHex
                 destTokenAddress : BytesHex
                 extraData : BytesHex
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller ccipOwner
             do
                 assertMsg "sendingMessage: AddTokenSend only allowed after pool CCVs are resolved" (state == SendingMessageState_FeeFinalized)

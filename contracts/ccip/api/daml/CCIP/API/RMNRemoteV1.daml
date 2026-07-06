@@ -1,0 +1,60 @@
+module CCIP.API.RMNRemoteV1 where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+interface RMNRemote where
+    viewtype RMNRemoteView
+
+    rmnRemote_publicFetchImpl : ContractId RMNRemote -> RMNRemote_PublicFetch -> Update RMNRemoteView
+    rmnRemote_isCursedImpl : ContractId RMNRemote -> RMNRemote_IsCursed -> Update Bool
+    rmnRemote_isCursedForChainImpl : ContractId RMNRemote -> RMNRemote_IsCursedForChain -> Update Bool
+    rmnRemote_getCursedSubjectsImpl : ContractId RMNRemote -> RMNRemote_GetCursedSubjects -> Update [BytesHex]
+
+    -- | Fetch the view of the RMNRemote contract.
+    nonconsuming choice RMNRemote_PublicFetch : RMNRemoteView
+        with
+            -- | The expected address of the RMNRemote contract.
+            -- Implementations MUST validate that this matches the actual address of the contract.
+            -- This way, callers can ensure that they are fetching the correct contract, provided all vetted
+            -- Daml packages only contain interface implementations that check the expected address.
+            expectedAddress : Chainlink.InstanceAddress.RawInstanceAddress
+            -- | The party fetching the contract.
+            caller : Party
+        controller caller
+        do rmnRemote_publicFetchImpl this self arg
+
+    -- | Check if globally cursed
+    nonconsuming choice RMNRemote_IsCursed : Bool
+        with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do rmnRemote_isCursedImpl this self arg
+
+    -- | Check if cursed for specific chain (global OR chain-specific)
+    nonconsuming choice RMNRemote_IsCursedForChain : Bool
+        with
+            chainSelector : Numeric 0
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do rmnRemote_isCursedForChainImpl this self arg
+
+    -- | Get all cursed subjects
+    nonconsuming choice RMNRemote_GetCursedSubjects : [BytesHex]
+        with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do rmnRemote_getCursedSubjectsImpl this self arg
+
+data RMNRemoteView = RMNRemoteView
+    with
+        ccipOwner : Party
+        rmnOwner : Party
+        instanceId : Text
+    deriving (Eq, Show)

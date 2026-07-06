@@ -184,6 +184,7 @@ template CCIPSender
                 quotedCCVFees <- foldlA (\fees input -> do
                     q <- exercise input.ccvCid ICCV.CrossChainVerifier_GetFee with
                         destChainSelector = destinationChainSelector
+                        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                         caller = owner
                     validateCCVFeeQuote input.ccvAddress q
                     pure (fees ++ [q])

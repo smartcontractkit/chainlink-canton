@@ -338,9 +338,9 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId badBurnMintFactoryCid)
-      sendingMessageCid = sendingMessageCid
+      sendingMessageCid = toInterfaceContractId sendingMessageCid
       senderInputCids = [senderHoldingCid]
       amount = 7.0
       caller = sender
@@ -489,9 +489,9 @@ testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId registryCid)
-      sendingMessageCid = sendingMessageCid
+      sendingMessageCid = toInterfaceContractId sendingMessageCid
       senderInputCids = [toInterfaceContractId wrongInstrumentInputCid]
       amount = 7.0
       caller = sender
@@ -500,9 +500,9 @@ testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId badPoolFeeInstrumentFactoryCid)
-      sendingMessageCid = sendingMessageCid
+      sendingMessageCid = toInterfaceContractId sendingMessageCid
       senderInputCids = [senderHoldingCid]
       amount = 7.0
       caller = sender
@@ -511,9 +511,9 @@ testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext outboundRateLimiterCid (toInterfaceContractId badExtraOutputFactoryCid)
-      sendingMessageCid = sendingMessageCid
+      sendingMessageCid = toInterfaceContractId sendingMessageCid
       senderInputCids = [senderHoldingCid]
       amount = 7.0
       caller = sender
@@ -600,7 +600,7 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -746,7 +746,7 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badWrongInstrumentFactoryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -755,7 +755,7 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badWrongOwnerFactoryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -764,7 +764,7 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badWrongAmountFactoryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -773,7 +773,7 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badExtraOutputFactoryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -782,7 +782,7 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId badNoOutputFactoryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -872,7 +872,7 @@ testBurnMintPoolReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = scrip
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -970,7 +970,7 @@ testBurnMintPoolReleaseFromTicketDecimalConversionTruncatesToZeroFails = script 
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -1067,7 +1067,7 @@ testBurnMintPoolReleaseFromTicketDecimalConversionOverflowFails = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -1187,7 +1187,7 @@ testBurnMintPoolReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -1305,7 +1305,7 @@ testBurnMintPoolReleaseFromTicketRejectsWrongCCVInstance = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
       tokenReceiveTicketCid = wrongPoolAddressTicketCid
       caller = receiver
@@ -1314,7 +1314,7 @@ testBurnMintPoolReleaseFromTicketRejectsWrongCCVInstance = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -1405,7 +1405,7 @@ testBurnMintPoolReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.ReleaseFromTicket with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = mkPoolContext inboundRateLimiterCid (toInterfaceContractId registryCid)
       tokenReceiveTicketCid = tokenReceiveTicketCid
       caller = receiver
@@ -1474,12 +1474,12 @@ testBurnMintPoolRejectsMissingBurnMintFactory = script do
     exerciseCmd tokenPoolCid BurnMintTokenPool.LockOrBurn with
       tokenAdminRegistryCid = tokenAdminRegistryCid
       tokenConfigCid = tokenConfigCid
-      rmnRemoteCid = rmnRemoteCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = MetadataV1.ChoiceContext with
         values = TextMap.fromList
           [ (RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue outboundRateLimiterCid)
           ]
-      sendingMessageCid = sendingMessageCid
+      sendingMessageCid = toInterfaceContractId sendingMessageCid
       senderInputCids = [senderHoldingCid]
       amount = 2.0
       caller = sender
