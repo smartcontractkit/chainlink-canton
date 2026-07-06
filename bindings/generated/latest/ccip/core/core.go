@@ -30,7 +30,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "b82df29f6afce1f274c15a391acc7577e22bda4dd1c3c665908180c1811b33bd"
+	PackageID   = "a74a5d53a8f1acc873f10788c74494f6e5007a54067bd1dae303347c7041e3a5"
 	SDKVersion  = "3.4.11"
 )
 
@@ -5445,50 +5445,51 @@ func (t *RemovePriceUpdaters) UnmarshalHex(data string) error {
 
 // SendingMessage is a Template type
 type SendingMessage struct {
-	Deps                      SendingMessageDeps                        `json:"deps"`
-	CcipOwner                 types.PARTY                               `json:"ccipOwner"`
-	Sender                    types.PARTY                               `json:"sender"`
-	DestChainSelector         types.NUMERIC                             `json:"destChainSelector"`
-	DestAddressBytesLength    types.INT64                               `json:"destAddressBytesLength"`
-	SequenceNumber            types.NUMERIC                             `json:"sequenceNumber"`
-	DestDefaultCCVs           []chainlinkapi.RawInstanceAddress         `json:"destDefaultCCVs"`
-	RequiredCCVs              []chainlinkapi.RawInstanceAddress         `json:"requiredCCVs"`
-	RequiredExecutor          *chainlinkapi.RawInstanceAddress          `json:"requiredExecutor" hex:"optional"`
-	ExecutorAddress           types.TEXT                                `json:"executorAddress"`
-	ExecutionMode             *ExecutionMode                            `json:"executionMode" hex:"optional"`
-	SourceChainSelector       types.NUMERIC                             `json:"sourceChainSelector"`
-	SenderAddress             types.TEXT                                `json:"senderAddress"`
-	Receiver                  types.TEXT                                `json:"receiver"`
-	Payload                   types.TEXT                                `json:"payload"`
-	ExecutionGasLimit         types.INT64                               `json:"executionGasLimit"`
-	CcipReceiveGasLimit       types.INT64                               `json:"ccipReceiveGasLimit"`
-	CcvAndExecutorHash        types.TEXT                                `json:"ccvAndExecutorHash"`
-	OnRampAddress             types.TEXT                                `json:"onRampAddress"`
-	OffRampAddress            types.TEXT                                `json:"offRampAddress" hex:"bytes"`
-	TokenReceiver             types.TEXT                                `json:"tokenReceiver"`
-	TokenArgs                 types.TEXT                                `json:"tokenArgs"`
-	FeeToken                  splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
-	NetworkFeeUSDCents        types.NUMERIC                             `json:"networkFeeUSDCents"`
-	ExpectedTokenInstrumentId *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId" hex:"optional"`
-	OutboundPoolCCVs          *[]chainlinkapi.RawInstanceAddress        `json:"outboundPoolCCVs" hex:"optional"`
-	ExecutorArgs              types.TEXT                                `json:"executorArgs"`
-	ExecutorFee               *ExecutorFee                              `json:"executorFee" hex:"optional"`
-	ExecutorDestGasLimit      types.INT64                               `json:"executorDestGasLimit"`
-	ExecutorDestBytesOverhead types.INT64                               `json:"executorDestBytesOverhead"`
-	ExecutorFeeTokenAmount    types.NUMERIC                             `json:"executorFeeTokenAmount"`
-	ObservingParties          []types.PARTY                             `json:"observingParties"`
-	CcvFees                   []CCVFee                                  `json:"ccvFees"`
-	TokenSendFee              *TokenSendFee                             `json:"tokenSendFee" hex:"optional"`
-	CcvFeeTokenAmounts        []types.NUMERIC                           `json:"ccvFeeTokenAmounts"`
-	TokenSendFeeTokenAmount   types.NUMERIC                             `json:"tokenSendFeeTokenAmount"`
-	NetworkFeeTokenAmount     types.NUMERIC                             `json:"networkFeeTokenAmount"`
-	TokenSendData             *TokenSendData                            `json:"tokenSendData" hex:"optional"`
-	VerifierData              []VerifierData                            `json:"verifierData"`
-	CcvOwners                 []types.PARTY                             `json:"ccvOwners"`
-	Message                   *ccipcodec.MessageV1                      `json:"message" hex:"optional"`
-	EncodedMessage            types.TEXT                                `json:"encodedMessage"`
-	MessageId                 types.TEXT                                `json:"messageId"`
-	State                     SendingMessageState                       `json:"state"`
+	Deps                           SendingMessageDeps                        `json:"deps"`
+	CcipOwner                      types.PARTY                               `json:"ccipOwner"`
+	Sender                         types.PARTY                               `json:"sender"`
+	DestChainSelector              types.NUMERIC                             `json:"destChainSelector"`
+	DestAddressBytesLength         types.INT64                               `json:"destAddressBytesLength"`
+	SequenceNumber                 types.NUMERIC                             `json:"sequenceNumber"`
+	DestDefaultCCVs                []chainlinkapi.RawInstanceAddress         `json:"destDefaultCCVs"`
+	RequiredCCVs                   []chainlinkapi.RawInstanceAddress         `json:"requiredCCVs"`
+	RequiredExecutor               *chainlinkapi.RawInstanceAddress          `json:"requiredExecutor" hex:"optional"`
+	ExecutorAddress                types.TEXT                                `json:"executorAddress"`
+	ExecutionMode                  *ExecutionMode                            `json:"executionMode" hex:"optional"`
+	SourceChainSelector            types.NUMERIC                             `json:"sourceChainSelector"`
+	SenderAddress                  types.TEXT                                `json:"senderAddress"`
+	Receiver                       types.TEXT                                `json:"receiver"`
+	Payload                        types.TEXT                                `json:"payload"`
+	ExecutionGasLimit              types.INT64                               `json:"executionGasLimit"`
+	CcipReceiveGasLimit            types.INT64                               `json:"ccipReceiveGasLimit"`
+	CcvAndExecutorHash             types.TEXT                                `json:"ccvAndExecutorHash"`
+	OnRampAddress                  types.TEXT                                `json:"onRampAddress"`
+	OffRampAddress                 types.TEXT                                `json:"offRampAddress" hex:"bytes"`
+	TokenReceiver                  types.TEXT                                `json:"tokenReceiver"`
+	TokenArgs                      types.TEXT                                `json:"tokenArgs"`
+	FeeToken                       splice_api_token_holding_v1.InstrumentId  `json:"feeToken"`
+	NetworkFeeUSDCents             types.NUMERIC                             `json:"networkFeeUSDCents"`
+	ExpectedTokenInstrumentId      *splice_api_token_holding_v1.InstrumentId `json:"expectedTokenInstrumentId" hex:"optional"`
+	TokenAmountBeforeTokenPoolFees types.NUMERIC                             `json:"tokenAmountBeforeTokenPoolFees"`
+	OutboundPoolCCVs               *[]chainlinkapi.RawInstanceAddress        `json:"outboundPoolCCVs" hex:"optional"`
+	ExecutorArgs                   types.TEXT                                `json:"executorArgs"`
+	ExecutorFee                    *ExecutorFee                              `json:"executorFee" hex:"optional"`
+	ExecutorDestGasLimit           types.INT64                               `json:"executorDestGasLimit"`
+	ExecutorDestBytesOverhead      types.INT64                               `json:"executorDestBytesOverhead"`
+	ExecutorFeeTokenAmount         types.NUMERIC                             `json:"executorFeeTokenAmount"`
+	ObservingParties               []types.PARTY                             `json:"observingParties"`
+	CcvFees                        []CCVFee                                  `json:"ccvFees"`
+	TokenSendFee                   *TokenSendFee                             `json:"tokenSendFee" hex:"optional"`
+	CcvFeeTokenAmounts             []types.NUMERIC                           `json:"ccvFeeTokenAmounts"`
+	TokenSendFeeTokenAmount        types.NUMERIC                             `json:"tokenSendFeeTokenAmount"`
+	NetworkFeeTokenAmount          types.NUMERIC                             `json:"networkFeeTokenAmount"`
+	TokenSendData                  *TokenSendData                            `json:"tokenSendData" hex:"optional"`
+	VerifierData                   []VerifierData                            `json:"verifierData"`
+	CcvOwners                      []types.PARTY                             `json:"ccvOwners"`
+	Message                        *ccipcodec.MessageV1                      `json:"message" hex:"optional"`
+	EncodedMessage                 types.TEXT                                `json:"encodedMessage"`
+	MessageId                      types.TEXT                                `json:"messageId"`
+	State                          SendingMessageState                       `json:"state"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -5621,6 +5622,10 @@ func (t SendingMessage) CreateCommand() *model.CreateCommand {
 			"_type": "optional",
 			"value": nil,
 		}
+	}
+
+	if t.TokenAmountBeforeTokenPoolFees != "" {
+		args["tokenAmountBeforeTokenPoolFees"] = t.TokenAmountBeforeTokenPoolFees
 	}
 
 	if t.OutboundPoolCCVs != nil {
@@ -5885,6 +5890,10 @@ func (t SendingMessage) CreateCommandWithPackageID(packageID string) *model.Crea
 			"_type": "optional",
 			"value": nil,
 		}
+	}
+
+	if t.TokenAmountBeforeTokenPoolFees != "" {
+		args["tokenAmountBeforeTokenPoolFees"] = t.TokenAmountBeforeTokenPoolFees
 	}
 
 	if t.OutboundPoolCCVs != nil {
