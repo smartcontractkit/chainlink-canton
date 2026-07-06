@@ -75,7 +75,7 @@ func (r RegisterNativeFeeTokenInTAR) Apply(e cldf.Environment, config CantonCSDe
 
 	instrumentID := config.Config.InstrumentId
 	if instrumentID.Admin == "" || instrumentID.Id == "" {
-		instrumentID, err = nativeinstrument.LookupNativeInstrumentID(e.GetContext(), participant)
+		instrumentID, err = nativeinstrument.ResolveNativeInstrumentID(e.GetContext(), participant, e.DataStore, config.ChainSelector)
 		if err != nil {
 			return cldf.ChangesetOutput{}, fmt.Errorf("resolve native fee token instrument: %w", err)
 		}

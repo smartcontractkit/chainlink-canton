@@ -33,13 +33,13 @@ const defaultLinkTokenInstrumentID = "link-token"
 // defaultLinkUsdPerTokenDollars is the nominal LINK/USD spot used when FamilyExtras omit a price.
 const defaultLinkUsdPerTokenDollars int64 = 10
 
-// defaultNativeUsdPerTokenDollars is the nominal Amulet/USD spot used when FamilyExtras omit a price.
-const defaultNativeUsdPerTokenDollars int64 = 1
+// defaultNativeUsdPerToken is the nominal Amulet/USD spot used when FamilyExtras omit a price.
+const defaultNativeUsdPerToken = "0.1"
 
 // cantonUsdPerTokenScale is the internal fixed-point scale (USD * 1e8) before formatting to Decimal.
 const cantonUsdPerTokenScale int64 = 100_000_000
 
-func resolveTokenPricesForRemoteDest(
+func ResolveTokenPricesForRemoteDest(
 	ds datastore.DataStore,
 	input ccipadapters.ConfigureChainForLanesInput,
 	remoteSelector uint64,
@@ -55,7 +55,11 @@ func resolveTokenPricesForRemoteDest(
 	}
 	if nativeInstrument != nil && nativeInstrument.Admin != "" && nativeInstrument.Id != "" {
 		key := instrumentPriceKey(nativeInstrument.Admin, nativeInstrument.Id)
-		prices[key] = usdPerTokenToScaled(defaultNativeUsdPerTokenDollars)
+		nativePrice, err := parseUsdPerTokenPriceString(defaultNativeUsdPerToken)
+		if err != nil {
+			return nil, fmt.Errorf("default native token price: %w", err)
+		}
+		prices[key] = nativePrice
 	}
 
 	extras, err := tokenPricesFromFamilyExtras(input.FamilyExtras, remoteSelector)

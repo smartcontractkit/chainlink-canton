@@ -30,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
+	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/finality"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
@@ -367,6 +368,7 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 	var (
 		messageIDHex string
 		wait         time.Duration
+		finalityName string
 	)
 	c := &cobra.Command{
 		Use:   "execute",
@@ -374,6 +376,10 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 			b, err := g.Resolve(ctx)
+			if err != nil {
+				return err
+			}
+			fin, err := finality.Parse(finalityName)
 			if err != nil {
 				return err
 			}
@@ -385,17 +391,18 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 			}
 			fmt.Printf("Verifier results for %s successfully retrieved.\n", messageId.Hex())
 
-			return cantonExecute(ctx, b, resp.Results[0].VerifierResult)
+			return cantonExecute(ctx, b, resp.Results[0].VerifierResult, fin)
 		},
 	}
 	c.Flags().StringVar(&messageIDHex, "message-id", "", "CCIP message id (0x-prefixed hex) (required)")
 	c.Flags().DurationVar(&wait, "wait", 15*time.Minute, "max time to wait for verifier results")
+	c.Flags().StringVar(&finalityName, "finality", "finality", "must match the send: finality (full), safe, or block depth 1-65535")
 	_ = c.MarkFlagRequired("message-id")
 
 	return c
 }
 
-func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierResult) error {
+func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierResult, fin finality.Parsed) error {
 	withToken := vr.Message.TokenTransfer != nil
 
 	encodedMessage, err := vr.Message.Encode()
@@ -421,7 +428,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 	if err != nil {
 		return err
 	}
-	receiverCid, err := cantonops.GetOrCreateReceiver(ctx, b.Participant)
+	receiverCid, err := cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, verifierRawAddress)
 	if err != nil {
 		return err
 	}
