@@ -752,6 +752,8 @@ testCCIPSend = script do
     Some msgSent <- user `queryContractId` sendResult.ccipMessageSent
     msgSent.event.sequenceNumber === 1.0
     msgSent.event.destChainSelector === destChainSelector
+    msgSent.event.feeToken === testFeeTokenId
+    msgSent.event.tokenAmountBeforeTokenPoolFees === 0.0
     let decoded = fromSome (CCIP.CodecV1.MessageCodecV1.decodeMessageV1 msgSent.event.encodedMessage)
     decoded.executionGasLimit === 112345
 

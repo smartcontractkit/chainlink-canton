@@ -356,6 +356,7 @@ mkSendingMessage ccipOwner sender destDefaultCCVs sequenceNumber = do
             feeToken = feeToken
             networkFeeUSDCents = cents 0.0
             expectedTokenInstrumentId = Some tokenInstrumentId
+            tokenAmountBeforeTokenPoolFees = 10.0
             outboundPoolCCVs = None
             executorArgs = ""
             executorFee = None

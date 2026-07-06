@@ -1051,6 +1051,7 @@ testForwardToVerifier_AllowlistChecksSender = script do
         feeToken = feeToken
         networkFeeUSDCents = 0.0
         expectedTokenInstrumentId = None
+        tokenAmountBeforeTokenPoolFees = 0.0
         outboundPoolCCVs = None
         executorArgs = ""
         executorFee = None
