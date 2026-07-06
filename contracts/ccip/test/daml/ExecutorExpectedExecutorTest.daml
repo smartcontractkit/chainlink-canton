@@ -8,8 +8,11 @@ import DA.Optional (fromSome)
 import DA.Set qualified as Set
 import qualified DA.TextMap as TextMap
 
+import qualified CCIP.API.FeeQuoterV1
+import qualified CCIP.API.GlobalConfigV1
+
 import qualified CCIP.CCIPSender
-import qualified CCIP.Client
+import qualified CCIP.ClientV1
 import qualified CCIP.Executor
 import qualified CCIP.ExecutorTypes as CCIP.Executor
 import qualified CCIP.FeeQuoter
@@ -50,22 +53,22 @@ feeContext : FeeFixture -> MetadataV1.ChoiceContext
 feeContext f =
     MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.FeeQuoter.feeQuoterKey, MetadataV1.AV_ContractId $ coerceContractId f.feeQuoter)
-            , (CCIP.GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
-            , (CCIP.OnRamp.onRampKey, MetadataV1.AV_ContractId $ coerceContractId f.onRamp)
+            [ (CCIP.API.FeeQuoterV1.feeQuoterContextKey, MetadataV1.AV_ContractId $ coerceContractId f.feeQuoter)
+            , (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
+            , (CCIP.OnRamp.onRampContextKey, MetadataV1.AV_ContractId $ coerceContractId f.onRamp)
             ]
 
 messageWithExecutor
     : FeeFixture
-    -> CCIP.Client.ExecutorExtraArg
-    -> CCIP.Client.Canton2AnyMessage
+    -> CCIP.ClientV1.ExecutorExtraArg
+    -> CCIP.ClientV1.Canton2AnyMessage
 messageWithExecutor f executor =
-    CCIP.Client.Canton2AnyMessage with
+    CCIP.ClientV1.Canton2AnyMessage with
         receiver = "0000000000000000000000000000000000000001"
         payload = "abcd"
         tokenTransfer = None
         feeToken = f.feeToken
-        extraArgs = CCIP.Client.V3 CCIP.Client.GenericExtraArgsV3 with
+        extraArgs = CCIP.ClientV1.V3 CCIP.ClientV1.GenericExtraArgsV3 with
             gasLimit = 0
             ccvs = []
             executor = executor
@@ -290,9 +293,9 @@ testSenderGetFeeRejectsWrongDefaultExecutorInput = script do
         ) do
         exerciseCmd f.sender CCIP.CCIPSender.GetFee with
             destinationChainSelector = f.destChainSelector
-            message = messageWithExecutor f (CCIP.Client.Executor_UseDefault "")
+            message = messageWithExecutor f (CCIP.ClientV1.Executor_UseDefault "")
             context = feeContext f
-            routerCid = f.router
+            routerCid = coerceContractId f.router
             ccvSendInputs = []
             tokenTransferInput = None
             executorInput = Some (executorInput f.executorB)
@@ -317,9 +320,9 @@ testSenderGetFeeRejectsWrongExplicitExecutorInput = script do
         exerciseCmd f.sender CCIP.CCIPSender.GetFee with
             destinationChainSelector = f.destChainSelector
             message = messageWithExecutor f
-                (CCIP.Client.Executor_WithAddress f.executorAAddress "")
+                (CCIP.ClientV1.Executor_WithAddress f.executorAAddress "")
             context = feeContext f
-            routerCid = f.router
+            routerCid = coerceContractId f.router
             ccvSendInputs = []
             tokenTransferInput = None
             executorInput = Some (executorInput f.executorB)
@@ -343,7 +346,7 @@ testRouterGetFeeRejectsMismatchedExecutorQuote = script do
             context = feeContext f
             destChainSelector = f.destChainSelector
             message = messageWithExecutor f
-                (CCIP.Client.Executor_WithAddress f.executorAAddress "")
+                (CCIP.ClientV1.Executor_WithAddress f.executorAAddress "")
             ccvFeeQuotes = []
             tokenPoolFeeQuote = None
             executorFeeQuote = Some (executorFeeQuote f.executorBAddress 9.0)
@@ -367,7 +370,7 @@ testRouterGetFeeRequiresExplicitExecutorQuote = script do
             context = feeContext f
             destChainSelector = f.destChainSelector
             message = messageWithExecutor f
-                (CCIP.Client.Executor_WithAddress f.executorAAddress "")
+                (CCIP.ClientV1.Executor_WithAddress f.executorAAddress "")
             ccvFeeQuotes = []
             tokenPoolFeeQuote = None
             executorFeeQuote = None

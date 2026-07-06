@@ -321,7 +321,7 @@ template LockReleaseTokenPool
                         caller = arg.caller
 
             tokenPool_verifyOutboundCCVsImpl self arg = do
-                coerceContractId <$> exercise (fromInterfaceContractId @LockReleaseTokenPool self) VerifyOutboundCCVs
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) VerifyOutboundCCVs
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         tokenConfigCid = arg.tokenConfigCid
@@ -353,20 +353,20 @@ template LockReleaseTokenPool
                         caller = arg.caller
 
             tokenPool_calculateFeeImpl self arg = do
-                coerceContractId <$> exercise (fromInterfaceContractId @LockReleaseTokenPool self) CalculateFee
+                exercise (fromInterfaceContractId @LockReleaseTokenPool self) CalculateFee
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         tokenConfigCid = arg.tokenConfigCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
-                        feeQuoterCid = coerceContractId arg.feeQuoterCid
+                        feeQuoterCid = arg.feeQuoterCid
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
 
             tokenPool_getFeeImpl self arg = do
                 exercise (fromInterfaceContractId @LockReleaseTokenPool self) GetFee
                     with
-                        feeQuoterCid = coerceContractId arg.feeQuoterCid
+                        feeQuoterCid = arg.feeQuoterCid
                         destChainSelector = arg.destChainSelector
                         tokenInstrumentId = arg.tokenInstrumentId
                         caller = arg.caller
@@ -792,7 +792,7 @@ template LockReleaseTokenPool
                 let expectedRateLimiter = if useCustomFinalityRateLimiter
                         then remoteChainCfg.inboundCustomBlockConfirmationsRateLimiter
                         else remoteChainCfg.inboundRateLimiter
-                rateLimiterCid <- CCIP.RateLimiterV1.lookupRateLimiterCid extraContext
+                rateLimiterCid <- CCIP.Utils.Context.getFromContextU extraContext CCIP.RateLimiterV1.rateLimiterContextKey
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "ReleaseFromTicket: rateLimiter"
@@ -826,7 +826,7 @@ template LockReleaseTokenPool
                         caller = poolOwner
 
                 -- Get inputs from extraContext
-                tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                tokenPoolHoldings <- CCIP.Utils.Context.getFromContextU extraContext tokenPoolHoldingsContextKey
                 _ <- sumCheckedHoldingAmounts
                     "ReleaseFromTicket: tokenPoolHoldings"
                     poolOwner
@@ -943,8 +943,7 @@ template LockReleaseTokenPool
         -- Calculate fee for outbound token transfer (USD cents only).
         -- Reads destChainSelector from SendingMessageV1, looks up per-chain
         -- fee config, appends fee directly to SendingMessageV1.
-        nonconsuming choice CalculateFee
-                : ContractId CCIP.API.SendingMessageV1.SendingMessage
+        nonconsuming choice CalculateFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
                 tokenAdminRegistryCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
@@ -1109,7 +1108,7 @@ template LockReleaseTokenPool
                 let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
 
                 let expectedRateLimiter = remoteChainCfg.outboundRateLimiter
-                rateLimiterCid <- CCIP.RateLimiterV1.lookupRateLimiterCid extraContext
+                rateLimiterCid <- CCIP.Utils.Context.getFromContextU extraContext CCIP.RateLimiterV1.rateLimiterContextKey
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "LockOrBurn: rateLimiter"
@@ -1123,7 +1122,7 @@ template LockReleaseTokenPool
                     requested = amountAfterFeeBps
 
                 -- Get inputs from extraContext
-                tokenPoolHoldings <- lookupTokenPoolHoldings extraContext
+                tokenPoolHoldings <- CCIP.Utils.Context.getFromContextU extraContext tokenPoolHoldingsContextKey
                 _ <- sumCheckedHoldingAmounts
                     "LockOrBurn: existing tokenPoolHoldings"
                     poolOwner

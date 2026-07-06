@@ -11,6 +11,12 @@ import qualified Chainlink.InstanceAddress
 import qualified CCIP.API.ExecutingMessageV1
 import qualified CCIP.API.SendingMessageV1
 
+tokenAdminRegistryContextKey : Text
+tokenAdminRegistryContextKey = "token-admin-registry"
+
+tokenConfigContextKey : Text
+tokenConfigContextKey = "token-config"
+
 interface TokenAdminRegistry where
     viewtype TokenAdminRegistryView
 

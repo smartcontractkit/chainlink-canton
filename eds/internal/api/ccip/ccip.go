@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -355,19 +356,19 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{
 		Values: map[string]splice_api_token_metadata_v1.AnyValue{
-			string(ccipruntime.OnRampKey): {
+			string(ccipruntime.OnRampContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeOnRampContract.GetCreatedEvent().GetContractId())),
 			},
-			string(core.GlobalConfigKey): {
+			string(ccipapi.GlobalConfigContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
 			},
-			string(core.TokenAdminRegistryKey): {
+			string(ccipapi.TokenAdminRegistryContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			string(core.RmnRemoteContextKey): {
+			string(ccipapi.RmnRemoteContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
-			string(core.FeeQuoterKey): {
+			string(ccipapi.FeeQuoterContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeFeeQuoterContract.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -431,7 +432,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 			c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: fmt.Sprintf("no token pool registered for token: %s", encodedInstrumentId.Hex())})
 			return
 		}
-		choiceContext.Values[string(core.TokenConfigKey)] = splice_api_token_metadata_v1.AnyValue{
+		choiceContext.Values[string(ccipapi.TokenConfigContextKey)] = splice_api_token_metadata_v1.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
 		}
 		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))
@@ -506,16 +507,16 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 
 	choiceContext := splice_api_token_metadata_v1.ChoiceContext{
 		Values: map[string]splice_api_token_metadata_v1.AnyValue{
-			string(ccipruntime.OffRampKey): {
+			string(ccipruntime.OffRampContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeOffRampContract.GetCreatedEvent().GetContractId())),
 			},
-			string(core.GlobalConfigKey): {
+			string(ccipapi.GlobalConfigContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeGlobalConfigContract.GetCreatedEvent().GetContractId())),
 			},
-			string(core.TokenAdminRegistryKey): {
+			string(ccipapi.TokenAdminRegistryContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			string(core.RmnRemoteContextKey): {
+			string(ccipapi.RmnRemoteContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
 		},
@@ -557,7 +558,7 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 			return
 		}
 		tokenPool = new(oapiCommon.RawInstanceAddress(contracts.InstanceID(parsedTokenConfig.Pool.PoolInstanceId).RawInstanceAddress(parsedTokenConfig.Pool.PoolOwner)))
-		choiceContext.Values[string(core.TokenConfigKey)] = splice_api_token_metadata_v1.AnyValue{
+		choiceContext.Values[string(ccipapi.TokenConfigContextKey)] = splice_api_token_metadata_v1.AnyValue{
 			AVContractId: new(types.CONTRACT_ID(activeTokenConfigContract.GetCreatedEvent().GetContractId())),
 		}
 		disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeTokenConfigContract))

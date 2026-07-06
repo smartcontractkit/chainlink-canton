@@ -56,7 +56,7 @@ messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 mkPoolContext : ContractId CCIP.RateLimiterV1.RateLimiter -> ContractId BurnMintV1.BurnMintFactory -> MetadataV1.ChoiceContext
 mkPoolContext rateLimiterCid burnMintFactoryCid = MetadataV1.ChoiceContext with
   values = TextMap.fromList
-    [ (CCIP.RateLimiterV1.rateLimiterKey, CCIP.Utils.Context.toAnyValue rateLimiterCid)
+    [ (CCIP.RateLimiterV1.rateLimiterContextKey, CCIP.Utils.Context.toAnyValue rateLimiterCid)
     , (BurnMintTokenPool.burnMintFactoryContextKey, CCIP.Utils.Context.toAnyValue burnMintFactoryCid)
     ]
 
@@ -1487,7 +1487,7 @@ testBurnMintPoolRejectsMissingBurnMintFactory = script do
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = MetadataV1.ChoiceContext with
         values = TextMap.fromList
-          [ (CCIP.RateLimiterV1.rateLimiterKey, CCIP.Utils.Context.toAnyValue outboundRateLimiterCid)
+          [ (CCIP.RateLimiterV1.rateLimiterContextKey, CCIP.Utils.Context.toAnyValue outboundRateLimiterCid)
           ]
       sendingMessageCid = toInterfaceContractId sendingMessageCid
       senderInputCids = [senderHoldingCid]

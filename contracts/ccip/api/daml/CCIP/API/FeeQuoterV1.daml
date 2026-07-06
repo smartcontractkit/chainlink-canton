@@ -5,6 +5,9 @@ import qualified Splice.Api.Token.HoldingV1
 
 import qualified Chainlink.InstanceAddress
 
+feeQuoterContextKey : Text
+feeQuoterContextKey = "fee-quoter"
+
 interface FeeQuoter where
     viewtype FeeQuoterView
 

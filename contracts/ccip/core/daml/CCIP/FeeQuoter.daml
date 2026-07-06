@@ -16,7 +16,6 @@ import Splice.Api.Token.MetadataV1 (ChoiceContext)
 import qualified Chainlink.InstanceAddress
 
 import qualified CCIP.API.FeeQuoterV1
-import qualified CCIP.Utils.Context
 
 import CCIP.Math qualified
 import qualified CCIP.SendingMessageV1
@@ -40,11 +39,6 @@ import CCIP.FeeQuoterTypes (
     ApplyFeeQuoterDestChainConfigUpdatesParams(..),
     )
 
-feeQuoterKey : Text
-feeQuoterKey = "fee-quoter"
-
-lookupFeeQuoterCid : ChoiceContext -> Update (ContractId FeeQuoter)
-lookupFeeQuoterCid ctx = CCIP.Utils.Context.getFromContextU ctx feeQuoterKey
 
 rawInstanceAddress : FeeQuoter -> Chainlink.InstanceAddress.RawInstanceAddress
 rawInstanceAddress feeQuoter = Chainlink.InstanceAddress.make feeQuoter.instanceId feeQuoter.owner

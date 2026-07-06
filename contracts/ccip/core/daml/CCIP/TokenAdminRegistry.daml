@@ -11,7 +11,6 @@ import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.API.TokenAdminRegistryV1
-import qualified CCIP.Utils.Context
 
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.MessageCodecV1
@@ -38,24 +37,6 @@ import CCIP.TokenAdminRegistryTypes (
     SetTransferFactoryParams(..),
     TransferAdminParams(..),
     )
-
-tokenAdminRegistryKey : Text
-tokenAdminRegistryKey = "token-admin-registry"
-
-tokenConfigKey : Text
-tokenConfigKey = "token-config"
-
-lookupTokenAdminRegistryCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId TokenAdminRegistry)
-lookupTokenAdminRegistryCid ctx =
-    CCIP.Utils.Context.getFromContextU ctx tokenAdminRegistryKey
-
-lookupTokenConfigCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId TokenConfig)
-lookupTokenConfigCid ctx =
-    CCIP.Utils.Context.getFromContextU ctx tokenConfigKey
-
-lookupOptionalTokenConfigCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (Optional (ContractId TokenConfig))
-lookupOptionalTokenConfigCid ctx =
-    CCIP.Utils.Context.lookupFromContextU ctx tokenConfigKey
 
 tokenConfigInstanceId : Splice.Api.Token.HoldingV1.InstrumentId -> Text
 tokenConfigInstanceId = CCIP.MessageCodecV1.encodeInstrumentId

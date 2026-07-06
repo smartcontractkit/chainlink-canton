@@ -14,6 +14,9 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 
 import qualified CCIP.API.ExecutingMessageV1
+import qualified CCIP.API.GlobalConfigV1
+import qualified CCIP.API.RMNRemoteV1
+import qualified CCIP.API.TokenAdminRegistryV1
 
 import qualified CCIP.CCVCodec
 
@@ -216,10 +219,10 @@ testExecuteWithCCVVerification = script do
     executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -244,10 +247,10 @@ testExecuteWithCCVVerification = script do
     executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     -- Verify SUCCESS
@@ -405,11 +408,11 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
                 values = TextMap.fromList
-                    [ (CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
-                    , (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)
-                    , (TokenAdminRegistry.tokenConfigKey, MetadataV1.AV_ContractId $ coerceContractId tokenConfigCid)
-                    , (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig)
-                    , (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)
+                    [ (CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote)
+                    , (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry)
+                    , (CCIP.API.TokenAdminRegistryV1.tokenConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenConfigCid)
+                    , (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig)
+                    , (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)
                     ]
             executingMessageCid = executingMessageCid
 
@@ -655,10 +658,10 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
     executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -683,10 +686,10 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
     submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     -- Add CCV2 verification
@@ -704,10 +707,10 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
     executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     -- Verify SUCCESS
@@ -835,10 +838,10 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
     executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -869,10 +872,10 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
     submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     -- Add CCV2 verification
@@ -888,10 +891,10 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
     executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     -- Verify SUCCESS
@@ -1021,10 +1024,10 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
     submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -1038,10 +1041,10 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
     executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -1071,10 +1074,10 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
     submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     -- Add CCV3 verification
@@ -1089,10 +1092,10 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
     executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     -- Verify SUCCESS
@@ -1206,10 +1209,10 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
     executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -1224,10 +1227,10 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
     submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     debug "testExecuteMessageOnlyRequiresReceiverCCVs: PASSED"
@@ -1330,10 +1333,10 @@ testPrepareExecuteAllowsSafeFinalityConfig = script do
     _ <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -1457,10 +1460,10 @@ testExecuteFailsMissingCCV = script do
     executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -1474,10 +1477,10 @@ testExecuteFailsMissingCCV = script do
     submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     debug ("Execute fails with missing CCV: PASSED")
@@ -1592,10 +1595,10 @@ testExecuteWrongReceiver = script do
     submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver  -- Providing receiver, but message.receiver is otherParty
             tokenReceiverParty = None
@@ -1711,10 +1714,10 @@ testExecuteAllowsMultipleOnRamps = script do
     executingMessageCid <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None
@@ -1735,10 +1738,10 @@ testExecuteAllowsMultipleOnRamps = script do
     executeResult <- submit (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.Execute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
     executeResult.state === CCIP.API.ExecutingMessageV1.SUCCESS
@@ -1846,10 +1849,10 @@ testExecuteRejectsUnconfiguredOnRamp = script do
     submitMustFail (actAs receiver <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd router PerPartyRouter.PrepareExecute with
             context = MetadataV1.ChoiceContext with
-                values = TextMap.fromList [(CCIP.RMNRemote.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
-                 (TokenAdminRegistry.tokenAdminRegistryKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
-                 (GlobalConfig.globalConfigKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
-                 (OffRamp.offRampKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
+                values = TextMap.fromList [(CCIP.API.RMNRemoteV1.rmnRemoteContextKey, MetadataV1.AV_ContractId $ coerceContractId rmnRemote),
+                 (CCIP.API.TokenAdminRegistryV1.tokenAdminRegistryContextKey, MetadataV1.AV_ContractId $ coerceContractId tokenAdminRegistry),
+                 (CCIP.API.GlobalConfigV1.globalConfigContextKey, MetadataV1.AV_ContractId $ coerceContractId globalConfig),
+                 (OffRamp.offRampContextKey, MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             encodedMessage = encodedMessage
             receiverParty = receiver
             tokenReceiverParty = None

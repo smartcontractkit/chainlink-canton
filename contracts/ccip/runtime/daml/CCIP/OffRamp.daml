@@ -14,7 +14,6 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import Chainlink.InstanceAddress (assertValidInstanceId)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 
-import qualified CCIP.Utils.Context
 import qualified CCIP.EventsV1.Events
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FinalityConfig
@@ -28,11 +27,8 @@ import qualified CCIP.TokenAdminRegistry
 import CCIP.OffRampTypes (OffRampDeps(..), SetDepsParams(..))
 import CCIP.OffRampCodecGen (decodeSetDepsParamsAt)
 
-offRampKey : Text
-offRampKey = "off-ramp"
-
-lookupOffRampCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId OffRamp)
-lookupOffRampCid ctx = CCIP.Utils.Context.getFromContextU ctx offRampKey
+offRampContextKey : Text
+offRampContextKey = "off-ramp"
 
 rawInstanceAddress : OffRamp -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress offRamp = RawInstanceAddress.make offRamp.instanceId offRamp.ccipOwner
