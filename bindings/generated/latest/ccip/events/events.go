@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-events"
-	PackageID   = "92570efbe4b4185cb0c651b85de70dfd9d9e8d5dc8e3aba2e923e4d7eb755924"
+	PackageID   = "ed745ab0d59b47a9988e7f420286c838a5d5ff5e16069c811b8702089fde01b7"
 	SDKVersion  = "3.4.11"
 )
 
@@ -195,14 +195,12 @@ func (t CCIPMessageSent) ArchiveWithPackageID(contractID string, packageID strin
 
 // CCIPMessageSentEvent is a Record type
 type CCIPMessageSentEvent struct {
-	DestChainSelector              types.NUMERIC                            `json:"destChainSelector"`
-	SequenceNumber                 types.NUMERIC                            `json:"sequenceNumber"`
-	MessageId                      types.TEXT                               `json:"messageId"`
-	FeeToken                       splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
-	TokenAmountBeforeTokenPoolFees types.NUMERIC                            `json:"tokenAmountBeforeTokenPoolFees"`
-	EncodedMessage                 types.TEXT                               `json:"encodedMessage"`
-	VerifierBlobs                  []types.TEXT                             `json:"verifierBlobs"`
-	Receipts                       []Receipt                                `json:"receipts"`
+	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	SequenceNumber    types.NUMERIC `json:"sequenceNumber"`
+	MessageId         types.TEXT    `json:"messageId"`
+	EncodedMessage    types.TEXT    `json:"encodedMessage"`
+	VerifierBlobs     []types.TEXT  `json:"verifierBlobs"`
+	Receipts          []Receipt     `json:"receipts"`
 }
 
 // ToMap converts CCIPMessageSentEvent to a map for DAML arguments
@@ -214,10 +212,6 @@ func (t CCIPMessageSentEvent) ToMap() map[string]any {
 	m["sequenceNumber"] = t.SequenceNumber
 
 	m["messageId"] = string(t.MessageId)
-
-	m["feeToken"] = model.NestedToDAMLValue(t.FeeToken)
-
-	m["tokenAmountBeforeTokenPoolFees"] = t.TokenAmountBeforeTokenPoolFees
 
 	m["encodedMessage"] = string(t.EncodedMessage)
 

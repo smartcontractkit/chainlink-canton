@@ -11,6 +11,7 @@ import (
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
 	ccvshared "github.com/smartcontractkit/chainlink-ccv/deployment/shared"
+	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 )
@@ -21,6 +22,12 @@ var tokenPoolVersions = []string{
 }
 
 func init() {
+	// Map the JD proto Canton chain type to its chain-selectors family so ccv's
+	// signing-key fetch (fetch_signing_keys) keeps Canton verifier chain configs
+	// instead of skipping them as an unsupported type. Without this, canton NOPs never
+	// reach state inference and on-chain canton signers fail to resolve to a NOP.
+	ccvshared.RegisterChainTypeFamily(nodev1.ChainType_CHAIN_TYPE_CANTON, chainsel.FamilyCanton)
+
 	// Canonicalise canton committee signer addresses (raw secp256k1 pubkey ->
 	// derived 20-byte ECDSA address) so ccv state inference can match on-chain
 	// committee signers back to canton NOPs.

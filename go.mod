@@ -23,24 +23,24 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/google/uuid v1.6.0
-	github.com/icza/gox v0.2.9
+	github.com/icza/gox v0.2.14
 	github.com/jedib0t/go-pretty/v6 v6.8.1
 	github.com/jpillora/backoff v1.0.0
 	github.com/lib/pq v1.12.3
-	github.com/moby/moby/api v1.54.2
+	github.com/moby/moby/api v1.55.0
 	github.com/oapi-codegen/runtime v1.4.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.0
 	github.com/smartcontractkit/chain-selectors v1.0.104
-	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260629123053-9119c0d88425
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260629123053-9119c0d88425
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260630070014-13227c2d12d0
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260630070014-13227c2d12d0
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260630070014-13227c2d12d0
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260702144426-865f1e5fe90d
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260702144426-865f1e5fe90d
+	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260703085752-3368a3af3d84
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260703085752-3368a3af3d84
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260703085752-3368a3af3d84
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
 	github.com/smartcontractkit/chainlink-deployments-framework v0.114.2
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260623160408-12abc7b173d8
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260630120514-36abe27604df
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/spf13/viper v1.21.0
@@ -53,7 +53,7 @@ require (
 	golang.org/x/crypto v0.53.0
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	golang.org/x/oauth2 v0.36.0
-	google.golang.org/grpc v1.81.1
+	google.golang.org/grpc v1.82.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -158,7 +158,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/sercand/kuberesolver/v6 v6.0.0 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.0-20260630070014-13227c2d12d0 // indirect
+	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.0-20260702145243-1bc05d9d7d3a // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20260423135514-5b1a7565a99c // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260423135514-5b1a7565a99c // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20260423135514-5b1a7565a99c // indirect
@@ -441,10 +441,10 @@ require (
 	github.com/smartcontractkit/chainlink-protos/chainlink-ccv/message-discovery v0.0.0-20251211142334-5c3421fe2c8d // indirect
 	github.com/smartcontractkit/chainlink-protos/chainlink-ccv/verifier v0.0.0-20251211142334-5c3421fe2c8d // indirect
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260505131349-78e491b80735 // indirect
-	github.com/smartcontractkit/chainlink-protos/job-distributor v0.19.0 // indirect
+	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0
 	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20251002192024-d2ad9222409b // indirect
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625-dff40e83b3c9 // indirect
-	github.com/smartcontractkit/chainlink-protos/orchestrator v0.10.0 // indirect
+	github.com/smartcontractkit/chainlink-protos/orchestrator v0.11.0 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260610194843-349ea43d69ce // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
 	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260514223130-48bc90aca745 // indirect
