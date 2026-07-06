@@ -434,7 +434,7 @@ func TestCCIPSend(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: contracts.IdentifierFromBinding(ccipruntime.PerPartyRouterFactory{}),
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
@@ -471,7 +471,7 @@ func TestCCIPSend(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId: contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipsender"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partySender}}},
@@ -486,13 +486,9 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("Deployed CCIPSender: %s", ccipSenderCid)
 
 	// Get disclosures for CCIPSender.Send
-	disclosedCCIPSender, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender",
-	})
+	disclosedCCIPSender, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, contracts.IdentifierFromBinding(sender.CCIPSender{}))
 	require.NoError(t, err)
-	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, &apiv2.Identifier{
-		PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
-	})
+	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, contracts.IdentifierFromBinding(ccipruntime.PerPartyRouter{}))
 	require.NoError(t, err)
 
 	// Prepare receiver address (destination party encoded as keccak256)
@@ -690,7 +686,7 @@ func TestCCIPSend(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					ContractId:     ccipSenderCid,
 					Choice:         "Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),

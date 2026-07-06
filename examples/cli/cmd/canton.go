@@ -102,9 +102,9 @@ func newCantonListEventsCmd(g *Globals) *cobra.Command {
 			var tmpl *apiv2.Identifier
 			switch eventName {
 			case "sent":
-				tmpl = &apiv2.Identifier{PackageId: "#ccip-core", ModuleName: "CCIP.Events", EntityName: "CCIPMessageSent"}
+				tmpl = contracts.IdentifierFromBinding(events.CCIPMessageSent{})
 			case "executed":
-				tmpl = &apiv2.Identifier{PackageId: "#ccip-core", ModuleName: "CCIP.Events", EntityName: "ExecutionStateChanged"}
+				tmpl = contracts.IdentifierFromBinding(events.ExecutionStateChanged{})
 			default:
 				return fmt.Errorf("invalid --event %q (sent|executed)", eventName)
 			}
@@ -480,7 +480,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
+					TemplateId:     contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
 					ContractId:     receiverCid,
 					Choice:         "Execute",
 					ChoiceArgument: ledger.MapToValue(executeArgs),
@@ -878,7 +878,7 @@ func cantonSend(
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					ContractId:     senderCid,
 					Choice:         "Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),
