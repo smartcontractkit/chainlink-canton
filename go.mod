@@ -23,7 +23,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/google/uuid v1.6.0
-	github.com/icza/gox v0.2.9
+	github.com/icza/gox v0.2.14
 	github.com/jedib0t/go-pretty/v6 v6.8.1
 	github.com/jpillora/backoff v1.0.0
 	github.com/lib/pq v1.12.3
@@ -53,7 +53,7 @@ require (
 	golang.org/x/crypto v0.53.0
 	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	golang.org/x/oauth2 v0.36.0
-	google.golang.org/grpc v1.81.1
+	google.golang.org/grpc v1.82.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
