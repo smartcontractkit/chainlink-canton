@@ -1,5 +1,5 @@
 sdk-version: 3.4.11
-name: ccip-client
+name: ccip-client-api
 source: daml
 version: 2.0.0
 build-options:
@@ -13,7 +13,6 @@ data-dependencies:
   - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
   - ../codec/.daml/dist/ccip-codec-2.0.0.dar
   - ../api/.daml/dist/ccip-api-2.0.0.dar
-  - ../events/.daml/dist/ccip-events-2.0.0.dar
   - ../extension-api/.daml/dist/ccip-extension-api-2.0.0.dar
 dependencies:
   - daml-prim

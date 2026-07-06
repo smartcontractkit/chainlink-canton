@@ -10,6 +10,7 @@ import qualified Chainlink.InstanceAddress
 
 import qualified CCIP.APIV1.ExecutingMessage
 import qualified CCIP.CodecV1.FinalityConfig
+import qualified CCIP.ClientV1
 import qualified CCIP.EventsV1.Receipts
 
 template CCIPMessageSent
@@ -22,6 +23,11 @@ template CCIPMessageSent
     where
         signatory dedup (ccipOwner :: ccvOwners)
         observer sender, observers
+
+        interface instance CCIP.ClientV1.ICCIPMessageSent for CCIPMessageSent where
+            view = CCIP.ClientV1.CCIPMessageSentView with
+                ccipOwner = ccipOwner
+                messageId = event.messageId
 
 data CCIPMessageSentEvent = CCIPMessageSentEvent
     with
@@ -44,6 +50,12 @@ template ExecutionStateChanged
     where
         signatory dedup (ccipOwner :: ccvOwners)
         observer receiver
+
+        interface instance CCIP.ClientV1.IExecutionStateChanged for ExecutionStateChanged where
+            view = CCIP.ClientV1.ExecutionStateChangedView with
+                ccipOwner = ccipOwner
+                messageId = event.messageId
+                state = event.state
 
 data ExecutionStateChangedEvent = ExecutionStateChangedEvent
     with

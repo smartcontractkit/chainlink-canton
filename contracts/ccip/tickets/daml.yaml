@@ -11,8 +11,8 @@ data-dependencies:
   - ../../dependencies/splice/splice-api-token-burn-mint-v1-1.0.0.dar
   - ../../dependencies/splice/splice-api-token-transfer-instruction-v1-1.0.0.dar
   - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
-  - ../api/.daml/dist/ccip-api-2.0.0.dar
   - ../codec/.daml/dist/ccip-codec-2.0.0.dar
+  - ../api/.daml/dist/ccip-api-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

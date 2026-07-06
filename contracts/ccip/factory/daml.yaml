@@ -16,7 +16,7 @@ data-dependencies:
   - ../utils/.daml/dist/ccip-utils-2.0.0.dar
   - ../events/.daml/dist/ccip-events-2.0.0.dar
   - ../rate-limiter/.daml/dist/ccip-rate-limiter-2.0.0.dar
-  - ../client/.daml/dist/ccip-client-2.0.0.dar
+  - ../client-api/.daml/dist/ccip-client-api-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

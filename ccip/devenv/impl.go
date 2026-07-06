@@ -45,7 +45,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	ccipevents "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
@@ -1268,15 +1268,15 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	sendArgs := ccipsender.Send{
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(dest, 10)),
-		Message: client.Canton2AnyMessage{
+		Message: clientapi.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
 			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
 			FeeToken: c.feeTokenInstrument,
-			ExtraArgs: client.ExtraArgs{
-				V3: &client.GenericExtraArgsV3{
+			ExtraArgs: clientapi.ExtraArgs{
+				V3: &clientapi.GenericExtraArgsV3{
 					GasLimit: types.INT64(opts.ExecutionGasLimit),
-					Executor: client.ExecutorExtraArg{
-						ExecutorUseDefault: &client.ExecutorUseDefault{},
+					Executor: clientapi.ExecutorExtraArg{
+						ExecutorUseDefault: &clientapi.ExecutorUseDefault{},
 					},
 				},
 			},
@@ -1312,7 +1312,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Token Pool Send disclosure for token pool at address %s: %w", tokenPoolAddress.String(), err)
 		}
-		sendArgs.Message.TokenTransfer = &client.TokenTransfer{
+		sendArgs.Message.TokenTransfer = &clientapi.TokenTransfer{
 			Token: splice_api_token_holding_v1.InstrumentId{
 				Admin: types.PARTY(outgoingMessage.TokenTransfer.Token.Admin),
 				Id:    types.TEXT(outgoingMessage.TokenTransfer.Token.Id),
@@ -1357,7 +1357,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
 			CcvExtraContext: ccvSendDisclosure.ChoiceContext,
 		})
-		sendArgs.Message.ExtraArgs.V3.Ccvs = append(sendArgs.Message.ExtraArgs.V3.Ccvs, client.CCVExtraArg{
+		sendArgs.Message.ExtraArgs.V3.Ccvs = append(sendArgs.Message.ExtraArgs.V3.Ccvs, clientapi.CCVExtraArg{
 			CcvAddress: ccvSendDisclosure.Address.Binding(),
 			CcvArgs:    "",
 		})

@@ -32,7 +32,7 @@ const (
 	CCIPTickets              = Package("ccip-tickets")
 	CCIPEvents               = Package("ccip-events")
 	CCIPRateLimiter          = Package("ccip-rate-limiter")
-	CCIPClient               = Package("ccip-client")
+	CCIPClientAPI            = Package("ccip-client-api")
 	CCIPUtils                = Package("ccip-utils")
 	CCIPCore                 = Package("ccip-core")
 	CCIPExtensionAPI         = Package("ccip-extension-api")
@@ -84,7 +84,7 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPTickets:              []string{CurrentVersion},
 	CCIPEvents:               []string{CurrentVersion},
 	CCIPRateLimiter:          []string{CurrentVersion},
-	CCIPClient:               []string{CurrentVersion},
+	CCIPClientAPI:            []string{CurrentVersion},
 	CCIPUtils:                []string{CurrentVersion},
 	CCIPCore:                 []string{"2.0.0", CurrentVersion},
 	CCIPExtensionAPI:         []string{"2.0.0", CurrentVersion},
@@ -154,7 +154,7 @@ var OutputDirs = map[Package][]string{
 	CCIPTickets:              []string{"ccip", "tickets"},
 	CCIPEvents:               []string{"ccip", "events"},
 	CCIPRateLimiter:          []string{"ccip", "ratelimiter"},
-	CCIPClient:               []string{"ccip", "client"},
+	CCIPClientAPI:            []string{"ccip", "clientapi"},
 	CCIPCore:                 []string{"ccip", "core"},
 	CCIPExtensionAPI:         []string{"ccip", "extensionapi"},
 	CCIPRuntime:              []string{"ccip", "ccipruntime"},

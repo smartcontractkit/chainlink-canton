@@ -6,8 +6,8 @@ build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
 data-dependencies:
-  - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
   - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
+  - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

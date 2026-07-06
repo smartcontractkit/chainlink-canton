@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
+	clientapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "f2db1b3d9ed0a030a286cec41852eef1cc627c8949682fe65e85ecabbb719e83"
+	PackageID   = "0eca1369436bbba5524e9e12def8223a9b596aef8f92debe1604e82e06ed9107"
 	SDKVersion  = "3.4.11"
 )
 
@@ -345,7 +345,7 @@ func (t *FeeTokenInput) UnmarshalHex(data string) error {
 // GetFee is a Record type
 type GetFee struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  client.Canton2AnyMessage                   `json:"message"`
+	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	CcvSendInputs            []CCVSendInput                             `json:"ccvSendInputs"`
@@ -464,7 +464,7 @@ func (t *GetFeeResult2) UnmarshalHex(data string) error {
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  client.Canton2AnyMessage                   `json:"message"`
+	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	TokenPoolCid             *types.CONTRACT_ID                         `json:"tokenPoolCid" hex:"optional"`
@@ -522,7 +522,7 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 // Send is a Record type
 type Send struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  client.Canton2AnyMessage                   `json:"message"`
+	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	FeeTokenInput            FeeTokenInput                              `json:"feeTokenInput"`

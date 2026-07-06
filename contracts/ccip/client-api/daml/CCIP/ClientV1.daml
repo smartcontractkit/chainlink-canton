@@ -13,7 +13,6 @@ import qualified CCIP.APIV1.SendingMessage
 import qualified CCIP.APIV1.TokenAdminRegistry
 import qualified CCIP.CodecV1.FinalityConfig
 import qualified CCIP.CodecV1.MessageCodecV1
-import qualified CCIP.EventsV1.Events
 import qualified CCIP.InterfacesV1.CrossChainVerifier
 import qualified CCIP.InterfacesV1.Executor
 import qualified CCIP.InterfacesV1.TokenPool
@@ -141,20 +140,39 @@ data GetFeeResult = GetFeeResult
         feeTokenAmount : Numeric 0
     deriving (Eq, Show)
 
+interface ICCIPMessageSent where
+    viewtype CCIPMessageSentView
+
+data CCIPMessageSentView = CCIPMessageSentView
+    with
+        ccipOwner : Party
+        messageId : BytesHex
+    deriving (Eq, Show)
+
 data CCIPSendResult = CCIPSendResult
     with
         router : ContractId PerPartyRouter
-        ccipMessageSent : ContractId CCIP.EventsV1.Events.CCIPMessageSent
+        ccipMessageSent : ContractId ICCIPMessageSent
         messageId : BytesHex
         feeChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         pendingFeeInstructions : [ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction]
+    deriving (Eq, Show)
+
+interface IExecutionStateChanged where
+    viewtype ExecutionStateChangedView
+
+data ExecutionStateChangedView = ExecutionStateChangedView
+    with
+        ccipOwner : Party
+        messageId : BytesHex
+        state : CCIP.APIV1.ExecutingMessage.MessageExecutionState
     deriving (Eq, Show)
 
 data ExecuteResult = ExecuteResult
     with
         router : ContractId PerPartyRouter
         tokenReceiveTicket : Optional (ContractId CCIP.APIV1.ExecutingMessage.ITokenReceiveTicket)
-        executionStateChanged : ContractId CCIP.EventsV1.Events.ExecutionStateChanged
+        executionStateChanged : ContractId IExecutionStateChanged
         messageId : BytesHex
         message : CCIP.CodecV1.MessageCodecV1.MessageV1
         state : CCIP.APIV1.ExecutingMessage.MessageExecutionState

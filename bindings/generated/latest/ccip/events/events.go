@@ -8,6 +8,7 @@ import (
 
 	ccipapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
+	clientapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -27,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-events"
-	PackageID   = "92570efbe4b4185cb0c651b85de70dfd9d9e8d5dc8e3aba2e923e4d7eb755924"
+	PackageID   = "7f9e43c98504032e5b703d80a9045c269e721feb26a8fd10adb4bf80d8928337"
 	SDKVersion  = "3.4.11"
 )
 
@@ -172,7 +173,7 @@ func (t *CCIPMessageSent) UnmarshalHex(data string) error {
 
 // Choice methods for CCIPMessageSent
 
-// Archive exercises the Archive choice on this CCIPMessageSent contract
+// Archive exercises the Archive choice on this CCIPMessageSent contract via the IICCIPMessageSent interface
 // This method uses the package name in the template ID
 func (t CCIPMessageSent) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
@@ -192,6 +193,10 @@ func (t CCIPMessageSent) ArchiveWithPackageID(contractID string, packageID strin
 		Arguments:  map[string]any{},
 	}
 }
+
+// Verify interface implementations for CCIPMessageSent
+
+var _ clientapi.IICCIPMessageSent = (*CCIPMessageSent)(nil)
 
 // CCIPMessageSentEvent is a Record type
 type CCIPMessageSentEvent struct {
@@ -360,7 +365,7 @@ func (t *ExecutionStateChanged) UnmarshalHex(data string) error {
 
 // Choice methods for ExecutionStateChanged
 
-// Archive exercises the Archive choice on this ExecutionStateChanged contract
+// Archive exercises the Archive choice on this ExecutionStateChanged contract via the IIExecutionStateChanged interface
 // This method uses the package name in the template ID
 func (t ExecutionStateChanged) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
@@ -380,6 +385,10 @@ func (t ExecutionStateChanged) ArchiveWithPackageID(contractID string, packageID
 		Arguments:  map[string]any{},
 	}
 }
+
+// Verify interface implementations for ExecutionStateChanged
+
+var _ clientapi.IIExecutionStateChanged = (*ExecutionStateChanged)(nil)
 
 // ExecutionStateChangedEvent is a Record type
 type ExecutionStateChangedEvent struct {

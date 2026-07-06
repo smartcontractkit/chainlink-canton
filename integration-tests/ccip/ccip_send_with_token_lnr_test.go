@@ -38,7 +38,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
@@ -813,25 +813,25 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Message: client.Canton2AnyMessage{
+		Message: clientapi.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
-			TokenTransfer: &client.TokenTransfer{
+			TokenTransfer: &clientapi.TokenTransfer{
 				Token:  nativeInstrumentId,
 				Amount: types.NUMERIC(tokenTransferAmountDecimal),
 			},
 			FeeToken: nativeInstrumentId,
-			ExtraArgs: client.ExtraArgs{
-				V3: &client.GenericExtraArgsV3{
+			ExtraArgs: clientapi.ExtraArgs{
+				V3: &clientapi.GenericExtraArgsV3{
 					GasLimit: 0,
-					Ccvs: []client.CCVExtraArg{
+					Ccvs: []clientapi.CCVExtraArg{
 						{
 							CcvAddress: committeeVerifierAddress.Binding(),
 							CcvArgs:    types.TEXT(""),
 						},
 					},
-					Executor: client.ExecutorExtraArg{
-						ExecutorWithAddress: &client.ExecutorWithAddress{
+					Executor: clientapi.ExecutorExtraArg{
+						ExecutorWithAddress: &clientapi.ExecutorWithAddress{
 							ExecutorAddress: executorAddress.Binding(),
 							ExecutorArgs:    types.TEXT(""),
 						},

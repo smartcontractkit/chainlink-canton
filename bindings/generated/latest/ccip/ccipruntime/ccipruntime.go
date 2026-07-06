@@ -8,7 +8,7 @@ import (
 
 	ccipapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	ccipcodec "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
-	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
+	clientapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	events "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
@@ -32,7 +32,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "0c0908e6ee22e91a4ec9cb411c919134757bc857e719aedd2746674d89ba4ee3"
+	PackageID   = "bb157cb127e63076f562a112e5ef74aaeee206ab877bdda2a0bc7f6a8f937722"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1151,7 +1151,7 @@ func (t *GetExecutionStateMCMSParams) UnmarshalHex(data string) error {
 type GetFee struct {
 	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
-	Message           client.Canton2AnyMessage                   `json:"message"`
+	Message           clientapi.Canton2AnyMessage                `json:"message"`
 	CcvFeeQuotes      []extensionapi.CrossChainVerifierFeeQuote  `json:"ccvFeeQuotes"`
 	TokenPoolFeeQuote *extensionapi.TokenPoolFeeQuote            `json:"tokenPoolFeeQuote" hex:"optional"`
 	ExecutorFeeQuote  *extensionapi.ExecutorFeeQuote             `json:"executorFeeQuote" hex:"optional"`
@@ -1231,7 +1231,7 @@ type GetFeeFromRouter struct {
 	GlobalConfigCid   types.CONTRACT_ID                         `json:"globalConfigCid"`
 	FeeQuoterCid      types.CONTRACT_ID                         `json:"feeQuoterCid"`
 	DestChainSelector types.NUMERIC                             `json:"destChainSelector"`
-	Message           client.Canton2AnyMessage                  `json:"message"`
+	Message           clientapi.Canton2AnyMessage               `json:"message"`
 	CcvFeeQuotes      []extensionapi.CrossChainVerifierFeeQuote `json:"ccvFeeQuotes"`
 	TokenPoolFeeQuote *extensionapi.TokenPoolFeeQuote           `json:"tokenPoolFeeQuote" hex:"optional"`
 	ExecutorFeeQuote  *extensionapi.ExecutorFeeQuote            `json:"executorFeeQuote" hex:"optional"`
@@ -1488,7 +1488,7 @@ func (t *GetRequiredCCVsForExecuteFromRouter) UnmarshalHex(data string) error {
 type GetRequiredCCVsForSend struct {
 	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
-	Message           client.Canton2AnyMessage                   `json:"message"`
+	Message           clientapi.Canton2AnyMessage                `json:"message"`
 	PoolReportedCCVs  []chainlinkapi.RawInstanceAddress          `json:"poolReportedCCVs"`
 }
 
@@ -1539,7 +1539,7 @@ func (t *GetRequiredCCVsForSend) UnmarshalHex(data string) error {
 type GetRequiredCCVsForSendFromRouter struct {
 	GlobalConfigCid   types.CONTRACT_ID                 `json:"globalConfigCid"`
 	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
-	Message           client.Canton2AnyMessage          `json:"message"`
+	Message           clientapi.Canton2AnyMessage       `json:"message"`
 	PoolReportedCCVs  []chainlinkapi.RawInstanceAddress `json:"poolReportedCCVs"`
 }
 
@@ -2742,7 +2742,7 @@ func (t PerPartyRouter) MCMSReceiverEntrypointWithPackageID(contractID string, p
 
 // PerPartyRouterGetSequenceNumber exercises the PerPartyRouter_GetSequenceNumber choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterGetSequenceNumber(contractID string, args client.PerPartyRouterGetSequenceNumber) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetSequenceNumber(contractID string, args clientapi.PerPartyRouterGetSequenceNumber) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2752,7 +2752,7 @@ func (t PerPartyRouter) PerPartyRouterGetSequenceNumber(contractID string, args 
 }
 
 // PerPartyRouterGetSequenceNumberWithPackageID exercises the PerPartyRouter_GetSequenceNumber choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterGetSequenceNumberWithPackageID(contractID string, packageID string, args client.PerPartyRouterGetSequenceNumber) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetSequenceNumberWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterGetSequenceNumber) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2763,7 +2763,7 @@ func (t PerPartyRouter) PerPartyRouterGetSequenceNumberWithPackageID(contractID 
 
 // PerPartyRouterGetRequiredCCVsForSend exercises the PerPartyRouter_GetRequiredCCVsForSend choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForSend(contractID string, args client.PerPartyRouterGetRequiredCCVsForSend) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForSend(contractID string, args clientapi.PerPartyRouterGetRequiredCCVsForSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2773,7 +2773,7 @@ func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForSend(contractID string, 
 }
 
 // PerPartyRouterGetRequiredCCVsForSendWithPackageID exercises the PerPartyRouter_GetRequiredCCVsForSend choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForSendWithPackageID(contractID string, packageID string, args client.PerPartyRouterGetRequiredCCVsForSend) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForSendWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterGetRequiredCCVsForSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2784,7 +2784,7 @@ func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForSendWithPackageID(contra
 
 // PerPartyRouterGetFee exercises the PerPartyRouter_GetFee choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterGetFee(contractID string, args client.PerPartyRouterGetFee) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetFee(contractID string, args clientapi.PerPartyRouterGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2794,7 +2794,7 @@ func (t PerPartyRouter) PerPartyRouterGetFee(contractID string, args client.PerP
 }
 
 // PerPartyRouterGetFeeWithPackageID exercises the PerPartyRouter_GetFee choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterGetFeeWithPackageID(contractID string, packageID string, args client.PerPartyRouterGetFee) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetFeeWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2805,7 +2805,7 @@ func (t PerPartyRouter) PerPartyRouterGetFeeWithPackageID(contractID string, pac
 
 // PerPartyRouterPrepareSend exercises the PerPartyRouter_PrepareSend choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterPrepareSend(contractID string, args client.PerPartyRouterPrepareSend) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterPrepareSend(contractID string, args clientapi.PerPartyRouterPrepareSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2815,7 +2815,7 @@ func (t PerPartyRouter) PerPartyRouterPrepareSend(contractID string, args client
 }
 
 // PerPartyRouterPrepareSendWithPackageID exercises the PerPartyRouter_PrepareSend choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterPrepareSendWithPackageID(contractID string, packageID string, args client.PerPartyRouterPrepareSend) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterPrepareSendWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterPrepareSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2826,7 +2826,7 @@ func (t PerPartyRouter) PerPartyRouterPrepareSendWithPackageID(contractID string
 
 // PerPartyRouterFinalizeFee exercises the PerPartyRouter_FinalizeFee choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterFinalizeFee(contractID string, args client.PerPartyRouterFinalizeFee) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterFinalizeFee(contractID string, args clientapi.PerPartyRouterFinalizeFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2836,7 +2836,7 @@ func (t PerPartyRouter) PerPartyRouterFinalizeFee(contractID string, args client
 }
 
 // PerPartyRouterFinalizeFeeWithPackageID exercises the PerPartyRouter_FinalizeFee choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterFinalizeFeeWithPackageID(contractID string, packageID string, args client.PerPartyRouterFinalizeFee) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterFinalizeFeeWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterFinalizeFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2847,7 +2847,7 @@ func (t PerPartyRouter) PerPartyRouterFinalizeFeeWithPackageID(contractID string
 
 // PerPartyRouterCCIPSend exercises the PerPartyRouter_CCIPSend choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterCCIPSend(contractID string, args client.PerPartyRouterCCIPSend) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterCCIPSend(contractID string, args clientapi.PerPartyRouterCCIPSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2857,7 +2857,7 @@ func (t PerPartyRouter) PerPartyRouterCCIPSend(contractID string, args client.Pe
 }
 
 // PerPartyRouterCCIPSendWithPackageID exercises the PerPartyRouter_CCIPSend choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterCCIPSendWithPackageID(contractID string, packageID string, args client.PerPartyRouterCCIPSend) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterCCIPSendWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterCCIPSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2868,7 +2868,7 @@ func (t PerPartyRouter) PerPartyRouterCCIPSendWithPackageID(contractID string, p
 
 // PerPartyRouterGetExecutionState exercises the PerPartyRouter_GetExecutionState choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterGetExecutionState(contractID string, args client.PerPartyRouterGetExecutionState) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetExecutionState(contractID string, args clientapi.PerPartyRouterGetExecutionState) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2878,7 +2878,7 @@ func (t PerPartyRouter) PerPartyRouterGetExecutionState(contractID string, args 
 }
 
 // PerPartyRouterGetExecutionStateWithPackageID exercises the PerPartyRouter_GetExecutionState choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterGetExecutionStateWithPackageID(contractID string, packageID string, args client.PerPartyRouterGetExecutionState) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetExecutionStateWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterGetExecutionState) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2889,7 +2889,7 @@ func (t PerPartyRouter) PerPartyRouterGetExecutionStateWithPackageID(contractID 
 
 // PerPartyRouterGetRequiredCCVsForExecute exercises the PerPartyRouter_GetRequiredCCVsForExecute choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForExecute(contractID string, args client.PerPartyRouterGetRequiredCCVsForExecute) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForExecute(contractID string, args clientapi.PerPartyRouterGetRequiredCCVsForExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2899,7 +2899,7 @@ func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForExecute(contractID strin
 }
 
 // PerPartyRouterGetRequiredCCVsForExecuteWithPackageID exercises the PerPartyRouter_GetRequiredCCVsForExecute choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForExecuteWithPackageID(contractID string, packageID string, args client.PerPartyRouterGetRequiredCCVsForExecute) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForExecuteWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterGetRequiredCCVsForExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2910,7 +2910,7 @@ func (t PerPartyRouter) PerPartyRouterGetRequiredCCVsForExecuteWithPackageID(con
 
 // PerPartyRouterPrepareExecute exercises the PerPartyRouter_PrepareExecute choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterPrepareExecute(contractID string, args client.PerPartyRouterPrepareExecute) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterPrepareExecute(contractID string, args clientapi.PerPartyRouterPrepareExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2920,7 +2920,7 @@ func (t PerPartyRouter) PerPartyRouterPrepareExecute(contractID string, args cli
 }
 
 // PerPartyRouterPrepareExecuteWithPackageID exercises the PerPartyRouter_PrepareExecute choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterPrepareExecuteWithPackageID(contractID string, packageID string, args client.PerPartyRouterPrepareExecute) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterPrepareExecuteWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterPrepareExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2931,7 +2931,7 @@ func (t PerPartyRouter) PerPartyRouterPrepareExecuteWithPackageID(contractID str
 
 // PerPartyRouterExecute exercises the PerPartyRouter_Execute choice on this PerPartyRouter contract via the IPerPartyRouter interface
 // This method uses the package name in the template ID
-func (t PerPartyRouter) PerPartyRouterExecute(contractID string, args client.PerPartyRouterExecute) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterExecute(contractID string, args clientapi.PerPartyRouterExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2941,7 +2941,7 @@ func (t PerPartyRouter) PerPartyRouterExecute(contractID string, args client.Per
 }
 
 // PerPartyRouterExecuteWithPackageID exercises the PerPartyRouter_Execute choice using the provided package ID instead of package name
-func (t PerPartyRouter) PerPartyRouterExecuteWithPackageID(contractID string, packageID string, args client.PerPartyRouterExecute) *model.ExerciseCommand {
+func (t PerPartyRouter) PerPartyRouterExecuteWithPackageID(contractID string, packageID string, args clientapi.PerPartyRouterExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RuntimeV1.PerPartyRouter", "PerPartyRouter"),
 		ContractID: contractID,
@@ -2954,7 +2954,7 @@ func (t PerPartyRouter) PerPartyRouterExecuteWithPackageID(contractID string, pa
 
 var _ api.IMCMSReceiver = (*PerPartyRouter)(nil)
 
-var _ client.IPerPartyRouter = (*PerPartyRouter)(nil)
+var _ clientapi.IPerPartyRouter = (*PerPartyRouter)(nil)
 
 // PerPartyRouterDeps is a Record type
 type PerPartyRouterDeps struct {
@@ -3322,7 +3322,7 @@ func (t *PrepareExecuteMCMSParams) UnmarshalHex(data string) error {
 // PrepareSend is a Record type
 type PrepareSend struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  client.Canton2AnyMessage                   `json:"message"`
+	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
@@ -3363,15 +3363,15 @@ func (t *PrepareSend) UnmarshalHex(data string) error {
 
 // PrepareSendFromRouter is a Record type
 type PrepareSendFromRouter struct {
-	DestChainSelector     types.NUMERIC            `json:"destChainSelector"`
-	Message               client.Canton2AnyMessage `json:"message"`
-	RouterPartyOwner      types.PARTY              `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT               `json:"routerInstanceId"`
-	GlobalConfigCid       types.CONTRACT_ID        `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID        `json:"tokenAdminRegistryCid"`
-	FeeQuoterCid          types.CONTRACT_ID        `json:"feeQuoterCid"`
-	RmnRemoteCid          types.CONTRACT_ID        `json:"rmnRemoteCid"`
-	CurrentSequenceNumber types.NUMERIC            `json:"currentSequenceNumber"`
+	DestChainSelector     types.NUMERIC               `json:"destChainSelector"`
+	Message               clientapi.Canton2AnyMessage `json:"message"`
+	RouterPartyOwner      types.PARTY                 `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT                  `json:"routerInstanceId"`
+	GlobalConfigCid       types.CONTRACT_ID           `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
+	FeeQuoterCid          types.CONTRACT_ID           `json:"feeQuoterCid"`
+	RmnRemoteCid          types.CONTRACT_ID           `json:"rmnRemoteCid"`
+	CurrentSequenceNumber types.NUMERIC               `json:"currentSequenceNumber"`
 }
 
 // ToMap converts PrepareSendFromRouter to a map for DAML arguments

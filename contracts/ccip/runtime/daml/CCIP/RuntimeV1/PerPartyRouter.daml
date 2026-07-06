@@ -354,7 +354,7 @@ template PerPartyRouter
                     context = arg.context
                 pure CCIP.ClientV1.CCIPSendResult with
                     router = coerceContractId result.router
-                    ccipMessageSent = result.ccipMessageSent
+                    ccipMessageSent = coerceContractId result.ccipMessageSent
                     messageId = result.messageId
                     feeChangeCids = result.feeChangeCids
                     pendingFeeInstructions = result.pendingFeeInstructions
@@ -396,7 +396,7 @@ template PerPartyRouter
                 pure CCIP.ClientV1.ExecuteResult with
                     router = coerceContractId result.router
                     tokenReceiveTicket = tokenReceiveTicket
-                    executionStateChanged = result.executionStateChanged
+                    executionStateChanged = coerceContractId result.executionStateChanged
                     messageId = result.messageId
                     message = result.message
                     state = result.state
