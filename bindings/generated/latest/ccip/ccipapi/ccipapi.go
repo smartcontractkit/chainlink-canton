@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-api"
-	PackageID   = "06ff038d96f9ce0cbfda991bb6bd82b400bdc6bc0b45424919135d46a22ba276"
+	PackageID   = "e3ae65012ea33fa0c573e44fe53ee85ad51898963796f0c8babaeb0ae2ac38dd"
 	SDKVersion  = "3.4.11"
 )
 
@@ -57,19 +57,6 @@ type IFeeQuoter interface {
 
 	// FeeQuoterGetTokenTransferFee executes the FeeQuoter_GetTokenTransferFee choice
 	FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand
-}
-
-// IGlobalConfig is a DAML interface
-type IGlobalConfig interface {
-
-	// Archive executes the Archive choice
-	Archive(contractID string) *model.ExerciseCommand
-
-	// GlobalConfigPublicFetch executes the GlobalConfig_PublicFetch choice
-	GlobalConfigPublicFetch(contractID string, args GlobalConfigPublicFetch) *model.ExerciseCommand
-
-	// GlobalConfigGetDestChainConfig executes the GlobalConfig_GetDestChainConfig choice
-	GlobalConfigGetDestChainConfig(contractID string, args GlobalConfigGetDestChainConfig) *model.ExerciseCommand
 }
 
 // IRMNRemote is a DAML interface
@@ -161,14 +148,6 @@ type ITokenReceiveTicket interface {
 	Archive(contractID string) *model.ExerciseCommand
 }
 
-const (
-	GlobalConfigContextKey       = types.TEXT("global-config")
-	RmnRemoteContextKey          = types.TEXT("rmn-remote")
-	FeeQuoterContextKey          = types.TEXT("fee-quoter")
-	TokenConfigContextKey        = types.TEXT("token-config")
-	TokenAdminRegistryContextKey = types.TEXT("token-admin-registry")
-)
-
 func argsToMap(args any) map[string]any {
 	if args == nil {
 		return map[string]any{}
@@ -216,94 +195,6 @@ func (t Consume) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes Consume from hex string (Canton MCMS format)
 func (t *Consume) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// DestChainConfig is a Record type
-type DestChainConfig struct {
-	IsEnabled                 types.BOOL                                 `json:"isEnabled"`
-	AddressBytesLength        types.INT64                                `json:"addressBytesLength"`
-	TokenReceiverAllowed      types.BOOL                                 `json:"tokenReceiverAllowed"`
-	BaseExecutionGasCost      types.INT64                                `json:"baseExecutionGasCost"`
-	OffRampAddress            types.TEXT                                 `json:"offRampAddress" hex:"bytes"`
-	DefaultExecutor           *chainlinkapi.RawInstanceAddress           `json:"defaultExecutor" hex:"optional"`
-	LaneMandatedCCVs          []chainlinkapi.RawInstanceAddress          `json:"laneMandatedCCVs"`
-	DefaultCCVs               []chainlinkapi.RawInstanceAddress          `json:"defaultCCVs"`
-	MessageNetworkFeeUSDCents types.NUMERIC                              `json:"messageNetworkFeeUSDCents"`
-	TokenNetworkFeeUSDCents   types.NUMERIC                              `json:"tokenNetworkFeeUSDCents"`
-	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-}
-
-// ToMap converts DestChainConfig to a map for DAML arguments
-func (t DestChainConfig) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["isEnabled"] = bool(t.IsEnabled)
-
-	m["addressBytesLength"] = int64(t.AddressBytesLength)
-
-	m["tokenReceiverAllowed"] = bool(t.TokenReceiverAllowed)
-
-	m["baseExecutionGasCost"] = int64(t.BaseExecutionGasCost)
-
-	m["offRampAddress"] = string(t.OffRampAddress)
-
-	if t.DefaultExecutor != nil {
-		m["defaultExecutor"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.DefaultExecutor),
-		}
-	} else {
-		m["defaultExecutor"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
-
-	m["laneMandatedCCVs"] = func() []any {
-		res := make([]any, 0, len(t.LaneMandatedCCVs))
-		for _, e := range t.LaneMandatedCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
-		}
-		return res
-	}()
-
-	m["defaultCCVs"] = func() []any {
-		res := make([]any, 0, len(t.DefaultCCVs))
-		for _, e := range t.DefaultCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
-		}
-		return res
-	}()
-
-	m["messageNetworkFeeUSDCents"] = t.MessageNetworkFeeUSDCents
-
-	m["tokenNetworkFeeUSDCents"] = t.TokenNetworkFeeUSDCents
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
-
-	return m
-}
-
-func (t DestChainConfig) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *DestChainConfig) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes DestChainConfig to hex string (Canton MCMS format)
-func (t DestChainConfig) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes DestChainConfig from hex string (Canton MCMS format)
-func (t *DestChainConfig) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -526,123 +417,6 @@ func (t FeeQuoterPublicFetch) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes FeeQuoterPublicFetch from hex string (Canton MCMS format)
 func (t *FeeQuoterPublicFetch) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GlobalConfigView is a Record type
-type GlobalConfigView struct {
-	CcipOwner types.PARTY `json:"ccipOwner"`
-}
-
-// ToMap converts GlobalConfigView to a map for DAML arguments
-func (t GlobalConfigView) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["ccipOwner"] = t.CcipOwner.ToMap()
-
-	return m
-}
-
-func (t GlobalConfigView) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *GlobalConfigView) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes GlobalConfigView to hex string (Canton MCMS format)
-func (t GlobalConfigView) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GlobalConfigView from hex string (Canton MCMS format)
-func (t *GlobalConfigView) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GlobalConfigGetDestChainConfig is a Record type
-type GlobalConfigGetDestChainConfig struct {
-	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
-	Caller            types.PARTY                                `json:"caller"`
-}
-
-// ToMap converts GlobalConfigGetDestChainConfig to a map for DAML arguments
-func (t GlobalConfigGetDestChainConfig) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["destChainSelector"] = t.DestChainSelector
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t GlobalConfigGetDestChainConfig) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *GlobalConfigGetDestChainConfig) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes GlobalConfigGetDestChainConfig to hex string (Canton MCMS format)
-func (t GlobalConfigGetDestChainConfig) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GlobalConfigGetDestChainConfig from hex string (Canton MCMS format)
-func (t *GlobalConfigGetDestChainConfig) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// GlobalConfigPublicFetch is a Record type
-type GlobalConfigPublicFetch struct {
-	ExpectedAddress chainlinkapi.RawInstanceAddress `json:"expectedAddress"`
-	Caller          types.PARTY                     `json:"caller"`
-}
-
-// ToMap converts GlobalConfigPublicFetch to a map for DAML arguments
-func (t GlobalConfigPublicFetch) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["expectedAddress"] = model.NestedToDAMLValue(t.ExpectedAddress)
-
-	m["caller"] = t.Caller.ToMap()
-
-	return m
-}
-
-func (t GlobalConfigPublicFetch) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *GlobalConfigPublicFetch) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes GlobalConfigPublicFetch to hex string (Canton MCMS format)
-func (t GlobalConfigPublicFetch) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes GlobalConfigPublicFetch from hex string (Canton MCMS format)
-func (t *GlobalConfigPublicFetch) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1749,16 +1523,6 @@ func IFeeQuoterInterfaceID() string {
 // IFeeQuoterInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IFeeQuoterInterfaceIDWithPackageID(packageID string) string {
 	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.API.FeeQuoterV1", "FeeQuoter")
-}
-
-// IGlobalConfigInterfaceID returns the interface ID for the IGlobalConfig interface using the package name
-func IGlobalConfigInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.API.GlobalConfigV1", "GlobalConfig")
-}
-
-// IGlobalConfigInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
-func IGlobalConfigInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.API.GlobalConfigV1", "GlobalConfig")
 }
 
 // IRMNRemoteInterfaceID returns the interface ID for the IRMNRemote interface using the package name
