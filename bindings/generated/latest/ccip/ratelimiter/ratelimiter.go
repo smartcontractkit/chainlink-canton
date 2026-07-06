@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rate-limiter"
-	PackageID   = "3a75ba8d563e4ca2e7f560c60d9a4ebed8a85cf2ecbb95de1121076f8e2b4dad"
+	PackageID   = "cf163092a8c62f4692e9026cb1d4769e158ba507787783938d85b74e16cfe28a"
 	SDKVersion  = "3.4.11"
 )
 
@@ -34,7 +34,7 @@ type Template interface {
 }
 
 const (
-	RateLimiterKey = types.TEXT("rate-limiter")
+	RateLimiterContextKey = types.TEXT("rate-limiter")
 )
 
 func argsToMap(args any) map[string]any {

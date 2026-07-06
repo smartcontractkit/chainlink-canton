@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	client "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "9fb2f3119616d1dbab6ab6977cc0a31b1d34dde2e5d280539ca5322693735424"
+	PackageID   = "371868370afcb24a74556cc5371d8e9f0eeba76d9eef9632522eb4960a0b408e"
 	SDKVersion  = "3.4.11"
 )
 
@@ -149,7 +149,7 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 
 // GetFee exercises the GetFee choice on this CCIPSender contract
 // This method uses the package name in the template ID
-func (t CCIPSender) GetFee(contractID string, args GetFee2) *model.ExerciseCommand {
+func (t CCIPSender) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
@@ -159,7 +159,7 @@ func (t CCIPSender) GetFee(contractID string, args GetFee2) *model.ExerciseComma
 }
 
 // GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
-func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee2) *model.ExerciseCommand {
+func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
@@ -342,10 +342,10 @@ func (t *FeeTokenInput) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// GetFee2 is a Record type
-type GetFee2 struct {
+// GetFee is a Record type
+type GetFee struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  core.Canton2AnyMessage                     `json:"message"`
+	Message                  client.Canton2AnyMessage                   `json:"message"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	CcvSendInputs            []CCVSendInput                             `json:"ccvSendInputs"`
@@ -353,8 +353,8 @@ type GetFee2 struct {
 	ExecutorInput            *ExecutorInput                             `json:"executorInput" hex:"optional"`
 }
 
-// ToMap converts GetFee2 to a map for DAML arguments
-func (t GetFee2) ToMap() map[string]any {
+// ToMap converts GetFee to a map for DAML arguments
+func (t GetFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destinationChainSelector"] = t.DestinationChainSelector
@@ -400,36 +400,36 @@ func (t GetFee2) ToMap() map[string]any {
 	return m
 }
 
-func (t GetFee2) MarshalJSON() ([]byte, error) {
+func (t GetFee) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *GetFee2) UnmarshalJSON(data []byte) error {
+func (t *GetFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes GetFee2 to hex string (Canton MCMS format)
-func (t GetFee2) MarshalHex() (string, error) {
+// MarshalHex encodes GetFee to hex string (Canton MCMS format)
+func (t GetFee) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes GetFee2 from hex string (Canton MCMS format)
-func (t *GetFee2) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetFee from hex string (Canton MCMS format)
+func (t *GetFee) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// GetFeeResult is a Record type
-type GetFeeResult struct {
+// GetFeeResult2 is a Record type
+type GetFeeResult2 struct {
 	FeeTokenAmount     types.NUMERIC `json:"feeTokenAmount"`
 	PoolFeeTokenAmount types.NUMERIC `json:"poolFeeTokenAmount"`
 }
 
-// ToMap converts GetFeeResult to a map for DAML arguments
-func (t GetFeeResult) ToMap() map[string]any {
+// ToMap converts GetFeeResult2 to a map for DAML arguments
+func (t GetFeeResult2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["feeTokenAmount"] = t.FeeTokenAmount
@@ -439,24 +439,24 @@ func (t GetFeeResult) ToMap() map[string]any {
 	return m
 }
 
-func (t GetFeeResult) MarshalJSON() ([]byte, error) {
+func (t GetFeeResult2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *GetFeeResult) UnmarshalJSON(data []byte) error {
+func (t *GetFeeResult2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes GetFeeResult to hex string (Canton MCMS format)
-func (t GetFeeResult) MarshalHex() (string, error) {
+// MarshalHex encodes GetFeeResult2 to hex string (Canton MCMS format)
+func (t GetFeeResult2) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes GetFeeResult from hex string (Canton MCMS format)
-func (t *GetFeeResult) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetFeeResult2 from hex string (Canton MCMS format)
+func (t *GetFeeResult2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -464,7 +464,7 @@ func (t *GetFeeResult) UnmarshalHex(data string) error {
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  core.Canton2AnyMessage                     `json:"message"`
+	Message                  client.Canton2AnyMessage                   `json:"message"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	TokenPoolCid             *types.CONTRACT_ID                         `json:"tokenPoolCid" hex:"optional"`
@@ -522,7 +522,7 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 // Send is a Record type
 type Send struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  core.Canton2AnyMessage                     `json:"message"`
+	Message                  client.Canton2AnyMessage                   `json:"message"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	FeeTokenInput            FeeTokenInput                              `json:"feeTokenInput"`
@@ -653,7 +653,7 @@ func (t *TokenTransferInput) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	GetFee(args GetFee2) (*bind.EncodedChoice, error)
+	GetFee(args GetFee) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
 	Send(args Send) (*bind.EncodedChoice, error)
 }
@@ -686,7 +686,7 @@ func (c *Contract) Encoder() MCMSEncoder {
 }
 
 // GetFee encodes parameters for the GetFee choice.
-func (e *encoder) GetFee(args GetFee2) (*bind.EncodedChoice, error) {
+func (e *encoder) GetFee(args GetFee) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetFee", args)
 }
 
