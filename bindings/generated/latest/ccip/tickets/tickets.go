@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-tickets"
-	PackageID   = "2c97c9a0b352e788b3ec762d70a023fd17782968dc3b39da495a9e5115009585"
+	PackageID   = "c2a6263f6b20be4ec65698c9d28180c629bcbc4fb63bda63665b5ab1f31f90a0"
 	SDKVersion  = "3.4.11"
 )
 
@@ -110,12 +110,12 @@ type TokenReceiveTicket struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t TokenReceiveTicket) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Tickets", "TokenReceiveTicket")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TicketsV1", "TokenReceiveTicket")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t TokenReceiveTicket) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Tickets", "TokenReceiveTicket")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.TicketsV1", "TokenReceiveTicket")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -296,11 +296,11 @@ func (t *TokenReceiveTicket) UnmarshalHex(data string) error {
 
 // Choice methods for TokenReceiveTicket
 
-// Consume exercises the Consume choice on this TokenReceiveTicket contract via the ITokenReceiveTicket interface
+// Consume exercises the Consume choice on this TokenReceiveTicket contract via the IITokenReceiveTicket interface
 // This method uses the package name in the template ID
 func (t TokenReceiveTicket) Consume(contractID string, args ccipapi.Consume) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Tickets", "TokenReceiveTicket"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TicketsV1", "TokenReceiveTicket"),
 		ContractID: contractID,
 		Choice:     "Consume",
 		Arguments:  argsToMap(args),
@@ -310,18 +310,18 @@ func (t TokenReceiveTicket) Consume(contractID string, args ccipapi.Consume) *mo
 // ConsumeWithPackageID exercises the Consume choice using the provided package ID instead of package name
 func (t TokenReceiveTicket) ConsumeWithPackageID(contractID string, packageID string, args ccipapi.Consume) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Tickets", "TokenReceiveTicket"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TicketsV1", "TokenReceiveTicket"),
 		ContractID: contractID,
 		Choice:     "Consume",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// Archive exercises the Archive choice on this TokenReceiveTicket contract via the ITokenReceiveTicket interface
+// Archive exercises the Archive choice on this TokenReceiveTicket contract via the IITokenReceiveTicket interface
 // This method uses the package name in the template ID
 func (t TokenReceiveTicket) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Tickets", "TokenReceiveTicket"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TicketsV1", "TokenReceiveTicket"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -331,7 +331,7 @@ func (t TokenReceiveTicket) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t TokenReceiveTicket) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Tickets", "TokenReceiveTicket"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TicketsV1", "TokenReceiveTicket"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -340,7 +340,7 @@ func (t TokenReceiveTicket) ArchiveWithPackageID(contractID string, packageID st
 
 // Verify interface implementations for TokenReceiveTicket
 
-var _ ccipapi.ITokenReceiveTicket = (*TokenReceiveTicket)(nil)
+var _ ccipapi.IITokenReceiveTicket = (*TokenReceiveTicket)(nil)
 
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.

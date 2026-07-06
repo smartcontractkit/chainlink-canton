@@ -1,0 +1,248 @@
+module SendingMessageTest where
+
+import Daml.Script
+
+import DA.Assert ((===))
+import DA.Either (isLeft)
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.CoreV1.SendingMessage
+
+-- | Two CCVs with the same instance id but different owners can both record verifier data.
+testDistinctCcvOwnersWithSameInstanceId : Script ()
+testDistinctCcvOwnersWithSameInstanceId = script do
+    ccipOwner <- allocateParty "ccip-owner-vdi"
+    ccvOwnerA <- allocateParty "ccv-owner-a-vdi"
+    ccvOwnerB <- allocateParty "ccv-owner-b-vdi"
+
+    let destChainSelector : Numeric 0 = 456.0
+    let ccvA = Chainlink.InstanceAddress.make "shared-ccv-id" ccvOwnerA
+    let ccvB = Chainlink.InstanceAddress.make "shared-ccv-id" ccvOwnerB
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with admin = ccipOwner; id = "feeToken"
+
+    let deps = CCIP.CoreV1.SendingMessage.SendingMessageDeps with
+            router = Chainlink.InstanceAddress.make "router-vdi" ccipOwner
+            onRamp = Chainlink.InstanceAddress.make "onramp-vdi" ccipOwner
+            globalConfig = Chainlink.InstanceAddress.make "globalconfig-vdi" ccipOwner
+            rmnRemote = Chainlink.InstanceAddress.make "rmn-vdi" ccipOwner
+            tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-vdi" ccipOwner
+            feeQuoter = Chainlink.InstanceAddress.make "feequoter-vdi" ccipOwner
+
+    sendingMessageCid <- submit ccipOwner do
+        createCmd CCIP.CoreV1.SendingMessage.SendingMessage with
+            deps = deps
+            ccipOwner = ccipOwner
+            sender = ccipOwner
+            destChainSelector = destChainSelector
+            destAddressBytesLength = 20
+            sequenceNumber = 1.0
+            destDefaultCCVs = []
+            requiredCCVs = [ccvA, ccvB]
+            requiredExecutor = None
+            executorAddress = "0000000000000000000000000000000000000000000000000000000000000000"
+            executionMode = Some CCIP.CoreV1.SendingMessage.ExecutionMode_NoExecutor
+            sourceChainSelector = 123.0
+            senderAddress = ""
+            receiver = "80adbb5ae1b4e8301bc3dd02aa0b7a0d6daeb2c7"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = ""
+            offRampAddress = ""
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = 0.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorDestGasLimit = 0
+            executorDestBytesOverhead = 0
+            executorFeeTokenAmount = 0.0
+            observingParties = [ccvOwnerA, ccvOwnerB]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = CCIP.CoreV1.SendingMessage.SendingMessageState_FeeFinalized
+
+    sendingMessageCid <- submit ccipOwner do
+        exerciseCmd sendingMessageCid CCIP.CoreV1.SendingMessage.BuildMessage with
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+    sendingMessageCid <- submit (actAs ccvOwnerA) do
+        exerciseCmd sendingMessageCid CCIP.CoreV1.SendingMessage.AddVerifierData with
+            ccvInstanceId = "shared-ccv-id"
+            versionTag = "00000001"
+            verifierBlob = "aaaa"
+            messageSentObservers = []
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = ccvOwnerA
+
+    sendingMessageCid <- submit (actAs ccvOwnerB) do
+        exerciseCmd sendingMessageCid CCIP.CoreV1.SendingMessage.AddVerifierData with
+            ccvInstanceId = "shared-ccv-id"
+            versionTag = "00000002"
+            verifierBlob = "bbbb"
+            messageSentObservers = []
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = ccvOwnerB
+
+    Some sm <- queryContractId ccipOwner sendingMessageCid
+    length sm.verifierData === 2
+
+    pure ()
+
+-- | A single party operating two CCVs with distinct instance ids can add fees for both.
+testSameOwnerDistinctInstanceIds : Script ()
+testSameOwnerDistinctInstanceIds = script do
+    ccipOwner <- allocateParty "ccip-owner-sodi"
+    ccvOwner <- allocateParty "ccv-owner-sodi"
+
+    let destChainSelector : Numeric 0 = 456.0
+    let ccvA = Chainlink.InstanceAddress.make "ccv-id-1" ccvOwner
+    let ccvB = Chainlink.InstanceAddress.make "ccv-id-2" ccvOwner
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with admin = ccipOwner; id = "feeToken"
+
+    let deps = CCIP.CoreV1.SendingMessage.SendingMessageDeps with
+            router = Chainlink.InstanceAddress.make "router-sodi" ccipOwner
+            onRamp = Chainlink.InstanceAddress.make "onramp-sodi" ccipOwner
+            globalConfig = Chainlink.InstanceAddress.make "globalconfig-sodi" ccipOwner
+            rmnRemote = Chainlink.InstanceAddress.make "rmn-sodi" ccipOwner
+            tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-sodi" ccipOwner
+            feeQuoter = Chainlink.InstanceAddress.make "feequoter-sodi" ccipOwner
+
+    sendingMessageCid <- submit ccipOwner do
+        createCmd CCIP.CoreV1.SendingMessage.SendingMessage with
+            deps = deps
+            ccipOwner = ccipOwner
+            sender = ccipOwner
+            destChainSelector = destChainSelector
+            destAddressBytesLength = 20
+            sequenceNumber = 1.0
+            destDefaultCCVs = []
+            requiredCCVs = [ccvA, ccvB]
+            requiredExecutor = None
+            executorAddress = "0000000000000000000000000000000000000000000000000000000000000000"
+            executionMode = Some CCIP.CoreV1.SendingMessage.ExecutionMode_NoExecutor
+            sourceChainSelector = 123.0
+            senderAddress = ""
+            receiver = "842bfeb3bcb6ec81ceaec55cf9a0e9db5eb77be0"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = ""
+            offRampAddress = ""
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = 0.0
+            expectedTokenInstrumentId = None
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorDestGasLimit = 0
+            executorDestBytesOverhead = 0
+            executorFeeTokenAmount = 0.0
+            observingParties = [ccvOwner]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = CCIP.CoreV1.SendingMessage.SendingMessageState_Prepared
+
+    sendingMessageCid <- submit (actAs ccvOwner) do
+        exerciseCmd sendingMessageCid CCIP.CoreV1.SendingMessage.AddCCVFee with
+            ccvInstanceId = "ccv-id-1"
+            feeUSDCents = 0.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = ccvOwner
+
+    sendingMessageCid <- submit (actAs ccvOwner) do
+        exerciseCmd sendingMessageCid CCIP.CoreV1.SendingMessage.AddCCVFee with
+            ccvInstanceId = "ccv-id-2"
+            feeUSDCents = 0.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = ccvOwner
+
+    Some sm <- queryContractId ccipOwner sendingMessageCid
+    length sm.ccvFees === 2
+
+    pure ()
+
+testValidateDestChainAddress : Script ()
+testValidateDestChainAddress = do
+    -- In: 20 bytes, unpadded
+    -- Out: 20 bytes, unpadded
+    let addr = "c31ea3de7f6eff3f70c3bfda0c4c4aabbea2c1b3"
+    CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 20 === addr
+
+    -- In: 21 bytes, unpadded
+    -- Out: 21 bytes, unpadded
+    let addr = "1898a4923b1bfc6dbdf6debb1fbe6adabcf227caef"
+    CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 21 === addr
+
+    -- In: 30 bytes, unpadded
+    -- Out: 30 bytes, unpadded
+    let addr = "12ee197fd1e17f73ed3f6bed10a676aff0d852fe271fbad6fc85c267fcf1"
+    CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 30 === addr
+
+    -- In: 32 bytes, unpadded
+    -- Out: 32 bytes, unpadded
+    let addr = "12ee197fd1e17f73ed3f6bed10a676aff0d852fe271fbad6fc85c267fcf1e2c3"
+    CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 32 === addr
+
+    -- In: 20 bytes, padded to 32 bytes
+    -- Out: 20 bytes, unpadded
+    let addr = "000000000000000000000000135de120c28b8bfacbeb1cfdce3cc743b5f98dfb"
+    CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 20 === "135de120c28b8bfacbeb1cfdce3cc743b5f98dfb"
+
+    -- In: 21 bytes, padded to 32 bytes
+    -- Out: 21 bytes, unpadded
+    let addr = "00000000000000000000001898a4923b1bfc6dbdf6debb1fbe6adabcf227caef"
+    CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 21 === "1898a4923b1bfc6dbdf6debb1fbe6adabcf227caef"
+
+    -- In: 20 bytes, padded to 30 bytes
+    -- Out: 20 bytes, padded to 30 bytes (no trimming, only trims if input is 32 bytes)
+    let addr = "00000000000000000000aa6a78ecec748d11d2b179ac19c0d8fdc4c8e5dc"
+    CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 30 === addr
+
+    -- Invalid - invalid hex
+    let addr = "00000000000000000000001898a4923b1bfc6dbdf6debb1fbe6adabcf227caeg"
+    result <- tryToEither (\() -> pure (CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 20))
+    isLeft result === True
+
+    -- Invalid - 32-byte address with 20-byte addressBytesLength
+    let addr = "4ffd0dccc767ffbcdcdd2450cf3a766f02ada5a3b23eada4fec7bbb94dbd7acf"
+    result <- tryToEither (\() -> pure (CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 20))
+    isLeft result === True
+
+    -- Invalid - 30-byte address with 20-byte addressBytesLength
+    let addr = "00000000000000000000aa6a78ecec748d11d2b179ac19c0d8fdc4c8e5dc"
+    result <- tryToEither (\() -> pure (CCIP.CoreV1.SendingMessage.validateDestChainAddress addr 20))
+    isLeft result === True

@@ -10,35 +10,28 @@ import DA.Optional (fromSome)
 import DA.TextMap qualified as TextMap
 
 import qualified Splice.Api.Token.HoldingV1
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import CCIP.FinalityConfig qualified as FinalityCodec
-import CCIP.LockReleaseTokenPool
-import CCIP.LockReleaseTokenPoolCodecGen (
-    encodeSetDynamicConfigParams,
-    encodeApplyChainUpdatesParams,
-    encodeSetRateLimiterReferencesParams,
-    encodeSetTransferTimeoutParams,
-    encodeAddPoolReceiveContextNonContractValueParams,
-    encodeAddPoolReceiveContextContractValueParams,
-    encodeRemovePoolReceiveContextValueParams,
-    )
+import qualified Splice.Api.Token.MetadataV1
 
-import CCIP.Utils.Context (encodeAnyValue)
-import Chainlink.InstanceAddress (RawInstanceAddress(..))
-import Splice.Api.Token.MetadataV1 qualified as MetadataV1
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+
+import qualified Chainlink.InstanceAddress
+
+import CCIP.CodecV1.FinalityConfig
+import CCIP.LockReleaseTokenPoolV1
+import CCIP.LockReleaseTokenPoolV1CodecGen
+import CCIP.UtilsV1.Context
 
 mkFinalityConfig n =
   if n == 0
-  then FinalityCodec.WaitForFinality
-  else FinalityCodec.BlockDepth n
+  then CCIP.CodecV1.FinalityConfig.WaitForFinality
+  else CCIP.CodecV1.FinalityConfig.BlockDepth n
 
 dummyPoolDeps : Party -> LockReleaseTokenPoolDeps
 dummyPoolDeps ccipOwner =
   LockReleaseTokenPoolDeps with
-    tokenAdminRegistry = RawInstanceAddress ("dummy-tar@" <> partyToText ccipOwner)
-    rmnRemote = RawInstanceAddress ("dummy-rmn@" <> partyToText ccipOwner)
-    feeQuoter = RawInstanceAddress ("dummy-fq@" <> partyToText ccipOwner)
+    tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress ("dummy-tar@" <> partyToText ccipOwner)
+    rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress ("dummy-rmn@" <> partyToText ccipOwner)
+    feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress ("dummy-fq@" <> partyToText ccipOwner)
 
 -- ========================================================
 -- |          MCMS Entrypoint - SetDynamicConfig          |
@@ -64,11 +57,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetDynamicConfig = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
+            poolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Update rate limit admin via mcmsEntrypoint
@@ -114,11 +107,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_ApplyChainUpdates = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
+            poolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Create remote chain config
@@ -127,12 +120,12 @@ testLockReleaseTokenPoolMCMSEntrypoint_ApplyChainUpdates = script do
                 remoteChainSelector = 123.0
                 remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4", "d7e508a1d4ba82aed19fadcbf6ebd81d2c9b173a"]
                 remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
-                inboundCCVs = [RawInstanceAddress "in1@owner", RawInstanceAddress "in2@owner"]
+                inboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "in1@owner", Chainlink.InstanceAddress.RawInstanceAddress "in2@owner"]
                 outboundCCVs = []
                 finalityConfig = mkFinalityConfig 0
-                inboundRateLimiter = RawInstanceAddress "rate-limiter-in-new@owner"
-                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-new@owner"
-                outboundRateLimiter = RawInstanceAddress "rate-limiter-out-new@owner"
+                inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-new@owner"
+                inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom-new@owner"
+                outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out-new@owner"
             ]
 
         encoded = encodeApplyChainUpdatesParams (ApplyChainUpdatesParams with
@@ -171,12 +164,12 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
         existingConfig = RemoteChainConfig with
             remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
             remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
-            inboundCCVs = [RawInstanceAddress "in1@owner"]
-            outboundCCVs = [RawInstanceAddress "out1@owner"]
+            inboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "in1@owner"]
+            outboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "out1@owner"]
             finalityConfig = mkFinalityConfig 0
-            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
-            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
-            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+            inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
 
     -- Create LockReleaseTokenPool with existing remote chain config
     poolCid <- submit poolOwner do
@@ -189,11 +182,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
             rateLimitAdmin = None
             remoteChainConfigs = Map.fromList [(123.0, existingConfig)]
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
+            poolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = RelativeHours 24
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Create multiple chain pool configs, one to replace existing
@@ -202,22 +195,22 @@ testLockReleaseTokenPoolMCMSEntrypoint_UpdateChainPoolConfigs_Multiple = script 
                 remoteChainSelector = 123.0
                 remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4", "d7e508a1d4ba82aed19fadcbf6ebd81d2c9b173a"]
                 remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
-                inboundCCVs = [RawInstanceAddress "in1@owner", RawInstanceAddress "in2@owner"]
+                inboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "in1@owner", Chainlink.InstanceAddress.RawInstanceAddress "in2@owner"]
                 outboundCCVs = []
                 finalityConfig = mkFinalityConfig 12
-                inboundRateLimiter = RawInstanceAddress "rate-limiter-in-new@owner"
-                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-new@owner"
-                outboundRateLimiter = RawInstanceAddress "rate-limiter-out-new@owner"
+                inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-new@owner"
+                inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom-new@owner"
+                outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out-new@owner"
             ,ChainUpdate with
                 remoteChainSelector = 456.0
                 remotePools = ["d3704b816babab425caa936be1eb5b5a9bfb59c7"]
                 remoteTokenAddress = "cf9a923ab9efa0e261608dbd3c40fc0cfabade92"
-                inboundCCVs = [RawInstanceAddress "in4@owner", RawInstanceAddress "in5@owner"]
+                inboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "in4@owner", Chainlink.InstanceAddress.RawInstanceAddress "in5@owner"]
                 outboundCCVs = []
                 finalityConfig = mkFinalityConfig 0
-                inboundRateLimiter = RawInstanceAddress "rate-limiter-in-2@owner"
-                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-2@owner"
-                outboundRateLimiter = RawInstanceAddress "rate-limiter-out-2@owner"
+                inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-2@owner"
+                inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom-2@owner"
+                outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out-2@owner"
             ]
 
         encoded = encodeApplyChainUpdatesParams (ApplyChainUpdatesParams with
@@ -261,12 +254,12 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimiterReferences = script do
         existingConfig = RemoteChainConfig with
             remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
             remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
-            inboundCCVs = [RawInstanceAddress "in1@owner"]
-            outboundCCVs = [RawInstanceAddress "out1@owner"]
+            inboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "in1@owner"]
+            outboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "out1@owner"]
             finalityConfig = mkFinalityConfig 0
-            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
-            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
-            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+            inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
 
   -- Create LockReleaseTokenPool with existing config
     poolCid <- submit poolOwner do
@@ -279,20 +272,20 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimiterReferences = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.fromList [(123.0, existingConfig)]
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
+            poolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Create rate limiter config update for existing chain
     let args = [
             RateLimitConfigArgs with
                 remoteChainSelector = 123.0
-                inboundRateLimiter = RawInstanceAddress "rate-limiter-in-updated@owner"
-                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-updated@owner"
-                outboundRateLimiter = RawInstanceAddress "rate-limiter-out-updated@owner"
+                inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-updated@owner"
+                inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom-updated@owner"
+                outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out-updated@owner"
             ]
 
         encoded = encodeSetRateLimiterReferencesParams (SetRateLimiterReferencesParams with
@@ -341,11 +334,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_UnknownFunction = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
+            poolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
   -- Call with unknown function name - should fail
@@ -377,11 +370,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_InvalidParams = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
+            poolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
   -- Call with invalid operationData - should fail
@@ -413,7 +406,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.ChoiceContext (TextMap.empty)
+            poolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.empty)
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
@@ -425,12 +418,12 @@ testLockReleaseTokenPoolMCMSEntrypoint_MissingSelfCid = script do
                 remoteChainSelector = 123.0
                 remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4", "d7e508a1d4ba82aed19fadcbf6ebd81d2c9b173a"]
                 remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
-                inboundCCVs = [RawInstanceAddress "in1@owner", RawInstanceAddress "in2@owner"]
+                inboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "in1@owner", Chainlink.InstanceAddress.RawInstanceAddress "in2@owner"]
                 outboundCCVs = []
                 finalityConfig = mkFinalityConfig 0
-                inboundRateLimiter = RawInstanceAddress "rate-limiter-in-new@owner"
-                inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom-new@owner"
-                outboundRateLimiter = RawInstanceAddress "rate-limiter-out-new@owner"
+                inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-new@owner"
+                inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom-new@owner"
+                outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out-new@owner"
             ]
 
         encoded = encodeApplyChainUpdatesParams (ApplyChainUpdatesParams with
@@ -497,15 +490,15 @@ testLockReleaseTokenPoolMCMSEntrypoint_AddPoolReceiveContextNonContractValue = s
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.emptyChoiceContext
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
-    let newContext = MetadataV1.ChoiceContext (TextMap.fromList [("key1", MetadataV1.AV_Text "value1"), ("key2", MetadataV1.AV_Int 42)])
-    let encoded1 = encodeAddPoolReceiveContextNonContractValueParams (AddPoolReceiveContextNonContractValueParams with contextKey = "key1", valuePayload = encodeAnyValue (MetadataV1.AV_Text "value1"))
+    let newContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.fromList [("key1", Splice.Api.Token.MetadataV1.AV_Text "value1"), ("key2", Splice.Api.Token.MetadataV1.AV_Int 42)])
+    let encoded1 = encodeAddPoolReceiveContextNonContractValueParams (AddPoolReceiveContextNonContractValueParams with contextKey = "key1", valuePayload = encodeAnyValue (Splice.Api.Token.MetadataV1.AV_Text "value1"))
     cidMap1 <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
             functionName = "AddPoolReceiveContextNonContractValue"
@@ -514,7 +507,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_AddPoolReceiveContextNonContractValue = s
 
     let poolCid2 = coerceContractId (fromSome (Map.lookup instAddr cidMap1)) : ContractId LockReleaseTokenPool
     let target2 = toInterfaceContractId @MCMSReceiver poolCid2
-    let encoded2 = encodeAddPoolReceiveContextNonContractValueParams (AddPoolReceiveContextNonContractValueParams with contextKey = "key2", valuePayload = encodeAnyValue (MetadataV1.AV_Int 42))
+    let encoded2 = encodeAddPoolReceiveContextNonContractValueParams (AddPoolReceiveContextNonContractValueParams with contextKey = "key2", valuePayload = encodeAnyValue (Splice.Api.Token.MetadataV1.AV_Int 42))
     _ <- submit poolOwner do
         exerciseCmd target2 MCMSReceiver_Entrypoint with
             functionName = "AddPoolReceiveContextNonContractValue"
@@ -535,7 +528,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_ClearPoolReceiveContext = script do
 
     let instanceId = "pool-context-empty-test"
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-        initialContext = MetadataV1.ChoiceContext (TextMap.fromList [("existing", MetadataV1.AV_Text "data")])
+        initialContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.fromList [("existing", Splice.Api.Token.MetadataV1.AV_Text "data")])
 
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
@@ -551,10 +544,10 @@ testLockReleaseTokenPoolMCMSEntrypoint_ClearPoolReceiveContext = script do
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
-    let emptyContext = MetadataV1.emptyChoiceContext
+    let emptyContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
     _ <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
             functionName = "ClearPoolReceiveContext"
@@ -586,13 +579,13 @@ testLockReleaseTokenPoolMCMSEntrypoint_AddPoolReceiveContextContractValue = scri
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.emptyChoiceContext
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
-    let encoded = encodeAddPoolReceiveContextContractValueParams (AddPoolReceiveContextContractValueParams with contextKey = "selfRef", referentInstanceAddress = RawInstanceAddress instAddr)
+    let encoded = encodeAddPoolReceiveContextContractValueParams (AddPoolReceiveContextContractValueParams with contextKey = "selfRef", referentInstanceAddress = Chainlink.InstanceAddress.RawInstanceAddress instAddr)
 
     _ <- submit poolOwner do
         exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -603,7 +596,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_AddPoolReceiveContextContractValue = scri
     contracts <- query @LockReleaseTokenPool poolOwner
     case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
         [(_, pool)] -> do
-            let expected = MetadataV1.ChoiceContext (TextMap.fromList [("selfRef", MetadataV1.AV_ContractId (coerceContractId poolCid))])
+            let expected = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.fromList [("selfRef", Splice.Api.Token.MetadataV1.AV_ContractId (coerceContractId poolCid))])
             assertMsg ("poolReceiveContext mismatch, got: " <> show pool.poolReceiveContext) (pool.poolReceiveContext == expected)
         _ -> abort "Expected exactly one LockReleaseTokenPool contract"
 
@@ -615,7 +608,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_RemovePoolReceiveContextValue = script do
 
     let instanceId = "pool-context-remove-test"
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
-        initialContext = MetadataV1.ChoiceContext (TextMap.fromList [("keep", MetadataV1.AV_Text "me"), ("remove", MetadataV1.AV_Int 99)])
+        initialContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.fromList [("keep", Splice.Api.Token.MetadataV1.AV_Text "me"), ("remove", Splice.Api.Token.MetadataV1.AV_Int 99)])
 
     poolCid <- submit poolOwner do
         createCmd LockReleaseTokenPool with
@@ -631,7 +624,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_RemovePoolReceiveContextValue = script do
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
     let encoded = encodeRemovePoolReceiveContextValueParams (RemovePoolReceiveContextValueParams with contextKey = "remove")
 
@@ -644,7 +637,7 @@ testLockReleaseTokenPoolMCMSEntrypoint_RemovePoolReceiveContextValue = script do
     contracts <- query @LockReleaseTokenPool poolOwner
     case filter (\(_, pool) -> pool.instanceId == instanceId) contracts of
         [(_, pool)] -> do
-            let expected = MetadataV1.ChoiceContext (TextMap.fromList [("keep", MetadataV1.AV_Text "me")])
+            let expected = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.fromList [("keep", Splice.Api.Token.MetadataV1.AV_Text "me")])
             assertMsg ("poolReceiveContext mismatch, got: " <> show pool.poolReceiveContext) (pool.poolReceiveContext == expected)
         _ -> abort "Expected exactly one LockReleaseTokenPool contract"
 
@@ -672,11 +665,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetTransferTimeout_Indefinite = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.emptyChoiceContext
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             transferTimeout = RelativeHours 24
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Change to Indefinite
@@ -716,11 +709,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetTransferTimeout_RelativeHours = script
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.emptyChoiceContext
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Change to RelativeHours 48
@@ -760,11 +753,11 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetTransferTimeout_InvalidData = script d
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.emptyChoiceContext
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
-    let instAddr = RawInstanceAddress.makeText instanceId poolOwner
+    let instAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
 
     -- Call with invalid tag byte - should fail
@@ -787,12 +780,12 @@ testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig = script do
         mkRemoteConfig finality = RemoteChainConfig with
             remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4"]
             remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
-            inboundCCVs = [RawInstanceAddress "in1@owner"]
+            inboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "in1@owner"]
             outboundCCVs = []
             finalityConfig = finality
-            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
-            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
-            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+            inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
         mkPool remoteChainConfigs = LockReleaseTokenPool with
             instanceId
             poolOwner
@@ -802,15 +795,15 @@ testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig = script do
             rateLimitAdmin = None
             remoteChainConfigs
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.emptyChoiceContext
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 
     submitMustFail poolOwner do
-        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (FinalityCodec.BlockDepth 0))]))
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (CCIP.CodecV1.FinalityConfig.BlockDepth 0))]))
 
     submitMustFail poolOwner do
-        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (FinalityCodec.BlockDepth (-1)))]))
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (CCIP.CodecV1.FinalityConfig.BlockDepth (-1)))]))
 
     poolCid <- submit poolOwner do
         createCmd (mkPool Map.empty)
@@ -819,27 +812,27 @@ testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig = script do
             remoteChainSelector = 123.0
             remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4"]
             remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
-            inboundCCVs = [RawInstanceAddress "in1@owner"]
+            inboundCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "in1@owner"]
             outboundCCVs = []
             finalityConfig = finality
-            inboundRateLimiter = RawInstanceAddress "rate-limiter-in@owner"
-            inboundCustomBlockConfirmationsRateLimiter = RawInstanceAddress "rate-limiter-in-custom@owner"
-            outboundRateLimiter = RawInstanceAddress "rate-limiter-out@owner"
+            inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in@owner"
+            inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@owner"
+            outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
 
     submitMustFail poolOwner do
         exerciseCmd poolCid ApplyChainUpdates with
             remoteChainSelectorsToRemove = []
-            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth 0)]
+            chainsToAdd = [mkUpdate (CCIP.CodecV1.FinalityConfig.BlockDepth 0)]
 
     submitMustFail poolOwner do
         exerciseCmd poolCid ApplyChainUpdates with
             remoteChainSelectorsToRemove = []
-            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth (-1))]
+            chainsToAdd = [mkUpdate (CCIP.CodecV1.FinalityConfig.BlockDepth (-1))]
 
     _ <- submit poolOwner do
         exerciseCmd poolCid ApplyChainUpdates with
             remoteChainSelectorsToRemove = []
-            chainsToAdd = [mkUpdate (FinalityCodec.BlockDepth 1)]
+            chainsToAdd = [mkUpdate (CCIP.CodecV1.FinalityConfig.BlockDepth 1)]
 
     pure ()
 
@@ -859,7 +852,7 @@ testLockReleaseTokenPool_RejectsInvalidDecimals = script do
             rateLimitAdmin = None
             remoteChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
-            poolReceiveContext = MetadataV1.emptyChoiceContext
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             transferTimeout = Indefinite
             deps = dummyPoolDeps ccipOwner
 

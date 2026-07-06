@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 // getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as
@@ -42,7 +43,7 @@ func quoteCCIPSenderFee(
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					ContractId:     ccipSenderCid,
 					Choice:         "GetFee",
 					ChoiceArgument: ledger.MapToValue(getFeeChoiceArgumentMap(sendArgs)),

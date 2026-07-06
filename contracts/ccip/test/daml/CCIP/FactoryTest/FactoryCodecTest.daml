@@ -6,6 +6,9 @@ import DA.Assert ((===))
 import DA.Optional (fromSome)
 import DA.Crypto.Text (BytesHex)
 
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
 import MCMS.Codec
   ( encodeText
   , encodeNumeric0
@@ -19,89 +22,84 @@ import MCMS.Codec
   , encodeList
   , encodeOptional
   )
-import CCIP.Codec
-  ( encodeInstrumentId
-  , encodeRawInstanceAddress
-  )
-import qualified Splice.Api.Token.HoldingV1
 
-import CCIP.FinalityConfig qualified as FinalityCodec
-import CCIP.Factory
-import qualified CCIP.CommitteeVerifier
-import Chainlink.InstanceAddress (RawInstanceAddress(..))
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import CCIP.RateLimiterV1 (RateLimitDirection(..), RateLimitMode(..))
-import CCIP.Utils.Context (encodeChoiceContext)
-import CCIP.LockReleaseTokenPoolCodecGen (encodeTransferTimeout)
-import qualified CCIP.BurnMintTokenPoolCodecGen
-import qualified CCIP.BurnMintTokenPoolTypes
-import CCIP.LockReleaseTokenPoolTypes (TransferTimeout(..))
-import Splice.Api.Token.MetadataV1 qualified as MetadataV1
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.BurnMintTokenPoolV1
+import qualified CCIP.BurnMintTokenPoolV1CodecGen
+import qualified CCIP.CodecV1
+import qualified CCIP.CodecV1.FinalityConfig
+import qualified CCIP.CommitteeVerifierV1
+import qualified CCIP.FactoryV1
+import qualified CCIP.LockReleaseTokenPoolV1
+import qualified CCIP.LockReleaseTokenPoolV1CodecGen
+import qualified CCIP.RateLimiterV1
+import qualified CCIP.UtilsV1.Context
 
 finalityConfig n =
   if n == 0
-  then FinalityCodec.WaitForFinality
-  else FinalityCodec.BlockDepth n
+  then CCIP.CodecV1.FinalityConfig.WaitForFinality
+  else CCIP.CodecV1.FinalityConfig.BlockDepth n
 
-encodeRequestedFinality : FinalityCodec.FinalityConfig -> BytesHex
+encodeRequestedFinality : CCIP.CodecV1.FinalityConfig.FinalityConfig -> BytesHex
 encodeRequestedFinality requestedFinality =
   case requestedFinality of
-    FinalityCodec.WaitForFinality -> fromSome (encodeUint8 0)
-    FinalityCodec.WaitForSafe -> fromSome (encodeUint8 1)
-    FinalityCodec.BlockDepth depth ->
+    CCIP.CodecV1.FinalityConfig.WaitForFinality -> fromSome (encodeUint8 0)
+    CCIP.CodecV1.FinalityConfig.WaitForSafe -> fromSome (encodeUint8 1)
+    CCIP.CodecV1.FinalityConfig.BlockDepth depth ->
       fromSome (encodeUint8 2) <> fromSome (encodeInt64 depth)
 
 -- ===========================================================================
 -- ENCODER FUNCTIONS FOR DEPLOY PARAMS
 -- ===========================================================================
 
-encodeDeployGlobalConfigParams : DeployGlobalConfigParams -> BytesHex
+encodeDeployGlobalConfigParams : CCIP.FactoryV1.DeployGlobalConfigParams -> BytesHex
 encodeDeployGlobalConfigParams params =
   encodeText params.instanceId
   <> encodeNumeric0 params.chainSelector
 
-encodeDeployFeeQuoterParams : DeployFeeQuoterParams -> BytesHex
+encodeDeployFeeQuoterParams : CCIP.FactoryV1.DeployFeeQuoterParams -> BytesHex
 encodeDeployFeeQuoterParams params =
   encodeText params.instanceId
-  <> encodeInstrumentId params.linkTokenInstrumentId
+  <> CCIP.CodecV1.encodeInstrumentId params.linkTokenInstrumentId
 
-encodeDeployLinkTokenParams : DeployLinkTokenParams -> BytesHex
+encodeDeployLinkTokenParams : CCIP.FactoryV1.DeployLinkTokenParams -> BytesHex
 encodeDeployLinkTokenParams params =
   encodeText params.instanceId
-  <> encodeInstrumentId params.instrumentId
+  <> CCIP.CodecV1.encodeInstrumentId params.instrumentId
 
-encodeDeployTokenAdminRegistryParams : DeployTokenAdminRegistryParams -> BytesHex
+encodeDeployTokenAdminRegistryParams : CCIP.FactoryV1.DeployTokenAdminRegistryParams -> BytesHex
 encodeDeployTokenAdminRegistryParams params =
   encodeText params.instanceId
 
-encodeDeployOnRampParams : DeployOnRampParams -> BytesHex
+encodeDeployOnRampParams : CCIP.FactoryV1.DeployOnRampParams -> BytesHex
 encodeDeployOnRampParams params =
   encodeText params.instanceId
-  <> encodeRawInstanceAddress params.globalConfig
-  <> encodeRawInstanceAddress params.rmnRemote
-  <> encodeRawInstanceAddress params.tokenAdminRegistry
-  <> encodeRawInstanceAddress params.feeQuoter
-  <> encodeRawInstanceAddress params.ccvRegistry
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.globalConfig
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.rmnRemote
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.tokenAdminRegistry
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.feeQuoter
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.ccvRegistry
   <> encodeNumeric0 params.maxUSDCentsPerMsg
 
-encodeDeployOffRampParams : DeployOffRampParams -> BytesHex
+encodeDeployOffRampParams : CCIP.FactoryV1.DeployOffRampParams -> BytesHex
 encodeDeployOffRampParams params =
   encodeText params.instanceId
-  <> encodeRawInstanceAddress params.globalConfig
-  <> encodeRawInstanceAddress params.rmnRemote
-  <> encodeRawInstanceAddress params.tokenAdminRegistry
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.globalConfig
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.rmnRemote
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.tokenAdminRegistry
 
-encodeDeployPerPartyRouterFactoryParams : DeployPerPartyRouterFactoryParams -> BytesHex
+encodeDeployPerPartyRouterFactoryParams : CCIP.FactoryV1.DeployPerPartyRouterFactoryParams -> BytesHex
 encodeDeployPerPartyRouterFactoryParams params =
   encodeText params.instanceId
-  <> encodeRawInstanceAddress params.onRamp
-  <> encodeRawInstanceAddress params.offRamp
-  <> encodeRawInstanceAddress params.globalConfig
-  <> encodeRawInstanceAddress params.tokenAdminRegistry
-  <> encodeRawInstanceAddress params.feeQuoter
-  <> encodeRawInstanceAddress params.rmnRemote
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.onRamp
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.offRamp
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.globalConfig
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.tokenAdminRegistry
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.feeQuoter
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.rmnRemote
 
-encodeDeployRMNRemoteParams : DeployRMNRemoteParams -> BytesHex
+encodeDeployRMNRemoteParams : CCIP.FactoryV1.DeployRMNRemoteParams -> BytesHex
 encodeDeployRMNRemoteParams params =
   encodeText params.instanceId
   <> encodeParty params.rmnOwner
@@ -109,7 +107,7 @@ encodeDeployRMNRemoteParams params =
   <> encodePartyList params.customObservers
   <> encodeBytesHexList params.cursedSubjects
 
-encodeDeployCommitteeVerifierParams : DeployCommitteeVerifierParams -> BytesHex
+encodeDeployCommitteeVerifierParams : CCIP.FactoryV1.DeployCommitteeVerifierParams -> BytesHex
 encodeDeployCommitteeVerifierParams params =
   encodeText params.instanceId
   <> encodeParty params.owner
@@ -117,12 +115,12 @@ encodeDeployCommitteeVerifierParams params =
   <> encodeBytesHex params.versionTag
   <> encodeOptional params.allowListAdmin encodeParty
   <> encodePartyList params.messageSentObservers
-  <> encodeRawInstanceAddress params.rmnRemote
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.rmnRemote
   <> encodeList params.storageLocations encodeText
   <> encodeParty params.storageLocationsAdmin
   <> encodeParty params.pendingStorageLocationsAdmin
 
-encodeDeployExecutorParams : DeployExecutorParams -> BytesHex
+encodeDeployExecutorParams : CCIP.FactoryV1.DeployExecutorParams -> BytesHex
 encodeDeployExecutorParams params =
   encodeText params.instanceId
   <> encodeParty params.owner
@@ -130,43 +128,43 @@ encodeDeployExecutorParams params =
   <> encodeRequestedFinality params.allowedFinalityConfig
   <> encodeBool params.ccvAllowlistEnabled
 
-encodeDeployLockReleaseTokenPoolParams : DeployLockReleaseTokenPoolParams -> BytesHex
+encodeDeployLockReleaseTokenPoolParams : CCIP.FactoryV1.DeployLockReleaseTokenPoolParams -> BytesHex
 encodeDeployLockReleaseTokenPoolParams params =
   encodeText params.instanceId
   <> encodeParty params.poolOwner
   <> encodeParty params.ccipOwner
-  <> encodeInstrumentId params.instrumentId
+  <> CCIP.CodecV1.encodeInstrumentId params.instrumentId
   <> fromSome (encodeInt64 params.decimals)
   <> encodeOptional params.rateLimitAdmin encodeParty
-  <> encodeRawInstanceAddress params.tokenAdminRegistry
-  <> encodeRawInstanceAddress params.feeQuoter
-  <> encodeRawInstanceAddress params.rmnRemote
-  <> encodeChoiceContext params.poolReceiveContext
-  <> encodeTransferTimeout params.transferTimeout
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.tokenAdminRegistry
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.feeQuoter
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.rmnRemote
+  <> CCIP.UtilsV1.Context.encodeChoiceContext params.poolReceiveContext
+  <> CCIP.LockReleaseTokenPoolV1CodecGen.encodeTransferTimeout params.transferTimeout
 
-encodeDeployBurnMintTokenPoolParams : DeployBurnMintTokenPoolParams -> BytesHex
+encodeDeployBurnMintTokenPoolParams : CCIP.FactoryV1.DeployBurnMintTokenPoolParams -> BytesHex
 encodeDeployBurnMintTokenPoolParams params =
   encodeText params.instanceId
   <> encodeParty params.poolOwner
   <> encodeParty params.ccipOwner
-  <> encodeInstrumentId params.instrumentId
+  <> CCIP.CodecV1.encodeInstrumentId params.instrumentId
   <> fromSome (encodeInt64 params.decimals)
   <> encodeOptional params.rateLimitAdmin encodeParty
-  <> encodeRawInstanceAddress params.tokenAdminRegistry
-  <> encodeRawInstanceAddress params.feeQuoter
-  <> encodeRawInstanceAddress params.rmnRemote
-  <> encodeChoiceContext params.poolReceiveContext
-  <> CCIP.BurnMintTokenPoolCodecGen.encodeTransferTimeout params.transferTimeout
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.tokenAdminRegistry
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.feeQuoter
+  <> CCIP.CodecV1.encodeRawInstanceAddress params.rmnRemote
+  <> CCIP.UtilsV1.Context.encodeChoiceContext params.poolReceiveContext
+  <> CCIP.BurnMintTokenPoolV1CodecGen.encodeTransferTimeout params.transferTimeout
 
-encodeRateLimitDirection : RateLimitDirection -> BytesHex
-encodeRateLimitDirection RateLimitDirection_Outbound = fromSome (encodeUint8 0)
-encodeRateLimitDirection RateLimitDirection_Inbound = fromSome (encodeUint8 1)
+encodeRateLimitDirection : CCIP.RateLimiterV1.RateLimitDirection -> BytesHex
+encodeRateLimitDirection CCIP.RateLimiterV1.RateLimitDirection_Outbound = fromSome (encodeUint8 0)
+encodeRateLimitDirection CCIP.RateLimiterV1.RateLimitDirection_Inbound = fromSome (encodeUint8 1)
 
-encodeRateLimitMode : RateLimitMode -> BytesHex
-encodeRateLimitMode RateLimitMode_DefaultFinality = fromSome (encodeUint8 0)
-encodeRateLimitMode RateLimitMode_CustomFinality = fromSome (encodeUint8 1)
+encodeRateLimitMode : CCIP.RateLimiterV1.RateLimitMode -> BytesHex
+encodeRateLimitMode CCIP.RateLimiterV1.RateLimitMode_DefaultFinality = fromSome (encodeUint8 0)
+encodeRateLimitMode CCIP.RateLimiterV1.RateLimitMode_CustomFinality = fromSome (encodeUint8 1)
 
-encodeDeployRateLimiterParams : DeployRateLimiterParams -> BytesHex
+encodeDeployRateLimiterParams : CCIP.FactoryV1.DeployRateLimiterParams -> BytesHex
 encodeDeployRateLimiterParams params =
   encodeText params.instanceId
   <> encodeText params.poolInstanceId
@@ -184,12 +182,12 @@ encodeDeployRateLimiterParams params =
 
 testDecodeDeployGlobalConfigParams : Script ()
 testDecodeDeployGlobalConfigParams = script do
-  let params = DeployGlobalConfigParams with
+  let params = CCIP.FactoryV1.DeployGlobalConfigParams with
         instanceId = "gc-1"
         chainSelector = 123.0
       encoded = encodeDeployGlobalConfigParams params
 
-  case decodeDeployGlobalConfigParams encoded of
+  case CCIP.FactoryV1.decodeDeployGlobalConfigParams encoded of
     None -> abort "Failed to decode DeployGlobalConfigParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -201,12 +199,12 @@ testDecodeDeployGlobalConfigParams_LargeChainSelector : Script ()
 testDecodeDeployGlobalConfigParams_LargeChainSelector = script do
   -- Test with large CCIP-style chain selector
   let largeSelector : Numeric 0 = 16015286601757825753.0  -- Avalanche Fuji
-      params = DeployGlobalConfigParams with
+      params = CCIP.FactoryV1.DeployGlobalConfigParams with
         instanceId = "gc-large"
         chainSelector = largeSelector
       encoded = encodeDeployGlobalConfigParams params
 
-  case decodeDeployGlobalConfigParams encoded of
+  case CCIP.FactoryV1.decodeDeployGlobalConfigParams encoded of
     None -> abort "Failed to decode with large chain selector"
     Some decoded -> decoded.chainSelector === largeSelector
 
@@ -216,12 +214,12 @@ testDecodeDeployFeeQuoterParams : Script ()
 testDecodeDeployFeeQuoterParams = script do
   tokenAdmin <- allocateParty "TokenAdmin"
 
-  let params = DeployFeeQuoterParams with
+  let params = CCIP.FactoryV1.DeployFeeQuoterParams with
         instanceId = "fq-1"
         linkTokenInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
       encoded = encodeDeployFeeQuoterParams params
 
-  case decodeDeployFeeQuoterParams encoded of
+  case CCIP.FactoryV1.decodeDeployFeeQuoterParams encoded of
     None -> abort "Failed to decode DeployFeeQuoterParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -233,12 +231,12 @@ testDecodeDeployLinkTokenParams : Script ()
 testDecodeDeployLinkTokenParams = script do
   tokenAdmin <- allocateParty "LinkTokenAdmin"
 
-  let params = DeployLinkTokenParams with
+  let params = CCIP.FactoryV1.DeployLinkTokenParams with
         instanceId = "link-token-1"
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
       encoded = encodeDeployLinkTokenParams params
 
-  case decodeDeployLinkTokenParams encoded of
+  case CCIP.FactoryV1.decodeDeployLinkTokenParams encoded of
     None -> abort "Failed to decode DeployLinkTokenParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -248,11 +246,11 @@ testDecodeDeployLinkTokenParams = script do
 
 testDecodeDeployTokenAdminRegistryParams : Script ()
 testDecodeDeployTokenAdminRegistryParams = script do
-  let params = DeployTokenAdminRegistryParams with
+  let params = CCIP.FactoryV1.DeployTokenAdminRegistryParams with
         instanceId = "tar-1"
       encoded = encodeDeployTokenAdminRegistryParams params
 
-  case decodeDeployTokenAdminRegistryParams encoded of
+  case CCIP.FactoryV1.decodeDeployTokenAdminRegistryParams encoded of
     None -> abort "Failed to decode DeployTokenAdminRegistryParams"
     Some decoded -> decoded.instanceId === params.instanceId
 
@@ -260,17 +258,17 @@ testDecodeDeployTokenAdminRegistryParams = script do
 
 testDecodeDeployOnRampParams : Script ()
 testDecodeDeployOnRampParams = script do
-  let params = DeployOnRampParams with
+  let params = CCIP.FactoryV1.DeployOnRampParams with
         instanceId = "onramp-1"
-        globalConfig = RawInstanceAddress "gc@owner"
-        rmnRemote = RawInstanceAddress "rmn@owner"
-        tokenAdminRegistry = RawInstanceAddress "tar@owner"
-        feeQuoter = RawInstanceAddress "fq@owner"
-        ccvRegistry = RawInstanceAddress "ccv@owner"
+        globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc@owner"
+        rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
+        tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
+        feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
+        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv@owner"
         maxUSDCentsPerMsg = 12345.0
       encoded = encodeDeployOnRampParams params
 
-  case decodeDeployOnRampParams encoded of
+  case CCIP.FactoryV1.decodeDeployOnRampParams encoded of
     None -> abort "Failed to decode DeployOnRampParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -285,14 +283,14 @@ testDecodeDeployOnRampParams = script do
 
 testDecodeDeployOffRampParams : Script ()
 testDecodeDeployOffRampParams = script do
-  let params = DeployOffRampParams with
+  let params = CCIP.FactoryV1.DeployOffRampParams with
         instanceId = "offramp-1"
-        globalConfig = RawInstanceAddress "gc@owner"
-        rmnRemote = RawInstanceAddress "rmn@owner"
-        tokenAdminRegistry = RawInstanceAddress "tar@owner"
+        globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc@owner"
+        rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
+        tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
       encoded = encodeDeployOffRampParams params
 
-  case decodeDeployOffRampParams encoded of
+  case CCIP.FactoryV1.decodeDeployOffRampParams encoded of
     None -> abort "Failed to decode DeployOffRampParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -304,17 +302,17 @@ testDecodeDeployOffRampParams = script do
 
 testDecodeDeployPerPartyRouterFactoryParams : Script ()
 testDecodeDeployPerPartyRouterFactoryParams = script do
-  let params = DeployPerPartyRouterFactoryParams with
+  let params = CCIP.FactoryV1.DeployPerPartyRouterFactoryParams with
         instanceId = "ppr-factory-1"
-        onRamp = RawInstanceAddress "onramp@owner"
-        offRamp = RawInstanceAddress "offramp@owner"
-        globalConfig = RawInstanceAddress "gc@owner"
-        tokenAdminRegistry = RawInstanceAddress "tar@owner"
-        feeQuoter = RawInstanceAddress "fq@owner"
-        rmnRemote = RawInstanceAddress "rmn@owner"
+        onRamp = Chainlink.InstanceAddress.RawInstanceAddress "onramp@owner"
+        offRamp = Chainlink.InstanceAddress.RawInstanceAddress "offramp@owner"
+        globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc@owner"
+        tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
+        feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
+        rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
       encoded = encodeDeployPerPartyRouterFactoryParams params
 
-  case decodeDeployPerPartyRouterFactoryParams encoded of
+  case CCIP.FactoryV1.decodeDeployPerPartyRouterFactoryParams encoded of
     None -> abort "Failed to decode DeployPerPartyRouterFactoryParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -334,7 +332,7 @@ testDecodeDeployRMNRemoteParams = script do
   observer1 <- allocateParty "observer1"
   observer2 <- allocateParty "observer2"
 
-  let params = DeployRMNRemoteParams with
+  let params = CCIP.FactoryV1.DeployRMNRemoteParams with
         instanceId = "rmn-1"
         rmnOwner
         ccipOwner
@@ -342,7 +340,7 @@ testDecodeDeployRMNRemoteParams = script do
         cursedSubjects = ["deadbeef", "cafebabe"]
       encoded = encodeDeployRMNRemoteParams params
 
-  case decodeDeployRMNRemoteParams encoded of
+  case CCIP.FactoryV1.decodeDeployRMNRemoteParams encoded of
     None -> abort "Failed to decode DeployRMNRemoteParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -358,7 +356,7 @@ testDecodeDeployRMNRemoteParams_EmptyLists = script do
   rmnOwner <- allocateParty "rmn_owner"
   ccipOwner <- allocateParty "ccip_owner"
 
-  let params = DeployRMNRemoteParams with
+  let params = CCIP.FactoryV1.DeployRMNRemoteParams with
         instanceId = "rmn-empty"
         rmnOwner
         ccipOwner
@@ -366,7 +364,7 @@ testDecodeDeployRMNRemoteParams_EmptyLists = script do
         cursedSubjects = []
       encoded = encodeDeployRMNRemoteParams params
 
-  case decodeDeployRMNRemoteParams encoded of
+  case CCIP.FactoryV1.decodeDeployRMNRemoteParams encoded of
     None -> abort "Failed to decode with empty lists"
     Some decoded -> do
       decoded.customObservers === []
@@ -383,21 +381,21 @@ testDecodeDeployCommitteeVerifierParams = script do
   pendingAdmin <- allocateParty "pending_admin"
   allowListAdmin <- allocateParty "allow_list_admin"
 
-  let params = DeployCommitteeVerifierParams with
+  let params = CCIP.FactoryV1.DeployCommitteeVerifierParams with
         instanceId = "ccv-1"
         owner
         ccipOwner
-        versionTag = CCIP.CommitteeVerifier.versionTagV2_0_0
+        versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
         allowListAdmin = Some allowListAdmin
         --allowListAdmin = None
         messageSentObservers = [messageSentObserver]
-        rmnRemote = RawInstanceAddress "rmn@owner"
+        rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         storageLocations = ["loc1", "loc2", "loc3"]
         storageLocationsAdmin = storageAdmin
         pendingStorageLocationsAdmin = pendingAdmin
       encoded = encodeDeployCommitteeVerifierParams params
 
-  case decodeDeployCommitteeVerifierParams encoded of
+  case CCIP.FactoryV1.decodeDeployCommitteeVerifierParams encoded of
     None -> abort "Failed to decode DeployCommitteeVerifierParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -420,20 +418,20 @@ testDecodeDeployCommitteeVerifierParams_EmptyStorageLocations = script do
   messageSentObserver <- allocateParty "msg_observer"
   storageAdmin <- allocateParty "storage_admin"
 
-  let params = DeployCommitteeVerifierParams with
+  let params = CCIP.FactoryV1.DeployCommitteeVerifierParams with
         instanceId = "ccv-empty"
         owner
         ccipOwner
         versionTag = ""
         allowListAdmin = None
         messageSentObservers = [messageSentObserver]
-        rmnRemote = RawInstanceAddress "rmn@owner"
+        rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         storageLocations = []
         storageLocationsAdmin = storageAdmin
         pendingStorageLocationsAdmin = storageAdmin
       encoded = encodeDeployCommitteeVerifierParams params
 
-  case decodeDeployCommitteeVerifierParams encoded of
+  case CCIP.FactoryV1.decodeDeployCommitteeVerifierParams encoded of
     None -> abort "Failed to decode with empty storage locations"
     Some decoded -> do
       decoded.storageLocations === []
@@ -445,7 +443,7 @@ testDecodeDeployExecutorParams : Script ()
 testDecodeDeployExecutorParams = script do
   owner <- allocateParty "ExecutorOwner"
 
-  let params = DeployExecutorParams with
+  let params = CCIP.FactoryV1.DeployExecutorParams with
         instanceId = "executor-1"
         owner
         maxCCVsPerMsg = 10
@@ -453,7 +451,7 @@ testDecodeDeployExecutorParams = script do
         ccvAllowlistEnabled = False
       encoded = encodeDeployExecutorParams params
 
-  case decodeDeployExecutorParams encoded of
+  case CCIP.FactoryV1.decodeDeployExecutorParams encoded of
     None -> abort "Failed to decode DeployExecutorParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -469,19 +467,19 @@ testDecodeDeployExecutorParamsRejectsNonPositiveBlockDepth = script do
   owner <- allocateParty "ExecutorOwner"
 
   let encodeWith finality =
-        encodeDeployExecutorParams (DeployExecutorParams with
+        encodeDeployExecutorParams (CCIP.FactoryV1.DeployExecutorParams with
           instanceId = "executor-1"
           owner
           maxCCVsPerMsg = 10
           allowedFinalityConfig = finality
           ccvAllowlistEnabled = False)
       assertDecodeFails finality =
-        case decodeDeployExecutorParams (encodeWith finality) of
+        case CCIP.FactoryV1.decodeDeployExecutorParams (encodeWith finality) of
           None -> pure ()
           Some _ -> abort "expected DeployExecutorParams decode to reject non-positive BlockDepth"
 
-  assertDecodeFails (FinalityCodec.BlockDepth 0)
-  assertDecodeFails (FinalityCodec.BlockDepth (-1))
+  assertDecodeFails (CCIP.CodecV1.FinalityConfig.BlockDepth 0)
+  assertDecodeFails (CCIP.CodecV1.FinalityConfig.BlockDepth (-1))
 
 testDecodeDeployLockReleaseTokenPoolParams : Script ()
 testDecodeDeployLockReleaseTokenPoolParams = script do
@@ -492,21 +490,21 @@ testDecodeDeployLockReleaseTokenPoolParams = script do
   feeOwner <- allocateParty "fee_owner"
   rmnOwner <- allocateParty "rmn_owner"
 
-  let params = DeployLockReleaseTokenPoolParams with
+  let params = CCIP.FactoryV1.DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-1"
         poolOwner
         ccipOwner
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
         decimals = 6
         rateLimitAdmin = Some rateLimitAdmin
-        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
-        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
-        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
-        poolReceiveContext = MetadataV1.emptyChoiceContext
-        transferTimeout = RelativeHours 24
+        tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = Chainlink.InstanceAddress.make "fq-1" feeOwner
+        rmnRemote = Chainlink.InstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.LockReleaseTokenPoolV1.RelativeHours 24
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
-  case decodeDeployLockReleaseTokenPoolParams encoded of
+  case CCIP.FactoryV1.decodeDeployLockReleaseTokenPoolParams encoded of
     None -> abort "Failed to decode DeployLockReleaseTokenPoolParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -531,25 +529,25 @@ testDecodeDeployLockReleaseTokenPoolParams_Indefinite = script do
   feeOwner <- allocateParty "fee_owner"
   rmnOwner <- allocateParty "rmn_owner"
 
-  let params = DeployLockReleaseTokenPoolParams with
+  let params = CCIP.FactoryV1.DeployLockReleaseTokenPoolParams with
         instanceId = "lrtp-indefinite"
         poolOwner
         ccipOwner
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
         decimals = 18
         rateLimitAdmin = None
-        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
-        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
-        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
-        poolReceiveContext = MetadataV1.emptyChoiceContext
-        transferTimeout = Indefinite
+        tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = Chainlink.InstanceAddress.make "fq-1" feeOwner
+        rmnRemote = Chainlink.InstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.LockReleaseTokenPoolV1.Indefinite
       encoded = encodeDeployLockReleaseTokenPoolParams params
 
-  case decodeDeployLockReleaseTokenPoolParams encoded of
+  case CCIP.FactoryV1.decodeDeployLockReleaseTokenPoolParams encoded of
     None -> abort "Failed to decode DeployLockReleaseTokenPoolParams with Indefinite"
     Some decoded -> do
-      decoded.transferTimeout === Indefinite
-      decoded.poolReceiveContext === MetadataV1.emptyChoiceContext
+      decoded.transferTimeout === CCIP.LockReleaseTokenPoolV1.Indefinite
+      decoded.poolReceiveContext === Splice.Api.Token.MetadataV1.emptyChoiceContext
       decoded.rateLimitAdmin === None
 
   pure ()
@@ -563,21 +561,21 @@ testDecodeDeployBurnMintTokenPoolParams = script do
   feeOwner <- allocateParty "fee_owner"
   rmnOwner <- allocateParty "rmn_owner"
 
-  let params = DeployBurnMintTokenPoolParams with
+  let params = CCIP.FactoryV1.DeployBurnMintTokenPoolParams with
         instanceId = "bmtp-1"
         poolOwner
         ccipOwner
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
         decimals = 6
         rateLimitAdmin = Some rateLimitAdmin
-        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
-        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
-        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
-        poolReceiveContext = MetadataV1.emptyChoiceContext
-        transferTimeout = CCIP.BurnMintTokenPoolTypes.RelativeHours 24
+        tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = Chainlink.InstanceAddress.make "fq-1" feeOwner
+        rmnRemote = Chainlink.InstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.BurnMintTokenPoolV1.RelativeHours 24
       encoded = encodeDeployBurnMintTokenPoolParams params
 
-  case decodeDeployBurnMintTokenPoolParams encoded of
+  case CCIP.FactoryV1.decodeDeployBurnMintTokenPoolParams encoded of
     None -> abort "Failed to decode DeployBurnMintTokenPoolParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -602,25 +600,25 @@ testDecodeDeployBurnMintTokenPoolParams_Indefinite = script do
   feeOwner <- allocateParty "fee_owner"
   rmnOwner <- allocateParty "rmn_owner"
 
-  let params = DeployBurnMintTokenPoolParams with
+  let params = CCIP.FactoryV1.DeployBurnMintTokenPoolParams with
         instanceId = "bmtp-indefinite"
         poolOwner
         ccipOwner
         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
         decimals = 18
         rateLimitAdmin = None
-        tokenAdminRegistry = RawInstanceAddress.make "tar-1" tokenAdmin
-        feeQuoter = RawInstanceAddress.make "fq-1" feeOwner
-        rmnRemote = RawInstanceAddress.make "rmn-1" rmnOwner
-        poolReceiveContext = MetadataV1.emptyChoiceContext
-        transferTimeout = CCIP.BurnMintTokenPoolTypes.Indefinite
+        tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-1" tokenAdmin
+        feeQuoter = Chainlink.InstanceAddress.make "fq-1" feeOwner
+        rmnRemote = Chainlink.InstanceAddress.make "rmn-1" rmnOwner
+        poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.BurnMintTokenPoolV1.Indefinite
       encoded = encodeDeployBurnMintTokenPoolParams params
 
-  case decodeDeployBurnMintTokenPoolParams encoded of
+  case CCIP.FactoryV1.decodeDeployBurnMintTokenPoolParams encoded of
     None -> abort "Failed to decode DeployBurnMintTokenPoolParams with Indefinite"
     Some decoded -> do
-      decoded.transferTimeout === CCIP.BurnMintTokenPoolTypes.Indefinite
-      decoded.poolReceiveContext === MetadataV1.emptyChoiceContext
+      decoded.transferTimeout === CCIP.BurnMintTokenPoolV1.Indefinite
+      decoded.poolReceiveContext === Splice.Api.Token.MetadataV1.emptyChoiceContext
       decoded.rateLimitAdmin === None
 
   pure ()
@@ -629,19 +627,19 @@ testDecodeDeployRateLimiterParams : Script ()
 testDecodeDeployRateLimiterParams = script do
   poolOwner <- allocateParty "pool_owner"
 
-  let params = DeployRateLimiterParams with
+  let params = CCIP.FactoryV1.DeployRateLimiterParams with
         instanceId = "rl-1"
         poolInstanceId = "pool-1"
         poolOwner
         remoteChainSelector = 137.0
-        direction = RateLimitDirection_Outbound
-        mode = RateLimitMode_DefaultFinality
+        direction = CCIP.RateLimiterV1.RateLimitDirection_Outbound
+        mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
         isEnabled = True
         capacity = 1000000.0
         rate = 100.0
       encoded = encodeDeployRateLimiterParams params
 
-  case decodeDeployRateLimiterParams encoded of
+  case CCIP.FactoryV1.decodeDeployRateLimiterParams encoded of
     None -> abort "Failed to decode DeployRateLimiterParams"
     Some decoded -> do
       decoded.instanceId === params.instanceId
@@ -660,23 +658,23 @@ testDecodeDeployRateLimiterParams_Inbound : Script ()
 testDecodeDeployRateLimiterParams_Inbound = script do
   poolOwner <- allocateParty "pool_owner"
 
-  let params = DeployRateLimiterParams with
+  let params = CCIP.FactoryV1.DeployRateLimiterParams with
         instanceId = "rl-inbound"
         poolInstanceId = "pool-1"
         poolOwner
         remoteChainSelector = 1.0
-        direction = RateLimitDirection_Inbound
-        mode = RateLimitMode_CustomFinality
+        direction = CCIP.RateLimiterV1.RateLimitDirection_Inbound
+        mode = CCIP.RateLimiterV1.RateLimitMode_CustomFinality
         isEnabled = False
         capacity = 500000.0
         rate = 50.0
       encoded = encodeDeployRateLimiterParams params
 
-  case decodeDeployRateLimiterParams encoded of
+  case CCIP.FactoryV1.decodeDeployRateLimiterParams encoded of
     None -> abort "Failed to decode inbound rate limiter params"
     Some decoded -> do
-      decoded.direction === RateLimitDirection_Inbound
-      decoded.mode === RateLimitMode_CustomFinality
+      decoded.direction === CCIP.RateLimiterV1.RateLimitDirection_Inbound
+      decoded.mode === CCIP.RateLimiterV1.RateLimitMode_CustomFinality
       decoded.isEnabled === False
 
   pure ()
@@ -688,11 +686,11 @@ testDecodeDeployRateLimiterParams_Inbound = script do
 testRateLimitDirection_Enum : Script ()
 testRateLimitDirection_Enum = script do
   -- Test Outbound = 0
-  let outboundEncoded = encodeRateLimitDirection RateLimitDirection_Outbound
+  let outboundEncoded = encodeRateLimitDirection CCIP.RateLimiterV1.RateLimitDirection_Outbound
   outboundEncoded === "00"
 
   -- Test Inbound = 1
-  let inboundEncoded = encodeRateLimitDirection RateLimitDirection_Inbound
+  let inboundEncoded = encodeRateLimitDirection CCIP.RateLimiterV1.RateLimitDirection_Inbound
   inboundEncoded === "01"
 
   pure ()
@@ -700,11 +698,11 @@ testRateLimitDirection_Enum = script do
 testRateLimitMode_Enum : Script ()
 testRateLimitMode_Enum = script do
   -- Test DefaultFinality = 0
-  let defaultEncoded = encodeRateLimitMode RateLimitMode_DefaultFinality
+  let defaultEncoded = encodeRateLimitMode CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
   defaultEncoded === "00"
 
   -- Test CustomFinality = 1
-  let customEncoded = encodeRateLimitMode RateLimitMode_CustomFinality
+  let customEncoded = encodeRateLimitMode CCIP.RateLimiterV1.RateLimitMode_CustomFinality
   customEncoded === "01"
 
   pure ()
@@ -712,31 +710,31 @@ testRateLimitMode_Enum = script do
 testChainSelectorEdgeCases : Script ()
 testChainSelectorEdgeCases = script do
   -- Test zero selector
-  let zeroParams = DeployGlobalConfigParams with
+  let zeroParams = CCIP.FactoryV1.DeployGlobalConfigParams with
         instanceId = "gc-zero"
         chainSelector = 0.0
       zeroEncoded = encodeDeployGlobalConfigParams zeroParams
-  case decodeDeployGlobalConfigParams zeroEncoded of
+  case CCIP.FactoryV1.decodeDeployGlobalConfigParams zeroEncoded of
     None -> abort "Failed to decode zero selector"
     Some decoded -> decoded.chainSelector === 0.0
 
   -- Test max Int64 boundary
   let maxInt64 : Numeric 0 = 9223372036854775807.0
-      maxInt64Params = DeployGlobalConfigParams with
+      maxInt64Params = CCIP.FactoryV1.DeployGlobalConfigParams with
         instanceId = "gc-max-int64"
         chainSelector = maxInt64
       maxInt64Encoded = encodeDeployGlobalConfigParams maxInt64Params
-  case decodeDeployGlobalConfigParams maxInt64Encoded of
+  case CCIP.FactoryV1.decodeDeployGlobalConfigParams maxInt64Encoded of
     None -> abort "Failed to decode max Int64 selector"
     Some decoded -> decoded.chainSelector === maxInt64
 
   -- Test max uint64
   let maxUint64 : Numeric 0 = 18446744073709551615.0
-      maxUint64Params = DeployGlobalConfigParams with
+      maxUint64Params = CCIP.FactoryV1.DeployGlobalConfigParams with
         instanceId = "gc-max-uint64"
         chainSelector = maxUint64
       maxUint64Encoded = encodeDeployGlobalConfigParams maxUint64Params
-  case decodeDeployGlobalConfigParams maxUint64Encoded of
+  case CCIP.FactoryV1.decodeDeployGlobalConfigParams maxUint64Encoded of
     None -> abort "Failed to decode max uint64 selector"
     Some decoded -> decoded.chainSelector === maxUint64
 

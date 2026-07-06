@@ -647,7 +647,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: contracts.IdentifierFromBinding(ccipruntime.PerPartyRouterFactory{}),
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -684,7 +684,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId: contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipsender"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partySender}}},
@@ -742,7 +742,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	var senderLinkHoldings []*apiv2.ActiveContract
 	require.Eventually(t, func() bool {
 		var listErr error
-		senderLinkHoldings, listErr = testhelpers.ListActiveContractsByTemplateId(t.Context(), senderParticipant, contracts.TemplateIDFromBinding(link.LinkHolding{}).ToLedgerIdentifier())
+		senderLinkHoldings, listErr = testhelpers.ListActiveContractsByTemplateId(t.Context(), senderParticipant, contracts.IdentifierFromBinding(link.LinkHolding{}))
 		if listErr != nil {
 			return false
 		}
@@ -978,7 +978,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					ContractId:     ccipSenderCid,
 					Choice:         "Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),

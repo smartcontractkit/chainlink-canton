@@ -4,12 +4,12 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.MetadataV1
 
-import Chainlink.InstanceAddress (assertValidInstanceId)
+import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.Interfaces.CrossChainVerifier
-import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.APIV1.SendingMessage
+import qualified CCIP.CoreV1.ExecutingMessage
+import qualified CCIP.InterfacesV1.CrossChainVerifier
 
-import qualified CCIP.ExecutingMessageV1
 
 -- | Dummy version tag for testing
 dummyVersionTag : BytesHex
@@ -26,10 +26,10 @@ template DummyCommitteeVerifier
         destBytesOverhead : Int
     where
         signatory owner
-        ensure assertValidInstanceId instanceId
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
 
-        interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
-            view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
+        interface instance CCIP.InterfacesV1.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
+            view = CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierView with
                 instanceId = instanceId
                 owner = owner
                 ccipOwner = ccipOwner
@@ -40,14 +40,14 @@ template DummyCommitteeVerifier
                     "01" -> error "DummyCommitteeVerifier: Simulated verification failure"
                     _ -> do
                         debug "DummyCommitteeVerifier: Simulated successful verification"
-                        coerceContractId <$> exercise (coerceContractId arg.executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1) CCIP.ExecutingMessageV1.AddCCVVerification with
+                        coerceContractId <$> exercise (coerceContractId arg.executingMessageCid : ContractId CCIP.CoreV1.ExecutingMessage.ExecutingMessage) CCIP.CoreV1.ExecutingMessage.AddCCVVerification with
                             ccvInstanceId = instanceId
                             versionTag = versionTag
                             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                             caller = owner
 
             crossChainVerifier_calculateFeeImpl _self arg = do
-                exercise arg.sendingMessageCid CCIP.API.SendingMessageV1.SendingMessage_AddCCVFee with
+                exercise arg.sendingMessageCid CCIP.APIV1.SendingMessage.SendingMessage_AddCCVFee with
                     ccvInstanceId = instanceId
                     feeUSDCents = feeUSDCents
                     destGasLimit = destGasLimit
@@ -56,7 +56,7 @@ template DummyCommitteeVerifier
                     caller = owner
 
             crossChainVerifier_getFeeImpl _self _arg = do
-                pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
+                pure CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierFeeQuote with
                     ccvInstanceId = instanceId
                     ccvOwner = owner
                     feeUSDCents = feeUSDCents
@@ -69,15 +69,15 @@ template DummyCommitteeVerifier
                         sendingMessageCid = coerceContractId arg.sendingMessageCid
                         caller = arg.caller
 
-        nonconsuming choice ForwardToVerifier : ContractId CCIP.API.SendingMessageV1.SendingMessage
+        nonconsuming choice ForwardToVerifier : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             with
-                sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
+                sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
                 caller : Party
             controller caller
             do
                 let verifierBlob = versionTag
 
-                exercise sendingMessageCid CCIP.API.SendingMessageV1.SendingMessage_AddVerifierData with
+                exercise sendingMessageCid CCIP.APIV1.SendingMessage.SendingMessage_AddVerifierData with
                     ccvInstanceId = instanceId
                     versionTag = versionTag
                     verifierBlob = verifierBlob

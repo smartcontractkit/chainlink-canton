@@ -12,9 +12,8 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 
 import qualified Chainlink.InstanceAddress
 
-import CCIP.RMNRemote
-import CCIP.RMNRemoteCodecGen
-import CCIP.RMNRemoteTypes
+import qualified CCIP.CoreV1.RMNRemote
+import qualified CCIP.CoreV1.RMNRemoteCodecGen
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - CURSE
@@ -29,9 +28,9 @@ testRMNRemoteMCMSEntrypoint_Curse = script do
   let instanceId = "rmn-test"
       globalSubject = "01000000000000000000000000000001"
 
-  -- Create RMNRemote with no cursed subjects
+  -- Create CCIP.CoreV1.RMNRemote.RMNRemote with no cursed subjects
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -42,7 +41,7 @@ testRMNRemoteMCMSEntrypoint_Curse = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode Curse params
-  let encoded = encodeCurseParams (CurseParams with subject = globalSubject)
+  let encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseParams (CCIP.CoreV1.RMNRemote.CurseParams with subject = globalSubject)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -52,7 +51,7 @@ testRMNRemoteMCMSEntrypoint_Curse = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
 
   -- Verify subject was cursed
-  contracts <- query @RMNRemote rmnOwner
+  contracts <- query @CCIP.CoreV1.RMNRemote.RMNRemote rmnOwner
   case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
     [(_, rmn)] -> do
       length rmn.cursedSubjects === 1
@@ -70,9 +69,9 @@ testRMNRemoteMCMSEntrypoint_Uncurse = script do
   let instanceId = "rmn-uncurse-test"
       subject = "01000000000000000000000000000001"
 
-  -- Create RMNRemote with subject already cursed
+  -- Create CCIP.CoreV1.RMNRemote.RMNRemote with subject already cursed
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -83,7 +82,7 @@ testRMNRemoteMCMSEntrypoint_Uncurse = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode Uncurse params
-  let encoded = encodeUncurseParams (UncurseParams with subject)
+  let encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeUncurseParams (CCIP.CoreV1.RMNRemote.UncurseParams with subject)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -93,7 +92,7 @@ testRMNRemoteMCMSEntrypoint_Uncurse = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
 
   -- Verify subject was uncursed
-  contracts <- query @RMNRemote rmnOwner
+  contracts <- query @CCIP.CoreV1.RMNRemote.RMNRemote rmnOwner
   case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
     [(_, rmn)] -> rmn.cursedSubjects === []
     _ -> abort "Expected exactly one RMNRemote contract"
@@ -115,7 +114,7 @@ testRMNRemoteMCMSEntrypoint_CurseChain = script do
 
   -- Create RMNRemote
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -126,7 +125,7 @@ testRMNRemoteMCMSEntrypoint_CurseChain = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode CurseChain params
-  let encoded = encodeCurseChainParams (CurseChainParams with chainSelector)
+  let encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseChainParams (CCIP.CoreV1.RMNRemote.CurseChainParams with chainSelector)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -136,13 +135,13 @@ testRMNRemoteMCMSEntrypoint_CurseChain = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
 
   -- Verify chain was cursed
-  contracts <- query @RMNRemote rmnOwner
+  contracts <- query @CCIP.CoreV1.RMNRemote.RMNRemote rmnOwner
   case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
     [(newCid, rmn)] -> do
       length rmn.cursedSubjects === 1
       -- Verify IsCursedForChain returns True
       isCursed <- submit rmnOwner do
-        exerciseCmd newCid IsCursedForChain with
+        exerciseCmd newCid CCIP.CoreV1.RMNRemote.IsCursedForChain with
           chainSelector = chainSelector
           context = Splice.Api.Token.MetadataV1.emptyChoiceContext
           caller = rmnOwner
@@ -159,11 +158,11 @@ testRMNRemoteMCMSEntrypoint_UncurseChain = script do
 
   let instanceId = "rmn-uncursechain-test"
       chainSelector : Numeric 0 = 42161.0
-      chainSubject = chainSelectorToSubject chainSelector
+      chainSubject = CCIP.CoreV1.RMNRemote.chainSelectorToSubject chainSelector
 
-  -- Create RMNRemote with chain already cursed
+  -- Create CCIP.CoreV1.RMNRemote.RMNRemote with chain already cursed
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -174,7 +173,7 @@ testRMNRemoteMCMSEntrypoint_UncurseChain = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode UncurseChain params
-  let encoded = encodeUncurseChainParams (UncurseChainParams with chainSelector)
+  let encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeUncurseChainParams (CCIP.CoreV1.RMNRemote.UncurseChainParams with chainSelector)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -184,7 +183,7 @@ testRMNRemoteMCMSEntrypoint_UncurseChain = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
 
   -- Verify chain was uncursed
-  contracts <- query @RMNRemote rmnOwner
+  contracts <- query @CCIP.CoreV1.RMNRemote.RMNRemote rmnOwner
   case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
     [(_, rmn)] -> rmn.cursedSubjects === []
     _ -> abort "Expected exactly one RMNRemote contract"
@@ -210,7 +209,7 @@ testRMNRemoteMCMSEntrypoint_CurseMultiple = script do
 
   -- Create RMNRemote
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -221,7 +220,7 @@ testRMNRemoteMCMSEntrypoint_CurseMultiple = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode CurseMultiple params
-  let encoded = encodeCurseMultipleParams (CurseMultipleParams with subjects)
+  let encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseMultipleParams (CCIP.CoreV1.RMNRemote.CurseMultipleParams with subjects)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -231,7 +230,7 @@ testRMNRemoteMCMSEntrypoint_CurseMultiple = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
 
   -- Verify all subjects were cursed
-  contracts <- query @RMNRemote rmnOwner
+  contracts <- query @CCIP.CoreV1.RMNRemote.RMNRemote rmnOwner
   case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
     [(_, rmn)] -> length rmn.cursedSubjects === 3
     _ -> abort "Expected exactly one RMNRemote contract"
@@ -250,9 +249,9 @@ testRMNRemoteMCMSEntrypoint_UncurseMultiple = script do
         "00000000000000000000000000000002"
         ]
 
-  -- Create RMNRemote with subjects already cursed
+  -- Create CCIP.CoreV1.RMNRemote.RMNRemote with subjects already cursed
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -263,7 +262,7 @@ testRMNRemoteMCMSEntrypoint_UncurseMultiple = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode UncurseMultiple params
-  let encoded = encodeUncurseMultipleParams (UncurseMultipleParams with subjects)
+  let encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeUncurseMultipleParams (CCIP.CoreV1.RMNRemote.UncurseMultipleParams with subjects)
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -273,7 +272,7 @@ testRMNRemoteMCMSEntrypoint_UncurseMultiple = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
 
   -- Verify all subjects were uncursed
-  contracts <- query @RMNRemote rmnOwner
+  contracts <- query @CCIP.CoreV1.RMNRemote.RMNRemote rmnOwner
   case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
     [(_, rmn)] -> rmn.cursedSubjects === []
     _ -> abort "Expected exactly one RMNRemote contract"
@@ -294,9 +293,9 @@ testRMNRemoteMCMSEntrypoint_AddCustomObservers = script do
 
   let instanceId = "rmn-observers-test"
 
-  -- Create RMNRemote with no custom observers
+  -- Create CCIP.CoreV1.RMNRemote.RMNRemote with no custom observers
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -307,7 +306,7 @@ testRMNRemoteMCMSEntrypoint_AddCustomObservers = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode AddCustomObservers params
-  let encoded = encodeAddCustomObserversParams (AddCustomObserversParams with parties = [observer1, observer2])
+  let encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeAddCustomObserversParams (CCIP.CoreV1.RMNRemote.AddCustomObserversParams with parties = [observer1, observer2])
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -317,7 +316,7 @@ testRMNRemoteMCMSEntrypoint_AddCustomObservers = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
 
   -- Verify observers were added
-  contracts <- query @RMNRemote rmnOwner
+  contracts <- query @CCIP.CoreV1.RMNRemote.RMNRemote rmnOwner
   case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
     [(_, rmn)] -> length rmn.customObservers === 2
     _ -> abort "Expected exactly one RMNRemote contract"
@@ -334,9 +333,9 @@ testRMNRemoteMCMSEntrypoint_RemoveCustomObservers = script do
 
   let instanceId = "rmn-remove-observers-test"
 
-  -- Create RMNRemote with custom observers
+  -- Create CCIP.CoreV1.RMNRemote.RMNRemote with custom observers
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -347,7 +346,7 @@ testRMNRemoteMCMSEntrypoint_RemoveCustomObservers = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode RemoveCustomObservers params (remove observer1)
-  let encoded = encodeRemoveCustomObserversParams (RemoveCustomObserversParams with parties = [observer1])
+  let encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeRemoveCustomObserversParams (CCIP.CoreV1.RMNRemote.RemoveCustomObserversParams with parties = [observer1])
 
   -- Call mcmsEntrypoint
   newContractIds <- submit rmnOwner do
@@ -357,7 +356,7 @@ testRMNRemoteMCMSEntrypoint_RemoveCustomObservers = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId rmnCid)]
 
   -- Verify observer1 was removed, observer2 remains
-  contracts <- query @RMNRemote rmnOwner
+  contracts <- query @CCIP.CoreV1.RMNRemote.RMNRemote rmnOwner
   case filter (\(_, rmn) -> rmn.instanceId == instanceId) contracts of
     [(_, rmn)] -> do
       length rmn.customObservers === 1
@@ -379,7 +378,7 @@ testRMNRemoteMCMSEntrypoint_UnknownFunction = script do
   let instanceId = "rmn-error-test"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -407,7 +406,7 @@ testRMNRemoteMCMSEntrypoint_InvalidParams = script do
   let instanceId = "rmn-invalid-test"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -435,7 +434,7 @@ testRMNRemoteMCMSEntrypoint_MissingSelfCid = script do
   let instanceId = "rmn-missing-cid-test"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId
       rmnOwner
       ccipOwner
@@ -445,7 +444,7 @@ testRMNRemoteMCMSEntrypoint_MissingSelfCid = script do
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver rmnCid
 
   -- Encode valid params
-  let encoded = encodeCurseParams (CurseParams with subject = "01000000000000000000000000000001")
+  let encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseParams (CCIP.CoreV1.RMNRemote.CurseParams with subject = "01000000000000000000000000000001")
 
   -- Call with empty contractIds map - should fail
   submitMustFail rmnOwner do
@@ -462,7 +461,7 @@ testRMNRemote_CurseMultipleRejectsDuplicateSubjects = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId = "rmn-duplicate-subjects-test"
       rmnOwner
       ccipOwner
@@ -472,7 +471,7 @@ testRMNRemote_CurseMultipleRejectsDuplicateSubjects = script do
   let duplicatedSubject = "01000000000000000000000000000001"
 
   submitMustFail rmnOwner do
-    exerciseCmd rmnCid CurseMultiple with
+    exerciseCmd rmnCid CCIP.CoreV1.RMNRemote.CurseMultiple with
       subjects = [duplicatedSubject, duplicatedSubject]
 
   pure ()
@@ -486,7 +485,7 @@ testRMNRemote_CurseMultipleRejectsAlreadyCursedSubject = script do
       newSubject = "00000000000000000000000000000089"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId = "rmn-already-cursed-test"
       rmnOwner
       ccipOwner
@@ -494,7 +493,7 @@ testRMNRemote_CurseMultipleRejectsAlreadyCursedSubject = script do
       cursedSubjects = [existingSubject]
 
   submitMustFail rmnOwner do
-    exerciseCmd rmnCid CurseMultiple with
+    exerciseCmd rmnCid CCIP.CoreV1.RMNRemote.CurseMultiple with
       subjects = [existingSubject, newSubject]
 
   pure ()

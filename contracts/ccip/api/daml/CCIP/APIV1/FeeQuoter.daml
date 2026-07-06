@@ -1,0 +1,43 @@
+module CCIP.APIV1.FeeQuoter where
+
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.HoldingV1
+
+import qualified Chainlink.InstanceAddress
+
+feeQuoterContextKey : Text
+feeQuoterContextKey = "fee-quoter"
+
+interface IFeeQuoter where
+    viewtype FeeQuoterView
+
+    feeQuoter_publicFetchImpl : ContractId IFeeQuoter -> FeeQuoter_PublicFetch -> Update FeeQuoterView
+    feeQuoter_getTokenTransferFeeImpl : ContractId IFeeQuoter -> FeeQuoter_GetTokenTransferFee -> Update (Numeric 0, Int, Int)
+
+    -- | Fetch the view of the FeeQuoter contract.
+    nonconsuming choice FeeQuoter_PublicFetch : FeeQuoterView
+        with
+            -- | The expected address of the FeeQuoter contract.
+            -- Implementations MUST validate that this matches the actual address of the contract.
+            -- This way, callers can ensure that they are fetching the correct contract, provided all vetted
+            -- Daml packages only contain interface implementations that check the expected address.
+            expectedAddress : Chainlink.InstanceAddress.RawInstanceAddress
+            -- | The party fetching the contract.
+            caller : Party
+        controller caller
+        do feeQuoter_publicFetchImpl this self arg
+
+    nonconsuming choice FeeQuoter_GetTokenTransferFee : (Numeric 0, Int, Int)
+        with
+            destChainSelector : Numeric 0
+            token : Splice.Api.Token.HoldingV1.InstrumentId
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do feeQuoter_getTokenTransferFeeImpl this self arg
+
+data FeeQuoterView = FeeQuoterView
+    with
+        ccipOwner : Party
+        instanceId : Text
+    deriving (Eq, Show)

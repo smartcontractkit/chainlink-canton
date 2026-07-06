@@ -5,33 +5,13 @@ import Daml.Script
 import DA.Assert ((===))
 
 import qualified Splice.Api.Token.HoldingV1
-import CCIP.TokenAdminRegistryCodecGen (
-    encodePoolRegistration,
-    decodePoolRegistrationAt,
-    encodeSetPoolParams,
-    decodeSetPoolParamsAt,
-    encodeSetTransferFactoryParams,
-    decodeSetTransferFactoryParamsAt,
-    encodeSetBurnMintFactoryParams,
-    decodeSetBurnMintFactoryParamsAt,
-    encodeProposeAdminParams,
-    decodeProposeAdminParamsAt,
-    encodeTransferAdminParams,
-    decodeTransferAdminParamsAt,
-    encodeAcceptAdminParams,
-    decodeAcceptAdminParamsAt,
-    )
-import CCIP.TokenAdminRegistryTypes (
-    PoolRegistration(..),
-    SetPoolParams(..),
-    SetTransferFactoryParams(..),
-    SetBurnMintFactoryParams(..),
-    ProposeAdminParams(..),
-    TransferAdminParams(..),
-    AcceptAdminParams(..),
-    )
+
 import MCMS.Codec (encodeText, decodeTextAt)
+
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+import qualified CCIP.CoreV1.TokenAdminRegistry
+import qualified CCIP.CoreV1.TokenAdminRegistryCodecGen
 
 -- ===========================================================================
 -- TEXT ENCODING/DECODING TESTS
@@ -70,13 +50,13 @@ testPoolRegistrationRoundtrip : Script ()
 testPoolRegistrationRoundtrip = do
   alice <- allocateParty "Alice"
 
-  let poolReg = PoolRegistration with
+  let poolReg = CCIP.CoreV1.TokenAdminRegistry.PoolRegistration with
         poolOwner = alice
         poolInstanceId = "pool-instance-v1"
 
-      encoded = encodePoolRegistration poolReg
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodePoolRegistration poolReg
 
-  case decodePoolRegistrationAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodePoolRegistrationAt encoded 0 of
     None -> abort "Failed to decode PoolRegistration"
     Some (decoded, _) -> do
       decoded.poolOwner === poolReg.poolOwner
@@ -88,13 +68,13 @@ testPoolRegistrationEmptyInstanceId : Script ()
 testPoolRegistrationEmptyInstanceId = do
   alice <- allocateParty "Alice"
 
-  let poolReg = PoolRegistration with
+  let poolReg = CCIP.CoreV1.TokenAdminRegistry.PoolRegistration with
         poolOwner = alice
         poolInstanceId = ""
 
-      encoded = encodePoolRegistration poolReg
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodePoolRegistration poolReg
 
-  case decodePoolRegistrationAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodePoolRegistrationAt encoded 0 of
     None -> abort "Failed to decode PoolRegistration with empty instanceId"
     Some (decoded, _) -> do
       decoded.poolOwner === poolReg.poolOwner
@@ -112,13 +92,13 @@ testSetPoolParamsWithPool = do
   tokenAdmin <- allocateParty "TokenAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
-      poolReg = PoolRegistration with
+      poolReg = CCIP.CoreV1.TokenAdminRegistry.PoolRegistration with
         poolOwner = alice
         poolInstanceId = "lock-release-pool-v1"
-      params = SetPoolParams with instrumentId, tokenPool = Some poolReg
-      encoded = encodeSetPoolParams params
+      params = CCIP.CoreV1.TokenAdminRegistry.SetPoolParams with instrumentId, tokenPool = Some poolReg
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetPoolParams params
 
-  case decodeSetPoolParamsAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeSetPoolParamsAt encoded 0 of
     None -> abort "Failed to decode set_pool params with pool"
     Some (decoded, _) -> do
       decoded.instrumentId === instrumentId
@@ -135,10 +115,10 @@ testSetPoolParamsNoPool = do
   tokenAdmin <- allocateParty "TokenAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "USDC"
-      params = SetPoolParams with instrumentId, tokenPool = None
-      encoded = encodeSetPoolParams params
+      params = CCIP.CoreV1.TokenAdminRegistry.SetPoolParams with instrumentId, tokenPool = None
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetPoolParams params
 
-  case decodeSetPoolParamsAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeSetPoolParamsAt encoded 0 of
     None -> abort "Failed to decode set_pool params without pool"
     Some (decoded, _) -> do
       decoded.instrumentId === instrumentId
@@ -156,12 +136,12 @@ testSetTransferFactoryParamsWithAddress = do
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
       factoryAddress = RawInstanceAddress.make "link-transfer-factory" tokenAdmin
-      params = SetTransferFactoryParams with
+      params = CCIP.CoreV1.TokenAdminRegistry.SetTransferFactoryParams with
         instrumentId
         transferFactoryAddress = Some factoryAddress
-      encoded = encodeSetTransferFactoryParams params
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetTransferFactoryParams params
 
-  case decodeSetTransferFactoryParamsAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeSetTransferFactoryParamsAt encoded 0 of
     None -> abort "Failed to decode set_transfer_factory params with address"
     Some (decoded, _) -> do
       decoded.instrumentId === instrumentId
@@ -174,12 +154,12 @@ testSetTransferFactoryParamsNoAddress = do
   tokenAdmin <- allocateParty "TokenAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-      params = SetTransferFactoryParams with
+      params = CCIP.CoreV1.TokenAdminRegistry.SetTransferFactoryParams with
         instrumentId
         transferFactoryAddress = None
-      encoded = encodeSetTransferFactoryParams params
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetTransferFactoryParams params
 
-  case decodeSetTransferFactoryParamsAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeSetTransferFactoryParamsAt encoded 0 of
     None -> abort "Failed to decode set_transfer_factory params without address"
     Some (decoded, _) -> do
       decoded.instrumentId === instrumentId
@@ -193,12 +173,12 @@ testSetBurnMintFactoryParamsWithAddress = do
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
       factoryAddress = RawInstanceAddress.make "link-burn-mint-factory" tokenAdmin
-      params = SetBurnMintFactoryParams with
+      params = CCIP.CoreV1.TokenAdminRegistry.SetBurnMintFactoryParams with
         instrumentId
         burnMintFactoryAddress = Some factoryAddress
-      encoded = encodeSetBurnMintFactoryParams params
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetBurnMintFactoryParams params
 
-  case decodeSetBurnMintFactoryParamsAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeSetBurnMintFactoryParamsAt encoded 0 of
     None -> abort "Failed to decode set_burn_mint_factory params with address"
     Some (decoded, _) -> do
       decoded.instrumentId === instrumentId
@@ -211,12 +191,12 @@ testSetBurnMintFactoryParamsNoAddress = do
   tokenAdmin <- allocateParty "TokenAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
-      params = SetBurnMintFactoryParams with
+      params = CCIP.CoreV1.TokenAdminRegistry.SetBurnMintFactoryParams with
         instrumentId
         burnMintFactoryAddress = None
-      encoded = encodeSetBurnMintFactoryParams params
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeSetBurnMintFactoryParams params
 
-  case decodeSetBurnMintFactoryParamsAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeSetBurnMintFactoryParamsAt encoded 0 of
     None -> abort "Failed to decode set_burn_mint_factory params without address"
     Some (decoded, _) -> do
       decoded.instrumentId === instrumentId
@@ -234,10 +214,10 @@ testProposeAdminParamsRoundtrip = do
   newAdmin <- allocateParty "NewAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
-      params = ProposeAdminParams with instrumentId, newAdmin
-      encoded = encodeProposeAdminParams params
+      params = CCIP.CoreV1.TokenAdminRegistry.ProposeAdminParams with instrumentId, newAdmin
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeProposeAdminParams params
 
-  case decodeProposeAdminParamsAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeProposeAdminParamsAt encoded 0 of
     None -> abort "Failed to decode propose_admin params"
     Some (decoded, _) -> do
       decoded.instrumentId === instrumentId
@@ -255,10 +235,10 @@ testTransferAdminParamsRoundtrip = do
   newAdmin <- allocateParty "NewAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
-      params = TransferAdminParams with instrumentId, newAdmin
-      encoded = encodeTransferAdminParams params
+      params = CCIP.CoreV1.TokenAdminRegistry.TransferAdminParams with instrumentId, newAdmin
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeTransferAdminParams params
 
-  case decodeTransferAdminParamsAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeTransferAdminParamsAt encoded 0 of
     None -> abort "Failed to decode transfer_admin params"
     Some (decoded, _) -> do
       decoded.instrumentId === instrumentId
@@ -275,10 +255,10 @@ testAcceptAdminParamsRoundtrip = do
   tokenAdmin <- allocateParty "TokenAdmin"
 
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "TOKEN"
-      params = AcceptAdminParams with instrumentId
-      encoded = encodeAcceptAdminParams params
+      params = CCIP.CoreV1.TokenAdminRegistry.AcceptAdminParams with instrumentId
+      encoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeAcceptAdminParams params
 
-  case decodeAcceptAdminParamsAt encoded 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeAcceptAdminParamsAt encoded 0 of
     None -> abort "Failed to decode accept_admin params"
     Some (decoded, _) ->
       decoded.instrumentId === instrumentId
@@ -292,12 +272,12 @@ testAcceptAdminParamsRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-  case decodeSetPoolParamsAt "" 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeSetPoolParamsAt "" 0 of
     None -> pure ()  -- Expected
     Some _ -> abort "Expected decodeSetPoolParamsAt to fail on empty data"
 
   -- Truncated data should fail
-  case decodeSetPoolParamsAt "00" 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeSetPoolParamsAt "00" 0 of
     None -> pure ()  -- Expected
     Some _ -> abort "Expected decodeSetPoolParamsAt to fail on truncated data"
 
@@ -305,12 +285,12 @@ testInvalidDataRejection = do
   -- First need valid instrumentId, then invalid bool
   tokenAdmin <- allocateParty "TokenAdmin"
   let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "T"
-      validParams = AcceptAdminParams with instrumentId
-      validInstrumentIdEncoded = encodeAcceptAdminParams validParams
+      validParams = CCIP.CoreV1.TokenAdminRegistry.AcceptAdminParams with instrumentId
+      validInstrumentIdEncoded = CCIP.CoreV1.TokenAdminRegistryCodecGen.encodeAcceptAdminParams validParams
       -- Append invalid bool (02 instead of 00 or 01)
       invalidData = validInstrumentIdEncoded <> "02"
 
-  case decodeSetPoolParamsAt invalidData 0 of
+  case CCIP.CoreV1.TokenAdminRegistryCodecGen.decodeSetPoolParamsAt invalidData 0 of
     None -> pure ()  -- Expected - should fail on invalid bool
     Some _ -> abort "Expected decodeSetPoolParamsAt to fail on invalid bool"
 

@@ -6,7 +6,7 @@ import DA.Assert ((===))
 
 import qualified Splice.Api.Token.MetadataV1
 
-import CCIP.RMNRemote
+import qualified CCIP.CoreV1.RMNRemote
 
 -- ===========================================================================
 -- UNCURSE MULTIPLE VALIDATION TESTS
@@ -21,7 +21,7 @@ testRMNRemote_UncurseMultipleRejectsDuplicateSubjects = script do
   let subject = "01000000000000000000000000000001"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId = "rmn-uncurse-dup-test"
       rmnOwner
       ccipOwner
@@ -29,7 +29,7 @@ testRMNRemote_UncurseMultipleRejectsDuplicateSubjects = script do
       cursedSubjects = [subject]
 
   submitMustFail rmnOwner do
-    exerciseCmd rmnCid UncurseMultiple with
+    exerciseCmd rmnCid CCIP.CoreV1.RMNRemote.UncurseMultiple with
       subjects = [subject, subject]
 
   pure ()
@@ -44,7 +44,7 @@ testRMNRemote_UncurseMultipleRejectsNotCursedSubject = script do
       notCursedSubject = "00000000000000000000000000000089"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId = "rmn-uncurse-not-cursed-test"
       rmnOwner
       ccipOwner
@@ -52,7 +52,7 @@ testRMNRemote_UncurseMultipleRejectsNotCursedSubject = script do
       cursedSubjects = [cursedSubject]
 
   submitMustFail rmnOwner do
-    exerciseCmd rmnCid UncurseMultiple with
+    exerciseCmd rmnCid CCIP.CoreV1.RMNRemote.UncurseMultiple with
       subjects = [cursedSubject, notCursedSubject]
 
   pure ()
@@ -67,7 +67,7 @@ testRMNRemote_UncurseMultipleSucceeds = script do
       subject2 = "00000000000000000000000000000089"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId = "rmn-uncurse-success-test"
       rmnOwner
       ccipOwner
@@ -75,7 +75,7 @@ testRMNRemote_UncurseMultipleSucceeds = script do
       cursedSubjects = [subject1, subject2]
 
   rmnCid' <- submit rmnOwner do
-    exerciseCmd rmnCid UncurseMultiple with
+    exerciseCmd rmnCid CCIP.CoreV1.RMNRemote.UncurseMultiple with
       subjects = [subject1, subject2]
 
   rmn <- queryContractId rmnOwner rmnCid'
@@ -90,7 +90,7 @@ testRMNRemote_UncurseMultipleRejectsAllNotCursed = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId = "rmn-uncurse-none-cursed-test"
       rmnOwner
       ccipOwner
@@ -98,7 +98,7 @@ testRMNRemote_UncurseMultipleRejectsAllNotCursed = script do
       cursedSubjects = []
 
   submitMustFail rmnOwner do
-    exerciseCmd rmnCid UncurseMultiple with
+    exerciseCmd rmnCid CCIP.CoreV1.RMNRemote.UncurseMultiple with
       subjects = ["01000000000000000000000000000001"]
 
   pure ()
@@ -114,7 +114,7 @@ testRMNRemote_CurseChainRejectsReservedSubjectMapping = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId = "rmn-curse-reserved-mapping-test"
       rmnOwner
       ccipOwner
@@ -122,7 +122,7 @@ testRMNRemote_CurseChainRejectsReservedSubjectMapping = script do
       cursedSubjects = []
 
   submitMustFail rmnOwner do
-    exerciseCmd rmnCid CurseChain with
+    exerciseCmd rmnCid CCIP.CoreV1.RMNRemote.CurseChain with
       chainSelector = chainSelectorAliasingGlobalSubject
 
   pure ()
@@ -133,15 +133,15 @@ testRMNRemote_UncurseChainRejectsReservedSubjectMapping = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId = "rmn-uncurse-reserved-mapping-test"
       rmnOwner
       ccipOwner
       customObservers = []
-      cursedSubjects = [globalCurseSubject]
+      cursedSubjects = [CCIP.CoreV1.RMNRemote.globalCurseSubject]
 
   submitMustFail rmnOwner do
-    exerciseCmd rmnCid UncurseChain with
+    exerciseCmd rmnCid CCIP.CoreV1.RMNRemote.UncurseChain with
       chainSelector = chainSelectorAliasingGlobalSubject
 
   pure ()
@@ -152,7 +152,7 @@ testRMNRemote_IsCursedForChainRejectsReservedSubjectMapping = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   rmnCid <- submit rmnOwner do
-    createCmd RMNRemote with
+    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
       instanceId = "rmn-iscursed-reserved-mapping-test"
       rmnOwner
       ccipOwner
@@ -160,7 +160,7 @@ testRMNRemote_IsCursedForChainRejectsReservedSubjectMapping = script do
       cursedSubjects = []
 
   submitMustFail rmnOwner do
-    exerciseCmd rmnCid IsCursedForChain with
+    exerciseCmd rmnCid CCIP.CoreV1.RMNRemote.IsCursedForChain with
       chainSelector = chainSelectorAliasingGlobalSubject
       context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = rmnOwner

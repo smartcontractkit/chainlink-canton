@@ -7,7 +7,7 @@ import DA.Crypto.Text (byteCount)
 import DA.Optional
 import DA.Text qualified as Text
 
-import CCIP.NumericHex qualified as NumericHex
+import CCIP.CodecV1.NumericHex
 
 maxNumeric0Text : Text
 maxNumeric0Text = "99999999999999999999999999999999999999"
@@ -28,72 +28,72 @@ normalizeDecimalTextOrZero raw =
 
 assertDecimalHexRoundTrip : Text -> Script ()
 assertDecimalHexRoundTrip decimalText =
-    NumericHex.hexStringToDecimalString (NumericHex.decimalStringToHex decimalText)
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString (CCIP.CodecV1.NumericHex.decimalStringToHex decimalText)
         === Some (normalizeDecimalTextOrZero decimalText)
 
 testNumericHex_Numeric0ToDecimalStringAndPadLeft : Script ()
 testNumericHex_Numeric0ToDecimalStringAndPadLeft = script do
-    NumericHex.numeric0ToDecimalString 0.0 === "0"
-    NumericHex.numeric0ToDecimalString 42.0 === "42"
-    NumericHex.numeric0ToDecimalString 18446744073709551615.0 === "18446744073709551615"
-    NumericHex.numeric0ToDecimalString 99999999999999999999999999999999999999.0 === maxNumeric0Text
+    CCIP.CodecV1.NumericHex.numeric0ToDecimalString 0.0 === "0"
+    CCIP.CodecV1.NumericHex.numeric0ToDecimalString 42.0 === "42"
+    CCIP.CodecV1.NumericHex.numeric0ToDecimalString 18446744073709551615.0 === "18446744073709551615"
+    CCIP.CodecV1.NumericHex.numeric0ToDecimalString 99999999999999999999999999999999999999.0 === maxNumeric0Text
 
-    NumericHex.padLeft 4 "0" "a" === "000a"
-    NumericHex.padLeft 4 "0" "abcd" === "abcd"
-    NumericHex.padLeft 2 "0" "abcd" === "abcd"
-    NumericHex.padLeft 64 "0" maxUint256Hex === maxUint256Hex
+    CCIP.CodecV1.NumericHex.padLeft 4 "0" "a" === "000a"
+    CCIP.CodecV1.NumericHex.padLeft 4 "0" "abcd" === "abcd"
+    CCIP.CodecV1.NumericHex.padLeft 2 "0" "abcd" === "abcd"
+    CCIP.CodecV1.NumericHex.padLeft 64 "0" maxUint256Hex === maxUint256Hex
 
     debug "testNumericHex_Numeric0ToDecimalStringAndPadLeft: PASSED"
 
 testNumericHex_CompareDecimalStrings : Script ()
 testNumericHex_CompareDecimalStrings = script do
-    NumericHex.compareDecimalStrings "0" "0" === False
-    NumericHex.compareDecimalStrings "000" "0" === False
-    NumericHex.compareDecimalStrings "1" "0" === True
-    NumericHex.compareDecimalStrings "2" "10" === False
-    NumericHex.compareDecimalStrings "10" "2" === True
-    NumericHex.compareDecimalStrings "0010" "10" === False
-    NumericHex.compareDecimalStrings "0001" "0000" === True
-    NumericHex.compareDecimalStrings "12345678901234567890" "12345678901234567889" === True
-    NumericHex.compareDecimalStrings maxNumeric0Text maxUint256Text === False
-    NumericHex.compareDecimalStrings maxUint256Text maxNumeric0Text === True
+    CCIP.CodecV1.NumericHex.compareDecimalStrings "0" "0" === False
+    CCIP.CodecV1.NumericHex.compareDecimalStrings "000" "0" === False
+    CCIP.CodecV1.NumericHex.compareDecimalStrings "1" "0" === True
+    CCIP.CodecV1.NumericHex.compareDecimalStrings "2" "10" === False
+    CCIP.CodecV1.NumericHex.compareDecimalStrings "10" "2" === True
+    CCIP.CodecV1.NumericHex.compareDecimalStrings "0010" "10" === False
+    CCIP.CodecV1.NumericHex.compareDecimalStrings "0001" "0000" === True
+    CCIP.CodecV1.NumericHex.compareDecimalStrings "12345678901234567890" "12345678901234567889" === True
+    CCIP.CodecV1.NumericHex.compareDecimalStrings maxNumeric0Text maxUint256Text === False
+    CCIP.CodecV1.NumericHex.compareDecimalStrings maxUint256Text maxNumeric0Text === True
 
     debug "testNumericHex_CompareDecimalStrings: PASSED"
 
 testNumericHex_DecimalStringToHex_Vectors : Script ()
 testNumericHex_DecimalStringToHex_Vectors = script do
-    NumericHex.decimalStringToHex "0" === "0"
-    NumericHex.decimalStringToHex "000000" === "0"
-    NumericHex.decimalStringToHex "1" === "1"
-    NumericHex.decimalStringToHex "15" === "f"
-    NumericHex.decimalStringToHex "16" === "10"
-    NumericHex.decimalStringToHex "255" === "ff"
-    NumericHex.decimalStringToHex "256" === "100"
-    NumericHex.decimalStringToHex "1000000000000000000" === "de0b6b3a7640000"
-    NumericHex.decimalStringToHex "12379813738877118345" === "abcdef0123456789"
-    NumericHex.decimalStringToHex maxNumeric0Text === maxNumeric0Hex
-    NumericHex.decimalStringToHex maxUint256Text === maxUint256Hex
+    CCIP.CodecV1.NumericHex.decimalStringToHex "0" === "0"
+    CCIP.CodecV1.NumericHex.decimalStringToHex "000000" === "0"
+    CCIP.CodecV1.NumericHex.decimalStringToHex "1" === "1"
+    CCIP.CodecV1.NumericHex.decimalStringToHex "15" === "f"
+    CCIP.CodecV1.NumericHex.decimalStringToHex "16" === "10"
+    CCIP.CodecV1.NumericHex.decimalStringToHex "255" === "ff"
+    CCIP.CodecV1.NumericHex.decimalStringToHex "256" === "100"
+    CCIP.CodecV1.NumericHex.decimalStringToHex "1000000000000000000" === "de0b6b3a7640000"
+    CCIP.CodecV1.NumericHex.decimalStringToHex "12379813738877118345" === "abcdef0123456789"
+    CCIP.CodecV1.NumericHex.decimalStringToHex maxNumeric0Text === maxNumeric0Hex
+    CCIP.CodecV1.NumericHex.decimalStringToHex maxUint256Text === maxUint256Hex
 
     debug "testNumericHex_DecimalStringToHex_Vectors: PASSED"
 
 testNumericHex_HexStringToDecimalString_Vectors : Script ()
 testNumericHex_HexStringToDecimalString_Vectors = script do
-    NumericHex.hexStringToDecimalString "0" === Some "0"
-    NumericHex.hexStringToDecimalString "0000" === Some "0"
-    NumericHex.hexStringToDecimalString "0000ff" === Some "255"
-    NumericHex.hexStringToDecimalString "1" === Some "1"
-    NumericHex.hexStringToDecimalString "f" === Some "15"
-    NumericHex.hexStringToDecimalString "10" === Some "16"
-    NumericHex.hexStringToDecimalString "ff" === Some "255"
-    NumericHex.hexStringToDecimalString "100" === Some "256"
-    NumericHex.hexStringToDecimalString "DE0B6B3A7640000" === Some "1000000000000000000"
-    NumericHex.hexStringToDecimalString "DEADBEEF" === Some "3735928559"
-    NumericHex.hexStringToDecimalString "abcdef0123456789" === Some "12379813738877118345"
-    NumericHex.hexStringToDecimalString "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff" === Some maxNumeric0Text
-    NumericHex.hexStringToDecimalString maxNumeric0Hex === Some maxNumeric0Text
-    NumericHex.hexStringToDecimalString maxUint256Hex === Some maxUint256Text
-    NumericHex.hexStringToDecimalString "0x10" === None
-    NumericHex.hexStringToDecimalString "xyz" === None
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "0" === Some "0"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "0000" === Some "0"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "0000ff" === Some "255"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "1" === Some "1"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "f" === Some "15"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "10" === Some "16"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "ff" === Some "255"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "100" === Some "256"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "DE0B6B3A7640000" === Some "1000000000000000000"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "DEADBEEF" === Some "3735928559"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "abcdef0123456789" === Some "12379813738877118345"
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff" === Some maxNumeric0Text
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString maxNumeric0Hex === Some maxNumeric0Text
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString maxUint256Hex === Some maxUint256Text
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "0x10" === None
+    CCIP.CodecV1.NumericHex.hexStringToDecimalString "xyz" === None
 
     debug "testNumericHex_HexStringToDecimalString_Vectors: PASSED"
 
@@ -111,41 +111,41 @@ testNumericHex_DecimalHex_RoundTrip = script do
 
 testNumericHex_EncodeUint64 : Script ()
 testNumericHex_EncodeUint64 = script do
-    NumericHex.encodeUint64 0.0 === Some "0000000000000000"
-    NumericHex.encodeUint64 1.0 === Some "0000000000000001"
-    NumericHex.encodeUint64 255.0 === Some "00000000000000ff"
-    NumericHex.encodeUint64 18446744073709551615.0 === Some "ffffffffffffffff"
-    NumericHex.encodeUint64 18446744073709551616.0 === None
-    NumericHex.encodeUint64 (-1.0) === None
+    CCIP.CodecV1.NumericHex.encodeUint64 0.0 === Some "0000000000000000"
+    CCIP.CodecV1.NumericHex.encodeUint64 1.0 === Some "0000000000000001"
+    CCIP.CodecV1.NumericHex.encodeUint64 255.0 === Some "00000000000000ff"
+    CCIP.CodecV1.NumericHex.encodeUint64 18446744073709551615.0 === Some "ffffffffffffffff"
+    CCIP.CodecV1.NumericHex.encodeUint64 18446744073709551616.0 === None
+    CCIP.CodecV1.NumericHex.encodeUint64 (-1.0) === None
 
     assertMsg "uint64 encodings must be 8 bytes"
         (all (\hex -> byteCount hex == 8)
-            [ fromSome (NumericHex.encodeUint64 0.0)
-            , fromSome (NumericHex.encodeUint64 1.0)
-            , fromSome (NumericHex.encodeUint64 18446744073709551615.0)
+            [ fromSome (CCIP.CodecV1.NumericHex.encodeUint64 0.0)
+            , fromSome (CCIP.CodecV1.NumericHex.encodeUint64 1.0)
+            , fromSome (CCIP.CodecV1.NumericHex.encodeUint64 18446744073709551615.0)
             ])
 
     debug "testNumericHex_EncodeUint64: PASSED"
 
 testNumericHex_EncodeUint256 : Script ()
 testNumericHex_EncodeUint256 = script do
-    NumericHex.encodeUint256 0.0
+    CCIP.CodecV1.NumericHex.encodeUint256 0.0
         === Some "0000000000000000000000000000000000000000000000000000000000000000"
-    NumericHex.encodeUint256 1.0
+    CCIP.CodecV1.NumericHex.encodeUint256 1.0
         === Some "0000000000000000000000000000000000000000000000000000000000000001"
-    NumericHex.encodeUint256 1000000.0
+    CCIP.CodecV1.NumericHex.encodeUint256 1000000.0
         === Some "00000000000000000000000000000000000000000000000000000000000f4240"
-    NumericHex.encodeUint256 1000000000000000000.0
+    CCIP.CodecV1.NumericHex.encodeUint256 1000000000000000000.0
         === Some "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
-    NumericHex.encodeUint256 99999999999999999999999999999999999999.0
+    CCIP.CodecV1.NumericHex.encodeUint256 99999999999999999999999999999999999999.0
         === Some "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff"
-    NumericHex.encodeUint256 (-1.0) === None
+    CCIP.CodecV1.NumericHex.encodeUint256 (-1.0) === None
 
     assertMsg "uint256 encodings must be 32 bytes"
         (all (\hex -> byteCount hex == 32)
-            [ fromSome (NumericHex.encodeUint256 0.0)
-            , fromSome (NumericHex.encodeUint256 1.0)
-            , fromSome (NumericHex.encodeUint256 99999999999999999999999999999999999999.0)
+            [ fromSome (CCIP.CodecV1.NumericHex.encodeUint256 0.0)
+            , fromSome (CCIP.CodecV1.NumericHex.encodeUint256 1.0)
+            , fromSome (CCIP.CodecV1.NumericHex.encodeUint256 99999999999999999999999999999999999999.0)
             ])
 
     debug "testNumericHex_EncodeUint256: PASSED"

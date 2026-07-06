@@ -21,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
@@ -29,18 +30,10 @@ import (
 )
 
 var (
-	perPartyRouterTemplateID = &apiv2.Identifier{
-		PackageId: "#ccip-runtime", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
-	}
-	perPartyRouterFactoryTemplateID = &apiv2.Identifier{
-		PackageId: "#ccip-runtime", ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory",
-	}
-	ccipSenderTemplateID = &apiv2.Identifier{
-		PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender",
-	}
-	ccipReceiverTemplateID = &apiv2.Identifier{
-		PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver",
-	}
+	perPartyRouterTemplateID        = contracts.IdentifierFromBinding(ccipruntime.PerPartyRouter{})
+	perPartyRouterFactoryTemplateID = contracts.IdentifierFromBinding(ccipruntime.PerPartyRouterFactory{})
+	ccipSenderTemplateID            = contracts.IdentifierFromBinding(sender.CCIPSender{})
+	ccipReceiverTemplateID          = contracts.IdentifierFromBinding(receiver.CCIPReceiver{})
 )
 
 // propagationTimeout bounds how long we'll wait for a freshly created

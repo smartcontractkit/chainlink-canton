@@ -8,16 +8,15 @@ import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.API.ExecutingMessageV1
-import qualified CCIP.API.SendingMessageV1
-import qualified CCIP.API.TokenAdminRegistryV1
+import qualified CCIP.APIV1.ExecutingMessage
+import qualified CCIP.APIV1.SendingMessage
+import qualified CCIP.APIV1.TokenAdminRegistry
+import qualified CCIP.CodecV1.FinalityConfig
+import qualified CCIP.CodecV1.MessageCodecV1
 import qualified CCIP.EventsV1.Events
-import qualified CCIP.FinalityConfig
-import qualified CCIP.Interfaces.CrossChainVerifier
-import qualified CCIP.Interfaces.Executor
-import qualified CCIP.Interfaces.TokenPool
-import qualified CCIP.MessageCodecV1
-import qualified CCIP.Tickets
+import qualified CCIP.InterfacesV1.CrossChainVerifier
+import qualified CCIP.InterfacesV1.Executor
+import qualified CCIP.InterfacesV1.TokenPool
 
 interface PerPartyRouter where
     viewtype PerPartyRouterView
@@ -25,13 +24,13 @@ interface PerPartyRouter where
     perPartyRouter_getSequenceNumberImpl : ContractId PerPartyRouter -> PerPartyRouter_GetSequenceNumber -> Update (Numeric 0)
     perPartyRouter_getRequiredCCVsForSendImpl : ContractId PerPartyRouter -> PerPartyRouter_GetRequiredCCVsForSend -> Update [Chainlink.InstanceAddress.RawInstanceAddress]
     perPartyRouter_getFeeImpl : ContractId PerPartyRouter -> PerPartyRouter_GetFee -> Update GetFeeResult
-    perPartyRouter_prepareSendImpl : ContractId PerPartyRouter -> PerPartyRouter_PrepareSend -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
-    perPartyRouter_finalizeFeeImpl : ContractId PerPartyRouter -> PerPartyRouter_FinalizeFee -> Update (ContractId CCIP.API.SendingMessageV1.SendingMessage)
+    perPartyRouter_prepareSendImpl : ContractId PerPartyRouter -> PerPartyRouter_PrepareSend -> Update (ContractId CCIP.APIV1.SendingMessage.ISendingMessage)
+    perPartyRouter_finalizeFeeImpl : ContractId PerPartyRouter -> PerPartyRouter_FinalizeFee -> Update (ContractId CCIP.APIV1.SendingMessage.ISendingMessage)
     perPartyRouter_ccipSendImpl : ContractId PerPartyRouter -> PerPartyRouter_CCIPSend -> Update CCIPSendResult
 
-    perPartyRouter_getExecutionStateImpl : ContractId PerPartyRouter -> PerPartyRouter_GetExecutionState -> Update CCIP.API.ExecutingMessageV1.MessageExecutionState
+    perPartyRouter_getExecutionStateImpl : ContractId PerPartyRouter -> PerPartyRouter_GetExecutionState -> Update CCIP.APIV1.ExecutingMessage.MessageExecutionState
     perPartyRouter_getRequiredCCVsForExecuteImpl : ContractId PerPartyRouter -> PerPartyRouter_GetRequiredCCVsForExecute -> Update [Chainlink.InstanceAddress.RawInstanceAddress]
-    perPartyRouter_prepareExecuteImpl : ContractId PerPartyRouter -> PerPartyRouter_PrepareExecute -> Update (ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage)
+    perPartyRouter_prepareExecuteImpl : ContractId PerPartyRouter -> PerPartyRouter_PrepareExecute -> Update (ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage)
     perPartyRouter_executeImpl : ContractId PerPartyRouter -> PerPartyRouter_Execute -> Update ExecuteResult
 
     -- ===================
@@ -59,13 +58,13 @@ interface PerPartyRouter where
             context : Splice.Api.Token.MetadataV1.ChoiceContext
             destChainSelector : Numeric 0
             message : Canton2AnyMessage
-            ccvFeeQuotes : [CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote]
-            tokenPoolFeeQuote : Optional CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
-            executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
+            ccvFeeQuotes : [CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierFeeQuote]
+            tokenPoolFeeQuote : Optional CCIP.InterfacesV1.TokenPool.TokenPoolFeeQuote
+            executorFeeQuote : Optional CCIP.InterfacesV1.Executor.ExecutorFeeQuote
         controller (view this).owner
         do perPartyRouter_getFeeImpl this self arg
 
-    nonconsuming choice PerPartyRouter_PrepareSend : ContractId CCIP.API.SendingMessageV1.SendingMessage
+    nonconsuming choice PerPartyRouter_PrepareSend : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
         with
             destinationChainSelector : Numeric 0
             message : Canton2AnyMessage
@@ -73,9 +72,9 @@ interface PerPartyRouter where
         controller (view this).owner
         do perPartyRouter_prepareSendImpl this self arg
 
-    nonconsuming choice PerPartyRouter_FinalizeFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
+    nonconsuming choice PerPartyRouter_FinalizeFee : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
         with
-            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
+            sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             context : Splice.Api.Token.MetadataV1.ChoiceContext
         controller (view this).owner
         do perPartyRouter_finalizeFeeImpl this self arg
@@ -83,9 +82,9 @@ interface PerPartyRouter where
     nonconsuming choice PerPartyRouter_CCIPSend : CCIPSendResult
         with
             context : Splice.Api.Token.MetadataV1.ChoiceContext
-            sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
+            sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             feeTokenHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
-            feeTokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
+            feeTokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
             feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
             feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
         controller (view this).owner
@@ -95,7 +94,7 @@ interface PerPartyRouter where
     --   Message Execution
     -- =====================
 
-    nonconsuming choice PerPartyRouter_GetExecutionState : CCIP.API.ExecutingMessageV1.MessageExecutionState
+    nonconsuming choice PerPartyRouter_GetExecutionState : CCIP.APIV1.ExecutingMessage.MessageExecutionState
         with
             messageHash : BytesHex
             context : Splice.Api.Token.MetadataV1.ChoiceContext
@@ -106,7 +105,7 @@ interface PerPartyRouter where
     nonconsuming choice PerPartyRouter_GetRequiredCCVsForExecute : [Chainlink.InstanceAddress.RawInstanceAddress]
         with
             context : Splice.Api.Token.MetadataV1.ChoiceContext
-            message : CCIP.MessageCodecV1.MessageV1
+            message : CCIP.CodecV1.MessageCodecV1.MessageV1
             receiverRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             receiverOptionalThreshold : Int
@@ -114,7 +113,7 @@ interface PerPartyRouter where
         controller (view this).owner
         do perPartyRouter_getRequiredCCVsForExecuteImpl this self arg
 
-    nonconsuming choice PerPartyRouter_PrepareExecute : ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage
+    nonconsuming choice PerPartyRouter_PrepareExecute : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
         with
             context : Splice.Api.Token.MetadataV1.ChoiceContext
             encodedMessage : BytesHex
@@ -123,7 +122,7 @@ interface PerPartyRouter where
             receiverRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             receiverOptionalThreshold : Int
-            receiverFinalityConfig : CCIP.FinalityConfig.FinalityConfig
+            receiverFinalityConfig : CCIP.CodecV1.FinalityConfig.FinalityConfig
             caller : Party
         controller (view this).owner
         do perPartyRouter_prepareExecuteImpl this self arg
@@ -131,7 +130,7 @@ interface PerPartyRouter where
     nonconsuming choice PerPartyRouter_Execute : ExecuteResult
         with
             context : Splice.Api.Token.MetadataV1.ChoiceContext
-            executingMessageCid : ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage
+            executingMessageCid : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
         controller (view this).owner
         do perPartyRouter_executeImpl this self arg
 
@@ -154,11 +153,11 @@ data CCIPSendResult = CCIPSendResult
 data ExecuteResult = ExecuteResult
     with
         router : ContractId PerPartyRouter
-        tokenReceiveTicket : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
+        tokenReceiveTicket : Optional (ContractId CCIP.APIV1.ExecutingMessage.ITokenReceiveTicket)
         executionStateChanged : ContractId CCIP.EventsV1.Events.ExecutionStateChanged
         messageId : BytesHex
-        message : CCIP.MessageCodecV1.MessageV1
-        state : CCIP.API.ExecutingMessageV1.MessageExecutionState
+        message : CCIP.CodecV1.MessageCodecV1.MessageV1
+        state : CCIP.APIV1.ExecutingMessage.MessageExecutionState
     deriving (Eq, Show)
 
 data PerPartyRouterView = PerPartyRouterView

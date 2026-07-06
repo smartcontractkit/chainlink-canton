@@ -4,11 +4,11 @@ module CCIP.OnRampTest.OnRampCodecTest where
 import Daml.Script
 import DA.Assert ((===))
 
-import CCIP.OnRamp (orderedVerifierDataByCCVs)
-import CCIP.OnRampTypes (OnRampDeps(..), SetDepsParams(..))
-import CCIP.OnRampCodecGen (encodeSetDepsParams, decodeSetDepsParamsAt, encodeOnRampDeps, decodeOnRampDepsAt)
-import Chainlink.InstanceAddress (RawInstanceAddress(..), make, toInstanceAddress)
-import CCIP.SendingMessageV1 qualified as SendingMessageV1
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.RuntimeV1.OnRamp
+import qualified CCIP.RuntimeV1.OnRampCodecGen
+import qualified CCIP.CoreV1.SendingMessage
 
 -- ===========================================================================
 -- SETDEPSPARAMS ENCODING/DECODING TESTS (Optional fields)
@@ -16,16 +16,16 @@ import CCIP.SendingMessageV1 qualified as SendingMessageV1
 
 testSetDepsParamsRoundtrip_AllSome : Script ()
 testSetDepsParamsRoundtrip_AllSome = do
-  let params = SetDepsParams with
-        globalConfig = Some (RawInstanceAddress "gc-instance@party::namespace")
-        rmnRemote = Some (RawInstanceAddress "rmn-instance@another-party")
-        tokenAdminRegistry = Some (RawInstanceAddress "tar-instance@yet-another")
-        feeQuoter = Some (RawInstanceAddress "fq-instance@fee-owner")
-        ccvRegistry = Some (RawInstanceAddress "ccv-registry@registry-owner")
+  let params = CCIP.RuntimeV1.OnRamp.SetDepsParams with
+        globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc-instance@party::namespace")
+        rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn-instance@another-party")
+        tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar-instance@yet-another")
+        feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq-instance@fee-owner")
+        ccvRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "ccv-registry@registry-owner")
 
-      encoded = encodeSetDepsParams params
+      encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams params
 
-  case fst <$> decodeSetDepsParamsAt encoded 0 of
+  case fst <$> CCIP.RuntimeV1.OnRampCodecGen.decodeSetDepsParamsAt encoded 0 of
     None -> abort "Failed to decode SetDepsParams (all Some)"
     Some decoded -> decoded === params
 
@@ -33,16 +33,16 @@ testSetDepsParamsRoundtrip_AllSome = do
 
 testSetDepsParamsRoundtrip_AllNone : Script ()
 testSetDepsParamsRoundtrip_AllNone = do
-  let params = SetDepsParams with
+  let params = CCIP.RuntimeV1.OnRamp.SetDepsParams with
         globalConfig = None
         rmnRemote = None
         tokenAdminRegistry = None
         feeQuoter = None
         ccvRegistry = None
 
-      encoded = encodeSetDepsParams params
+      encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams params
 
-  case fst <$> decodeSetDepsParamsAt encoded 0 of
+  case fst <$> CCIP.RuntimeV1.OnRampCodecGen.decodeSetDepsParamsAt encoded 0 of
     None -> abort "Failed to decode SetDepsParams (all None)"
     Some decoded -> decoded === params
 
@@ -50,16 +50,16 @@ testSetDepsParamsRoundtrip_AllNone = do
 
 testSetDepsParamsRoundtrip_Mixed : Script ()
 testSetDepsParamsRoundtrip_Mixed = do
-  let params = SetDepsParams with
-        globalConfig = Some (RawInstanceAddress "gc@owner")
+  let params = CCIP.RuntimeV1.OnRamp.SetDepsParams with
+        globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc@owner")
         rmnRemote = None
         tokenAdminRegistry = None
-        feeQuoter = Some (RawInstanceAddress "fq@owner")
+        feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq@owner")
         ccvRegistry = None
 
-      encoded = encodeSetDepsParams params
+      encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams params
 
-  case fst <$> decodeSetDepsParamsAt encoded 0 of
+  case fst <$> CCIP.RuntimeV1.OnRampCodecGen.decodeSetDepsParamsAt encoded 0 of
     None -> abort "Failed to decode SetDepsParams (mixed)"
     Some decoded -> decoded === params
 
@@ -71,16 +71,16 @@ testSetDepsParamsRoundtrip_Mixed = do
 
 testOnRampDepsRoundtrip : Script ()
 testOnRampDepsRoundtrip = do
-  let deps = OnRampDeps with
-        globalConfig = RawInstanceAddress "globalconfig@ccip_owner"
-        rmnRemote = RawInstanceAddress "rmnremote@ccip_owner"
-        tokenAdminRegistry = RawInstanceAddress "tar@ccip_owner"
-        feeQuoter = RawInstanceAddress "feequoter@ccip_owner"
-        ccvRegistry = RawInstanceAddress "ccvregistry@ccip_owner"
+  let deps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+        globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "globalconfig@ccip_owner"
+        rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmnremote@ccip_owner"
+        tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@ccip_owner"
+        feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "feequoter@ccip_owner"
+        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccvregistry@ccip_owner"
 
-      encoded = encodeOnRampDeps deps
+      encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeOnRampDeps deps
 
-  case decodeOnRampDepsAt encoded 0 of
+  case CCIP.RuntimeV1.OnRampCodecGen.decodeOnRampDepsAt encoded 0 of
     None -> abort "Failed to decode OnRampDeps"
     Some (decoded, _) -> do
       decoded.globalConfig === deps.globalConfig
@@ -93,16 +93,16 @@ testOnRampDepsRoundtrip = do
 
 testOnRampDepsSpecialCharacters : Script ()
 testOnRampDepsSpecialCharacters = do
-  let deps = OnRampDeps with
-        globalConfig = RawInstanceAddress "config-with-dashes@party1::namespace1"
-        rmnRemote = RawInstanceAddress "rmn_with_underscores@party2::namespace2"
-        tokenAdminRegistry = RawInstanceAddress "tar.with.dots@party3"
-        feeQuoter = RawInstanceAddress "fq/with/slashes@party4"
-        ccvRegistry = RawInstanceAddress "ccv:with:colons@party5"
+  let deps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+        globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "config-with-dashes@party1::namespace1"
+        rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn_with_underscores@party2::namespace2"
+        tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar.with.dots@party3"
+        feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq/with/slashes@party4"
+        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv:with:colons@party5"
 
-      encoded = encodeOnRampDeps deps
+      encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeOnRampDeps deps
 
-  case decodeOnRampDepsAt encoded 0 of
+  case CCIP.RuntimeV1.OnRampCodecGen.decodeOnRampDepsAt encoded 0 of
     None -> abort "Failed to decode OnRampDeps with special characters"
     Some (decoded, _) -> do
       decoded.globalConfig === deps.globalConfig
@@ -119,11 +119,11 @@ testOnRampDepsSpecialCharacters = do
 
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
-  case decodeSetDepsParamsAt "" 0 of
+  case CCIP.RuntimeV1.OnRampCodecGen.decodeSetDepsParamsAt "" 0 of
     None -> pure ()
     Some _ -> abort "Expected decodeSetDepsParamsAt to fail on empty data"
 
-  case decodeSetDepsParamsAt "ff" 0 of
+  case CCIP.RuntimeV1.OnRampCodecGen.decodeSetDepsParamsAt "ff" 0 of
     None -> pure ()
     Some _ -> abort "Expected decodeSetDepsParamsAt to fail on invalid tag"
 
@@ -133,22 +133,22 @@ testOrderedVerifierDataByCCVs : Script ()
 testOrderedVerifierDataByCCVs = do
   ccvOwner <- allocateParty "ccv-owner"
 
-  let ccv1 = toInstanceAddress (make "ccv-1" ccvOwner)
-      ccv2 = toInstanceAddress (make "ccv-2" ccvOwner)
-      vd1 = SendingMessageV1.VerifierData with
+  let ccv1 = Chainlink.InstanceAddress.toInstanceAddress (Chainlink.InstanceAddress.make "ccv-1" ccvOwner)
+      ccv2 = Chainlink.InstanceAddress.toInstanceAddress (Chainlink.InstanceAddress.make "ccv-2" ccvOwner)
+      vd1 = CCIP.CoreV1.SendingMessage.VerifierData with
         ccvInstanceId = "ccv-1"
         ccvOwner = ccvOwner
         versionTag = "11111111"
         verifierBlob = "aaaa"
         messageSentObservers = []
-      vd2 = SendingMessageV1.VerifierData with
+      vd2 = CCIP.CoreV1.SendingMessage.VerifierData with
         ccvInstanceId = "ccv-2"
         ccvOwner = ccvOwner
         versionTag = "22222222"
         verifierBlob = "bbbb"
         messageSentObservers = []
 
-  let ordered = orderedVerifierDataByCCVs [ccv1, ccv2] [vd2, vd1]
+  let ordered = CCIP.RuntimeV1.OnRamp.orderedVerifierDataByCCVs [ccv1, ccv2] [vd2, vd1]
   map (.ccvInstanceId) ordered === ["ccv-1", "ccv-2"]
   map (.verifierBlob) ordered === ["aaaa", "bbbb"]
 
