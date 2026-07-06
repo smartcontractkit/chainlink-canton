@@ -7,5 +7,6 @@ participant-config.json
 # Operator-local node configs (JWTs, KMS ARNs — refresh before each run)
 config/testnet/nodes/
 config/mainnet/nodes/
+config/staging/nodes/
 
 /bin
