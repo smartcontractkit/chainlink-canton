@@ -18,5 +18,9 @@ logs/
 
 vendor/
 scripts/staging/.env
+scripts/prod_mainnet/.env
+scripts/prod_mainnet/.env.example
+scripts/prod_testnet/.env
 scripts/staging/fetch_active_contract_by_instance_address/report.html
 eds/staging_testnet_canton.local.toml
+examples/cli/config.yaml
