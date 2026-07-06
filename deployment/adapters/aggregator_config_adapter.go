@@ -33,7 +33,17 @@ type CantonCommitteeVerifierOnchain struct{}
 
 // ApplySignatureConfigs implements [adapters.CommitteeVerifierOnchainAdapter].
 func (a *CantonCommitteeVerifierOnchain) ApplySignatureConfigs(ctx context.Context, env deployment.Environment, destChainSelector uint64, qualifier string, change adapters.SignatureConfigChange) error {
-	panic("unimplemented")
+	return nil
+}
+
+// SetAllowedFinalityConfig implements [adapters.CommitteeVerifierOnchainAdapter].
+func (a *CantonCommitteeVerifierOnchain) SetAllowedFinalityConfig(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, waitForFinality bool, waitForSafe bool, blockDepth uint16) error {
+	return nil
+}
+
+// ApplyAllowlistUpdates implements [adapters.CommitteeVerifierOnchainAdapter].
+func (a *CantonCommitteeVerifierOnchain) ApplyAllowlistUpdates(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, destChainSelector uint64, allowlistEnabled bool, addedSenders []string, removedSenders []string) error {
+	return nil
 }
 
 // ScanCommitteeStates implements [adapters.CommitteeVerifierOnchainAdapter].
