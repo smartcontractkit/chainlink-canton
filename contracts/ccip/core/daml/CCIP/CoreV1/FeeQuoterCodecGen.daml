@@ -180,3 +180,4 @@ decodeApplyFeeQuoterDestChainConfigUpdatesParamsAt encoded offset = do
     Some (ApplyFeeQuoterDestChainConfigUpdatesParams{..}, offset)
 
 
+
