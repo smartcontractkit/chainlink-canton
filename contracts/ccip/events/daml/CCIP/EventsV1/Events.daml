@@ -28,6 +28,8 @@ data CCIPMessageSentEvent = CCIPMessageSentEvent
         destChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         messageId : BytesHex
+        feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+        tokenAmountBeforeTokenPoolFees : Decimal
         encodedMessage : BytesHex
         verifierBlobs : [BytesHex]
         receipts : [CCIP.EventsV1.Receipts.Receipt]

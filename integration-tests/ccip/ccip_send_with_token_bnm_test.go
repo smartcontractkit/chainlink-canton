@@ -36,12 +36,14 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
@@ -990,36 +992,37 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Extract messageId from CCIPMessageSent to verify success
-	var returnedMessageId string
-	var returnedEncodedMessage string
+	// Extract CIPMessageSent event to verify success
+	eventTemplateId := events.CCIPMessageSent{}.GetTemplateID()
+	var ccipMessageSent *events.CCIPMessageSent
 	for _, event := range res.GetTransaction().GetEvents() {
-		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-			if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
-				fields := e.Created.GetCreateArguments().GetFields()
-				if len(fields) >= 5 {
-					eventField := fields[4].GetValue().GetRecord()
-					if eventField != nil {
-						for _, field := range eventField.Fields {
-							if field.GetLabel() == "messageId" {
-								returnedMessageId = field.GetValue().GetText()
-							}
-							if field.GetLabel() == "encodedMessage" {
-								returnedEncodedMessage = field.GetValue().GetText()
-							}
-						}
-					}
+		if createdEvent := event.GetCreated(); createdEvent != nil {
+			if templateId := createdEvent.GetTemplateId(); templateId != nil {
+				gotTemplateId := fmt.Sprintf("#%s:%s:%s", createdEvent.GetPackageName(), templateId.GetModuleName(), templateId.GetEntityName())
+				if gotTemplateId == eventTemplateId {
+					// Found CCIPMessageSent event
+					ccipMessageSent, err = bindings.UnmarshalCreatedEvent[events.CCIPMessageSent](createdEvent)
+					require.NoError(t, err)
+					break
 				}
-
-				break
 			}
 		}
 	}
-	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
-	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
+	require.NotNil(t, ccipMessageSent, "CCIPMessageSent event not found")
+	require.NotEmpty(t, ccipMessageSent.Event.MessageId, "CCIPMessageSent should be created")
+	require.NotEmpty(t, ccipMessageSent.Event.EncodedMessage, "CCIPMessageSent should contain encoded message")
+
+	// Verify that the event contains the feeToken InstrumentId
+	require.Equal(t, nativeInstrumentId, ccipMessageSent.Event.FeeToken, "CCIPMessageSent should contain feeToken InstrumentId")
 
 	// Verify pool feeBps haircut: 10,000 smallest units with 5% feeBps => 9,500 bridged.
-	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
+	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, ccipMessageSent.Event.EncodedMessage), "encoded token amount should be net after 5% feeBps")
+	// Verify that the event itself contains the original amount without fees
+	wantAmount, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
+	require.True(t, ok, "token transfer amount should parse as a decimal value")
+	gotAmount, ok := new(big.Rat).SetString(string(ccipMessageSent.Event.TokenAmountBeforeTokenPoolFees))
+	require.True(t, ok, "token amount before token pool fees should parse as a decimal value")
+	require.Equal(t, 0, wantAmount.Cmp(gotAmount), "token amount before token pool fees should match original transfer amount")
 
 	quotedFeeAmount, ok := new(big.Rat).SetString(feeStr)
 	require.True(t, ok, "quoted fee should parse as a decimal value")
@@ -1051,7 +1054,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	}, 15*time.Second, 200*time.Millisecond, "sender LINK deduction should equal net token transfer amount after pool feeBps")
 
 	t.Logf("Send completed")
-	t.Logf("  Message ID: %s", returnedMessageId)
+	t.Logf("  Message ID: %s", ccipMessageSent.Event.MessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
 
 	t.Logf("✅ Success")

@@ -399,9 +399,9 @@ template OnRamp
                     instrumentId = message.feeToken
                     caller = ccipOwner
 
-                let (hasTokenTransfer, tokenInstrumentId) = case message.tokenTransfer of
-                        None -> (False, None)
-                        Some tt -> (True, Some tt.token)
+                let (hasTokenTransfer, tokenInstrumentId, tokenAmountBeforeTokenPoolFees) = case message.tokenTransfer of
+                        None -> (False, None, 0.0)
+                        Some tt -> (True, Some tt.token, tt.amount)
                 let resolvedSenderRequiredCCVs =
                         computeRequiredCCVsForSend
                             destConfig
@@ -476,6 +476,7 @@ template OnRamp
                     feeToken = message.feeToken
                     networkFeeUSDCents = networkFeeUSD
                     expectedTokenInstrumentId = tokenInstrumentId
+                    tokenAmountBeforeTokenPoolFees = tokenAmountBeforeTokenPoolFees
                     outboundPoolCCVs = None
                     executorAddress = resolvedExecutorAddress
                     executionMode = executionMode

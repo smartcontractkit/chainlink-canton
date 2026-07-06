@@ -230,6 +230,9 @@ template SendingMessage
         networkFeeUSDCents : Numeric 0
         -- Expected token instrument for outbound TAR validation
         expectedTokenInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
+        -- The original input amount of the message, before the pool deducts any fees.
+        -- Emitted in the CCIPMessageSent event
+        tokenAmountBeforeTokenPoolFees : Decimal
         -- Pool-required outbound CCVs, set via TAR authorization
         outboundPoolCCVs : Optional [Chainlink.InstanceAddress.RawInstanceAddress]
         -- Executor arguments, set during PrepareSend and validated by AddExecutorFee.
@@ -630,6 +633,8 @@ template SendingMessage
                         destChainSelector = destChainSelector
                         sequenceNumber = sequenceNumber
                         messageId = messageId
+                        feeToken = feeToken
+                        tokenAmountBeforeTokenPoolFees = tokenAmountBeforeTokenPoolFees
                         encodedMessage = encodedMessage
                         verifierBlobs = verifierBlobs
                         receipts = receipts

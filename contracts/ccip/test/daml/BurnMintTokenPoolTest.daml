@@ -233,6 +233,7 @@ mkSendingMessage ccipOwner sender rmnOwner rmnInstanceId tokenAdminRegistryInsta
       feeToken = instrumentId
       networkFeeUSDCents = 0.0
       expectedTokenInstrumentId = Some instrumentId
+      tokenAmountBeforeTokenPoolFees = 10.0
       outboundPoolCCVs = Some []
       executorArgs = ""
       executorFee = None
