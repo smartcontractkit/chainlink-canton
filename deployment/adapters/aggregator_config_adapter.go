@@ -33,7 +33,17 @@ type CantonCommitteeVerifierOnchain struct{}
 
 // ApplySignatureConfigs implements [adapters.CommitteeVerifierOnchainAdapter].
 func (a *CantonCommitteeVerifierOnchain) ApplySignatureConfigs(ctx context.Context, env deployment.Environment, destChainSelector uint64, qualifier string, change adapters.SignatureConfigChange) error {
-	panic("unimplemented")
+	return nil
+}
+
+// SetAllowedFinalityConfig implements [adapters.CommitteeVerifierOnchainAdapter].
+func (a *CantonCommitteeVerifierOnchain) SetAllowedFinalityConfig(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, waitForFinality bool, waitForSafe bool, blockDepth uint16) error {
+	return nil
+}
+
+// ApplyAllowlistUpdates implements [adapters.CommitteeVerifierOnchainAdapter].
+func (a *CantonCommitteeVerifierOnchain) ApplyAllowlistUpdates(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, destChainSelector uint64, allowlistEnabled bool, addedSenders []string, removedSenders []string) error {
+	return nil
 }
 
 // ScanCommitteeStates implements [adapters.CommitteeVerifierOnchainAdapter].
@@ -257,4 +267,20 @@ func signerKeyToAddress(hexKey string) (string, error) {
 	}
 
 	return gethcrypto.PubkeyToAddress(*pubKey).Hex(), nil
+}
+
+// normalizeCantonSignerAddress canonicalises a Canton committee signer to the
+// lowercase 20-byte ECDSA address used on-chain. Canton's NOP signer identity is a
+// raw 65-byte secp256k1 public key, but the on-chain committee verifier stores the
+// derived address (gethcrypto.PubkeyToAddress, as signerKeyToAddress does). Without
+// this, the ccv state-inference signer↔NOP index (keyed via shared.NormalizeAddress
+// for the canton family) holds the pubkey and never matches the derived address an
+// on-chain scan returns — surfacing as "signer has no JD-known NOP". Registered as
+// the canton address normalizer so both representations collapse to one form.
+func normalizeCantonSignerAddress(addr string) string {
+	if derived, err := signerKeyToAddress(addr); err == nil {
+		return strings.ToLower(derived)
+	}
+
+	return "0x" + strings.ToLower(strings.TrimPrefix(strings.TrimSpace(addr), "0x"))
 }
