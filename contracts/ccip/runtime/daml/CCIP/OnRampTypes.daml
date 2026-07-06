@@ -8,7 +8,6 @@ data OnRampDeps = OnRampDeps
         rmnRemote : RawInstanceAddress
         tokenAdminRegistry : RawInstanceAddress
         feeQuoter : RawInstanceAddress
-        ccvRegistry : RawInstanceAddress
     deriving (Eq, Show)
 
 data SetDepsParams = SetDepsParams
@@ -17,5 +16,4 @@ data SetDepsParams = SetDepsParams
         rmnRemote : Optional RawInstanceAddress
         tokenAdminRegistry : Optional RawInstanceAddress
         feeQuoter : Optional RawInstanceAddress
-        ccvRegistry : Optional RawInstanceAddress
     deriving (Eq, Show)

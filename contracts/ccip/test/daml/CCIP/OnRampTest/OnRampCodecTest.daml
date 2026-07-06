@@ -21,7 +21,7 @@ testSetDepsParamsRoundtrip_AllSome = do
         rmnRemote = Some (RawInstanceAddress "rmn-instance@another-party")
         tokenAdminRegistry = Some (RawInstanceAddress "tar-instance@yet-another")
         feeQuoter = Some (RawInstanceAddress "fq-instance@fee-owner")
-        ccvRegistry = Some (RawInstanceAddress "ccv-registry@registry-owner")
+
 
       encoded = encodeSetDepsParams params
 
@@ -38,7 +38,7 @@ testSetDepsParamsRoundtrip_AllNone = do
         rmnRemote = None
         tokenAdminRegistry = None
         feeQuoter = None
-        ccvRegistry = None
+
 
       encoded = encodeSetDepsParams params
 
@@ -55,7 +55,7 @@ testSetDepsParamsRoundtrip_Mixed = do
         rmnRemote = None
         tokenAdminRegistry = None
         feeQuoter = Some (RawInstanceAddress "fq@owner")
-        ccvRegistry = None
+
 
       encoded = encodeSetDepsParams params
 
@@ -76,7 +76,7 @@ testOnRampDepsRoundtrip = do
         rmnRemote = RawInstanceAddress "rmnremote@ccip_owner"
         tokenAdminRegistry = RawInstanceAddress "tar@ccip_owner"
         feeQuoter = RawInstanceAddress "feequoter@ccip_owner"
-        ccvRegistry = RawInstanceAddress "ccvregistry@ccip_owner"
+
 
       encoded = encodeOnRampDeps deps
 
@@ -87,7 +87,7 @@ testOnRampDepsRoundtrip = do
       decoded.rmnRemote === deps.rmnRemote
       decoded.tokenAdminRegistry === deps.tokenAdminRegistry
       decoded.feeQuoter === deps.feeQuoter
-      decoded.ccvRegistry === deps.ccvRegistry
+
 
   pure ()
 
@@ -98,7 +98,7 @@ testOnRampDepsSpecialCharacters = do
         rmnRemote = RawInstanceAddress "rmn_with_underscores@party2::namespace2"
         tokenAdminRegistry = RawInstanceAddress "tar.with.dots@party3"
         feeQuoter = RawInstanceAddress "fq/with/slashes@party4"
-        ccvRegistry = RawInstanceAddress "ccv:with:colons@party5"
+
 
       encoded = encodeOnRampDeps deps
 
@@ -109,7 +109,7 @@ testOnRampDepsSpecialCharacters = do
       decoded.rmnRemote === deps.rmnRemote
       decoded.tokenAdminRegistry === deps.tokenAdminRegistry
       decoded.feeQuoter === deps.feeQuoter
-      decoded.ccvRegistry === deps.ccvRegistry
+
 
   pure ()
 

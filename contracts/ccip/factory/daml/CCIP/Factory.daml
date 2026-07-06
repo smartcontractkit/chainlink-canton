@@ -517,7 +517,6 @@ data DeployOnRampParams = DeployOnRampParams
         rmnRemote : RawInstanceAddress.RawInstanceAddress
         tokenAdminRegistry : RawInstanceAddress.RawInstanceAddress
         feeQuoter : RawInstanceAddress.RawInstanceAddress
-        ccvRegistry : RawInstanceAddress.RawInstanceAddress
         maxUSDCentsPerMsg : Numeric 0
     deriving (Eq, Show)
 
@@ -664,7 +663,6 @@ mkOnRampContract ccipOwner params = CCIP.OnRamp.OnRamp with
         rmnRemote = params.rmnRemote
         tokenAdminRegistry = params.tokenAdminRegistry
         feeQuoter = params.feeQuoter
-        ccvRegistry = params.ccvRegistry
 
 mkOffRampContract : Party -> DeployOffRampParams -> CCIP.OffRamp.OffRamp
 mkOffRampContract ccipOwner params = CCIP.OffRamp.OffRamp with
@@ -819,8 +817,7 @@ decodeDeployOnRampParams encoded = do
     (rmnRemote, offset3) <- decodeRawInstanceAddressAt encoded offset2
     (tokenAdminRegistry, offset4) <- decodeRawInstanceAddressAt encoded offset3
     (feeQuoter, offset5) <- decodeRawInstanceAddressAt encoded offset4
-    (ccvRegistry, offset6) <- decodeRawInstanceAddressAt encoded offset5
-    (maxUSDCentsPerMsg, finalOffset) <- decodeNumeric0At encoded offset6
+    (maxUSDCentsPerMsg, finalOffset) <- decodeNumeric0At encoded offset5
     assertOffset finalOffset (byteCount encoded)
     Some DeployOnRampParams with
         instanceId
@@ -828,7 +825,6 @@ decodeDeployOnRampParams encoded = do
         rmnRemote
         tokenAdminRegistry
         feeQuoter
-        ccvRegistry
         maxUSDCentsPerMsg
 
 decodeDeployOffRampParams : BytesHex -> Optional DeployOffRampParams

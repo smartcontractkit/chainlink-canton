@@ -109,9 +109,6 @@ func (d DeployCCIPChainContractsFromFactory) VerifyPreconditions(e cldf.Environm
 	if err := requireFactoryDeployOwnerParties(config.Config.OwnerParty, config.Config.CCIPOwnerParty); err != nil {
 		return err
 	}
-	if config.Config.Params.CcvRegistryBinding.Unpack == "" {
-		return fmt.Errorf("CcvRegistryBinding is required for core CCIP factory deploy")
-	}
 	_, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
 	if err != nil {
 		return fmt.Errorf("core CCIPFactory must be deployed first: %w", err)

@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "e72c7b81e9cc09ed2d35ba3333f561851d5f8a5f81527d05249060ad1edd1eb5"
+	PackageID   = "95817e77485fd17017bcb30ad5fde6e401dddc042534d7045972e817def1730b"
 	SDKVersion  = "3.4.11"
 )
 
@@ -2225,7 +2225,6 @@ type OnRampDeps struct {
 	RmnRemote          chainlinkapi.RawInstanceAddress `json:"rmnRemote"`
 	TokenAdminRegistry chainlinkapi.RawInstanceAddress `json:"tokenAdminRegistry"`
 	FeeQuoter          chainlinkapi.RawInstanceAddress `json:"feeQuoter"`
-	CcvRegistry        chainlinkapi.RawInstanceAddress `json:"ccvRegistry"`
 }
 
 // ToMap converts OnRampDeps to a map for DAML arguments
@@ -2239,8 +2238,6 @@ func (t OnRampDeps) ToMap() map[string]any {
 	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
 
 	m["feeQuoter"] = model.NestedToDAMLValue(t.FeeQuoter)
-
-	m["ccvRegistry"] = model.NestedToDAMLValue(t.CcvRegistry)
 
 	return m
 }
@@ -3325,7 +3322,6 @@ type SetDepsParams struct {
 	RmnRemote          *chainlinkapi.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
 	TokenAdminRegistry *chainlinkapi.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
 	FeeQuoter          *chainlinkapi.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
-	CcvRegistry        *chainlinkapi.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams to a map for DAML arguments
@@ -3375,18 +3371,6 @@ func (t SetDepsParams) ToMap() map[string]any {
 		}
 	} else {
 		m["feeQuoter"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
-
-	if t.CcvRegistry != nil {
-		m["ccvRegistry"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.CcvRegistry),
-		}
-	} else {
-		m["ccvRegistry"] = map[string]any{
 			"_type": "optional",
 			"value": nil,
 		}

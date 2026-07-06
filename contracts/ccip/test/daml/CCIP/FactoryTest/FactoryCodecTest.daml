@@ -81,7 +81,6 @@ encodeDeployOnRampParams params =
   <> encodeRawInstanceAddress params.rmnRemote
   <> encodeRawInstanceAddress params.tokenAdminRegistry
   <> encodeRawInstanceAddress params.feeQuoter
-  <> encodeRawInstanceAddress params.ccvRegistry
   <> encodeNumeric0 params.maxUSDCentsPerMsg
 
 encodeDeployOffRampParams : DeployOffRampParams -> BytesHex
@@ -266,7 +265,7 @@ testDecodeDeployOnRampParams = script do
         rmnRemote = RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = RawInstanceAddress "tar@owner"
         feeQuoter = RawInstanceAddress "fq@owner"
-        ccvRegistry = RawInstanceAddress "ccv@owner"
+
         maxUSDCentsPerMsg = 12345.0
       encoded = encodeDeployOnRampParams params
 
@@ -278,7 +277,7 @@ testDecodeDeployOnRampParams = script do
       decoded.rmnRemote === params.rmnRemote
       decoded.tokenAdminRegistry === params.tokenAdminRegistry
       decoded.feeQuoter === params.feeQuoter
-      decoded.ccvRegistry === params.ccvRegistry
+
       decoded.maxUSDCentsPerMsg === params.maxUSDCentsPerMsg
 
   pure ()

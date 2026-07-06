@@ -211,7 +211,7 @@ setupOutboundFixture suffix = do
                 rmnRemote = RawInstanceAddress.make rmnInstanceId rmnOwner
                 tokenAdminRegistry = RawInstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
                 feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
-                ccvRegistry = RawInstanceAddress.make ("ccvregistry-bounds-" <> suffix) ccipOwner
+
 
     router <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouter with

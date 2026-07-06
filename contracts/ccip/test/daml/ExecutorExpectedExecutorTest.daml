@@ -181,7 +181,7 @@ setupFeeFixture suffix useDefaultExecutor = do
                 rmnRemote = RawInstanceAddress.make ("rmn-unused-" <> suffix) ccipOwner
                 tokenAdminRegistry = RawInstanceAddress.make ("tar-unused-" <> suffix) ccipOwner
                 feeQuoter = RawInstanceAddress.make feeQuoterInstanceId ccipOwner
-                ccvRegistry = RawInstanceAddress.make ("ccvregistry-unused-" <> suffix) ccipOwner
+
 
     router <- submit ccipOwner do
         createCmd CCIP.PerPartyRouter.PerPartyRouter with

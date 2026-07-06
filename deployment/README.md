@@ -306,10 +306,9 @@ Deploy creates **TokenAdminRegistry** (core). Token **pools** and **rate limiter
 | Ref needed by | Must exist first | Checked in |
 |---|---|---|
 | CV template `Deps.RmnRemote` | RMN deployed | `DeployCCVFromFactory` preconditions |
-| Core `CcvRegistryBinding` | CV deployed | `DeployCCIPChainContractsFromFactory` |
 | OnRamp/OffRamp `Deps.RmnRemote` | RMN deployed | core sequence templates |
 
-On-ledger: creating OnRamp with a missing RMN or CV registry ref **fails at execute time** even if proposal generation succeeded.
+On-ledger: creating OnRamp with a missing RMN ref **fails at execute time** even if proposal generation succeeded.
 
 ---
 

@@ -265,7 +265,6 @@ template OnRamp
                         rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
                         tokenAdminRegistry = fromOptional deps.tokenAdminRegistry newDeps.tokenAdminRegistry
                         feeQuoter = fromOptional deps.feeQuoter newDeps.feeQuoter
-                        ccvRegistry = fromOptional deps.ccvRegistry newDeps.ccvRegistry
                 create this with deps = mergedDeps
 
         -- | Get required CCV raw instance addresses for outbound message.

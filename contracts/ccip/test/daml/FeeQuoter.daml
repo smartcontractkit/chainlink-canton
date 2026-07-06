@@ -1253,7 +1253,7 @@ testCalculateFeeResult_CCVRoundingMatchesFinalizeFee = script do
                 rmnRemote = RawInstanceAddress.make "rmn-ccv-rounding-quote" owner
                 tokenAdminRegistry = RawInstanceAddress.make "tar-ccv-rounding-quote" owner
                 feeQuoter = RawInstanceAddress.make "test-feequoter-ccv-rounding-quote" owner
-                ccvRegistry = RawInstanceAddress.make "ccvregistry-ccv-rounding-quote" owner
+
 
     feeQuote <- submit owner do
         exerciseCmd onRamp OnRamp.GetFeeFromRouter with

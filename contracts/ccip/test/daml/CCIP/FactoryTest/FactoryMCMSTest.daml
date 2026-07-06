@@ -473,7 +473,7 @@ testDeployOnRamp_MCMS = script do
         rmnRemote = RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = RawInstanceAddress "tar@owner"
         feeQuoter = RawInstanceAddress "fq@owner"
-        ccvRegistry = RawInstanceAddress "ccv@owner"
+
         maxUSDCentsPerMsg = 12345.0
       encoded = encodeDeployOnRampParams params
 
