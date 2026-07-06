@@ -24,7 +24,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.3
 	github.com/google/uuid v1.6.0
 	github.com/icza/gox v0.2.14
-	github.com/jedib0t/go-pretty/v6 v6.8.1
+	github.com/jedib0t/go-pretty/v6 v6.8.2
 	github.com/jpillora/backoff v1.0.0
 	github.com/lib/pq v1.12.3
 	github.com/moby/moby/api v1.55.0
