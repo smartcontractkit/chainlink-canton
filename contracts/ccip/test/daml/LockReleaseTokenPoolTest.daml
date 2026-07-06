@@ -17,19 +17,20 @@ import Splice.Api.Token.HoldingV1 qualified as HoldingV1
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1
 import Splice.Api.Token.TransferInstructionV1 qualified as TransferInstructionV1
 
+import qualified CCIP.API.FeeQuoterV1
 import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.EventsV1.Events
 
 import qualified CCIP.CCVCodec
+import qualified CCIP.RateLimiterV1
 
-import qualified CCIP.Context
-import CCIP.Events qualified as Events
+import qualified CCIP.Utils.Context
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityCodec
 import CCIP.FeeQuoter qualified as FeeQuoter
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.LockReleaseTokenPool qualified as LockReleaseTokenPool
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
-import CCIP.RateLimiter qualified as RateLimiter
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.RMNRemote qualified as RMNRemote
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
@@ -72,7 +73,7 @@ unsafeDecodeRequestedFinality finalityConfig =
 
 messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
-mkPoolContext : ContractId RateLimiter.RateLimiter -> ContractId TransferInstructionV1.TransferFactory -> [ContractId HoldingV1.Holding] -> [(Party, ContractId TestToken.TestTransferPreapproval)] -> MetadataV1.ChoiceContext
+mkPoolContext : ContractId CCIP.RateLimiterV1.RateLimiter -> ContractId TransferInstructionV1.TransferFactory -> [ContractId HoldingV1.Holding] -> [(Party, ContractId TestToken.TestTransferPreapproval)] -> MetadataV1.ChoiceContext
 mkPoolContext rateLimiterCid burnMintFactoryCid tokenPoolHoldings preapprovals =
   let preapprovalMap = TextMap.fromList [(show p, MetadataV1.AV_ContractId $ coerceContractId cid) | (p, cid) <- preapprovals]
       extraArgsContextEntry = case preapprovals of
@@ -80,9 +81,9 @@ mkPoolContext rateLimiterCid burnMintFactoryCid tokenPoolHoldings preapprovals =
         _  -> [(LockReleaseTokenPool.transferFactoryExtraArgsContextValuesContextKey, MetadataV1.AV_Map preapprovalMap)]
   in MetadataV1.ChoiceContext with
        values = TextMap.fromList (
-         [ (RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)
-         , (LockReleaseTokenPool.transferFactoryContextKey, CCIP.Context.toAnyValue burnMintFactoryCid)
-         , (LockReleaseTokenPool.tokenPoolHoldingsContextKey, CCIP.Context.toAnyValue tokenPoolHoldings)
+         [ (CCIP.RateLimiterV1.rateLimiterKey, CCIP.Utils.Context.toAnyValue rateLimiterCid)
+         , (LockReleaseTokenPool.transferFactoryContextKey, CCIP.Utils.Context.toAnyValue burnMintFactoryCid)
+         , (LockReleaseTokenPool.tokenPoolHoldingsContextKey, CCIP.Utils.Context.toAnyValue tokenPoolHoldings)
          ] ++ extraArgsContextEntry)
 
 template ParseSourcePoolDecimalsHarness
@@ -125,26 +126,26 @@ createRateLimiter
     : Party
     -> Text
     -> Numeric 0
-    -> RateLimiter.RateLimitDirection
+    -> CCIP.RateLimiterV1.RateLimitDirection
     -> Numeric 0
     -> Numeric 0
-    -> Script (ContractId RateLimiter.RateLimiter, RawInstanceAddress.RawInstanceAddress)
+    -> Script (ContractId CCIP.RateLimiterV1.RateLimiter, RawInstanceAddress.RawInstanceAddress)
 createRateLimiter poolOwner poolInstanceId remoteChainSelector direction capacity rate = do
     now <- getTime
     let instanceId = poolInstanceId <> "-"
             <> (case direction of
-                    RateLimiter.RateLimitDirection_Outbound -> "outbound"
-                    RateLimiter.RateLimitDirection_Inbound -> "inbound")
+                    CCIP.RateLimiterV1.RateLimitDirection_Outbound -> "outbound"
+                    CCIP.RateLimiterV1.RateLimitDirection_Inbound -> "inbound")
             <> "-"
             <> show remoteChainSelector
     rateLimiterCid <- submit poolOwner do
-        createCmd RateLimiter.RateLimiter with
+        createCmd CCIP.RateLimiterV1.RateLimiter with
             instanceId = instanceId
             poolInstanceId = poolInstanceId
             poolOwner = poolOwner
             remoteChainSelector = remoteChainSelector
             direction = direction
-            mode = RateLimiter.RateLimitMode_DefaultFinality
+            mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
             isEnabled = True
             capacity = capacity
             rate = rate
@@ -276,7 +277,7 @@ testLockOrBurn = script do
         poolOwner
         tokenPoolInstanceId
         destChainSelector
-        RateLimiter.RateLimitDirection_Outbound
+        CCIP.RateLimiterV1.RateLimitDirection_Outbound
         100000000000.0
         10000000.0
 
@@ -527,7 +528,7 @@ testLockOrBurnValidatesExistingPoolHoldingsAndPreservesThem = script do
         poolOwner
         tokenPoolInstanceId
         destChainSelector
-        RateLimiter.RateLimitDirection_Outbound
+        CCIP.RateLimiterV1.RateLimitDirection_Outbound
         100000000000.0
         10000000.0
 
@@ -717,7 +718,7 @@ testLockOrBurnDeductsFeeBps = script do
         poolOwner
         tokenPoolInstanceId
         destChainSelector
-        RateLimiter.RateLimitDirection_Outbound
+        CCIP.RateLimiterV1.RateLimitDirection_Outbound
         100000000000.0
         10000000.0
 
@@ -834,7 +835,7 @@ testLockOrBurnDeductsFeeBps = script do
     let tokenSendData = fromSome sm.tokenSendData
     -- 5% feeBps deducted from bridged amount.
     tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 47500000000.0)
-    rateLimiters <- query @RateLimiter.RateLimiter poolOwner
+    rateLimiters <- query @CCIP.RateLimiterV1.RateLimiter poolOwner
     let [(_, updatedOutboundRateLimiter)] = rateLimiters
     updatedOutboundRateLimiter.tokens === 52500000000.0
 
@@ -897,7 +898,7 @@ testReleaseFromTicket = script do
         poolOwner
         tokenPoolInstanceId
         sourceChainSelector
-        RateLimiter.RateLimitDirection_Inbound
+        CCIP.RateLimiterV1.RateLimitDirection_Inbound
         100000000000.0
         10000000.0
 
@@ -980,13 +981,13 @@ testReleaseFromTicket = script do
             receiverH.owner === receiver
         _ -> abort "Expected completed result"
 
-    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId Events.TokenReceiveTicketClaimed)
+    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.EventsV1.Events.TokenReceiveTicketClaimed)
     assertMsg "Claimed event should exist" (isSome claimedEvent)
     let claimed = fromSome claimedEvent
-    claimed.tokenReceiveTicketCid === tokenReceiveTicket
+    claimed.tokenReceiveTicketCid === coerceContractId tokenReceiveTicket
     claimed.event.messageId === "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     case claimed.event.output of
-        Events.TokenReceiveTicketClaimed_Completed receiverCids ->
+        CCIP.EventsV1.Events.TokenReceiveTicketClaimed_Completed receiverCids ->
             length receiverCids === 1
         _ -> abort "Expected completed claimed event output"
 
@@ -1093,7 +1094,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
         poolOwner
         tokenPoolInstanceId
         sourceChainSelector
-        RateLimiter.RateLimitDirection_Inbound
+        CCIP.RateLimiterV1.RateLimitDirection_Inbound
         100000000000.0
         10000000.0
 
@@ -1264,7 +1265,7 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
         poolOwner
         tokenPoolInstanceId
         sourceChainSelector
-        RateLimiter.RateLimitDirection_Inbound
+        CCIP.RateLimiterV1.RateLimitDirection_Inbound
         100000000000.0
         10000000.0
 
@@ -1415,7 +1416,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
         poolOwner
         tokenPoolInstanceId
         sourceChainSelector
-        RateLimiter.RateLimitDirection_Inbound
+        CCIP.RateLimiterV1.RateLimitDirection_Inbound
         100000000000.0
         10000000.0
 
@@ -1566,7 +1567,7 @@ testReleaseFromTicketDecimalConversion = script do
         poolOwner
         tokenPoolInstanceId
         sourceChainSelector
-        RateLimiter.RateLimitDirection_Inbound
+        CCIP.RateLimiterV1.RateLimitDirection_Inbound
         9999999999999999999999999999.0
         9999999999999999999999999999.0
 
@@ -1642,17 +1643,17 @@ testReleaseFromTicketDecimalConversion = script do
             receiverH.amount === 1.2345678901
         _ -> abort "Expected completed result"
 
-    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId Events.TokenReceiveTicketClaimed)
+    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.EventsV1.Events.TokenReceiveTicketClaimed)
     let claimed = fromSome claimedEvent
     claimed.event.messageId === "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     case claimed.event.output of
-        Events.TokenReceiveTicketClaimed_Completed receiverCids ->
+        CCIP.EventsV1.Events.TokenReceiveTicketClaimed_Completed receiverCids ->
             length receiverCids === 1
         _ -> abort "Expected completed claimed event output"
 
     -- ConsumeCapacity archives the old rate limiter and creates a new one,
     -- so query by template type instead of the stale CID.
-    rateLimiters <- query @RateLimiter.RateLimiter poolOwner
+    rateLimiters <- query @CCIP.RateLimiterV1.RateLimiter poolOwner
     let [(_, updatedRateLimiter)] = rateLimiters
     updatedRateLimiter.tokens === 9999999999999999987654321098.0
 
@@ -1711,7 +1712,7 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
         poolOwner
         tokenPoolInstanceId
         sourceChainSelector
-        RateLimiter.RateLimitDirection_Inbound
+        CCIP.RateLimiterV1.RateLimitDirection_Inbound
         9999999999999999999999999999.0
         9999999999999999999999999999.0
 
@@ -1787,7 +1788,7 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
             receiverH.amount === 1.0
         _ -> abort "Expected completed result"
 
-    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId Events.TokenReceiveTicketClaimed)
+    claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.EventsV1.Events.TokenReceiveTicketClaimed)
     let claimed = fromSome claimedEvent
     claimed.event.sourceAmount === sourceAmount
     claimed.event.localAmount === 10000000000.0
@@ -1846,7 +1847,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
         poolOwner
         tokenPoolInstanceId
         sourceChainSelector
-        RateLimiter.RateLimitDirection_Inbound
+        CCIP.RateLimiterV1.RateLimitDirection_Inbound
         9999999999999999999999999999.0
         9999999999999999999999999999.0
 
@@ -1983,7 +1984,7 @@ testReleaseFromTicketDecimalConversionTruncatesToZeroFails = script do
         poolOwner
         tokenPoolInstanceId
         sourceChainSelector
-        RateLimiter.RateLimitDirection_Inbound
+        CCIP.RateLimiterV1.RateLimitDirection_Inbound
         100000000000.0
         10000000.0
 
@@ -2123,7 +2124,7 @@ testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
         poolOwner
         tokenPoolInstanceId
         sourceChainSelector
-        RateLimiter.RateLimitDirection_Inbound
+        CCIP.RateLimiterV1.RateLimitDirection_Inbound
         100000000000.0
         10000000.0
 
@@ -3860,9 +3861,10 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
             priceUpdaters = [owner]
 
     (feeUSD, destGasOverhead, destBytesOverhead) <- submit owner do
-        exerciseCmd feeQuoter FeeQuoter.GetTokenTransferFee with
+        exerciseCmd (coerceContractId @_ @CCIP.API.FeeQuoterV1.FeeQuoter feeQuoter) CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
             destChainSelector = destChainSelector
             token = testInstrumentId
+            context = MetadataV1.emptyChoiceContext
             caller = owner
 
     feeUSD === usdToCents 0.75
@@ -3908,14 +3910,16 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
             priceUpdaters = [owner]
 
     (fee1, gas1, bytes1) <- submit owner do
-        exerciseCmd feeQuoter FeeQuoter.GetTokenTransferFee with
+        exerciseCmd (coerceContractId @_ @CCIP.API.FeeQuoterV1.FeeQuoter feeQuoter) CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
             destChainSelector = destChainSelector1
             token = testInstrumentId
+            context = MetadataV1.emptyChoiceContext
             caller = owner
     (fee2, gas2, bytes2) <- submit owner do
-        exerciseCmd feeQuoter FeeQuoter.GetTokenTransferFee with
+        exerciseCmd (coerceContractId @_ @CCIP.API.FeeQuoterV1.FeeQuoter feeQuoter) CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
             destChainSelector = destChainSelector2
             token = testInstrumentId
+            context = MetadataV1.emptyChoiceContext
             caller = owner
 
     fee1 === usdToCents 1.0
@@ -4422,7 +4426,7 @@ testLockReleaseTokenPool_SetRateLimiterReferences = script do
     -- | ========= Test 3b ========
     -- | poolOwner may tune the deployed inbound limiter for chain 456 via SetRateLimitConfig
     -- | ========================
-    (inbound456Cid, inbound456Addr) <- createRateLimiter owner "test-lock-release-pool" 456.0 RateLimiter.RateLimitDirection_Inbound 100.0 10.0
+    (inbound456Cid, inbound456Addr) <- createRateLimiter owner "test-lock-release-pool" 456.0 CCIP.RateLimiterV1.RateLimitDirection_Inbound 100.0 10.0
     tokenPoolCid <- submit owner do
         exerciseCmd tokenPoolCid LockReleaseTokenPool.SetRateLimiterReferences with
             rateLimitConfigArgs = [
@@ -4434,7 +4438,7 @@ testLockReleaseTokenPool_SetRateLimiterReferences = script do
                 ]
 
     submitMustFail rateLimitAdmin do
-        exerciseCmd inbound456Cid RateLimiter.SetConfig with
+        exerciseCmd inbound456Cid CCIP.RateLimiterV1.SetConfig with
             newIsEnabled = True
             newCapacity = 99.0
             newRate = 9.0

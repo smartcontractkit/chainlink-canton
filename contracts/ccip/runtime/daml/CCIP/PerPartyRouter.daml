@@ -16,10 +16,11 @@ import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.API.ExecutingMessageV1
+import qualified CCIP.Utils.Context
 
 import qualified CCIP.Client
 import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.Events
+import qualified CCIP.EventsV1.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
@@ -29,13 +30,13 @@ import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import qualified CCIP.OffRamp
+import qualified CCIP.RMNRemote
 import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.CCVCodec
-import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..), AddCustomObserversParams(..), RemoveCustomObserversParams(..))
 import CCIP.PerPartyRouterCodecGen (decodeSetDepsParamsAt, decodeAddCustomObserversParamsAt, decodeRemoveCustomObserversParamsAt)
@@ -379,7 +380,7 @@ template PerPartyRouter
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
-                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
 
                 onRamp <- fetch onRampCid
                 RawInstanceAddress.assertEqual "router: onramp mismatch"
@@ -479,7 +480,7 @@ template PerPartyRouter
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
                 tokenConfigCid <- CCIP.TokenAdminRegistry.lookupOptionalTokenConfigCid context
-                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
 
                 onRamp <- fetch onRampCid
                 RawInstanceAddress.assertEqual "router: onramp mismatch"
@@ -691,7 +692,7 @@ template PerPartyRouter
                 offRampCid <- CCIP.OffRamp.lookupOffRampCid context
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
-                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
 
                 offRamp <- fetch offRampCid
                 RawInstanceAddress.assertEqual "router: offramp mismatch"
@@ -745,7 +746,7 @@ template PerPartyRouter
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
                 tokenConfigCid <- CCIP.TokenAdminRegistry.lookupOptionalTokenConfigCid context
-                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
 
                 offRamp <- fetch offRampCid
                 RawInstanceAddress.assertEqual "router: offramp mismatch"
@@ -926,7 +927,7 @@ template PerPartyRouter
 data CCIPSendResult = CCIPSendResult
     with
         router : ContractId PerPartyRouter
-        ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
+        ccipMessageSent : ContractId CCIP.EventsV1.Events.CCIPMessageSent
         messageId : BytesHex
         feeChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         pendingFeeInstructions : [ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction]
@@ -936,7 +937,7 @@ data ExecuteResult = ExecuteResult
     with
         router : ContractId PerPartyRouter
         tokenReceiveTicket : Optional (ContractId CCIP.Tickets.TokenReceiveTicket)
-        executionStateChanged : ContractId CCIP.Events.ExecutionStateChanged
+        executionStateChanged : ContractId CCIP.EventsV1.Events.ExecutionStateChanged
         messageId : BytesHex
         message : CCIP.MessageCodecV1.MessageV1
         state : CCIP.API.ExecutingMessageV1.MessageExecutionState

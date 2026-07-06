@@ -41,6 +41,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -358,15 +359,15 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 
 	// Setup token pool for outbound token transfer in Send.
 	poolInstanceID := "test-pool-send"
-	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[core.RateLimiter]{
+	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[ratelimiter.RateLimiter]{
 		ParticipantIndex: 1,
 		OwnerParty:       types.PARTY(partySender),
-		Template: core.RateLimiter{
+		Template: ratelimiter.RateLimiter{
 			PoolInstanceId:      types.TEXT(poolInstanceID),
 			PoolOwner:           types.PARTY(partySender),
 			RemoteChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-			Direction:           core.RateLimitDirectionRateLimitDirection_Outbound,
-			Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
+			Direction:           ratelimiter.RateLimitDirectionRateLimitDirection_Outbound,
+			Mode:                ratelimiter.RateLimitModeRateLimitMode_DefaultFinality,
 			IsEnabled:           true,
 			Capacity:            types.NUMERIC("10000000000"),
 			Rate:                types.NUMERIC("10000000000"),
@@ -417,7 +418,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 			// Set a custom token transfer fee config
-			TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{
+			TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig{
 				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): {
 					IsEnabled:         types.BOOL(true),
 					DestGasOverhead:   types.INT64(25_000),

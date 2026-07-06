@@ -30,22 +30,20 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import qualified Chainlink.InstanceAddress
 
 import qualified CCIP.API.ExecutingMessageV1
+import qualified CCIP.API.FeeQuoterV1
 import qualified CCIP.API.RMNRemoteV1
 import qualified CCIP.API.SendingMessageV1
 import qualified CCIP.API.TokenAdminRegistryV1
+import qualified CCIP.EventsV1.Events
+import qualified CCIP.RateLimiterV1
 
-import qualified CCIP.Context
-import qualified CCIP.Events
+import qualified CCIP.Utils.Context
 import qualified CCIP.FinalityConfig
-import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Math
 import qualified CCIP.Uint256
-import qualified CCIP.RateLimiter
 import qualified CCIP.Tickets
-import qualified CCIP.TokenAdminRegistry
-import CCIP.ContextCodec (decodeAnyValueAt)
 
 import CCIP.LockReleaseTokenPoolCodecGen (
     decodeSetDynamicConfigParamsAt,
@@ -85,25 +83,25 @@ transferFactoryContextKey : Text
 transferFactoryContextKey = "transfer-factory"
 
 lookupTransferFactory : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory)
-lookupTransferFactory ctx = CCIP.Context.getFromContextU ctx transferFactoryContextKey
+lookupTransferFactory ctx = CCIP.Utils.Context.getFromContextU ctx transferFactoryContextKey
 
 transferFactoryExtraArgsContextValuesContextKey : Text
 transferFactoryExtraArgsContextValuesContextKey = "transfer-factory-extra-args-context-values"
 
 lookupTransferFactoryExtraArgsContextValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Splice.Api.Token.MetadataV1.AnyValue)
-lookupTransferFactoryExtraArgsContextValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx transferFactoryExtraArgsContextValuesContextKey
+lookupTransferFactoryExtraArgsContextValues ctx = fromOptional TextMap.empty <$> CCIP.Utils.Context.lookupFromContextU ctx transferFactoryExtraArgsContextValuesContextKey
 
 transferFactoryExtraArgsMetaValuesContextKey : Text
 transferFactoryExtraArgsMetaValuesContextKey = "transfer-factory-extra-args-meta-values"
 
 lookupTransferFactoryExtraArgsMetaValues : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (TextMap.TextMap Text)
-lookupTransferFactoryExtraArgsMetaValues ctx = fromOptional TextMap.empty <$> CCIP.Context.lookupFromContextU ctx transferFactoryExtraArgsMetaValuesContextKey
+lookupTransferFactoryExtraArgsMetaValues ctx = fromOptional TextMap.empty <$> CCIP.Utils.Context.lookupFromContextU ctx transferFactoryExtraArgsMetaValuesContextKey
 
 tokenPoolHoldingsContextKey : Text
 tokenPoolHoldingsContextKey = "token-pool-holdings"
 
 lookupTokenPoolHoldings : Splice.Api.Token.MetadataV1.ChoiceContext -> Update [ContractId Splice.Api.Token.HoldingV1.Holding]
-lookupTokenPoolHoldings ctx = CCIP.Context.getFromContextU ctx tokenPoolHoldingsContextKey
+lookupTokenPoolHoldings ctx = CCIP.Utils.Context.getFromContextU ctx tokenPoolHoldingsContextKey
 
 data LockReleaseTokenPoolDeps = LockReleaseTokenPoolDeps
     with
@@ -208,12 +206,12 @@ assertPoolConfiguredRateLimiter
     : Text
     -> Party
     -> Map.Map (Numeric 0) RemoteChainConfig
-    -> ContractId CCIP.RateLimiter.RateLimiter
+    -> ContractId CCIP.RateLimiterV1.RateLimiter
     -> Update ()
 assertPoolConfiguredRateLimiter poolInstanceId poolOwner remoteChainConfigs rateLimiterCid = do
     rl <- fetch rateLimiterCid
     assertMsg "SetRateLimitConfig: rate limiter not configured on pool"
-        (CCIP.RateLimiter.rawInstanceAddress rl `elem` remoteChainRateLimiterAddresses remoteChainConfigs)
+        (CCIP.RateLimiterV1.rawInstanceAddress rl `elem` remoteChainRateLimiterAddresses remoteChainConfigs)
     assertMsg "SetRateLimitConfig: pool instance mismatch" (rl.poolInstanceId == poolInstanceId)
     assertMsg "SetRateLimitConfig: pool owner mismatch" (rl.poolOwner == poolOwner)
 
@@ -221,10 +219,10 @@ assertRateLimiter
     : Text
     -> Text
     -> Numeric 0
-    -> CCIP.RateLimiter.RateLimitDirection
-    -> CCIP.RateLimiter.RateLimitMode
+    -> CCIP.RateLimiterV1.RateLimitDirection
+    -> CCIP.RateLimiterV1.RateLimitMode
     -> Chainlink.InstanceAddress.RawInstanceAddress
-    -> CCIP.RateLimiter.RateLimiter
+    -> CCIP.RateLimiterV1.RateLimiter
     -> Update ()
 assertRateLimiter prefix poolInstanceId remoteChainSelector direction mode expected limiter = do
     Chainlink.InstanceAddress.assertEqual (prefix <> ": instance address mismatch")
@@ -424,7 +422,7 @@ template LockReleaseTokenPool
                     assertMsg ("ApplyChainUpdates: chain already exists: " <> show remoteChainSelector) (not (Map.member remoteChainSelector remoteChainConfigsRemoved))
                     assertMsg "ApplyChainUpdates: BlockDepth finality must be positive" (CCIP.FinalityConfig.isValidFinalityConfig finalityConfig)
                     -- Validate rate limiters
-                    CCIP.RateLimiter.assertDistinctRateLimiters "ApplyChainUpdates"
+                    CCIP.RateLimiterV1.assertDistinctRateLimiters "ApplyChainUpdates"
                         inboundRateLimiter
                         outboundRateLimiter
                         (if customFinalityRateLimiterRequired finalityConfig
@@ -495,10 +493,10 @@ template LockReleaseTokenPool
 
         -- Tunes capacity/rate/isEnabled on a rate limiter already referenced by this pool's remote chain config.
         -- Callable by poolOwner; caller must be poolOwner or rateLimitAdmin (admin does not sign—owner executes on their behalf).
-        nonconsuming choice SetRateLimitConfig : ContractId CCIP.RateLimiter.RateLimiter
+        nonconsuming choice SetRateLimitConfig : ContractId CCIP.RateLimiterV1.RateLimiter
             with
                 caller : Party
-                rateLimiterCid : ContractId CCIP.RateLimiter.RateLimiter
+                rateLimiterCid : ContractId CCIP.RateLimiterV1.RateLimiter
                 newIsEnabled : Bool
                 newCapacity : Numeric 0
                 newRate : Numeric 0
@@ -507,7 +505,7 @@ template LockReleaseTokenPool
                 assertMsg "SetRateLimitConfig: unauthorized caller"
                     (caller == poolOwner || rateLimitAdmin == Some caller)
                 assertPoolConfiguredRateLimiter instanceId poolOwner remoteChainConfigs rateLimiterCid
-                exercise rateLimiterCid CCIP.RateLimiter.SetConfig with
+                exercise rateLimiterCid CCIP.RateLimiterV1.SetConfig with
                     newIsEnabled
                     newCapacity
                     newRate
@@ -525,7 +523,7 @@ template LockReleaseTokenPool
                     cfg <- case Map.lookup arg.remoteChainSelector remoteChainConfigs of
                         None -> abort ("SetRateLimiterReferences: unsupported chain selector: " <> show arg.remoteChainSelector)
                         Some cfg -> pure cfg
-                    CCIP.RateLimiter.assertDistinctRateLimiters "SetRateLimitConfig"
+                    CCIP.RateLimiterV1.assertDistinctRateLimiters "SetRateLimitConfig"
                         arg.inboundRateLimiter
                         arg.outboundRateLimiter
                         (if customFinalityRateLimiterRequired cfg.finalityConfig
@@ -789,18 +787,18 @@ template LockReleaseTokenPool
                         ticket.finality /= CCIP.FinalityConfig.WaitForFinality
                         && CCIP.FinalityConfig.customFinalityRateLimiterRequired remoteChainCfg.finalityConfig
                 let expectedRateLimitMode = if useCustomFinalityRateLimiter
-                        then CCIP.RateLimiter.RateLimitMode_CustomFinality
-                        else CCIP.RateLimiter.RateLimitMode_DefaultFinality
+                        then CCIP.RateLimiterV1.RateLimitMode_CustomFinality
+                        else CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
                 let expectedRateLimiter = if useCustomFinalityRateLimiter
                         then remoteChainCfg.inboundCustomBlockConfirmationsRateLimiter
                         else remoteChainCfg.inboundRateLimiter
-                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
+                rateLimiterCid <- CCIP.RateLimiterV1.lookupRateLimiterCid extraContext
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "ReleaseFromTicket: rateLimiter"
                     instanceId
                     ticket.sourceChainSelector
-                    CCIP.RateLimiter.RateLimitDirection_Inbound
+                    CCIP.RateLimiterV1.RateLimitDirection_Inbound
                     expectedRateLimitMode
                     expectedRateLimiter
                     rateLimiter
@@ -815,7 +813,7 @@ template LockReleaseTokenPool
                 assertMsg "ReleaseFromTicket: local amount rounds down to zero"
                     (conversion.localAmount > 0.0)
                 let localAmount = conversion.localAmount
-                _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
+                _ <- exercise rateLimiterCid CCIP.RateLimiterV1.ConsumeCapacity with
                     requested = localAmount
 
                 -- Consume ticket via TAR after validating the disclosed TAR identity.
@@ -880,16 +878,16 @@ template LockReleaseTokenPool
                             receiverCids
                         let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Completed with
                                 receiverHoldingCids = receiverCids
-                        let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Completed with
+                        let claimedOutput = CCIP.EventsV1.Events.TokenReceiveTicketClaimed_Completed with
                                 receiverHoldingCids = receiverCids
-                        claimedEventCid <- create CCIP.Events.TokenReceiveTicketClaimed with
+                        claimedEventCid <- create CCIP.EventsV1.Events.TokenReceiveTicketClaimed with
                             ccipOwner = ticket.ccipOwner
                             ccvOwners = ticket.ccvOwners
                             poolOwner = ticket.poolOwner
                             receiver = ticket.receiver
                             tokenReceiver = ticket.tokenReceiver
-                            tokenReceiveTicketCid = tokenReceiveTicketImplementation
-                            event = CCIP.Events.TokenReceiveTicketClaimedEvent with
+                            tokenReceiveTicketCid = coerceContractId tokenReceiveTicketImplementation
+                            event = CCIP.EventsV1.Events.TokenReceiveTicketClaimedEvent with
                                 verifiedCCVs = ticket.verifiedCCVs
                                 tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
                                 poolAddress = ticket.poolAddress
@@ -915,16 +913,16 @@ template LockReleaseTokenPool
                             instrCid
                         let output = CCIP.Interfaces.TokenPool.ReleaseOrMintResult_Pending with
                                 transferInstructionCid = instrCid
-                        let claimedOutput = CCIP.Events.TokenReceiveTicketClaimed_Pending with
+                        let claimedOutput = CCIP.EventsV1.Events.TokenReceiveTicketClaimed_Pending with
                                 transferInstructionCid = instrCid
-                        claimedEventCid <- create CCIP.Events.TokenReceiveTicketClaimed with
+                        claimedEventCid <- create CCIP.EventsV1.Events.TokenReceiveTicketClaimed with
                             ccipOwner = ticket.ccipOwner
                             ccvOwners = ticket.ccvOwners
                             poolOwner = ticket.poolOwner
                             receiver = ticket.receiver
                             tokenReceiver = ticket.tokenReceiver
-                            tokenReceiveTicketCid = tokenReceiveTicketImplementation
-                            event = CCIP.Events.TokenReceiveTicketClaimedEvent with
+                            tokenReceiveTicketCid = coerceContractId tokenReceiveTicketImplementation
+                            event = CCIP.EventsV1.Events.TokenReceiveTicketClaimedEvent with
                                 verifiedCCVs = ticket.verifiedCCVs
                                 tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
                                 poolAddress = ticket.poolAddress
@@ -952,7 +950,7 @@ template LockReleaseTokenPool
                 tokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
-                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                feeQuoterCid : ContractId CCIP.API.FeeQuoterV1.FeeQuoter
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
             controller caller
@@ -971,9 +969,11 @@ template LockReleaseTokenPool
                     (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
                 assertMsg "pool: tokenInstrumentId mismatch"
                     (tokenInstrumentId == instrumentId)
-                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
+                feeQuoterView <- exercise feeQuoterCid CCIP.API.FeeQuoterV1.FeeQuoter_PublicFetch with
+                    expectedAddress = deps.feeQuoter
+                    caller
                 Chainlink.InstanceAddress.assertEqual "pool: feeQuoter mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoterView.instanceId feeQuoterView.ccipOwner deps.feeQuoter
                 assertMsg "pool: sending message feeQuoter mismatch"
                     (sendingMsgView.feeQuoter == deps.feeQuoter)
                 -- Check if fee config is enabled for the destination chain.
@@ -986,9 +986,10 @@ template LockReleaseTokenPool
                             , feeConfig.destBytesOverhead
                             )
                     _ ->
-                        exercise feeQuoterCid CCIP.FeeQuoter.GetTokenTransferFee with
+                        exercise feeQuoterCid CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
                             destChainSelector = sendingMsgView.destChainSelector
                             token = tokenInstrumentId
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                             caller = poolOwner
 
                 exercise tokenAdminRegistryCid
@@ -1005,7 +1006,7 @@ template LockReleaseTokenPool
         nonconsuming choice GetFee
                 : CCIP.Interfaces.TokenPool.TokenPoolFeeQuote
             with
-                feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
+                feeQuoterCid : ContractId CCIP.API.FeeQuoterV1.FeeQuoter
                 destChainSelector : Numeric 0
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
                 caller : Party
@@ -1014,9 +1015,11 @@ template LockReleaseTokenPool
                 assertMsg "pool: tokenInstrumentId mismatch"
                     (tokenInstrumentId == instrumentId)
 
-                feeQuoter <- exercise feeQuoterCid CCIP.FeeQuoter.Get with caller
+                feeQuoterView <- exercise feeQuoterCid CCIP.API.FeeQuoterV1.FeeQuoter_PublicFetch with
+                    expectedAddress = deps.feeQuoter
+                    caller
                 Chainlink.InstanceAddress.assertEqual "pool: feeQuoter mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoterView.instanceId feeQuoterView.ccipOwner deps.feeQuoter
 
                 case Map.lookup destChainSelector tokenTransferFeeConfigs of
                     Some feeConfig | feeConfig.isEnabled ->
@@ -1030,9 +1033,10 @@ template LockReleaseTokenPool
                             isEnabled = True
                     _ -> do
                         (feeUSDCents, destGasOverhead, destBytesOverhead) <- exercise feeQuoterCid
-                            CCIP.FeeQuoter.GetTokenTransferFee with
+                            CCIP.API.FeeQuoterV1.FeeQuoter_GetTokenTransferFee with
                                 destChainSelector = destChainSelector
                                 token = tokenInstrumentId
+                                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                                 caller = poolOwner
                         pure CCIP.Interfaces.TokenPool.TokenPoolFeeQuote with
                             poolInstanceId = instanceId
@@ -1105,17 +1109,17 @@ template LockReleaseTokenPool
                 let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
 
                 let expectedRateLimiter = remoteChainCfg.outboundRateLimiter
-                rateLimiterCid <- CCIP.RateLimiter.lookupRateLimiterCid extraContext
+                rateLimiterCid <- CCIP.RateLimiterV1.lookupRateLimiterCid extraContext
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "LockOrBurn: rateLimiter"
                     instanceId
                     sendingMsgView.destChainSelector
-                    CCIP.RateLimiter.RateLimitDirection_Outbound
-                    CCIP.RateLimiter.RateLimitMode_DefaultFinality
+                    CCIP.RateLimiterV1.RateLimitDirection_Outbound
+                    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
                     expectedRateLimiter
                     rateLimiter
-                _ <- exercise rateLimiterCid CCIP.RateLimiter.ConsumeCapacity with
+                _ <- exercise rateLimiterCid CCIP.RateLimiterV1.ConsumeCapacity with
                     requested = amountAfterFeeBps
 
                 -- Get inputs from extraContext
@@ -1253,7 +1257,7 @@ template LockReleaseTokenPool
                             let limiterAddr = Chainlink.InstanceAddress.toText rateLimiterInstanceAddress
                             rateLimiterCid <- case Map.lookup limiterAddr contractIds of
                                 None -> abort ("E_RATE_LIMITER_NOT_IN_MAP: " <> limiterAddr)
-                                Some c -> pure (coerceContractId c : ContractId CCIP.RateLimiter.RateLimiter)
+                                Some c -> pure (coerceContractId c : ContractId CCIP.RateLimiterV1.RateLimiter)
                             updatedLimiterCid <- exercise selfCid SetRateLimitConfig with
                                 caller
                                 rateLimiterCid
@@ -1266,7 +1270,7 @@ template LockReleaseTokenPool
                         None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue"
                         Some (AddPoolReceiveContextNonContractValueParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue" (finalOffset == byteCount operationData)
-                            (value, innerOff) <- case decodeAnyValueAt valuePayload 0 of
+                            (value, innerOff) <- case CCIP.Utils.Context.decodeAnyValueAt valuePayload 0 of
                                 None -> abort "E_INVALID_PARAMS: AddPoolReceiveContextNonContractValue:valuePayload"
                                 Some p -> pure p
                             assertMsg "E_TRAILING_BYTES: AddPoolReceiveContextNonContractValue:valuePayload" (innerOff == byteCount valuePayload)

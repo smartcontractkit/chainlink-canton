@@ -1,0 +1,19 @@
+sdk-version: 3.4.11
+name: ccip-events
+source: daml
+version: 2.0.0
+build-options:
+  - "-Wno-crypto-text-is-alpha"
+  - "-Werror=unused-dependency"
+data-dependencies:
+  - ../../dependencies/splice/splice-api-token-metadata-v1-1.0.0.dar
+  - ../../dependencies/splice/splice-api-token-holding-v1-1.0.0.dar
+  - ../../dependencies/splice/splice-api-token-burn-mint-v1-1.0.0.dar
+  - ../../dependencies/splice/splice-api-token-transfer-instruction-v1-1.0.0.dar
+  - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
+  - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
+  - ../codec/.daml/dist/ccip-codec-2.0.0.dar
+  - ../api/.daml/dist/ccip-api-2.0.0.dar
+dependencies:
+  - daml-prim
+  - daml-stdlib

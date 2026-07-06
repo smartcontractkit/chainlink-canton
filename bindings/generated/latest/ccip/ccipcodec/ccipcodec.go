@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "ccip-codec"
-	PackageID   = "8544db6616ca04518c523d3e1e5f4c4916f0827b9e34dcbb19c01a022088044c"
+	PackageID   = "5f3b07df1bd1d9ea3dc0acae29c4bfaf72e7a9c5531a2becdc015b1a513a0a1c"
 	SDKVersion  = "3.4.11"
 )
 
@@ -33,6 +33,15 @@ type Template interface {
 }
 
 const (
+	UsdPerUsdCent            = types.NUMERIC("100000000.")
+	PremiumIdentity          = types.NUMERIC("10000000000.")
+	MinTokenDecimals         = types.INT64(0)
+	MaxTokenDecimals         = types.INT64(37)
+	E10PerPercent            = types.NUMERIC("100000000.")
+	BaseNumeric              = types.NUMERIC("100000000.")
+	BaseInt                  = types.INT64(100000000)
+	MaxUint256DecimalText    = types.TEXT("115792089237316195423570985008687907853269984665640564039457584007913129639935")
+	MaxNumeric0DecimalText   = types.TEXT("99999999999999999999999999999999999999")
 	MaxCCVsPerMessage        = types.INT64(255)
 	WaitForFinalityFlag      = types.TEXT("00000000")
 	MinBlockDepth            = types.INT64(1)
@@ -187,6 +196,48 @@ func (v FinalityConfig) GetVariantTagByte() byte {
 }
 
 var _ types.VariantWithTagByte = (*FinalityConfig)(nil)
+
+// LocalAmountConversionResult is a Record type
+type LocalAmountConversionResult struct {
+	LocalAmount        types.NUMERIC `json:"localAmount"`
+	TruncatedRemainder types.TEXT    `json:"truncatedRemainder"`
+	WasTruncated       types.BOOL    `json:"wasTruncated"`
+}
+
+// ToMap converts LocalAmountConversionResult to a map for DAML arguments
+func (t LocalAmountConversionResult) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["localAmount"] = t.LocalAmount
+
+	m["truncatedRemainder"] = string(t.TruncatedRemainder)
+
+	m["wasTruncated"] = bool(t.WasTruncated)
+
+	return m
+}
+
+func (t LocalAmountConversionResult) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *LocalAmountConversionResult) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes LocalAmountConversionResult to hex string (Canton MCMS format)
+func (t LocalAmountConversionResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LocalAmountConversionResult from hex string (Canton MCMS format)
+func (t *LocalAmountConversionResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // MessageV1 is a Record type
 type MessageV1 struct {

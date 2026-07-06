@@ -7,15 +7,16 @@ import DA.Map qualified as Map
 import DA.Optional (fromSome, fromSomeNote, isSome)
 import DA.TextMap qualified as TextMap
 
-import qualified CCIP.Context
-import qualified CCIP.Events
+import qualified CCIP.Utils.Context
+import qualified CCIP.EventsV1.Events
+import qualified CCIP.RateLimiterV1
+
 import CCIP.BurnMintTokenPool qualified as BurnMintTokenPool
 import CCIP.ExecutingMessageV1 qualified as ExecutingMessageV1
 import CCIP.FinalityConfig qualified as FinalityConfig
 import CCIP.Interfaces.TokenPool qualified as ITokenPool
 import CCIP.MessageCodecV1 qualified as MessageCodecV1
 import CCIP.RMNRemote qualified as RMNRemote
-import CCIP.RateLimiter qualified as RateLimiter
 import CCIP.SendingMessageV1 qualified as SendingMessageV1
 import CCIP.Tickets qualified as Tickets
 import CCIP.TokenAdminRegistry qualified as TokenAdminRegistry
@@ -52,11 +53,11 @@ unsafeDecodeRequestedFinality fc =
 
 messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
-mkPoolContext : ContractId RateLimiter.RateLimiter -> ContractId BurnMintV1.BurnMintFactory -> MetadataV1.ChoiceContext
+mkPoolContext : ContractId CCIP.RateLimiterV1.RateLimiter -> ContractId BurnMintV1.BurnMintFactory -> MetadataV1.ChoiceContext
 mkPoolContext rateLimiterCid burnMintFactoryCid = MetadataV1.ChoiceContext with
   values = TextMap.fromList
-    [ (RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue rateLimiterCid)
-    , (BurnMintTokenPool.burnMintFactoryContextKey, CCIP.Context.toAnyValue burnMintFactoryCid)
+    [ (CCIP.RateLimiterV1.rateLimiterKey, CCIP.Utils.Context.toAnyValue rateLimiterCid)
+    , (BurnMintTokenPool.burnMintFactoryContextKey, CCIP.Utils.Context.toAnyValue burnMintFactoryCid)
     ]
 
 mkPoolDeps : Text -> Text -> Text -> Party -> Party -> BurnMintTokenPool.BurnMintTokenPoolDeps
@@ -71,15 +72,15 @@ createRateLimiter
   -> Text
   -> Text
   -> Numeric 0
-  -> RateLimiter.RateLimitDirection
-  -> RateLimiter.RateLimitMode
+  -> CCIP.RateLimiterV1.RateLimitDirection
+  -> CCIP.RateLimiterV1.RateLimitMode
   -> Numeric 0
   -> Numeric 0
-  -> Script (ContractId RateLimiter.RateLimiter, RawInstanceAddress.RawInstanceAddress)
+  -> Script (ContractId CCIP.RateLimiterV1.RateLimiter, RawInstanceAddress.RawInstanceAddress)
 createRateLimiter poolOwner instanceId poolInstanceId remoteChainSelector direction mode capacity rate = do
   now <- getTime
   rateLimiterCid <- submit poolOwner do
-    createCmd RateLimiter.RateLimiter with
+    createCmd CCIP.RateLimiterV1.RateLimiter with
       instanceId
       poolInstanceId
       poolOwner
@@ -301,8 +302,8 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
     "rl-bm-lock-out"
     tokenPoolInstanceId
     destChainSelector
-    RateLimiter.RateLimitDirection_Outbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Outbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -370,7 +371,7 @@ testBurnMintPoolLockOrBurnBurnsAndMintsOutputs = script do
   let tokenSendData = fromSomeNote "expected token send data" updatedSendingMessage.tokenSendData
   tokenSendData.amount === fromSome (MessageCodecV1.encodeUint256 66500000000.0)
   tokenSendData.instrumentId === instrumentId
-  rateLimiters <- query @RateLimiter.RateLimiter poolOwner
+  rateLimiters <- query @CCIP.RateLimiterV1.RateLimiter poolOwner
   let [(_, updatedOutboundRateLimiter)] = rateLimiters
   updatedOutboundRateLimiter.tokens === 33500000000.0
 
@@ -419,8 +420,8 @@ testBurnMintPoolLockOrBurnRejectsBadInputsAndOutputs = script do
     "rl-bm-bad-lock-out"
     tokenPoolInstanceId
     destChainSelector
-    RateLimiter.RateLimitDirection_Outbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Outbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -551,8 +552,8 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
     "rl-bm-release-in"
     tokenPoolInstanceId
     sourceChainSelector
-    RateLimiter.RateLimitDirection_Inbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Inbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -648,8 +649,8 @@ testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
     "rl-bm-bad-mint-in"
     tokenPoolInstanceId
     sourceChainSelector
-    RateLimiter.RateLimitDirection_Inbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Inbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -824,8 +825,8 @@ testBurnMintPoolReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = scrip
     "rl-bm-release-raw-uint256-in"
     tokenPoolInstanceId
     sourceChainSelector
-    RateLimiter.RateLimitDirection_Inbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Inbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -887,7 +888,7 @@ testBurnMintPoolReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = scrip
       receiverHolding.holdingAmount === 1.0
     _ -> abort "expected completed release result"
 
-  Some claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.Events.TokenReceiveTicketClaimed)
+  Some claimedEvent <- queryContractId receiver (coerceContractId result.claimedEventCid : ContractId CCIP.EventsV1.Events.TokenReceiveTicketClaimed)
   claimedEvent.event.sourceAmount === sourceAmount
   claimedEvent.event.localAmount === 10000000000.0
 
@@ -924,8 +925,8 @@ testBurnMintPoolReleaseFromTicketDecimalConversionTruncatesToZeroFails = script 
     "rl-bm-release-zero-in"
     tokenPoolInstanceId
     sourceChainSelector
-    RateLimiter.RateLimitDirection_Inbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Inbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -1022,8 +1023,8 @@ testBurnMintPoolReleaseFromTicketDecimalConversionOverflowFails = script do
     "rl-bm-release-overflow-in"
     tokenPoolInstanceId
     sourceChainSelector
-    RateLimiter.RateLimitDirection_Inbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Inbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     9999999999999999999999999999.0
     9999999999999999999999999999.0
 
@@ -1128,8 +1129,8 @@ testBurnMintPoolReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
     "rl-bm-release-drift-in"
     tokenPoolInstanceId
     sourceChainSelector
-    RateLimiter.RateLimitDirection_Inbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Inbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -1243,8 +1244,8 @@ testBurnMintPoolReleaseFromTicketRejectsWrongCCVInstance = script do
     "rl-bm-release-instance-in"
     tokenPoolInstanceId
     sourceChainSelector
-    RateLimiter.RateLimitDirection_Inbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Inbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -1363,8 +1364,8 @@ testBurnMintPoolReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
     "rl-bm-release-ccv-auth-in"
     tokenPoolInstanceId
     sourceChainSelector
-    RateLimiter.RateLimitDirection_Inbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Inbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -1454,8 +1455,8 @@ testBurnMintPoolRejectsMissingBurnMintFactory = script do
     "rl-bm-missing-out"
     tokenPoolInstanceId
     destChainSelector
-    RateLimiter.RateLimitDirection_Outbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Outbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -1486,7 +1487,7 @@ testBurnMintPoolRejectsMissingBurnMintFactory = script do
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       extraContext = MetadataV1.ChoiceContext with
         values = TextMap.fromList
-          [ (RateLimiter.rateLimiterKey, CCIP.Context.toAnyValue outboundRateLimiterCid)
+          [ (CCIP.RateLimiterV1.rateLimiterKey, CCIP.Utils.Context.toAnyValue outboundRateLimiterCid)
           ]
       sendingMessageCid = toInterfaceContractId sendingMessageCid
       senderInputCids = [senderHoldingCid]
@@ -1505,8 +1506,8 @@ testBurnMintTokenPool_ApplyTokenTransferFeeConfigUpdates_RejectsNegativeFeeUSDCe
         "rl-bm-fee-out"
         tokenPoolInstanceId
         destChainSelector
-        RateLimiter.RateLimitDirection_Outbound
-        RateLimiter.RateLimitMode_DefaultFinality
+        CCIP.RateLimiterV1.RateLimitDirection_Outbound
+        CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
         100000000000.0
         10000000.0
 
@@ -1556,8 +1557,8 @@ testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
     "rl-bm-admin-in"
     "burn-mint-pool-rl-admin"
     sourceChainSelector
-    RateLimiter.RateLimitDirection_Inbound
-    RateLimiter.RateLimitMode_DefaultFinality
+    CCIP.RateLimiterV1.RateLimitDirection_Inbound
+    CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
     100000000000.0
     10000000.0
 
@@ -1587,7 +1588,7 @@ testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
         ]
 
   submitMustFail rateLimitAdmin do
-    exerciseCmd inboundRateLimiterCid RateLimiter.SetConfig with
+    exerciseCmd inboundRateLimiterCid CCIP.RateLimiterV1.SetConfig with
       newIsEnabled = True
       newCapacity = 50.0
       newRate = 5.0

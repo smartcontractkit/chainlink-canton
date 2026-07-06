@@ -13,7 +13,6 @@ import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified CCIP.Client
-import qualified CCIP.Context
 import qualified CCIP.FeeQuoter
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
@@ -22,6 +21,7 @@ import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.PerPartyRouter
+import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.TokenAdminRegistry
 import qualified CCIP.Uint256
@@ -271,7 +271,7 @@ template CCIPSender
             do
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
-                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
+                rmnRemoteCid <- CCIP.RMNRemote.lookupRmnRemoteCid context
                 tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
 
                 extraArgs <- case message.extraArgs of

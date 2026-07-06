@@ -22,7 +22,7 @@ import CCIP.BurnMintTokenPoolTypes (
     RemovePoolReceiveContextValueParams(..),
     )
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import CCIP.ContextCodec (encodeChoiceContext, decodeChoiceContextAt, encodeAnyValue)
+import CCIP.Utils.Context (encodeChoiceContext, decodeChoiceContextAt, encodeAnyValue)
 import DA.TextMap qualified as TextMap
 
 import Splice.Api.Token.MetadataV1 qualified as MetadataV1

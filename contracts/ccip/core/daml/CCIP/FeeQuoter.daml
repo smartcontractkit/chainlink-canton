@@ -13,10 +13,12 @@ import DA.Set qualified as Set
 import Splice.Api.Token.HoldingV1
 import Splice.Api.Token.MetadataV1 (ChoiceContext)
 
-import qualified CCIP.Context
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.API.FeeQuoterV1
+import qualified CCIP.Utils.Context
+
 import CCIP.Math qualified
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import Chainlink.InstanceAddress (assertValidInstanceId)
 import qualified CCIP.SendingMessageV1
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import MCMS.Codec (decodePartyList)
@@ -42,10 +44,10 @@ feeQuoterKey : Text
 feeQuoterKey = "fee-quoter"
 
 lookupFeeQuoterCid : ChoiceContext -> Update (ContractId FeeQuoter)
-lookupFeeQuoterCid ctx = CCIP.Context.getFromContextU ctx feeQuoterKey
+lookupFeeQuoterCid ctx = CCIP.Utils.Context.getFromContextU ctx feeQuoterKey
 
-rawInstanceAddress : FeeQuoter -> RawInstanceAddress.RawInstanceAddress
-rawInstanceAddress feeQuoter = RawInstanceAddress.make feeQuoter.instanceId feeQuoter.owner
+rawInstanceAddress : FeeQuoter -> Chainlink.InstanceAddress.RawInstanceAddress
+rawInstanceAddress feeQuoter = Chainlink.InstanceAddress.make feeQuoter.instanceId feeQuoter.owner
 
 gasCostUsdCents : Decimal -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
@@ -70,7 +72,25 @@ template FeeQuoter
     where
         signatory owner
         observer priceUpdaters
-        ensure assertValidInstanceId instanceId && unique priceUpdaters
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId && unique priceUpdaters
+
+        interface instance CCIP.API.FeeQuoterV1.FeeQuoter for FeeQuoter where
+            view = CCIP.API.FeeQuoterV1.FeeQuoterView with
+                ccipOwner = owner
+                instanceId
+
+            feeQuoter_publicFetchImpl self arg = do
+                Chainlink.InstanceAddress.assertEqual "FeeQuoter: expected address mismatch" instanceId owner arg.expectedAddress
+                pure CCIP.API.FeeQuoterV1.FeeQuoterView with
+                    ccipOwner = owner
+                    instanceId
+
+            feeQuoter_getTokenTransferFeeImpl self arg = do
+                exercise (fromInterfaceContractId @FeeQuoter self) GetTokenTransferFee with
+                    destChainSelector = arg.destChainSelector
+                    token = arg.token
+                    context = arg.context
+                    caller = arg.caller
 
         nonconsuming choice Get : FeeQuoter
             with
@@ -183,6 +203,7 @@ template FeeQuoter
             with
                 destChainSelector : Numeric 0
                 token : Splice.Api.Token.HoldingV1.InstrumentId
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do

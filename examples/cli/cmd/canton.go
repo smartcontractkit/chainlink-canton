@@ -22,6 +22,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -120,7 +121,7 @@ func newCantonListEventsCmd(g *Globals) *cobra.Command {
 				tw.SetTitle("CCIPMessageSent Events")
 				tw.AppendHeader(table.Row{"Message ID", "Destination Chain", "Sequence Number", "Sender"})
 				for _, c := range active {
-					ev, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](c.GetCreatedEvent())
+					ev, err := bindings.UnmarshalCreatedEvent[events.CCIPMessageSent](c.GetCreatedEvent())
 					if err != nil {
 						return fmt.Errorf("unmarshal: %w", err)
 					}
@@ -135,7 +136,7 @@ func newCantonListEventsCmd(g *Globals) *cobra.Command {
 				tw.SetTitle("ExecutionStateChanged Events")
 				tw.AppendHeader(table.Row{"Message ID", "Source Chain", "Sequence Number", "State", "Receiver"})
 				for _, c := range active {
-					ev, err := bindings.UnmarshalCreatedEvent[core.ExecutionStateChanged](c.GetCreatedEvent())
+					ev, err := bindings.UnmarshalCreatedEvent[events.ExecutionStateChanged](c.GetCreatedEvent())
 					if err != nil {
 						return fmt.Errorf("unmarshal: %w", err)
 					}

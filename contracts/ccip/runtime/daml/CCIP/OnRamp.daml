@@ -16,21 +16,21 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Chainlink.InstanceAddress (assertValidInstanceId)
 
 import qualified CCIP.Interfaces.CrossChainVerifier
+import qualified CCIP.Utils.Context
+import qualified CCIP.EventsV1.Events
+import qualified CCIP.EventsV1.Receipts
 
 import qualified CCIP.Client
-import qualified CCIP.Events
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
 import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
-import qualified CCIP.Context
 import qualified CCIP.CCVCodec
 import qualified Splice.Api.Token.HoldingV1
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
-import qualified CCIP.Receipts
 import qualified CCIP.TokenAdminRegistry
 
 import CCIP.OnRampTypes (OnRampDeps(..), SetDepsParams(..))
@@ -73,7 +73,7 @@ onRampKey : Text
 onRampKey = "on-ramp"
 
 lookupOnRampCid : Splice.Api.Token.MetadataV1.ChoiceContext -> Update (ContractId OnRamp)
-lookupOnRampCid ctx = CCIP.Context.getFromContextU ctx onRampKey
+lookupOnRampCid ctx = CCIP.Utils.Context.getFromContextU ctx onRampKey
 
 rawInstanceAddress : OnRamp -> RawInstanceAddress.RawInstanceAddress
 rawInstanceAddress onRamp = RawInstanceAddress.make onRamp.instanceId onRamp.ccipOwner
@@ -874,10 +874,10 @@ template OnRamp
 
 data CCIPSendFromRouterResult = CCIPSendFromRouterResult
     with
-        ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
+        ccipMessageSent : ContractId CCIP.EventsV1.Events.CCIPMessageSent
         verifierBlobs : [BytesHex]
         messageSentObservers : [Party]
-        receipts : [CCIP.Receipts.Receipt]
+        receipts : [CCIP.EventsV1.Receipts.Receipt]
     deriving (Eq, Show)
 
 orderedVerifierDataByCCVs
@@ -907,7 +907,7 @@ orderedVerifierData sendingMsg =
 -- | Assemble final receipts from the separated fee fields, verifier data,
 -- token send data, executor fee, and the network fee. Receipt order matches
 -- EVM: CCV receipts, pool receipt, executor receipt, network fee receipt.
-assembleReceipts : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.Receipts.Receipt]
+assembleReceipts : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.EventsV1.Receipts.Receipt]
 assembleReceipts sendingMsg =
     let
         finalVerifierData = orderedVerifierData sendingMsg
@@ -920,8 +920,8 @@ assembleReceipts sendingMsg =
             (Some tsd, Some fee) ->
                 let poolAddr = CCIP.MessageCodecV1.encodeInstanceAddress
                         tsd.poolInstanceId tsd.poolOwner
-                in [CCIP.Receipts.Receipt with
-                    issuerType = CCIP.Receipts.IssuerType_Pool
+                in [CCIP.EventsV1.Receipts.Receipt with
+                    issuerType = CCIP.EventsV1.Receipts.IssuerType_Pool
                     issuerAddress = poolAddr
                     versionTag = None
                     destGasLimit = fee.destGasOverhead
@@ -941,8 +941,8 @@ assembleReceipts sendingMsg =
                                 None -> error "missing executor fee"
                         CCIP.SendingMessageV1.ExecutionMode_NoExecutor ->
                             noExecutionAddressBytes
-                in [CCIP.Receipts.Receipt with
-                    issuerType = CCIP.Receipts.IssuerType_Executor
+                in [CCIP.EventsV1.Receipts.Receipt with
+                    issuerType = CCIP.EventsV1.Receipts.IssuerType_Executor
                     issuerAddress = execAddr
                     versionTag = None
                     destGasLimit = sendingMsg.executorDestGasLimit
@@ -950,8 +950,8 @@ assembleReceipts sendingMsg =
                     feeTokenAmount = CCIP.Math.decimalToNumeric0 sendingMsg.executorFeeTokenAmount
                     extraArgs = sendingMsg.executorArgs]
 
-        networkReceipt = CCIP.Receipts.Receipt with
-            issuerType = CCIP.Receipts.IssuerType_Network
+        networkReceipt = CCIP.EventsV1.Receipts.Receipt with
+            issuerType = CCIP.EventsV1.Receipts.IssuerType_Network
             issuerAddress = ""
             versionTag = None
             destGasLimit = 0
@@ -963,14 +963,14 @@ assembleReceipts sendingMsg =
 
 -- | Finds the matching ccvFee by (ccvInstanceId, ccvOwner) and looks up
 -- the corresponding feeTokenAmount from the parallel ccvFeeTokenAmounts list.
-assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> CCIP.SendingMessageV1.VerifierData -> CCIP.Receipts.Receipt
+assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> CCIP.SendingMessageV1.VerifierData -> CCIP.EventsV1.Receipts.Receipt
 assembleCCVReceipt ccvFees ccvFeeTokenAmounts vd =
     let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress vd.ccvInstanceId vd.ccvOwner
         (fee, feeTokenAmt) = findFeeWithAmount ccvFees ccvFeeTokenAmounts
             (\q -> q.ccvInstanceId == vd.ccvInstanceId
                 && q.ccvOwner == vd.ccvOwner)
-    in CCIP.Receipts.Receipt with
-        issuerType = CCIP.Receipts.IssuerType_CCV
+    in CCIP.EventsV1.Receipts.Receipt with
+        issuerType = CCIP.EventsV1.Receipts.IssuerType_CCV
         issuerAddress = ccvAddr
         versionTag = Some vd.versionTag
         destGasLimit = fee.destGasLimit

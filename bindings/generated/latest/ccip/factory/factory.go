@@ -13,6 +13,7 @@ import (
 	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executor "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
 	lockreleasetokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
+	ratelimiter "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	link "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
 	api "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
@@ -35,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "ccf10f3077179737fe8b27a5559ae2067f5b6a2e0edf1be5128ed0f432f0e0eb"
+	PackageID   = "8ff80a23931bedbe7df6c2eedbfaced86ba863662013497492421deb1ff60915"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1557,7 +1558,7 @@ func (t *DeployRMNRemoteParams) UnmarshalHex(data string) error {
 
 // DeployRateLimiter is a Record type
 type DeployRateLimiter struct {
-	Contract core.RateLimiter `json:"contract"`
+	Contract ratelimiter.RateLimiter `json:"contract"`
 }
 
 // ToMap converts DeployRateLimiter to a map for DAML arguments
@@ -1593,15 +1594,15 @@ func (t *DeployRateLimiter) UnmarshalHex(data string) error {
 
 // DeployRateLimiterParams is a Record type
 type DeployRateLimiterParams struct {
-	InstanceId          types.TEXT              `json:"instanceId"`
-	PoolInstanceId      types.TEXT              `json:"poolInstanceId"`
-	PoolOwner           types.PARTY             `json:"poolOwner"`
-	RemoteChainSelector types.NUMERIC           `json:"remoteChainSelector"`
-	Direction           core.RateLimitDirection `json:"direction"`
-	Mode                core.RateLimitMode      `json:"mode"`
-	IsEnabled           types.BOOL              `json:"isEnabled"`
-	Capacity            types.NUMERIC           `json:"capacity"`
-	Rate                types.NUMERIC           `json:"rate"`
+	InstanceId          types.TEXT                     `json:"instanceId"`
+	PoolInstanceId      types.TEXT                     `json:"poolInstanceId"`
+	PoolOwner           types.PARTY                    `json:"poolOwner"`
+	RemoteChainSelector types.NUMERIC                  `json:"remoteChainSelector"`
+	Direction           ratelimiter.RateLimitDirection `json:"direction"`
+	Mode                ratelimiter.RateLimitMode      `json:"mode"`
+	IsEnabled           types.BOOL                     `json:"isEnabled"`
+	Capacity            types.NUMERIC                  `json:"capacity"`
+	Rate                types.NUMERIC                  `json:"rate"`
 }
 
 // ToMap converts DeployRateLimiterParams to a map for DAML arguments

@@ -22,7 +22,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	ccipreceiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -293,7 +293,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// Get ExecutionStateChangedEvent from events
-	expectedTemplateID := core.ExecutionStateChanged{}.GetTemplateID()
+	expectedTemplateID := events.ExecutionStateChanged{}.GetTemplateID()
 	for _, event := range update.GetTransaction().GetEvents() {
 		//nolint:nestif // need to check if all of these are nil
 		if createdEvent := event.GetCreated(); createdEvent != nil {
@@ -319,7 +319,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 // parseExecutionStateChangedEvent parses a common.ExecutionStateChanged event from a Daml CreatedEvent and converts it to cciptestinterfaces.ExecutionStateChangedEvent.
 func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
-	executionStateChanged, err := bindings.UnmarshalCreatedEvent[core.ExecutionStateChanged](event)
+	executionStateChanged, err := bindings.UnmarshalCreatedEvent[events.ExecutionStateChanged](event)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to unmarshal ExecutionStateChanged event: %w", err)
 	}
@@ -400,7 +400,7 @@ func (c *Chain) findExistingExecutionState(
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: %w", err)
 	}
 
-	templateID := contracts.TemplateIDFromBinding(core.ExecutionStateChanged{}).ToLedgerIdentifier()
+	templateID := contracts.TemplateIDFromBinding(events.ExecutionStateChanged{}).ToLedgerIdentifier()
 	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, templateID)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: list active ExecutionStateChanged contracts: %w", err)

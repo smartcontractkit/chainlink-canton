@@ -22,7 +22,7 @@ import CCIP.LockReleaseTokenPoolTypes (
     RemovePoolReceiveContextValueParams(..),
     )
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import CCIP.ContextCodec (encodeChoiceContext, decodeChoiceContextAt, encodeAnyValue)
+import CCIP.Utils.Context (encodeChoiceContext, decodeChoiceContextAt, encodeAnyValue)
 import DA.TextMap qualified as TextMap
 
 import CCIP.FinalityConfig qualified as FinalityCodec

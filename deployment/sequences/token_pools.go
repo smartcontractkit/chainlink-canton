@@ -26,9 +26,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
@@ -195,7 +195,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteSelectorKeyStr,
 				"outbound",
 				outboundDefaultCfg,
-				core.RateLimitModeRateLimitMode_DefaultFinality,
+				ratelimiter.RateLimitModeRateLimitMode_DefaultFinality,
 				&proposalOutputs,
 			)
 			if err != nil {
@@ -215,7 +215,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteSelectorKeyStr,
 				"inbound",
 				inboundDefaultCfg,
-				core.RateLimitModeRateLimitMode_DefaultFinality,
+				ratelimiter.RateLimitModeRateLimitMode_DefaultFinality,
 				&proposalOutputs,
 			)
 			if err != nil {
@@ -235,7 +235,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				remoteSelectorKeyStr,
 				"inbound-custom",
 				inboundCustomCfg,
-				core.RateLimitModeRateLimitMode_CustomFinality,
+				ratelimiter.RateLimitModeRateLimitMode_CustomFinality,
 				&proposalOutputs,
 			)
 			if err != nil {
@@ -511,7 +511,7 @@ var DeployTokenPoolForToken = operations.NewSequence(
 					InstrumentId:            instrumentID,
 					Decimals:                types.INT64(10),
 					RemoteChainConfigs:      map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{},
-					TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{},
+					TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig{},
 					PoolReceiveContext:      poolReceiveContext,
 					TransferTimeout: lockreleasetokenpool.TransferTimeout{
 						RelativeHours: new(types.INT64(24)),
@@ -695,7 +695,7 @@ func deployTokenPoolRateLimiter(
 	remoteSelectorKey string,
 	direction string,
 	cfg tokenadapters.RateLimiterConfig,
-	mode core.RateLimitMode,
+	mode ratelimiter.RateLimitMode,
 	proposalOutputs *[]contract.ExerciseOutput,
 ) (datastore.AddressRef, chainlinkapi.RawInstanceAddress, error) {
 	qualifier := tokenPoolRateLimiterQualifier(tokenPoolAddress, direction, remoteSelectorKey)
@@ -712,9 +712,9 @@ func deployTokenPoolRateLimiter(
 		return ref, raw, nil
 	}
 
-	dirEnum := core.RateLimitDirectionRateLimitDirection_Inbound
+	dirEnum := ratelimiter.RateLimitDirectionRateLimitDirection_Inbound
 	if direction == "outbound" {
-		dirEnum = core.RateLimitDirectionRateLimitDirection_Outbound
+		dirEnum = ratelimiter.RateLimitDirectionRateLimitDirection_Outbound
 	}
 
 	capacity := types.NUMERIC("0")
@@ -731,7 +731,7 @@ func deployTokenPoolRateLimiter(
 		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, err
 	}
 	report, err := operations.ExecuteOperation(b, factoryops.DeployRateLimiter, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployRateLimiter{
-		Contract: core.RateLimiter{
+		Contract: ratelimiter.RateLimiter{
 			InstanceId:          types.TEXT(limiterInstanceID),
 			PoolInstanceId:      poolMeta.InstanceId,
 			PoolOwner:           poolMeta.PoolOwner,

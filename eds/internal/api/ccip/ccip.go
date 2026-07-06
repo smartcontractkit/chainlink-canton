@@ -364,7 +364,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 			string(core.TokenAdminRegistryKey): {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			string(core.RmnRemoteKey): {
+			string(core.RmnRemoteContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
 			string(core.FeeQuoterKey): {
@@ -515,7 +515,7 @@ func (s Server) PostCCIPExecute(c *gin.Context) {
 			string(core.TokenAdminRegistryKey): {
 				AVContractId: new(types.CONTRACT_ID(activeTokenAdminRegistryContract.GetCreatedEvent().GetContractId())),
 			},
-			string(core.RmnRemoteKey): {
+			string(core.RmnRemoteContextKey): {
 				AVContractId: new(types.CONTRACT_ID(activeRMNRemoteContract.GetCreatedEvent().GetContractId())),
 			},
 		},
