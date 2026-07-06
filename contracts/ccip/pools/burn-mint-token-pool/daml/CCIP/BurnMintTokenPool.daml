@@ -29,12 +29,13 @@ import qualified Chainlink.InstanceAddress
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
-import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.API.ExecutingMessageV1
 import qualified CCIP.API.RMNRemoteV1
+import qualified CCIP.API.SendingMessageV1
+import qualified CCIP.API.TokenAdminRegistryV1
 
 import qualified CCIP.Context
 import qualified CCIP.Events
-import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FinalityConfig
 import qualified CCIP.FeeQuoter
 import qualified CCIP.Interfaces.TokenPool
@@ -338,19 +339,19 @@ template BurnMintTokenPool
                         caller = arg.caller
 
             tokenPool_verifyInboundMessageImpl self arg = do
-                coerceContractId <$>exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyInboundMessage
+                exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyInboundMessage
                     with
-                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
-                        tokenConfigCid = coerceContractId arg.tokenConfigCid
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
                         extraContext = arg.extraContext
-                        executingMessageCid = coerceContractId arg.executingMessageCid
+                        executingMessageCid = arg.executingMessageCid
                         caller = arg.caller
 
             tokenPool_verifyOutboundCCVsImpl self arg = do
-                coerceContractId <$> exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyOutboundCCVs
+                exercise (fromInterfaceContractId @BurnMintTokenPool self) VerifyOutboundCCVs
                     with
-                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
-                        tokenConfigCid = coerceContractId arg.tokenConfigCid
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         amount = arg.amount
@@ -359,19 +360,19 @@ template BurnMintTokenPool
             tokenPool_releaseFromTicketImpl self arg = do
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) ReleaseFromTicket
                     with
-                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
-                        tokenConfigCid = coerceContractId arg.tokenConfigCid
-                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
+                        rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
-                        tokenReceiveTicketCid = coerceContractId arg.tokenReceiveTicketCid
+                        tokenReceiveTicketCid = arg.tokenReceiveTicketCid
                         caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
                 exercise (fromInterfaceContractId @BurnMintTokenPool self) LockOrBurn
                     with
-                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
-                        tokenConfigCid = coerceContractId arg.tokenConfigCid
-                        rmnRemoteCid = coerceContractId arg.rmnRemoteCid
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
+                        rmnRemoteCid = arg.rmnRemoteCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         senderInputCids = arg.senderInputCids
@@ -379,10 +380,10 @@ template BurnMintTokenPool
                         caller = arg.caller
 
             tokenPool_calculateFeeImpl self arg = do
-                coerceContractId <$> exercise (fromInterfaceContractId @BurnMintTokenPool self) CalculateFee
+                exercise (fromInterfaceContractId @BurnMintTokenPool self) CalculateFee
                     with
-                        tokenAdminRegistryCid = coerceContractId arg.tokenAdminRegistryCid
-                        tokenConfigCid = coerceContractId arg.tokenConfigCid
+                        tokenAdminRegistryCid = arg.tokenAdminRegistryCid
+                        tokenConfigCid = arg.tokenConfigCid
                         extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         feeQuoterCid = coerceContractId arg.feeQuoterCid
@@ -641,24 +642,28 @@ template BurnMintTokenPool
         -- validates the source pool address against the allowed remote pools for the source chain,
         -- looks up per-chain CCV requirements, and records them on the executing message.
         -- OffRamp performs the actual CCV coverage check.
-        nonconsuming choice VerifyInboundMessage : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+        nonconsuming choice VerifyInboundMessage : ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage
             with
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                tokenAdminRegistryCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
-                executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1
+                executingMessageCid : ContractId CCIP.API.ExecutingMessageV1.ExecutingMessage
                 caller : Party
             controller caller
             do
                 execMsg <- fetch executingMessageCid
-                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                let execMsgView = view execMsg
+                tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_PublicFetch
+                    with
+                        expectedAddress = deps.tokenAdminRegistry
+                        caller = caller
                 Chainlink.InstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
                 assertMsg "pool: executing message tokenAdminRegistry mismatch"
-                    (execMsg.deps.tokenAdminRegistry == deps.tokenAdminRegistry)
+                    (execMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
                 assertMsg "pool: executing message rmnRemote mismatch"
-                    (execMsg.deps.rmnRemote == deps.rmnRemote)
-                let message = execMsg.message
+                    (execMsgView.rmnRemote == deps.rmnRemote)
+                let message = execMsgView.message
 
                 tt <- case message.tokenTransfer of
                     None -> abort "pool: no token transfer in message"
@@ -681,7 +686,7 @@ template BurnMintTokenPool
                     (tt.sourceTokenAddress == remoteChainCfg.remoteTokenAddress)
 
                 exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.SetInboundPoolCCVs with
+                    CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_SetInboundPoolCCVs with
                         tokenConfigCid = tokenConfigCid
                         executingMessageCid
                         poolInstanceId = instanceId
@@ -692,8 +697,8 @@ template BurnMintTokenPool
         -- Looks up per-chain CCV requirements and records them on the sending message.
         nonconsuming choice VerifyOutboundCCVs : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                tokenAdminRegistryCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 amount : Decimal
@@ -704,11 +709,14 @@ template BurnMintTokenPool
 
                 sendingMsg <- fetch sendingMessageCid
                 let sendingMsgView = view sendingMsg
-                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_PublicFetch
+                    with
+                        expectedAddress = deps.tokenAdminRegistry
+                        caller = caller
                 Chainlink.InstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
                 assertMsg "pool: sending message ccipOwner mismatch"
-                    (sendingMsgView.ccipOwner == tokenAdminRegistry.owner)
+                    (sendingMsgView.ccipOwner == tokenAdminRegistryView.ccipOwner)
                 assertMsg "pool: sending message tokenAdminRegistry mismatch"
                     (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
                 assertMsg "pool: sending message rmnRemote mismatch"
@@ -719,7 +727,7 @@ template BurnMintTokenPool
                         Some cfg -> pure cfg.outboundCCVs
 
                 exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.SetOutboundPoolCCVs with
+                    CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_SetOutboundPoolCCVs with
                         tokenConfigCid = tokenConfigCid
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
@@ -732,27 +740,32 @@ template BurnMintTokenPool
         -- atomically. If any check fails, the entire transaction rolls back.
         nonconsuming choice ReleaseFromTicket : CCIP.Interfaces.TokenPool.ReleaseOrMintResult
             with
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                tokenAdminRegistryCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
                 rmnRemoteCid : ContractId CCIP.API.RMNRemoteV1.RMNRemote
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
-                tokenReceiveTicketCid : ContractId CCIP.Tickets.TokenReceiveTicket
+                tokenReceiveTicketCid : ContractId CCIP.API.ExecutingMessageV1.TokenReceiveTicket
                 caller : Party
             controller caller
             do
-                ticket <- fetch tokenReceiveTicketCid
-                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                let tokenReceiveTicketImplementation = coerceContractId @_ @CCIP.Tickets.TokenReceiveTicket tokenReceiveTicketCid
+            
+                ticket <- fetch tokenReceiveTicketImplementation
+                tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_PublicFetch
+                    with
+                        expectedAddress = deps.tokenAdminRegistry
+                        caller = caller
                 Chainlink.InstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
-                config <- exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                    tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
+                _ <- exercise tokenAdminRegistryCid
+                    CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_FetchTokenConfig with
                         tokenConfigCid
                         instrumentId = instrumentId
                         caller = poolOwner
                 assertMsg "ReleaseFromTicket: ticket tokenAdminRegistry instance mismatch"
-                    (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistry.instanceId)
+                    (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistryView.instanceId)
                 assertMsg "ReleaseFromTicket: ticket ccipOwner mismatch"
-                    (ticket.ccipOwner == tokenAdminRegistry.owner)
+                    (ticket.ccipOwner == tokenAdminRegistryView.ccipOwner)
                 rmnRemoteView <- exercise rmnRemoteCid CCIP.API.RMNRemoteV1.RMNRemote_PublicFetch with
                     expectedAddress = deps.rmnRemote
                     caller = caller
@@ -832,19 +845,18 @@ template BurnMintTokenPool
 
                 -- Consume ticket via TAR after validating the disclosed TAR identity.
                 exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.ConsumeReceiveTicket with
+                    CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_ConsumeReceiveTicket with
                         tokenConfigCid = tokenConfigCid
-                        ticketCid = tokenReceiveTicketCid
+                        tokenReceiveTicketCid = tokenReceiveTicketCid
                         instrumentId = instrumentId
                         poolInstanceId = instanceId
                         caller = poolOwner
 
                 -- Get inputs from extraContext
                 burnMintFactory <- lookupBurnMintFactory extraContext
-                CCIP.TokenAdminRegistry.assertConfiguredBurnMintFactory
-                    "ReleaseFromTicket"
-                    config
-                    burnMintFactory
+                _ <- exercise tokenConfigCid CCIP.API.TokenAdminRegistryV1.TokenConfig_AssertConfiguredBurnMintFactory with
+                    suppliedFactory = burnMintFactory
+                    caller = poolOwner
                 extraArgsContextValues <- lookupBurnMintFactoryExtraArgsContextValues extraContext
                 extraArgsMetaValues <- lookupBurnMintFactoryExtraArgsMetaValues extraContext
 
@@ -883,7 +895,7 @@ template BurnMintTokenPool
                     poolOwner = ticket.poolOwner
                     receiver = ticket.receiver
                     tokenReceiver = ticket.tokenReceiver
-                    tokenReceiveTicketCid
+                    tokenReceiveTicketCid = tokenReceiveTicketImplementation
                     event = CCIP.Events.TokenReceiveTicketClaimedEvent with
                         verifiedCCVs = ticket.verifiedCCVs
                         tokenAdminRegistryInstanceId = ticket.tokenAdminRegistryInstanceId
@@ -906,8 +918,8 @@ template BurnMintTokenPool
         -- fee config, appends fee directly to SendingMessageV1.
         nonconsuming choice CalculateFee : ContractId CCIP.API.SendingMessageV1.SendingMessage
             with
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                tokenAdminRegistryCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
                 feeQuoterCid : ContractId CCIP.FeeQuoter.FeeQuoter
@@ -917,11 +929,14 @@ template BurnMintTokenPool
             do
                 sendingMsg <- fetch sendingMessageCid
                 let sendingMsgView = view sendingMsg
-                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_PublicFetch
+                    with
+                        expectedAddress = deps.tokenAdminRegistry
+                        caller = caller
                 Chainlink.InstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
                 assertMsg "pool: sending message ccipOwner mismatch"
-                    (sendingMsgView.ccipOwner == tokenAdminRegistry.owner)
+                    (sendingMsgView.ccipOwner == tokenAdminRegistryView.ccipOwner)
                 assertMsg "pool: sending message tokenAdminRegistry mismatch"
                     (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
                 assertMsg "pool: tokenInstrumentId mismatch"
@@ -947,7 +962,7 @@ template BurnMintTokenPool
                             caller = poolOwner
 
                 exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.AddTokenSendFee with
+                    CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_AddTokenSendFee with
                         tokenConfigCid = tokenConfigCid
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
@@ -1003,8 +1018,8 @@ template BurnMintTokenPool
         -- Requires ccvAndExecutorHash to be finalized by the executor step before this runs.
         nonconsuming choice LockOrBurn : CCIP.Interfaces.TokenPool.LockOrBurnResult
             with
-                tokenAdminRegistryCid : ContractId CCIP.TokenAdminRegistry.TokenAdminRegistry
-                tokenConfigCid : ContractId CCIP.TokenAdminRegistry.TokenConfig
+                tokenAdminRegistryCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry
+                tokenConfigCid : ContractId CCIP.API.TokenAdminRegistryV1.TokenConfig
                 rmnRemoteCid : ContractId CCIP.API.RMNRemoteV1.RMNRemote
                 extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.API.SendingMessageV1.SendingMessage
@@ -1018,16 +1033,19 @@ template BurnMintTokenPool
 
                 sendingMsg <- fetch sendingMessageCid
                 let sendingMsgView = view sendingMsg
-                tokenAdminRegistry <- exercise tokenAdminRegistryCid CCIP.TokenAdminRegistry.Get with caller
+                tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_PublicFetch
+                    with
+                        expectedAddress = deps.tokenAdminRegistry
+                        caller = caller
                 Chainlink.InstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
-                config <- exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.GetTokenConfigByCid with
+                    tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
+                _ <- exercise tokenAdminRegistryCid
+                    CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_FetchTokenConfig with
                         tokenConfigCid
                         instrumentId
                         caller = poolOwner
                 assertMsg "LockOrBurn: sending message ccipOwner mismatch"
-                    (sendingMsgView.ccipOwner == tokenAdminRegistry.owner)
+                    (sendingMsgView.ccipOwner == tokenAdminRegistryView.ccipOwner)
                 assertMsg "LockOrBurn: sending message tokenAdminRegistry mismatch"
                     (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
                 rmnRemoteView <- exercise rmnRemoteCid CCIP.API.RMNRemoteV1.RMNRemote_PublicFetch with
@@ -1073,10 +1091,9 @@ template BurnMintTokenPool
 
                 -- Get inputs from extraContext
                 burnMintFactory <- lookupBurnMintFactory extraContext
-                CCIP.TokenAdminRegistry.assertConfiguredBurnMintFactory
-                    "LockOrBurn"
-                    config
-                    burnMintFactory
+                _ <- exercise tokenConfigCid CCIP.API.TokenAdminRegistryV1.TokenConfig_AssertConfiguredBurnMintFactory with
+                    suppliedFactory = burnMintFactory
+                    caller = poolOwner
                 extraArgsContextValues <- lookupBurnMintFactoryExtraArgsContextValues extraContext
                 extraArgsMetaValues <- lookupBurnMintFactoryExtraArgsMetaValues extraContext
 
@@ -1128,7 +1145,7 @@ template BurnMintTokenPool
                     burnMintResult.outputCids
                 let extraData = fromOptional "" destPoolData
                 newSendingMessageCid <- exercise tokenAdminRegistryCid
-                    CCIP.TokenAdminRegistry.AddTokenSend with
+                    CCIP.API.TokenAdminRegistryV1.TokenAdminRegistry_AddTokenSend with
                         tokenConfigCid = tokenConfigCid
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId

@@ -15,7 +15,7 @@ import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FeeQuoter
 import qualified CCIP.FinalityConfig
 import qualified CCIP.GlobalConfig
-import qualified CCIP.Internal
+import qualified CCIP.CCVCodec
 import CCIP.Interfaces.CrossChainVerifier qualified as ICCV
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
@@ -32,7 +32,7 @@ import qualified Splice.Api.Token.HoldingV1 as HoldingV1
 import qualified Splice.Api.Token.MetadataV1 as MetadataV1
 
 overMaxCCVCount : Int
-overMaxCCVCount = CCIP.Internal.maxCCVsPerMessage + 1
+overMaxCCVCount = CCIP.CCVCodec.maxCCVsPerMessage + 1
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
@@ -164,7 +164,7 @@ setupOutboundFixture suffix = do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do
@@ -387,7 +387,7 @@ testSetOutboundPoolCCVsRejectsTooManyAndExpandedCCVs = script do
     smExpanded <- mkSendingMessage ccipOwner sender (mkRawCCVs "outbound-default-ccv-" ccvOwner overMaxCCVCount) 2.0
     submitMustFail (actAs ccipOwner) do
         exerciseCmd smExpanded CCIP.SendingMessageV1.SetOutboundPoolCCVs with
-            poolCCVs = [CCIP.Internal.useDefaultCCVs]
+            poolCCVs = [CCIP.CCVCodec.useDefaultCCVs]
 
 data ExecuteFixture = ExecuteFixture
     with
@@ -454,7 +454,7 @@ setupExecuteFixture suffix sourceDefaultCCVs = do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     offRamp <- submit ccipOwner do
@@ -548,7 +548,7 @@ testGetRequiredCCVsForExecuteRejectsTooManyAndExpandedPoolCCVs = script do
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            tokenPoolRequiredCCVs = [CCIP.Internal.useDefaultCCVs]
+            tokenPoolRequiredCCVs = [CCIP.CCVCodec.useDefaultCCVs]
 
 mkExecutingMessage
     : Party
@@ -620,4 +620,4 @@ testSetInboundPoolCCVsRejectsTooManyAndExpandedCCVs = script do
         exerciseCmd msgExpanded CCIP.ExecutingMessageV1.SetInboundPoolCCVs with
             poolInstanceId = "pool-inbound-pool-bounds-expanded"
             poolOwner = ccipOwner
-            poolCCVs = [CCIP.Internal.useDefaultCCVs]
+            poolCCVs = [CCIP.CCVCodec.useDefaultCCVs]

@@ -649,9 +649,9 @@ mkLinkTokenContract owner params = Link.Token.LinkRegistry with
     registryMeta = Splice.Api.Token.MetadataV1.emptyMetadata
 
 mkTokenAdminRegistryContract : Party -> DeployTokenAdminRegistryParams -> CCIP.TokenAdminRegistry.TokenAdminRegistry
-mkTokenAdminRegistryContract owner params = CCIP.TokenAdminRegistry.TokenAdminRegistry with
+mkTokenAdminRegistryContract ccipOwner params = CCIP.TokenAdminRegistry.TokenAdminRegistry with
     instanceId = params.instanceId
-    owner
+    ccipOwner = ccipOwner
     entryCount = 0
 
 mkOnRampContract : Party -> DeployOnRampParams -> CCIP.OnRamp.OnRamp

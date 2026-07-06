@@ -1,17 +1,10 @@
-module CCIP.Internal where
+module CCIP.CCVCodec where
 
 import DA.List (dedup)
 import DA.Optional (fromOptional, isSome)
 import qualified CCIP.MessageCodecV1
 import Chainlink.InstanceAddress (RawInstanceAddress(..))
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
-
-data MessageExecutionState
-  = UNTOUCHED
-  | IN_PROGRESS
-  | SUCCESS
-  | FAILURE
-  deriving (Eq, Show)
 
 useDefaultCCVs : RawInstanceAddress
 useDefaultCCVs = RawInstanceAddress "default-ccvs"

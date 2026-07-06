@@ -8,8 +8,10 @@ import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified Chainlink.InstanceAddress
 
+import qualified CCIP.API.ExecutingMessageV1
+
 import qualified CCIP.FinalityConfig
-import qualified CCIP.Internal
+import qualified CCIP.Receipts
 import qualified CCIP.Tickets
 
 template CCIPMessageSent
@@ -30,7 +32,7 @@ data CCIPMessageSentEvent = CCIPMessageSentEvent
         messageId : BytesHex
         encodedMessage : BytesHex
         verifierBlobs : [BytesHex]
-        receipts : [CCIP.Tickets.Receipt]
+        receipts : [CCIP.Receipts.Receipt]
     deriving (Eq, Show)
 
 template ExecutionStateChanged
@@ -48,7 +50,7 @@ data ExecutionStateChangedEvent = ExecutionStateChangedEvent
         sourceChainSelector : Numeric 0
         sequenceNumber : Numeric 0
         messageId : BytesHex
-        state : CCIP.Internal.MessageExecutionState
+        state : CCIP.API.ExecutingMessageV1.MessageExecutionState
         returnData : BytesHex
     deriving (Eq, Show)
 

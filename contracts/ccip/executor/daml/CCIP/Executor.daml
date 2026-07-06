@@ -15,9 +15,8 @@ import qualified Chainlink.InstanceAddress
 
 import qualified CCIP.API.SendingMessageV1
 import qualified CCIP.Interfaces.Executor
-
 import qualified CCIP.FinalityConfig
-import qualified CCIP.Internal
+import qualified CCIP.CCVCodec
 
 import CCIP.ExecutorTypes (RemoteChainConfig(..), RemoteChainConfigArgs(..), DynamicConfig(..), ApplyDestChainUpdatesParams(..), SetDynamicConfigParams(..), ApplyAllowedCCVUpdatesParams(..))
 import CCIP.ExecutorCodecGen (decodeApplyDestChainUpdatesParamsAt, decodeSetDynamicConfigParamsAt, decodeApplyAllowedCCVUpdatesParamsAt)
@@ -34,7 +33,7 @@ template Executor
         signatory owner
         ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
             && maxCCVsPerMsg > 0
-            && maxCCVsPerMsg <= CCIP.Internal.maxCCVsPerMessage
+            && maxCCVsPerMsg <= CCIP.CCVCodec.maxCCVsPerMessage
             && CCIP.FinalityConfig.isValidFinalityConfig dynamicConfig.allowedFinalityConfig
 
         interface instance CCIP.Interfaces.Executor.IExecutor for Executor where

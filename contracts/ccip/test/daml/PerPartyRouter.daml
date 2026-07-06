@@ -12,13 +12,18 @@ import DA.Set qualified as Set
 import qualified DA.Text as Text
 import qualified DA.TextMap as TextMap
 
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified CCIP.API.ExecutingMessageV1
+
 import qualified CCIP.Client
 import qualified CCIP.Context
-import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.FinalityConfig
 import qualified CCIP.FeeQuoter
 import qualified CCIP.GlobalConfig
-import qualified CCIP.Internal
+import qualified CCIP.CCVCodec
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.OnRamp
 import qualified CCIP.OnRampTypes as CCIP.OnRamp
@@ -34,10 +39,6 @@ import qualified CCIP.Interfaces.Executor
 import qualified CCIP.Executor
 import qualified CCIP.ExecutorTypes as CCIP.Executor
 import qualified CommitteeVerifier.DummyCommitteeVerifier
-
-import qualified Splice.Api.Token.HoldingV1
-import qualified Splice.Api.Token.MetadataV1
-import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified TestToken
 
@@ -247,7 +248,7 @@ testCCIPSendAllFeePayouts = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 1
 
     feeQuoter <- submit ccipOwner do
@@ -573,7 +574,7 @@ testCCIPSend = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 1
 
     -- Deploy FeeQuoter with fee token price
@@ -872,7 +873,7 @@ testCCIPExecute = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     -- Deploy OffRamp
@@ -951,10 +952,11 @@ testCCIPExecute = script do
             caller = receiver
 
     -- Add CCV verification
-    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+    executingMessageCid <- coerceContractId <$> submit (actAs ccvOwner <> actAs ccipOwner) do
+        exerciseCmd (coerceContractId @_ @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ""
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     -- Execute
@@ -967,7 +969,7 @@ testCCIPExecute = script do
                  (CCIP.OffRamp.offRampKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId offRamp)]
             executingMessageCid = executingMessageCid
 
-    executeResult.state === CCIP.Internal.SUCCESS
+    executeResult.state === CCIP.API.ExecutingMessageV1.SUCCESS
 
     debug ("message executed: " <> show executeResult.messageId)
 
@@ -1048,7 +1050,7 @@ testPrepareSendExtraArgs = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do
@@ -1199,7 +1201,7 @@ testPrepareSendExtraArgs = script do
             context = context
             destChainSelector = destChainSelector
             message = tokenOnlyMessage
-            poolReportedCCVs = [CCIP.Internal.useDefaultCCVs, poolCCV]
+            poolReportedCCVs = [CCIP.CCVCodec.useDefaultCCVs, poolCCV]
     requiredCCVsWithSentinel === [defaultCCV, poolCCV]
 
     requiredCCVsWithExplicitPool <- submit (actAs user <> actAs ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig) do
@@ -1297,7 +1299,7 @@ testPrepareSendRejectsOversizedPayload = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do
@@ -1445,25 +1447,25 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
         exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = activeMessage
             caller = arbitraryCaller
-    activeState === CCIP.Internal.SUCCESS
+    activeState === CCIP.API.ExecutingMessageV1.SUCCESS
 
     newerArchiveState <- submit arbitraryCallerSubmission do
         exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = newerMessage
             caller = arbitraryCaller
-    newerArchiveState === CCIP.Internal.SUCCESS
+    newerArchiveState === CCIP.API.ExecutingMessageV1.SUCCESS
 
     olderArchiveState <- submit arbitraryCallerSubmission do
         exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = olderMessage
             caller = arbitraryCaller
-    olderArchiveState === CCIP.Internal.SUCCESS
+    olderArchiveState === CCIP.API.ExecutingMessageV1.SUCCESS
 
     missingState <- submit arbitraryCallerSubmission do
         exerciseCmd router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = missingMessage
             caller = arbitraryCaller
-    missingState === CCIP.Internal.UNTOUCHED
+    missingState === CCIP.API.ExecutingMessageV1.UNTOUCHED
 
     debug "testGetExecutionStateUsesActiveAndArchivedMessages: PASSED"
 
@@ -1515,7 +1517,7 @@ testExecuteRollsOverExecutedMessages = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     offRamp <- submit ccipOwner do
@@ -1593,10 +1595,11 @@ testExecuteRollsOverExecutedMessages = script do
             receiverFinalityConfig = finalityConfig 2000
             caller = receiver
 
-    executingMessageCid <- submit (actAs ccvOwner <> actAs ccipOwner) do
-        exerciseCmd executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+    executingMessageCid <- coerceContractId <$> submit (actAs ccvOwner <> actAs ccipOwner) do
+        exerciseCmd (coerceContractId @_ @CCIP.API.ExecutingMessageV1.ExecutingMessage executingMessageCid) CCIP.API.ExecutingMessageV1.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = ccvInstanceId
             versionTag = ""
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
     executeResult <- submit (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
@@ -1610,7 +1613,7 @@ testExecuteRollsOverExecutedMessages = script do
                     ]
             executingMessageCid = executingMessageCid
 
-    executeResult.state === CCIP.Internal.SUCCESS
+    executeResult.state === CCIP.API.ExecutingMessageV1.SUCCESS
 
     Some updatedRouter <- queryContractId receiver executeResult.router
     Set.size updatedRouter.executedMessages === 1
@@ -1641,19 +1644,19 @@ testExecuteRollsOverExecutedMessages = script do
         exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = executeResult.messageId
             caller = receiver
-    activeState === CCIP.Internal.SUCCESS
+    activeState === CCIP.API.ExecutingMessageV1.SUCCESS
 
     seededState <- submit receiver do
         exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = sampleSeededMessage
             caller = receiver
-    seededState === CCIP.Internal.SUCCESS
+    seededState === CCIP.API.ExecutingMessageV1.SUCCESS
 
     olderArchiveState <- submit receiver do
         exerciseCmd executeResult.router CCIP.PerPartyRouter.GetExecutionState with
             messageHash = olderArchivedMessage
             caller = receiver
-    olderArchiveState === CCIP.Internal.SUCCESS
+    olderArchiveState === CCIP.API.ExecutingMessageV1.SUCCESS
 
     submitMustFail (actAs receiver <> actAs ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedRmnRemote) do
         exerciseCmd executeResult.router CCIP.PerPartyRouter.PrepareExecute with
@@ -1733,7 +1736,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do
@@ -1890,7 +1893,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
     tokenAdminRegistry <- submit ccipOwner do
         createCmd CCIP.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do

@@ -11,6 +11,12 @@ import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional, isNone)
 import DA.Time (time)
 
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified CCIP.API.ExecutingMessageV1
+
 import qualified CCIP.Client
 import qualified CCIP.ExecutingMessageV1
 import qualified CCIP.Events
@@ -28,15 +34,12 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import qualified CCIP.SendingMessageV1
 import qualified CCIP.Tickets
 import qualified CCIP.TokenAdminRegistry
-import qualified CCIP.Internal
+import qualified CCIP.CCVCodec
 import qualified CCIP.Context
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 import CCIP.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..), AddCustomObserversParams(..), RemoveCustomObserversParams(..))
 import CCIP.PerPartyRouterCodecGen (decodeSetDepsParamsAt, decodeAddCustomObserversParamsAt, decodeRemoveCustomObserversParamsAt)
 
-import qualified Splice.Api.Token.HoldingV1
-import qualified Splice.Api.Token.MetadataV1
-import qualified Splice.Api.Token.TransferInstructionV1
 
 -- | Far-future time used as "never expires" for pending transfers.
 -- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
@@ -304,7 +307,7 @@ template PerPartyRouter
                 executorFeeQuote : Optional CCIP.Interfaces.Executor.ExecutorFeeQuote
             controller partyOwner
             do
-                CCIP.Internal.assertMaxCCVListLength "router: CCV fee quotes" ccvFeeQuotes
+                CCIP.CCVCodec.assertMaxCCVListLength "router: CCV fee quotes" ccvFeeQuotes
                 onRampCid <- CCIP.OnRamp.lookupOnRampCid context
                 globalConfigCid <- CCIP.GlobalConfig.lookupGlobalConfigCid context
                 feeQuoterCid <- CCIP.FeeQuoter.lookupFeeQuoterCid context
@@ -388,7 +391,7 @@ template PerPartyRouter
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 feeQuoter <- fetch feeQuoterCid
                 RawInstanceAddress.assertEqual "router: feequoter mismatch"
@@ -488,7 +491,7 @@ template PerPartyRouter
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
                 RawInstanceAddress.assertEqual "router: rmn mismatch"
@@ -700,7 +703,7 @@ template PerPartyRouter
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
                 RawInstanceAddress.assertEqual "router: rmn mismatch"
@@ -754,7 +757,7 @@ template PerPartyRouter
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "router: tokenadminregistry mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 rmnRemote <- fetch rmnRemoteCid
                 RawInstanceAddress.assertEqual "router: rmn mismatch"
@@ -800,9 +803,9 @@ template PerPartyRouter
                     executionStateChanged = result.executionStateChanged
                     messageId = result.messageId
                     message = result.message
-                    state = CCIP.Internal.SUCCESS
+                    state = CCIP.API.ExecutingMessageV1.SUCCESS
 
-        nonconsuming choice GetExecutionState : CCIP.Internal.MessageExecutionState
+        nonconsuming choice GetExecutionState : CCIP.API.ExecutingMessageV1.MessageExecutionState
             with
                 messageHash : BytesHex
                 caller : Party
@@ -813,8 +816,8 @@ template PerPartyRouter
                     executedMessages
                     archivedExecutionContractIds
                 pure $ if alreadyExecuted
-                    then CCIP.Internal.SUCCESS
-                    else CCIP.Internal.UNTOUCHED
+                    then CCIP.API.ExecutingMessageV1.SUCCESS
+                    else CCIP.API.ExecutingMessageV1.UNTOUCHED
 
         nonconsuming choice GetSequenceNumber : Numeric 0
             with
@@ -936,5 +939,5 @@ data ExecuteResult = ExecuteResult
         executionStateChanged : ContractId CCIP.Events.ExecutionStateChanged
         messageId : BytesHex
         message : CCIP.MessageCodecV1.MessageV1
-        state : CCIP.Internal.MessageExecutionState
+        state : CCIP.API.ExecutingMessageV1.MessageExecutionState
     deriving (Eq, Show)

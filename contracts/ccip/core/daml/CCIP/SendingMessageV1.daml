@@ -13,11 +13,11 @@ import DA.Text qualified as Text
 
 import qualified CCIP.Events
 import qualified CCIP.FinalityConfig
-import qualified CCIP.Internal
+import qualified CCIP.CCVCodec
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
-import qualified CCIP.Tickets
+import qualified CCIP.Receipts
 
 import MCMS.Crypto (isValidHex)
 
@@ -395,12 +395,12 @@ template SendingMessageV1
                 assertMsg "sendingMessage: SetOutboundPoolCCVs only allowed while pool CCVs are required" (state == SendingMessageState_RequirePoolCCVs)
                 assertMsg "sendingMessage: outbound pool CCV resolution only valid for token sends" (isSome expectedTokenInstrumentId)
                 assertMsg "setOutboundPoolCCVs: already set" (isNone outboundPoolCCVs)
-                CCIP.Internal.assertMaxCCVListLength "sendingMessage: outbound pool CCVs" poolCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "sendingMessage: outbound pool CCVs" poolCCVs
                 assertMsg "sendingMessage: outbound pool CCVs cannot contain duplicates" (unique poolCCVs)
-                let resolvedPoolCCVs = CCIP.Internal.resolveRequiredCCVsWithDefaults
+                let resolvedPoolCCVs = CCIP.CCVCodec.resolveRequiredCCVsWithDefaults
                         destDefaultCCVs
                         poolCCVs
-                CCIP.Internal.assertMaxCCVListLength "sendingMessage: resolved outbound pool CCVs" resolvedPoolCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "sendingMessage: resolved outbound pool CCVs" resolvedPoolCCVs
 
                 create this with
                     outboundPoolCCVs = Some resolvedPoolCCVs
@@ -527,7 +527,7 @@ template SendingMessageV1
 
                 let (finalCCVs, finalHash, messageV1, encoded, msgId) =
                         buildMessageArtifacts this
-                CCIP.Internal.assertMaxCCVListLength "sendingMessage: final CCVs" finalCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "sendingMessage: final CCVs" finalCCVs
                 create this with
                     requiredCCVs = finalCCVs
                     ccvAndExecutorHash = finalHash
@@ -601,7 +601,7 @@ template SendingMessageV1
                 let updated = this with tokenSendData = Some tsd
                 let (finalCCVs, finalHash, messageV1, encoded, msgId) =
                         buildMessageArtifacts updated
-                CCIP.Internal.assertMaxCCVListLength "sendingMessage: final CCVs" finalCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "sendingMessage: final CCVs" finalCCVs
                 create updated with
                     requiredCCVs = finalCCVs
                     ccvAndExecutorHash = finalHash
@@ -614,7 +614,7 @@ template SendingMessageV1
                 messageSender : Party
                 messageSentObservers : [Party]
                 verifierBlobs : [BytesHex]
-                receipts : [CCIP.Tickets.Receipt]
+                receipts : [CCIP.Receipts.Receipt]
             controller ccipOwner
             do
                 assertMsg "finalizeSend: only allowed after fee finalization" (state == SendingMessageState_FeeFinalized)

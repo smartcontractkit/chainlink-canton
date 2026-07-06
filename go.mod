@@ -42,7 +42,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.114.2
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260623160408-12abc7b173d8
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0
-	github.com/smartcontractkit/go-daml v0.0.0-20260630200614-6e739bf6e282
+	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.42.0

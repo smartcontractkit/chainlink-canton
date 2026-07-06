@@ -19,6 +19,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	ccipreceiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
@@ -342,13 +344,13 @@ func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfa
 	// Execution state
 	var executionState cciptestinterfaces.MessageExecutionState
 	switch executionStateChanged.Event.State {
-	case core.MessageExecutionStateUNTOUCHED:
+	case ccipapi.MessageExecutionStateUNTOUCHED:
 		executionState = cciptestinterfaces.ExecutionStateUntouched
-	case core.MessageExecutionStateIN_PROGRESS:
+	case ccipapi.MessageExecutionStateIN_PROGRESS:
 		executionState = cciptestinterfaces.ExecutionStateInProgress
-	case core.MessageExecutionStateSUCCESS:
+	case ccipapi.MessageExecutionStateSUCCESS:
 		executionState = cciptestinterfaces.ExecutionStateSuccess
-	case core.MessageExecutionStateFAILURE:
+	case ccipapi.MessageExecutionStateFAILURE:
 		executionState = cciptestinterfaces.ExecutionStateFailure
 	default:
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("unknown execution state %q", executionStateChanged.Event.State)
@@ -477,18 +479,18 @@ func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Byte
 	}, nil
 }
 
-func encodeReceiverFinalityConfig(finality int64) (core.FinalityConfig, error) {
+func encodeReceiverFinalityConfig(finality int64) (ccipcodec.FinalityConfig, error) {
 	switch {
 	case finality < 0:
-		return core.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
+		return ccipcodec.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
 	case finality == 0:
-		return core.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
+		return ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
 	case finality == 0x00010000:
-		return core.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
+		return ccipcodec.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
 	case finality > 0xFFFF:
-		return core.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
+		return ccipcodec.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
 	default:
-		return core.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
+		return ccipcodec.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
 	}
 }
 

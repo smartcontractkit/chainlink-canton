@@ -18,6 +18,7 @@ import (
 	cldf_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
@@ -264,7 +265,7 @@ func defaultExecutorParams(ownerParty string) sequences.ExecutorParams {
 	}
 }
 
-func requestedFinality(cfg finality.Config) core.FinalityConfig {
+func requestedFinality(cfg finality.Config) ccipcodec.FinalityConfig {
 	if cfg.IsZero() || cfg.WaitForFinality {
 		return waitForFinalityRequested()
 	}
@@ -275,16 +276,16 @@ func requestedFinality(cfg finality.Config) core.FinalityConfig {
 		return waitForSafeRequested()
 	}
 	if cfg.BlockDepth > 0 {
-		return core.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
+		return ccipcodec.FinalityConfig{BlockDepth: new(types.INT64(cfg.BlockDepth))}
 	}
 
 	return waitForFinalityRequested()
 }
 
-func waitForFinalityRequested() core.FinalityConfig {
-	return core.FinalityConfig{WaitForFinality: &types.UNIT{}}
+func waitForFinalityRequested() ccipcodec.FinalityConfig {
+	return ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}}
 }
 
-func waitForSafeRequested() core.FinalityConfig {
-	return core.FinalityConfig{WaitForSafe: &types.UNIT{}}
+func waitForSafeRequested() ccipcodec.FinalityConfig {
+	return ccipcodec.FinalityConfig{WaitForSafe: &types.UNIT{}}
 }

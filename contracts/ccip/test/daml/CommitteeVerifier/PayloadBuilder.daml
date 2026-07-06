@@ -7,6 +7,7 @@ import DA.Optional (fromSome, fromSomeNote)
 import qualified CCIP.FinalityConfig
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.CommitteeVerifier
+
 unsafeDecodeRequestedFinality : BytesHex -> CCIP.FinalityConfig.DecodedFinality
 unsafeDecodeRequestedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"

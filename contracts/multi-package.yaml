@@ -12,6 +12,7 @@ packages:
   - mcms/test/globalconfig-v1-upgraded
 
   - ccip/api
+  - ccip/codec
   - ccip/core
   - ccip/extension-api
   - ccip/runtime
@@ -23,6 +24,7 @@ packages:
   - ccip/pools/burn-mint-token-pool
   - ccip/factory
   - ccip/test
+  - ccip/tickets
 
   - test/interfaces
   - test/proxy

@@ -7,7 +7,7 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -16,10 +16,10 @@ import (
 func TestFinalityConfigEqual(t *testing.T) {
 	t.Parallel()
 
-	waitForFinality := core.FinalityConfig{WaitForFinality: &types.UNIT{}}
-	waitForSafe := core.FinalityConfig{WaitForSafe: &types.UNIT{}}
-	blockDepth1 := core.FinalityConfig{BlockDepth: new(types.INT64(1))}
-	blockDepth5 := core.FinalityConfig{BlockDepth: new(types.INT64(5))}
+	waitForFinality := ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}}
+	waitForSafe := ccipcodec.FinalityConfig{WaitForSafe: &types.UNIT{}}
+	blockDepth1 := ccipcodec.FinalityConfig{BlockDepth: new(types.INT64(1))}
+	blockDepth5 := ccipcodec.FinalityConfig{BlockDepth: new(types.INT64(5))}
 
 	require.True(t, finalityConfigEqual(waitForFinality, waitForFinality))
 	require.True(t, finalityConfigEqual(blockDepth1, blockDepth1))
@@ -31,13 +31,13 @@ func TestFinalityConfigEqual(t *testing.T) {
 func TestReceiverInstanceID(t *testing.T) {
 	t.Parallel()
 
-	require.Equal(t, "ccipreceiver-WaitForFinality", receiverInstanceID(core.FinalityConfig{
+	require.Equal(t, "ccipreceiver-WaitForFinality", receiverInstanceID(ccipcodec.FinalityConfig{
 		WaitForFinality: &types.UNIT{},
 	}))
-	require.Equal(t, "ccipreceiver-WaitForSafe", receiverInstanceID(core.FinalityConfig{
+	require.Equal(t, "ccipreceiver-WaitForSafe", receiverInstanceID(ccipcodec.FinalityConfig{
 		WaitForSafe: &types.UNIT{},
 	}))
-	require.Equal(t, "ccipreceiver-BlockDepth-1", receiverInstanceID(core.FinalityConfig{
+	require.Equal(t, "ccipreceiver-BlockDepth-1", receiverInstanceID(ccipcodec.FinalityConfig{
 		BlockDepth: new(types.INT64(1)),
 	}))
 }
@@ -45,10 +45,10 @@ func TestReceiverInstanceID(t *testing.T) {
 func TestReceiverFinalityLabel(t *testing.T) {
 	t.Parallel()
 
-	require.Equal(t, "WaitForFinality", receiverFinalityLabel(core.FinalityConfig{
+	require.Equal(t, "WaitForFinality", receiverFinalityLabel(ccipcodec.FinalityConfig{
 		WaitForFinality: &types.UNIT{},
 	}))
-	require.Equal(t, "BlockDepth(1)", receiverFinalityLabel(core.FinalityConfig{
+	require.Equal(t, "BlockDepth(1)", receiverFinalityLabel(ccipcodec.FinalityConfig{
 		BlockDepth: new(types.INT64(1)),
 	}))
 }

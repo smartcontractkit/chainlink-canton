@@ -26,11 +26,11 @@ import qualified CCIP.Interfaces.TokenPool
 import qualified CCIP.Math
 import qualified CCIP.MessageCodecV1
 import qualified CCIP.Context
-import qualified CCIP.Internal
+import qualified CCIP.CCVCodec
 import qualified Splice.Api.Token.HoldingV1
 import qualified CCIP.RMNRemote
 import qualified CCIP.SendingMessageV1
-import qualified CCIP.Tickets
+import qualified CCIP.Receipts
 import qualified CCIP.TokenAdminRegistry
 
 import CCIP.OnRampTypes (OnRampDeps(..), SetDepsParams(..))
@@ -93,10 +93,10 @@ computeRequiredCCVsForSend destConfig message extraArgs senderRequestedCCVs =
             [] ->
                 if isTokenOnlyTransfer
                 then []
-                else CCIP.Internal.resolveRequiredCCVsWithDefaults
+                else CCIP.CCVCodec.resolveRequiredCCVsWithDefaults
                     destConfig.defaultCCVs
                     senderRequestedCCVs
-            _ -> CCIP.Internal.resolveRequiredCCVsWithDefaults
+            _ -> CCIP.CCVCodec.resolveRequiredCCVsWithDefaults
                 destConfig.defaultCCVs
                 senderRequestedCCVs
     in dedup (resolvedSenderRequiredCCVs ++ destConfig.laneMandatedCCVs)
@@ -296,8 +296,8 @@ template OnRamp
                                 CCIP.Client.V3 v3 -> pure v3
                                 _ -> abort "onramp: unsupported extraArgs version"
                         let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
-                        CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
-                        CCIP.Internal.assertMaxCCVListLength "onramp: pool-reported CCVs" poolReportedCCVs
+                        CCIP.CCVCodec.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                        CCIP.CCVCodec.assertMaxCCVListLength "onramp: pool-reported CCVs" poolReportedCCVs
                         assertMsg "onramp: pool-reported CCVs cannot contain duplicates"
                             (unique poolReportedCCVs)
                         let senderRequiredCCVs =
@@ -309,10 +309,10 @@ template OnRamp
                         let finalRequiredCCVs = case message.tokenTransfer of
                                 None -> senderRequiredCCVs
                                 Some _ ->
-                                    dedup (senderRequiredCCVs ++ CCIP.Internal.resolveRequiredCCVsWithDefaults
+                                    dedup (senderRequiredCCVs ++ CCIP.CCVCodec.resolveRequiredCCVsWithDefaults
                                         config.defaultCCVs
                                         poolReportedCCVs)
-                        CCIP.Internal.assertMaxCCVListLength "onramp: required CCVs" finalRequiredCCVs
+                        CCIP.CCVCodec.assertMaxCCVListLength "onramp: required CCVs" finalRequiredCCVs
                         pure finalRequiredCCVs
 
         -- | Build SendingMessageV1 for outbound message.
@@ -343,7 +343,7 @@ template OnRamp
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "onramp: tokenadminregistry instance address mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner deps.tokenAdminRegistry
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner deps.tokenAdminRegistry
 
                 feeQuoter <- fetch feeQuoterCid
                 RawInstanceAddress.assertEqual "onramp: feequoter instance address mismatch"
@@ -374,7 +374,7 @@ template OnRamp
                 extraArgs <- case message.extraArgs of
                         CCIP.Client.V3 v3 -> pure v3
                 let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
-                CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
                 assertMsg "onramp: gas limit exceeds uint32" (extraArgs.gasLimit <= 4294967295)
                 assertValidHex "tokenReceiver" extraArgs.tokenReceiver
                 assertMsg "onramp: tokenReceiver not allowed" (destConfig.tokenReceiverAllowed || extraArgs.tokenReceiver == "")
@@ -409,7 +409,7 @@ template OnRamp
                             message
                             extraArgs
                             senderRequestedCCVs
-                CCIP.Internal.assertMaxCCVListLength "onramp: required CCVs" resolvedSenderRequiredCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "onramp: required CCVs" resolvedSenderRequiredCCVs
 
                 let newSequenceNumber = currentSequenceNumber + 1.0
                 assertMsg "onramp: sequence number exceeds uint64"
@@ -513,8 +513,8 @@ template OnRamp
                 extraArgs <- case message.extraArgs of
                     CCIP.Client.V3 v3 -> pure v3
                 let senderRequestedCCVs = map (.ccvAddress) extraArgs.ccvs
-                CCIP.Internal.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
-                CCIP.Internal.assertMaxCCVListLength "onramp: CCV fee quotes" ccvFeeQuotes
+                CCIP.CCVCodec.assertMaxCCVListLength "onramp: sender CCVs" senderRequestedCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "onramp: CCV fee quotes" ccvFeeQuotes
                 assertMsg "onramp: CCVs cannot contain duplicates"
                     (unique senderRequestedCCVs)
                 let executorArgs = case extraArgs.executor of
@@ -765,7 +765,7 @@ template OnRamp
 
                 tokenAdminRegistry <- fetch tokenAdminRegistryCid
                 RawInstanceAddress.assertEqual "tar mismatch"
-                    tokenAdminRegistry.instanceId tokenAdminRegistry.owner
+                    tokenAdminRegistry.instanceId tokenAdminRegistry.ccipOwner
                     sendingMsg.deps.tokenAdminRegistry
 
                 -- Authoritative RMN curse check
@@ -877,7 +877,7 @@ data CCIPSendFromRouterResult = CCIPSendFromRouterResult
         ccipMessageSent : ContractId CCIP.Events.CCIPMessageSent
         verifierBlobs : [BytesHex]
         messageSentObservers : [Party]
-        receipts : [CCIP.Tickets.Receipt]
+        receipts : [CCIP.Receipts.Receipt]
     deriving (Eq, Show)
 
 orderedVerifierDataByCCVs
@@ -907,7 +907,7 @@ orderedVerifierData sendingMsg =
 -- | Assemble final receipts from the separated fee fields, verifier data,
 -- token send data, executor fee, and the network fee. Receipt order matches
 -- EVM: CCV receipts, pool receipt, executor receipt, network fee receipt.
-assembleReceipts : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.Tickets.Receipt]
+assembleReceipts : CCIP.SendingMessageV1.SendingMessageV1 -> [CCIP.Receipts.Receipt]
 assembleReceipts sendingMsg =
     let
         finalVerifierData = orderedVerifierData sendingMsg
@@ -920,8 +920,8 @@ assembleReceipts sendingMsg =
             (Some tsd, Some fee) ->
                 let poolAddr = CCIP.MessageCodecV1.encodeInstanceAddress
                         tsd.poolInstanceId tsd.poolOwner
-                in [CCIP.Tickets.Receipt with
-                    issuerType = CCIP.Tickets.IssuerType_Pool
+                in [CCIP.Receipts.Receipt with
+                    issuerType = CCIP.Receipts.IssuerType_Pool
                     issuerAddress = poolAddr
                     versionTag = None
                     destGasLimit = fee.destGasOverhead
@@ -941,8 +941,8 @@ assembleReceipts sendingMsg =
                                 None -> error "missing executor fee"
                         CCIP.SendingMessageV1.ExecutionMode_NoExecutor ->
                             noExecutionAddressBytes
-                in [CCIP.Tickets.Receipt with
-                    issuerType = CCIP.Tickets.IssuerType_Executor
+                in [CCIP.Receipts.Receipt with
+                    issuerType = CCIP.Receipts.IssuerType_Executor
                     issuerAddress = execAddr
                     versionTag = None
                     destGasLimit = sendingMsg.executorDestGasLimit
@@ -950,8 +950,8 @@ assembleReceipts sendingMsg =
                     feeTokenAmount = CCIP.Math.decimalToNumeric0 sendingMsg.executorFeeTokenAmount
                     extraArgs = sendingMsg.executorArgs]
 
-        networkReceipt = CCIP.Tickets.Receipt with
-            issuerType = CCIP.Tickets.IssuerType_Network
+        networkReceipt = CCIP.Receipts.Receipt with
+            issuerType = CCIP.Receipts.IssuerType_Network
             issuerAddress = ""
             versionTag = None
             destGasLimit = 0
@@ -963,14 +963,14 @@ assembleReceipts sendingMsg =
 
 -- | Finds the matching ccvFee by (ccvInstanceId, ccvOwner) and looks up
 -- the corresponding feeTokenAmount from the parallel ccvFeeTokenAmounts list.
-assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> CCIP.SendingMessageV1.VerifierData -> CCIP.Tickets.Receipt
+assembleCCVReceipt : [CCIP.SendingMessageV1.CCVFee] -> [Decimal] -> CCIP.SendingMessageV1.VerifierData -> CCIP.Receipts.Receipt
 assembleCCVReceipt ccvFees ccvFeeTokenAmounts vd =
     let ccvAddr = CCIP.MessageCodecV1.encodeInstanceAddress vd.ccvInstanceId vd.ccvOwner
         (fee, feeTokenAmt) = findFeeWithAmount ccvFees ccvFeeTokenAmounts
             (\q -> q.ccvInstanceId == vd.ccvInstanceId
                 && q.ccvOwner == vd.ccvOwner)
-    in CCIP.Tickets.Receipt with
-        issuerType = CCIP.Tickets.IssuerType_CCV
+    in CCIP.Receipts.Receipt with
+        issuerType = CCIP.Receipts.IssuerType_CCV
         issuerAddress = ccvAddr
         versionTag = Some vd.versionTag
         destGasLimit = fee.destGasLimit

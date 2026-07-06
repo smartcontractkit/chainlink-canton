@@ -122,7 +122,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv1 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults1
             caller = owner
     debug ("===== Passed Test1 =====")
@@ -151,7 +151,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv2 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults2
             caller = owner
     debug ("===== Passed Test2 =====")
@@ -200,7 +200,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv4 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults4
             caller = owner
     debug ("===== Passed Test4 =====")
@@ -227,7 +227,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv5 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults5
             caller = owner
     debug ("===== Passed Test5 =====")
@@ -254,7 +254,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv6 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults6
             caller = owner
     debug ("===== Passed Test6 =====")
@@ -316,7 +316,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults =
                 "01234567" <> -- invalid version tag
                 "0004" <>     -- signature length too long
@@ -326,7 +326,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV2_0_0 <> -- version tag
                 "ffff" <>     -- signature length too long
@@ -336,7 +336,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv9 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults =
                 CommitteeVerifier.versionTagV2_0_0 <> -- version tag
                 "0001" <>     -- signature length too short
@@ -367,7 +367,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2]
             caller = owner
     -- Update signer config to 6, should fail due to threshold > number of signers
@@ -385,7 +385,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
             caller = owner
     -- Remove source chain config, afterward verification should fail
@@ -398,7 +398,7 @@ testCommitteeVerifier = script do
         exerciseCmd ccv10 CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
             caller = owner
     debug ("===== Passed Test10 =====")
@@ -881,7 +881,7 @@ testVerifyMessage_RejectsCrossDomainExecutingMessage = script do
         exerciseCmd ccvCid CommitteeVerifier.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            executingMessageCid = executingMessageCid
+            executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults
             caller = owner
 

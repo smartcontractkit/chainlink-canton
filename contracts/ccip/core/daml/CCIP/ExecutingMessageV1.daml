@@ -8,14 +8,19 @@ import DA.Crypto.Text (BytesHex)
 import DA.List (dedup, unique)
 import DA.Optional (isNone, isSome)
 
-import qualified CCIP.Events
-import qualified CCIP.FinalityConfig
-import qualified CCIP.Internal
-import qualified CCIP.MessageCodecV1
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
 import Chainlink.InstanceAddress (RawInstanceAddress)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+import qualified CCIP.API.ExecutingMessageV1
+
+import qualified CCIP.Events
+import qualified CCIP.FinalityConfig
+import qualified CCIP.CCVCodec
+import qualified CCIP.MessageCodecV1
 import qualified CCIP.Tickets
-import qualified Splice.Api.Token.HoldingV1
 
 -- | Record of a CCV verification appended via AddCCVVerification.
 -- The ccvOwner is authenticated by Daml's controller mechanism.
@@ -92,6 +97,27 @@ template ExecutingMessageV1
                 None -> [])
         observer observingParties
 
+        interface instance CCIP.API.ExecutingMessageV1.ExecutingMessage for ExecutingMessageV1 where
+            view = CCIP.API.ExecutingMessageV1.ExecutingMessageView with
+                ccipOwner = ccipOwner
+
+                message = message
+
+                offRamp = deps.offRamp
+                globalConfig = deps.globalConfig
+                rmnRemote = deps.rmnRemote
+                tokenAdminRegistry = deps.tokenAdminRegistry
+
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+            executingMessage_addCCVVerificationImpl self arg = do
+                coerceContractId <$> exercise (fromInterfaceContractId @ExecutingMessageV1 self) AddCCVVerification
+                    with
+                        ccvInstanceId = arg.ccvInstanceId
+                        versionTag = arg.versionTag
+                        context = arg.context
+                        caller = arg.caller
+
         -- Cleanup choice for failed or abandoned flows. Not used for the success path
         -- (which goes through FinalizeExecute).
         choice CancelExecute : ()
@@ -109,12 +135,13 @@ template ExecutingMessageV1
             with
                 ccvInstanceId : Text
                 versionTag : BytesHex
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
                 assertMsg "executingMessage: AddCCVVerification only allowed in Prepared"
                     (state == ExecutingMessageState_Prepared)
-                CCIP.Internal.assertCCVInstanceId
+                CCIP.CCVCodec.assertCCVInstanceId
                     "executingMessage: caller is not an allowed CCV"
                     requiredCCVs
                     (Some optionalCCVs)
@@ -147,17 +174,17 @@ template ExecutingMessageV1
                 assertMsg "executingMessage: inbound pool verification only valid for token transfers"
                     (isSome tokenReceiver)
                 assertMsg "SetInboundPoolCCVs: already set" (isNone inboundPoolVerification)
-                CCIP.Internal.assertMaxCCVListLength "executingMessage: inbound pool CCVs" poolCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "executingMessage: inbound pool CCVs" poolCCVs
                 assertMsg "SetInboundPoolCCVs: duplicate CCVs not allowed" (unique poolCCVs)
                 let (mergedRequiredCCVs, mergedOptionalCCVs, mergedOptionalCCVThreshold) =
-                        CCIP.Internal.mergeInboundPoolCCVs
+                        CCIP.CCVCodec.mergeInboundPoolCCVs
                             sourceDefaultCCVs
                             requiredCCVs
                             optionalCCVs
                             optionalCCVThreshold
                             poolCCVs
-                CCIP.Internal.assertMaxCCVListLength "executingMessage: resolved required CCVs" mergedRequiredCCVs
-                CCIP.Internal.assertMaxCCVListLength "executingMessage: resolved optional CCVs" mergedOptionalCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "executingMessage: resolved required CCVs" mergedRequiredCCVs
+                CCIP.CCVCodec.assertMaxCCVListLength "executingMessage: resolved optional CCVs" mergedOptionalCCVs
                 create this with
                     requiredCCVs = mergedRequiredCCVs
                     optionalCCVs = mergedOptionalCCVs
@@ -195,11 +222,11 @@ template ExecutingMessageV1
                             None -> abort "executingMessage: missing inbound pool CCVs for token ticket"
                         assertMsg "executingMessage: inbound pool address mismatch"
                             (poolAddress == RawInstanceAddress.make poolVerification.poolInstanceId poolVerification.poolOwner)
-                        CCIP.Internal.assertMaxCCVListLength "executingMessage: inbound pool CCVs" poolVerification.poolCCVs
-                        let resolvedInboundPoolCCVs = dedup (CCIP.Internal.resolveRequiredCCVsWithDefaults
+                        CCIP.CCVCodec.assertMaxCCVListLength "executingMessage: inbound pool CCVs" poolVerification.poolCCVs
+                        let resolvedInboundPoolCCVs = dedup (CCIP.CCVCodec.resolveRequiredCCVsWithDefaults
                                 sourceDefaultCCVs
                                 poolVerification.poolCCVs)
-                        CCIP.Internal.assertMaxCCVListLength "executingMessage: resolved inbound pool CCVs" resolvedInboundPoolCCVs
+                        CCIP.CCVCodec.assertMaxCCVListLength "executingMessage: resolved inbound pool CCVs" resolvedInboundPoolCCVs
                         sourcePoolData <- case message.tokenTransfer of
                             Some tokenTransfer -> pure tokenTransfer.extraData
                             None -> abort "executingMessage: missing token transfer for ticket"
@@ -222,6 +249,7 @@ template ExecutingMessageV1
                             messageId = messageId
                             sourceChainSelector = message.sourceChainSelector
                             finality = message.finality.requested
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                         pure (Some ticketCid)
                     (None, None, None, None, None) ->
                         pure None
@@ -235,7 +263,7 @@ template ExecutingMessageV1
                         sourceChainSelector = message.sourceChainSelector
                         sequenceNumber = message.sequenceNumber
                         messageId = messageId
-                        state = CCIP.Internal.SUCCESS
+                        state = CCIP.API.ExecutingMessageV1.SUCCESS
                         returnData = returnData
                 pure FinalizeExecuteResult with
                     tokenReceiveTicket = tokenReceiveTicket

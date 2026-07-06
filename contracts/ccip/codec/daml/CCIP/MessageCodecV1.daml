@@ -27,9 +27,10 @@ import DA.Crypto.Text
 import qualified DA.Text as Text
 import DA.Optional (fromSome)
 
+import qualified Splice.Api.Token.HoldingV1
+
 import qualified CCIP.FinalityConfig
 import qualified CCIP.NumericHex as NumericHex
-import qualified Splice.Api.Token.HoldingV1
 
 -- | MessageV1 struct matching EVM MessageV1Codec.sol exactly.
 -- The encoding order is critical for cross-chain messageId compatibility:

@@ -43,6 +43,7 @@ template DummyCommitteeVerifier
                         coerceContractId <$> exercise (coerceContractId arg.executingMessageCid : ContractId CCIP.ExecutingMessageV1.ExecutingMessageV1) CCIP.ExecutingMessageV1.AddCCVVerification with
                             ccvInstanceId = instanceId
                             versionTag = versionTag
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                             caller = owner
 
             crossChainVerifier_calculateFeeImpl _self arg = do
