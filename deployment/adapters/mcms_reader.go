@@ -40,6 +40,12 @@ func (r *CantonMCMSReader) GetChainMetadata(
 		ctx = e.GetContext()
 	}
 
+	pauseBeforeCantonLedgerReadIfConfigured(
+		ctx,
+		e.Logger,
+		"Canton MCMS proposal assembly reads ledger state on SmartContract VPN",
+	)
+
 	inspector := cantonsdk.NewInspector(
 		participant.LedgerServices.State,
 		opcontract.LedgerQueryParties(participant),

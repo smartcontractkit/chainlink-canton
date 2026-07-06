@@ -34,6 +34,29 @@ func requireCCVOwnerMCMSRef(e cldf.Environment, sel uint64) error {
 	return nil
 }
 
+// requireCommitteeVerifierLaneMCMSRefs allows Run 2 on prod (mcms-ccv@ccvOwner) or staging
+// single-MCMS (mcms-ccip@ccipOwner only, CV contracts also under ccipOwner).
+func requireCommitteeVerifierLaneMCMSRefs(e cldf.Environment, sel uint64) error {
+	if err := requireCCVOwnerMCMSRef(e, sel); err == nil {
+		return nil
+	}
+
+	return requireCCIPOwnerMCMSRef(e, sel)
+}
+
+// committeeVerifierLaneMCMSQualifier picks the MCMS root for CV lane proposals.
+// Uses ccvOwner when mcms-ccv is deployed; otherwise falls back to CLLCCIP (mcms-ccip).
+func committeeVerifierLaneMCMSQualifier(e cldf.Environment, sel uint64) (string, error) {
+	if err := requireCCVOwnerMCMSRef(e, sel); err == nil {
+		return cantonmcms.QualifierCCVOwner, nil
+	}
+	if err := requireCCIPOwnerMCMSRef(e, sel); err != nil {
+		return "", fmt.Errorf("committee verifier lane configure requires mcms-ccv or mcms-ccip on Canton: %w", err)
+	}
+
+	return cantonmcms.QualifierCCIPOwner, nil
+}
+
 // requireTripleMCMSRefs ensures mcms-ccip, mcms-rmn, and mcms-ccv are in the datastore.
 func requireTripleMCMSRefs(e cldf.Environment, sel uint64) error {
 	if err := requireCCIPOwnerMCMSRef(e, sel); err != nil {

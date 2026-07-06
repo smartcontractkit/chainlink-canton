@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"os"
 	"reflect"
 	"strconv"
 
@@ -64,7 +65,7 @@ func DefaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 
 func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[ccipadapters.ConfigureChainForLanesInput, ccipseq.OnChainOutput, cldfchain.BlockChains] {
 	return cldfops.NewSequence(
-		"canton/configure-chain-for-lanes",
+		cantonConfigureChainForLanesSequenceID(),
 		semver.MustParse("2.0.0"),
 		"Configures CCIP lanes for a Canton chain",
 		func(b cldfops.Bundle, chains cldfchain.BlockChains, input ccipadapters.ConfigureChainForLanesInput) (ccipseq.OnChainOutput, error) {
@@ -83,7 +84,7 @@ func (a *CantonChainFamilyAdapter) ConfigureChainForLanes() *cldfops.Sequence[cc
 // Used by ConfigureCantonCommitteeVerifierForLanesFromTopology (Run 2).
 func (a *CantonChainFamilyAdapter) ConfigureCommitteeVerifierForLanes() *cldfops.Sequence[ccipadapters.ConfigureChainForLanesInput, ccipseq.OnChainOutput, cldfchain.BlockChains] {
 	return cldfops.NewSequence(
-		"canton/configure-committee-verifier-for-lanes",
+		cantonConfigureCommitteeVerifierForLanesSequenceID(),
 		semver.MustParse("2.0.0"),
 		"Configures CommitteeVerifier lane settings for a Canton chain",
 		func(b cldfops.Bundle, chains cldfchain.BlockChains, input ccipadapters.ConfigureChainForLanesInput) (ccipseq.OnChainOutput, error) {
@@ -107,6 +108,8 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 	chains cldfchain.BlockChains,
 	input ccipadapters.ConfigureChainForLanesInput,
 ) (ccipseq.OnChainOutput, error) {
+	pauseBeforeCantonLaneConfigureIfConfigured(b)
+
 	ds, err := dataStoreFromConfigureChainForLanesInput(input)
 	if err != nil {
 		return ccipseq.OnChainOutput{}, err
@@ -296,6 +299,8 @@ func (a *CantonChainFamilyAdapter) configureCommitteeVerifierForLanes(
 	chains cldfchain.BlockChains,
 	input ccipadapters.ConfigureChainForLanesInput,
 ) (ccipseq.OnChainOutput, error) {
+	pauseBeforeCantonLaneConfigureIfConfigured(b)
+
 	chain, ok := chains.CantonChains()[input.ChainSelector]
 	if !ok {
 		return ccipseq.OnChainOutput{}, fmt.Errorf("canton chain %d not found", input.ChainSelector)
@@ -644,6 +649,34 @@ func (a *CantonChainFamilyAdapter) ValidateNOPsTopology(chainSelector string, no
 	}
 
 	return nil
+}
+
+// pauseBeforeCantonLaneConfigureIfConfigured sleeps before Canton lane configure RPCs so
+// operators can switch VPN (chainlink-legacy for JD/Sepolia → SmartContract for Canton).
+// Set CANTON_CONFIGURE_LANES_VPN_PAUSE=30s (any Go duration). When set, sequence IDs use a
+// -vpn-pause suffix so cached canton/configure-chain-for-lanes reports are not replayed.
+func pauseBeforeCantonLaneConfigureIfConfigured(b cldfops.Bundle) {
+	pauseBeforeCantonLedgerReadIfConfigured(
+		b.GetContext(),
+		b.Logger,
+		"Canton lane configure RPCs require SmartContract VPN",
+	)
+}
+
+func cantonConfigureChainForLanesSequenceID() string {
+	if os.Getenv("CANTON_CONFIGURE_LANES_VPN_PAUSE") != "" {
+		return "canton/configure-chain-for-lanes-vpn-pause"
+	}
+
+	return "canton/configure-chain-for-lanes"
+}
+
+func cantonConfigureCommitteeVerifierForLanesSequenceID() string {
+	if os.Getenv("CANTON_CONFIGURE_LANES_VPN_PAUSE") != "" {
+		return "canton/configure-committee-verifier-for-lanes-vpn-pause"
+	}
+
+	return "canton/configure-committee-verifier-for-lanes"
 }
 
 func dataStoreFromConfigureChainForLanesInput(input ccipadapters.ConfigureChainForLanesInput) (datastore.DataStore, error) {
