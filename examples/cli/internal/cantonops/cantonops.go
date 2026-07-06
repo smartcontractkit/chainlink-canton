@@ -11,7 +11,6 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
@@ -22,6 +21,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
