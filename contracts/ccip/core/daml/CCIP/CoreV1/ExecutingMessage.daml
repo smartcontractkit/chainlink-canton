@@ -108,6 +108,11 @@ template ExecutingMessage
 
                 context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
+            executingMessage_cancelExecuteImpl self arg = do
+                exercise (fromInterfaceContractId @ExecutingMessage self) CancelExecute with
+                    context = arg.context
+                    caller = arg.caller
+
             executingMessage_addCCVVerificationImpl self arg = do
                 coerceContractId <$> exercise (fromInterfaceContractId @ExecutingMessage self) AddCCVVerification
                     with
@@ -120,6 +125,7 @@ template ExecutingMessage
         -- (which goes through FinalizeExecute).
         choice CancelExecute : ()
             with
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do

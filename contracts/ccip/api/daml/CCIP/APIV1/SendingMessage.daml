@@ -9,9 +9,17 @@ import qualified Chainlink.InstanceAddress
 interface ISendingMessage where
     viewtype SendingMessageView
 
+    sendingMessage_feeTokenAmountImpl : ContractId ISendingMessage -> SendingMessage_FeeTokenAmount -> Update Decimal
     sendingMessage_addCCVFeeImpl : ContractId ISendingMessage -> SendingMessage_AddCCVFee -> Update (ContractId ISendingMessage)
     sendingMessage_addVerifierDataImpl : ContractId ISendingMessage -> SendingMessage_AddVerifierData -> Update (ContractId ISendingMessage)
     sendingMessage_addExecutorFeeImpl : ContractId ISendingMessage -> SendingMessage_AddExecutorFee -> Update (ContractId ISendingMessage)
+
+    nonconsuming choice SendingMessage_FeeTokenAmount : Decimal
+        with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do sendingMessage_feeTokenAmountImpl this self arg
 
     -- CCVs
 
@@ -48,6 +56,8 @@ interface ISendingMessage where
             caller : Party
         controller caller
         do sendingMessage_addExecutorFeeImpl this self arg
+
+    -- Token Pools interact with the SendingMessage via TokenAdminRegistry only.
 
 
 data SendingMessageView = SendingMessageView

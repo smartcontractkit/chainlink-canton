@@ -25,6 +25,8 @@ interface IRMNRemote where
             -- This way, callers can ensure that they are fetching the correct contract, provided all vetted
             -- Daml packages only contain interface implementations that check the expected address.
             expectedAddress : Chainlink.InstanceAddress.RawInstanceAddress
+            -- | Context reserved for future use.
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             -- | The party fetching the contract.
             caller : Party
         controller caller

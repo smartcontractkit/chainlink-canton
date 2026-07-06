@@ -6,8 +6,9 @@ import DA.Assert ((===))
 import DA.Map qualified as Map
 import DA.Optional (fromSomeNote)
 
-import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.BurnMintV1
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
@@ -164,6 +165,7 @@ testTokenAdminRegistryMCMSEntrypoint_SetTransferFactoryNone = script do
       tokenConfigCid = configCid0
       instrumentId
       transferFactory = Some (toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory factoryCid)
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = ccipOwner
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver tarCid

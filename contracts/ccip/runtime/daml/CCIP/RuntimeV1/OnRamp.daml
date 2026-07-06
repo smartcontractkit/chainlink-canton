@@ -192,6 +192,7 @@ calculateFeeResult ccipOwner maxUSDCentsPerMsg feeQuoterCid destChainSelector de
         nonCalldataGas
         calldataSize
         feeToken = inputs.feeToken
+        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
         caller = ccipOwner
 
     -- Apply the premium multiplier to USD-cent fees for the cap check.
@@ -267,7 +268,6 @@ template OnRamp
                         rmnRemote = fromOptional deps.rmnRemote newDeps.rmnRemote
                         tokenAdminRegistry = fromOptional deps.tokenAdminRegistry newDeps.tokenAdminRegistry
                         feeQuoter = fromOptional deps.feeQuoter newDeps.feeQuoter
-                        ccvRegistry = fromOptional deps.ccvRegistry newDeps.ccvRegistry
                 create this with deps = mergedDeps
 
         -- | Get required CCV raw instance addresses for outbound message.
@@ -329,6 +329,7 @@ template OnRamp
                 feeQuoterCid : ContractId CCIP.CoreV1.FeeQuoter.FeeQuoter
                 rmnRemoteCid : ContractId CCIP.CoreV1.RMNRemote.RMNRemote
                 currentSequenceNumber : Numeric 0
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller ccipOwner
             do
                 -- Fetch dependencies
@@ -346,7 +347,7 @@ template OnRamp
 
                 feeQuoter <- fetch feeQuoterCid
                 RawInstanceAddress.assertEqual "onramp: feequoter instance address mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoter.instanceId feeQuoter.ccipOwner deps.feeQuoter
 
                 -- RMN curse check
                 isCursed <- exercise rmnRemoteCid CCIP.CoreV1.RMNRemote.IsCursedForChain with
@@ -396,7 +397,8 @@ template OnRamp
                     None -> abort ("onramp: no fee config for destination chain " <> show destChainSelector)
 
                 _ <- exercise feeQuoterCid CCIP.CoreV1.FeeQuoter.GetTokenPrice with
-                    instrumentId = message.feeToken
+                    token = message.feeToken
+                    context = context
                     caller = ccipOwner
 
                 let (hasTokenTransfer, tokenInstrumentId, tokenAmountBeforeTokenPoolFees) = case message.tokenTransfer of
@@ -546,7 +548,7 @@ template OnRamp
 
                 feeQuoter <- fetch feeQuoterCid
                 RawInstanceAddress.assertEqual "onramp: feequoter instance address mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoter.instanceId feeQuoter.ccipOwner deps.feeQuoter
 
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.CoreV1.GlobalConfig.GetDestChainConfig with
@@ -634,7 +636,7 @@ template OnRamp
 
                 feeQuoter <- fetch feeQuoterCid
                 RawInstanceAddress.assertEqual "onramp: feequoter instance address mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoter.instanceId feeQuoter.ccipOwner deps.feeQuoter
 
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.CoreV1.GlobalConfig.GetDestChainConfig with
@@ -814,6 +816,7 @@ template OnRamp
                             CCIP.CoreV1.TokenAdminRegistry.GetTokenConfigByCid with
                                 tokenConfigCid = configCid
                                 instrumentId = tsd.instrumentId
+                                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                                 caller = ccipOwner
                         pool <- case config.tokenPool of
                             None -> abort "no pool registered"

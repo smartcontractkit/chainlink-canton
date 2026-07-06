@@ -79,7 +79,6 @@ encodeDeployOnRampParams params =
   <> CCIP.CodecV1.encodeRawInstanceAddress params.rmnRemote
   <> CCIP.CodecV1.encodeRawInstanceAddress params.tokenAdminRegistry
   <> CCIP.CodecV1.encodeRawInstanceAddress params.feeQuoter
-  <> CCIP.CodecV1.encodeRawInstanceAddress params.ccvRegistry
   <> encodeNumeric0 params.maxUSDCentsPerMsg
 
 encodeDeployOffRampParams : CCIP.FactoryV1.DeployOffRampParams -> BytesHex
@@ -264,7 +263,6 @@ testDecodeDeployOnRampParams = script do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv@owner"
         maxUSDCentsPerMsg = 12345.0
       encoded = encodeDeployOnRampParams params
 
@@ -276,7 +274,6 @@ testDecodeDeployOnRampParams = script do
       decoded.rmnRemote === params.rmnRemote
       decoded.tokenAdminRegistry === params.tokenAdminRegistry
       decoded.feeQuoter === params.feeQuoter
-      decoded.ccvRegistry === params.ccvRegistry
       decoded.maxUSDCentsPerMsg === params.maxUSDCentsPerMsg
 
   pure ()

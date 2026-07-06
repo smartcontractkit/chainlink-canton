@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-lock-release-token-pool"
-	PackageID   = "116066e5259919409b8606009893a6ffd6777291fac2e96f86abe70cec535e82"
+	PackageID   = "4afbee36aa18fd5ebfc041a8fdb7c0ce388013a4d91420af4527700ab364c5ad"
 	SDKVersion  = "3.4.11"
 )
 
@@ -429,10 +429,10 @@ func (t *ApplyTokenTransferFeeConfigUpdatesParams) UnmarshalHex(data string) err
 type CalculateFee struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	FeeQuoterCid          types.CONTRACT_ID                          `json:"feeQuoterCid"`
 	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -444,13 +444,13 @@ func (t CalculateFee) ToMap() map[string]any {
 
 	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	m["feeQuoterCid"] = model.NestedToDAMLValue(t.FeeQuoterCid)
 
 	m["tokenInstrumentId"] = model.NestedToDAMLValue(t.TokenInstrumentId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -482,8 +482,8 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type CalculateFeeMCMSParams struct {
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	TokenInstrumentId splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -610,10 +610,11 @@ func (t *ClearPoolReceiveContext) UnmarshalHex(data string) error {
 
 // GetFee is a Record type
 type GetFee struct {
-	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
-	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller            types.PARTY                              `json:"caller"`
+	FeeQuoterCid      types.CONTRACT_ID                          `json:"feeQuoterCid"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GetFee to a map for DAML arguments
@@ -625,6 +626,8 @@ func (t GetFee) ToMap() map[string]any {
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["tokenInstrumentId"] = model.NestedToDAMLValue(t.TokenInstrumentId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -656,8 +659,9 @@ func (t *GetFee) UnmarshalHex(data string) error {
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeMCMSParams struct {
-	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
-	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetFeeMCMSParams to hex string for MCMS operationData.
@@ -750,10 +754,10 @@ type LockOrBurn struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	SenderInputCids       []types.CONTRACT_ID                        `json:"senderInputCids"`
 	Amount                types.NUMERIC                              `json:"amount"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -767,8 +771,6 @@ func (t LockOrBurn) ToMap() map[string]any {
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	m["senderInputCids"] = func() []any {
@@ -780,6 +782,8 @@ func (t LockOrBurn) ToMap() map[string]any {
 	}()
 
 	m["amount"] = t.Amount
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -811,9 +815,9 @@ func (t *LockOrBurn) UnmarshalHex(data string) error {
 // LockOrBurnMCMSParams is LockOrBurn without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type LockOrBurnMCMSParams struct {
-	ExtraContext    splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	SenderInputCids []types.CONTRACT_ID                        `json:"senderInputCids"`
 	Amount          types.NUMERIC                              `json:"amount"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes LockOrBurnMCMSParams to hex string for MCMS operationData.
@@ -1645,8 +1649,8 @@ type ReleaseFromTicket struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -1660,9 +1664,9 @@ func (t ReleaseFromTicket) ToMap() map[string]any {
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["tokenReceiveTicketCid"] = model.NestedToDAMLValue(t.TokenReceiveTicketCid)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1694,7 +1698,7 @@ func (t *ReleaseFromTicket) UnmarshalHex(data string) error {
 // ReleaseFromTicketMCMSParams is ReleaseFromTicket without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type ReleaseFromTicketMCMSParams struct {
-	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes ReleaseFromTicketMCMSParams to hex string for MCMS operationData.
@@ -2383,8 +2387,8 @@ var _ types.VARIANT = (*TransferTimeout)(nil)
 type VerifyInboundMessage struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	ExecutingMessageCid   types.CONTRACT_ID                          `json:"executingMessageCid"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -2396,9 +2400,9 @@ func (t VerifyInboundMessage) ToMap() map[string]any {
 
 	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -2430,7 +2434,7 @@ func (t *VerifyInboundMessage) UnmarshalHex(data string) error {
 // VerifyInboundMessageMCMSParams is VerifyInboundMessage without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type VerifyInboundMessageMCMSParams struct {
-	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes VerifyInboundMessageMCMSParams to hex string for MCMS operationData.
@@ -2449,9 +2453,9 @@ func (t *VerifyInboundMessageMCMSParams) UnmarshalHex(data string) error {
 type VerifyOutboundCCVs struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	Amount                types.NUMERIC                              `json:"amount"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -2463,11 +2467,11 @@ func (t VerifyOutboundCCVs) ToMap() map[string]any {
 
 	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	m["amount"] = t.Amount
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -2499,8 +2503,8 @@ func (t *VerifyOutboundCCVs) UnmarshalHex(data string) error {
 // VerifyOutboundCCVsMCMSParams is VerifyOutboundCCVs without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type VerifyOutboundCCVsMCMSParams struct {
-	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
-	Amount       types.NUMERIC                              `json:"amount"`
+	Amount  types.NUMERIC                              `json:"amount"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes VerifyOutboundCCVsMCMSParams to hex string for MCMS operationData.

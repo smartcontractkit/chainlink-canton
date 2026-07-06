@@ -48,7 +48,7 @@ func TestParseGlobalConfig(t *testing.T) {
 							TokenNetworkFeeUSDCents:   "400",
 						},
 					},
-					SourceChainConfigs: map[types.NUMERIC]core.SourceChainConfig{
+					SourceChainConfigs: map[types.NUMERIC]core.SourceChainConfig2{
 						types.NUMERIC("222"): {
 							IsEnabled: true,
 							OnRampAddresses: []types.TEXT{
@@ -93,7 +93,7 @@ func TestParseGlobalConfig(t *testing.T) {
 			createdEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.FeeQuoter{
 					InstanceId: "feequoter",
-					Owner:      "ccipOwner",
+					CcipOwner:  "ccipOwner",
 				}),
 			},
 			want: nil,

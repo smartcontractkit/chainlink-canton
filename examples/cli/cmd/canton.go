@@ -454,7 +454,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		tokenTransferInput = &receiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolExecuteDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(b.Participant.PartyID),
-			PoolExtraContext:   tokenPoolExecuteDisclosure.ChoiceContext,
+			Context:            tokenPoolExecuteDisclosure.ChoiceContext,
 		}
 		allDisclosures = slices.Concat(
 			tokenPoolExecuteDisclosure.DisclosedContracts,
@@ -470,7 +470,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		CcvInputs: []receiver.CCVInput{{
 			CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 			VerifierResults: types.TEXT(hex.EncodeToString(vr.CCVData)),
-			CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+			Context:         ccvExecuteDisclosure.ChoiceContext,
 		}},
 	}
 
@@ -772,8 +772,8 @@ func cantonSend(
 			return fmt.Errorf("executor send disclosure: %w", err)
 		}
 		executorInput = &sender.ExecutorInput{
-			ExecutorCid:          types.CONTRACT_ID(execDisc.ContractId),
-			ExecutorExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+			ExecutorCid: types.CONTRACT_ID(execDisc.ContractId),
+			Context:     splice_api_token_metadata_v1.ChoiceContext{},
 		}
 		executorDisclosures = execDisc.DisclosedContracts
 		executorExtraArg = clientapi.ExecutorExtraArg{
@@ -825,17 +825,17 @@ func cantonSend(
 			},
 		},
 		CcvSendInputs: []sender.CCVSendInput{{
-			CcvAddress:      ccvSendDisclosure.Address.Binding(),
-			CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-			CcvExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+			CcvAddress: ccvSendDisclosure.Address.Binding(),
+			CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+			Context:    splice_api_token_metadata_v1.ChoiceContext{},
 		}},
 		ExecutorInput: executorInput,
 	}
 	if withToken {
 		sendArgs.TokenTransferInput = &sender.TokenTransferInput{
-			SenderInputCids:  tokenTransferInputCids,
-			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
-			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
+			SenderInputCids: tokenTransferInputCids,
+			TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
+			Context:         tokenPoolSendDisclosure.ChoiceContext,
 		}
 	}
 

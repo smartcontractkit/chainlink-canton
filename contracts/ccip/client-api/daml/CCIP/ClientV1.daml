@@ -45,21 +45,21 @@ interface PerPartyRouter where
 
     nonconsuming choice PerPartyRouter_GetRequiredCCVsForSend : [Chainlink.InstanceAddress.RawInstanceAddress]
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
             destChainSelector : Numeric 0
             message : Canton2AnyMessage
             poolReportedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
         controller (view this).owner
         do perPartyRouter_getRequiredCCVsForSendImpl this self arg
 
     nonconsuming choice PerPartyRouter_GetFee : GetFeeResult
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
             destChainSelector : Numeric 0
             message : Canton2AnyMessage
             ccvFeeQuotes : [CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierFeeQuote]
             tokenPoolFeeQuote : Optional CCIP.InterfacesV1.TokenPool.TokenPoolFeeQuote
             executorFeeQuote : Optional CCIP.InterfacesV1.Executor.ExecutorFeeQuote
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
         controller (view this).owner
         do perPartyRouter_getFeeImpl this self arg
 
@@ -103,18 +103,17 @@ interface PerPartyRouter where
 
     nonconsuming choice PerPartyRouter_GetRequiredCCVsForExecute : [Chainlink.InstanceAddress.RawInstanceAddress]
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
             message : CCIP.CodecV1.MessageCodecV1.MessageV1
             receiverRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             receiverOptionalThreshold : Int
             tokenPoolRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
         controller (view this).owner
         do perPartyRouter_getRequiredCCVsForExecuteImpl this self arg
 
     nonconsuming choice PerPartyRouter_PrepareExecute : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
             encodedMessage : BytesHex
             receiverParty : Party
             tokenReceiverParty : Optional Party
@@ -122,14 +121,15 @@ interface PerPartyRouter where
             receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             receiverOptionalThreshold : Int
             receiverFinalityConfig : CCIP.CodecV1.FinalityConfig.FinalityConfig
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller (view this).owner
         do perPartyRouter_prepareExecuteImpl this self arg
 
     nonconsuming choice PerPartyRouter_Execute : ExecuteResult
         with
-            context : Splice.Api.Token.MetadataV1.ChoiceContext
             executingMessageCid : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
         controller (view this).owner
         do perPartyRouter_executeImpl this self arg
 
@@ -138,6 +138,7 @@ data GetFeeResult = GetFeeResult
         -- Final amount payable in the selected fee token, including CCV fees,
         -- token-pool fee, CCIP network fee, executor flat fee, and execution gas cost.
         feeTokenAmount : Numeric 0
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 interface ICCIPMessageSent where
@@ -147,6 +148,7 @@ data CCIPMessageSentView = CCIPMessageSentView
     with
         ccipOwner : Party
         messageId : BytesHex
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data CCIPSendResult = CCIPSendResult
@@ -156,6 +158,7 @@ data CCIPSendResult = CCIPSendResult
         messageId : BytesHex
         feeChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         pendingFeeInstructions : [ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction]
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 interface IExecutionStateChanged where
@@ -166,6 +169,7 @@ data ExecutionStateChangedView = ExecutionStateChangedView
         ccipOwner : Party
         messageId : BytesHex
         state : CCIP.APIV1.ExecutingMessage.MessageExecutionState
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data ExecuteResult = ExecuteResult
@@ -176,12 +180,15 @@ data ExecuteResult = ExecuteResult
         messageId : BytesHex
         message : CCIP.CodecV1.MessageCodecV1.MessageV1
         state : CCIP.APIV1.ExecutingMessage.MessageExecutionState
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data PerPartyRouterView = PerPartyRouterView
     with
         ccipOwner : Party
         owner : Party
+
+-- Message types
 
 data Canton2AnyMessage = Canton2AnyMessage
     with

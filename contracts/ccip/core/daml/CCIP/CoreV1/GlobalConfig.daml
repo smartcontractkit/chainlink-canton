@@ -47,12 +47,14 @@ template GlobalConfig
 
         interface instance CCIP.APIV1.GlobalConfig.IGlobalConfig for GlobalConfig where
             view = CCIP.APIV1.GlobalConfig.GlobalConfigView with
-                ccipOwner
+                ccipOwner = ccipOwner
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext -- Return an empty context for now; can be extended in the future if needed
 
             globalConfig_publicFetchImpl self arg = do
                 Chainlink.InstanceAddress.assertEqual "GlobalConfig: expectedAddress mismatch" instanceId ccipOwner arg.expectedAddress
                 pure CCIP.APIV1.GlobalConfig.GlobalConfigView with
-                    ccipOwner
+                    ccipOwner = ccipOwner
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext -- Return an empty context for now; can be extended in the future if needed
 
             globalConfig_getDestChainConfigImpl self arg = do
                 config <- exercise (fromInterfaceContractId @GlobalConfig self) GetDestChainConfig with
@@ -71,6 +73,20 @@ template GlobalConfig
                         defaultCCVs = destChainConfig.defaultCCVs
                         messageNetworkFeeUSDCents = destChainConfig.messageNetworkFeeUSDCents
                         tokenNetworkFeeUSDCents = destChainConfig.tokenNetworkFeeUSDCents
+                        context = Splice.Api.Token.MetadataV1.emptyChoiceContext -- Return an empty context for now; can be extended in the future if needed
+                            )
+
+            globalConfig_getSourceChainConfigImpl self arg = do
+                config <- exercise (fromInterfaceContractId @GlobalConfig self) GetSourceChainConfig with
+                    sourceChainSelector = arg.sourceChainSelector
+                    caller = arg.caller
+                case config of
+                    None -> pure None
+                    Some sourceChainConfig -> pure (Some CCIP.APIV1.GlobalConfig.SourceChainConfig with
+                        isEnabled = sourceChainConfig.isEnabled
+                        onRampAddresses = sourceChainConfig.onRampAddresses
+                        defaultCCVs = sourceChainConfig.defaultCCVs
+                        laneMandatedCCVs = sourceChainConfig.laneMandatedCCVs
                         context = Splice.Api.Token.MetadataV1.emptyChoiceContext -- Return an empty context for now; can be extended in the future if needed
                             )
 

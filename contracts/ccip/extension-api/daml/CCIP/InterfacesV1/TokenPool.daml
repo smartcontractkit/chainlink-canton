@@ -37,6 +37,7 @@ interface ITokenPool where
             finality : BytesHex
             extraData : BytesHex
             direction : TransferDirection
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenPool_getRequiredCCVsImpl this self arg
@@ -47,8 +48,8 @@ interface ITokenPool where
         with
             tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
             tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
-            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             executingMessageCid : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenPool_verifyInboundMessageImpl this self arg
@@ -58,9 +59,9 @@ interface ITokenPool where
         with
             tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
             tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
-            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             amount : Decimal
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenPool_verifyOutboundCCVsImpl this self arg
@@ -72,8 +73,8 @@ interface ITokenPool where
             tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
             tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
             rmnRemoteCid : ContractId CCIP.APIV1.RMNRemote.IRMNRemote
-            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             tokenReceiveTicketCid : ContractId CCIP.APIV1.ExecutingMessage.ITokenReceiveTicket
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenPool_releaseFromTicketImpl this self arg
@@ -86,10 +87,10 @@ interface ITokenPool where
             tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
             tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
             rmnRemoteCid : ContractId CCIP.APIV1.RMNRemote.IRMNRemote
-            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
             amount : Decimal
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenPool_lockOrBurnImpl this self arg
@@ -100,10 +101,10 @@ interface ITokenPool where
         with
             tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
             tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
-            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             feeQuoterCid : ContractId CCIP.APIV1.FeeQuoter.IFeeQuoter
             tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenPool_calculateFeeImpl this self arg
@@ -114,6 +115,7 @@ interface ITokenPool where
             feeQuoterCid : ContractId CCIP.APIV1.FeeQuoter.IFeeQuoter
             destChainSelector : Numeric 0
             tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenPool_getFeeImpl this self arg
@@ -124,6 +126,7 @@ data TokenPoolView = TokenPoolView
         owner : Party
         ccipOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data ReleaseOrMintResult = ReleaseOrMintResult
@@ -131,6 +134,7 @@ data ReleaseOrMintResult = ReleaseOrMintResult
         output : ReleaseOrMintResult_Output
         poolChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         claimedEventCid : ContractId ()
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data ReleaseOrMintResult_Output
@@ -145,6 +149,7 @@ data LockOrBurnResult = LockOrBurnResult
         poolChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         senderChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data TokenPoolFeeQuote = TokenPoolFeeQuote
@@ -156,4 +161,5 @@ data TokenPoolFeeQuote = TokenPoolFeeQuote
         destBytesOverhead : Int
         tokenFeeBps : Numeric 0
         isEnabled : Bool
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)

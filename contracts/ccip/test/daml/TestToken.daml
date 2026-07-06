@@ -164,7 +164,7 @@ template TestTransferInstruction
 
 -- Looks up the preapproval CID from extraArgs.context keyed by show(receiver).
 -- Callers pass preapprovals via feeTokenExtraArgs.context (CCIPSend) or via the
--- transfer-factory-extra-args-context-values entry in the pool extraContext (LockOrBurn).
+-- transfer-factory-extra-args-context-values entry in the pool's context (LockOrBurn).
 template TestTransferFactory
   with
     admin : Party

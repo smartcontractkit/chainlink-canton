@@ -203,7 +203,6 @@ testCCIPSendAllFeePayouts = script do
     let onRampInstanceId = "test-onramp-all-fees"
     let rmnInstanceId = "test-rmn-all-fees"
     let tokenAdminRegistryInstanceId = "test-tar-all-fees"
-    let ccvRegistryInstanceId = "test-ccvregistry-all-fees"
     let executorInstanceId = "test-executor-all-fees"
     let sourceChainSelector : Numeric 0 = 1111111114.0
     let destChainSelector : Numeric 0 = 2222222225.0
@@ -215,7 +214,6 @@ testCCIPSendAllFeePayouts = script do
     let globalConfigInstanceAddress = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = Chainlink.InstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = Chainlink.InstanceAddress.make ccvRegistryInstanceId ccipOwner
     let executorInstanceAddress = Chainlink.InstanceAddress.make executorInstanceId executorOwner
     let ccvInstanceAddress = Chainlink.InstanceAddress.make ccvInstanceId ccvOwner
 
@@ -254,7 +252,7 @@ testCCIPSendAllFeePayouts = script do
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter-all-fees"
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             feeTokens = Set.fromList [testFeeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
@@ -289,7 +287,6 @@ testCCIPSendAllFeePayouts = script do
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = Chainlink.InstanceAddress.make "test-feequoter-all-fees" ccipOwner
-                ccvRegistry = ccvRegistryInstanceAddress
 
     executor <- submit executorOwner do
         createCmd CCIP.ExecutorV1.Executor with
@@ -406,7 +403,7 @@ testCCIPSendAllFeePayouts = script do
                 expectedExecutor = executorInstanceAddress
                 sendingMessageCid = sendingMessageCid
                 executorArgs = ""
-                extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 caller = ccipOwner
 
     -- FinalizeFee also calls BuildMessage (no token transfer), leaving SM in FeeFinalized state.
@@ -528,7 +525,6 @@ testCCIPSend = script do
     let rmnInstanceId = "test-rmn"
     let factoryInstanceId = "test-factory"
     let tokenAdminRegistryInstanceId = "test-tar"
-    let ccvRegistryInstanceId = "test-ccvregistry"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
 
@@ -540,7 +536,6 @@ testCCIPSend = script do
     let globalConfigInstanceAddress = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = Chainlink.InstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = Chainlink.InstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     -- Deploy GlobalConfig with network fee fields
     globalConfig <- submit ccipOwner do
@@ -581,7 +576,7 @@ testCCIPSend = script do
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter"
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             feeTokens = Set.fromList [testFeeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
@@ -616,7 +611,6 @@ testCCIPSend = script do
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = Chainlink.InstanceAddress.make "test-feequoter" ccipOwner
-                ccvRegistry = ccvRegistryInstanceAddress
 
     -- Deploy production Executor
     executor <- submit ccipOwner do
@@ -715,7 +709,7 @@ testCCIPSend = script do
                 expectedExecutor = executorInstanceAddress
                 sendingMessageCid = sendingMessageCid
                 executorArgs = ""
-                extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 caller = ccipOwner
 
     sendingMessageCid <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
@@ -787,7 +781,7 @@ testCCIPSend = script do
                 expectedExecutor = executorInstanceAddress
                 sendingMessageCid = sendingMessageCid2
                 executorArgs = ""
-                extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 caller = ccipOwner
 
     sendingMessageCid2 <- submit (actAs user <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
@@ -996,7 +990,6 @@ testPrepareSendExtraArgs = script do
     let rmnInstanceId = "test-rmn"
     let factoryInstanceId = "test-factory"
     let tokenAdminRegistryInstanceId = "test-tar"
-    let ccvRegistryInstanceId = "test-ccvregistry"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
     let destChainSelector2 : Numeric 0 = 3333333333.0
@@ -1009,7 +1002,6 @@ testPrepareSendExtraArgs = script do
     let globalConfigInstanceAddress = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = Chainlink.InstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = Chainlink.InstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.CoreV1.GlobalConfig.GlobalConfig with
@@ -1058,7 +1050,7 @@ testPrepareSendExtraArgs = script do
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId = "test-feequoter"
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             feeTokens = Set.fromList [feeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
@@ -1092,7 +1084,6 @@ testPrepareSendExtraArgs = script do
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = Chainlink.InstanceAddress.make "test-feequoter" ccipOwner
-                ccvRegistry = ccvRegistryInstanceAddress
 
     factory <- submit ccipOwner do
         createCmd CCIP.RuntimeV1.PerPartyRouter.PerPartyRouterFactory with
@@ -1258,7 +1249,6 @@ testPrepareSendRejectsOversizedPayload = script do
     let rmnInstanceId = "test-rmn-payload"
     let factoryInstanceId = "test-factory-payload"
     let tokenAdminRegistryInstanceId = "test-tar-payload"
-    let ccvRegistryInstanceId = "test-ccvregistry-payload"
     let feeQuoterInstanceId = "test-feequoter-payload"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
@@ -1270,7 +1260,6 @@ testPrepareSendRejectsOversizedPayload = script do
     let globalConfigInstanceAddress = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = Chainlink.InstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = Chainlink.InstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.CoreV1.GlobalConfig.GlobalConfig with
@@ -1307,7 +1296,7 @@ testPrepareSendRejectsOversizedPayload = script do
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             feeTokens = Set.fromList [testFeeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
@@ -1341,7 +1330,6 @@ testPrepareSendRejectsOversizedPayload = script do
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = Chainlink.InstanceAddress.make feeQuoterInstanceId ccipOwner
-                ccvRegistry = ccvRegistryInstanceAddress
 
     factory <- submit ccipOwner do
         createCmd CCIP.RuntimeV1.PerPartyRouter.PerPartyRouterFactory with
@@ -1702,7 +1690,6 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
     let rmnInstanceId = "test-rmn-dup-ccvs"
     let factoryInstanceId = "test-factory-dup-ccvs"
     let tokenAdminRegistryInstanceId = "test-tar-dup-ccvs"
-    let ccvRegistryInstanceId = "test-ccvregistry-dup-ccvs"
     let feeQuoterInstanceId = "test-feequoter-dup-ccvs"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
@@ -1714,7 +1701,6 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
     let globalConfigInstanceAddress = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
     let tokenAdminRegistryInstanceAddress = Chainlink.InstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
-    let ccvRegistryInstanceAddress = Chainlink.InstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
         createCmd CCIP.CoreV1.GlobalConfig.GlobalConfig with
@@ -1751,7 +1737,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             feeTokens = Set.fromList [testFeeTokenId]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -1773,7 +1759,6 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = Chainlink.InstanceAddress.make feeQuoterInstanceId ccipOwner
-                ccvRegistry = ccvRegistryInstanceAddress
 
     factory <- submit ccipOwner do
         createCmd CCIP.RuntimeV1.PerPartyRouter.PerPartyRouterFactory with
@@ -1857,7 +1842,6 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
     let onRampInstanceId = "test-onramp-seq"
     let rmnInstanceId = "test-rmn-seq"
     let tokenAdminRegistryInstanceId = "test-tar-seq"
-    let ccvRegistryInstanceId = "test-ccvregistry-seq"
     let feeQuoterInstanceId = "test-feequoter-seq"
     let sourceChainSelector : Numeric 0 = 1111111111.0
     let destChainSelector : Numeric 0 = 2222222222.0
@@ -1908,7 +1892,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             feeTokens = Set.fromList [testFeeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
                 isEnabled = True
@@ -1942,7 +1926,6 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 rmnRemote = rmnRemoteInstanceAddress
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = feeQuoterInstanceAddress
-                ccvRegistry = Chainlink.InstanceAddress.make ccvRegistryInstanceId ccipOwner
 
     router <- submit ccipOwner do
         createCmd CCIP.RuntimeV1.PerPartyRouter.PerPartyRouter with

@@ -551,7 +551,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			{
 				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 				VerifierResults: types.TEXT(verifierResultsHex),
-				CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+				Context:         ccvExecuteDisclosure.ChoiceContext,
 			},
 		},
 	}

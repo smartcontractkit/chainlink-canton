@@ -317,21 +317,22 @@ template PerPartyRouter
 
             perPartyRouter_getRequiredCCVsForSendImpl self arg = do
                 exercise (fromInterfaceContractId @PerPartyRouter self) GetRequiredCCVsForSend with
-                    context = arg.context
                     destChainSelector = arg.destChainSelector
                     message = arg.message
                     poolReportedCCVs = arg.poolReportedCCVs
+                    context = arg.context
 
             perPartyRouter_getFeeImpl self arg = do
                 result <- exercise (fromInterfaceContractId @PerPartyRouter self) GetFee with
-                    context = arg.context
                     destChainSelector = arg.destChainSelector
                     message = arg.message
                     ccvFeeQuotes = arg.ccvFeeQuotes
                     tokenPoolFeeQuote = arg.tokenPoolFeeQuote
                     executorFeeQuote = arg.executorFeeQuote
+                    context = arg.context
                 pure CCIP.ClientV1.GetFeeResult with
                     feeTokenAmount = result.feeTokenAmount
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             perPartyRouter_prepareSendImpl self arg = do
                 coerceContractId <$> exercise (fromInterfaceContractId @PerPartyRouter self) PrepareSend with
@@ -358,6 +359,7 @@ template PerPartyRouter
                     messageId = result.messageId
                     feeChangeCids = result.feeChangeCids
                     pendingFeeInstructions = result.pendingFeeInstructions
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             perPartyRouter_getExecutionStateImpl self arg = do
                 exercise (fromInterfaceContractId @PerPartyRouter self) GetExecutionState with
@@ -400,6 +402,7 @@ template PerPartyRouter
                     messageId = result.messageId
                     message = result.message
                     state = result.state
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
         nonconsuming choice GetFee : CCIP.RuntimeV1.OnRamp.GetFeeFromRouterResult
             with
@@ -426,7 +429,7 @@ template PerPartyRouter
 
                 feeQuoter <- fetch feeQuoterCid
                 Chainlink.InstanceAddress.assertEqual "router: feequoter mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoter.instanceId feeQuoter.ccipOwner deps.feeQuoter
 
                 exercise onRampCid CCIP.RuntimeV1.OnRamp.GetFeeFromRouter with
                     routerPartyOwner = partyOwner
@@ -499,7 +502,7 @@ template PerPartyRouter
 
                 feeQuoter <- fetch feeQuoterCid
                 Chainlink.InstanceAddress.assertEqual "router: feequoter mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoter.instanceId feeQuoter.ccipOwner deps.feeQuoter
 
                 rmnRemote <- fetch rmnRemoteCid
                 Chainlink.InstanceAddress.assertEqual "router: rmn mismatch"
@@ -519,11 +522,12 @@ template PerPartyRouter
                     feeQuoterCid
                     rmnRemoteCid
                     currentSequenceNumber = currentSeqNum
+                    context = context
 
         nonconsuming choice FinalizeFee : ContractId CCIP.CoreV1.SendingMessage.SendingMessage
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.CoreV1.SendingMessage.SendingMessage
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller partyOwner
             do
                 onRampCid : ContractId CCIP.RuntimeV1.OnRamp.OnRamp <- CCIP.UtilsV1.Context.getFromContextU context CCIP.RuntimeV1.OnRamp.onRampContextKey
@@ -540,7 +544,7 @@ template PerPartyRouter
 
                 feeQuoter <- fetch feeQuoterCid
                 Chainlink.InstanceAddress.assertEqual "router: feequoter mismatch"
-                    feeQuoter.instanceId feeQuoter.owner deps.feeQuoter
+                    feeQuoter.instanceId feeQuoter.ccipOwner deps.feeQuoter
 
                 sendingMsg <- fetch sendingMessageCid
                 Chainlink.InstanceAddress.assertEqual "router instance mismatch"
@@ -571,12 +575,12 @@ template PerPartyRouter
         -- authorization is needed for the sender-side Splice transfer.
         choice CCIPSend : CCIPSendResult
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.CoreV1.SendingMessage.SendingMessage
                 feeTokenHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
                 feeTokenConfigCid : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig
                 feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
                 feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller partyOwner
             do
                 onRampCid : ContractId CCIP.RuntimeV1.OnRamp.OnRamp <- CCIP.UtilsV1.Context.getFromContextU context CCIP.RuntimeV1.OnRamp.onRampContextKey
@@ -610,12 +614,14 @@ template PerPartyRouter
 
                 totalFee <- exercise sendingMessageCid
                     CCIP.CoreV1.SendingMessage.FeeTokenAmount with
+                        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                         caller = partyOwner
 
                 feeTokenConfig <- exercise tokenAdminRegistryCid
                     CCIP.CoreV1.TokenAdminRegistry.GetTokenConfigByCid with
                         tokenConfigCid = feeTokenConfigCid
                         instrumentId = sendingMsg.feeToken
+                        context = context
                         caller = partyOwner
                 CCIP.CoreV1.TokenAdminRegistry.assertConfiguredTransferFactory
                     "router"
@@ -781,7 +787,6 @@ template PerPartyRouter
         -- TODO: consider relaxing to allow `controller caller`
         nonconsuming choice PrepareExecute : ContractId CCIP.CoreV1.ExecutingMessage.ExecutingMessage
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 encodedMessage : BytesHex
                 receiverParty : Party
                 tokenReceiverParty : Optional Party
@@ -789,6 +794,7 @@ template PerPartyRouter
                 receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
                 receiverFinalityConfig : CCIP.CodecV1.FinalityConfig.FinalityConfig
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller partyOwner
             do
@@ -841,8 +847,8 @@ template PerPartyRouter
         -- executingMessageCid: The contract ID of the ExecutingMessage that was created in PrepareExecute and is being executed. This is used to read the message data, CCV verifications, and pool verification state for the execute request.
         choice Execute : ExecuteResult
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.CoreV1.ExecutingMessage.ExecutingMessage
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller partyOwner
             do
                 offRampCid : ContractId CCIP.RuntimeV1.OffRamp.OffRamp <- CCIP.UtilsV1.Context.getFromContextU context CCIP.RuntimeV1.OffRamp.offRampContextKey
@@ -935,10 +941,10 @@ template PerPartyRouter
         -- | Get all required CCV raw instance addresses for sending a message.
         nonconsuming choice GetRequiredCCVsForSend : [Chainlink.InstanceAddress.RawInstanceAddress]
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 destChainSelector : Numeric 0
                 message : CCIP.ClientV1.Canton2AnyMessage
                 poolReportedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller partyOwner
             do
                 onRampCid : ContractId CCIP.RuntimeV1.OnRamp.OnRamp <- CCIP.UtilsV1.Context.getFromContextU context CCIP.RuntimeV1.OnRamp.onRampContextKey
@@ -961,12 +967,12 @@ template PerPartyRouter
         -- | Get all required CCV raw instance addresses for executing a message.
         nonconsuming choice GetRequiredCCVsForExecute : [Chainlink.InstanceAddress.RawInstanceAddress]
             with
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 message : CCIP.CodecV1.MessageCodecV1.MessageV1
                 receiverRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
                 receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
                 receiverOptionalThreshold : Int
                 tokenPoolRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller partyOwner
             do
                 offRampCid : ContractId CCIP.RuntimeV1.OffRamp.OffRamp <- CCIP.UtilsV1.Context.getFromContextU context CCIP.RuntimeV1.OffRamp.offRampContextKey

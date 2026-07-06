@@ -60,6 +60,7 @@ mkFeeQuotes prefix owner count =
         feeUSDCents = 0.0
         gasForVerification = 0
         payloadSizeBytes = 0
+        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
     | i <- [0..(count - 1)]
     ]
 
@@ -173,7 +174,7 @@ setupOutboundFixture suffix = do
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList
                 [ (destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
@@ -214,7 +215,6 @@ setupOutboundFixture suffix = do
                 rmnRemote = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
                 feeQuoter = Chainlink.InstanceAddress.make feeQuoterInstanceId ccipOwner
-                ccvRegistry = Chainlink.InstanceAddress.make ("ccvregistry-bounds-" <> suffix) ccipOwner
 
     router <- submit ccipOwner do
         createCmd CCIP.RuntimeV1.PerPartyRouter.PerPartyRouter with

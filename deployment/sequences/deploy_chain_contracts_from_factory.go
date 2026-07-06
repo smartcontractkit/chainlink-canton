@@ -17,7 +17,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -138,7 +137,7 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		}
 		feeQuoterTemplate := core.FeeQuoter{
 			InstanceId:                       types.TEXT(feeQuoterInstanceID),
-			Owner:                            ccipOwnerParty,
+			CcipOwner:                        ccipOwnerParty,
 			FeeTokens:                        types.SET{},
 			DestChainConfigs:                 nil,
 			TokenTransferFeeConfigs:          nil,
@@ -155,13 +154,6 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		feeQuoterRawInstanceAddress := feeQuoterInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), feeQuoterRawInstanceAddress, fee_quoter.ContractType, fee_quoter.Version, ""))
 
-		var firstCommitteeVerifierBinding chainlinkapi.RawInstanceAddress
-		if len(input.CommitteeVerifiers) == 0 {
-			if input.CcvRegistryBinding.Unpack == "" {
-				return sequences.OnChainOutput{}, fmt.Errorf("CcvRegistryBinding is required when CommitteeVerifiers is empty")
-			}
-			firstCommitteeVerifierBinding = input.CcvRegistryBinding
-		}
 		var ccvOwnerParty types.PARTY
 		if len(input.CommitteeVerifiers) > 0 {
 			ccvOwnerParty, err = requireCCVOwnerParty(input)
@@ -198,9 +190,6 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 			}
 			proposalOutputs = appendExerciseOutput(proposalOutputs, deployCommitteeVerifierReport.Output, input.ProposalDriven)
 			committeeVerifierRawInstanceAddress := committeeVerifierInstanceID.RawInstanceAddress(committeeVerifierOwner)
-			if i == 0 {
-				firstCommitteeVerifierBinding = committeeVerifierRawInstanceAddress.Binding()
-			}
 			addresses = append(addresses, newAddressRef(deps.ChainSelector(), committeeVerifierRawInstanceAddress, committee_verifier.ContractType, committee_verifier.Version, qualifier))
 		}
 
@@ -238,7 +227,6 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 				RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
 				TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
 				FeeQuoter:          feeQuoterRawInstanceAddress.Binding(),
-				CcvRegistry:        firstCommitteeVerifierBinding,
 			},
 		}
 		deployOnRampReport, err := operations.ExecuteOperation(b, factoryops.DeployOnRamp, deps, newChoiceInput(factoryRawInstanceAddress, factorybindings.DeployOnRamp{Contract: onRampTemplate}, input.ProposalDriven))

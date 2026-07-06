@@ -82,6 +82,7 @@ finalizeUsingQuote owner feeQuoter sendingMessageCid = do
                         None -> 0)
                     + sm.executorDestBytesOverhead
             feeToken = sm.feeToken
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = owner
     submit owner do
         exerciseCmd sendingMessageCid CCIP.CoreV1.SendingMessage.FinalizeFee with
@@ -155,7 +156,7 @@ setup = script do
     -- Create FeeQuoter
     fq <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter"
             feeTokens = Set.empty
             destChainConfigs = Map.empty
@@ -185,7 +186,8 @@ setup = script do
     -- retrieve prices and assert
     result <- submit owner do
         exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetTokenPrice with
-            instrumentId = instrumentIdLINK
+            token = instrumentIdLINK
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = owner
     debug result
     result.price === 17.77
@@ -193,12 +195,15 @@ setup = script do
     result <- submit owner do
         exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetDestinationChainGasPrice with
             destChainSelector = destChainSelector1
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = owner
     debug result
     result.price === 0.045
 
     resultFeeTokens <- submit owner do
-        exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetFeeTokens with caller = owner
+        exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetFeeTokens with
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = owner
     Set.fromList resultFeeTokens === Set.fromList [instrumentIdLINK]
 
     -- Apply prices again, this time for two chains and two instruments
@@ -226,14 +231,16 @@ setup = script do
     -- retrieve prices for both and assert
     result <- submit owner do
         exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetTokenPrice with
-            instrumentId = instrumentIdLINK
+            token = instrumentIdLINK
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = owner
     debug result
     result.price === 20.0
     
     result <- submit owner do 
         exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetTokenPrice with
-            instrumentId = instrumentIdUSDC
+            token = instrumentIdUSDC
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = owner
     debug result
     result.price === 1.0
@@ -241,6 +248,7 @@ setup = script do
     result <- submit owner do
         exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetDestinationChainGasPrice with
             destChainSelector = destChainSelector1
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = owner
     debug result
     result.price === 0.05
@@ -248,12 +256,15 @@ setup = script do
     result <- submit owner do
         exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetDestinationChainGasPrice with
             destChainSelector = destChainSelector2
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = owner
     debug result
     result.price === 0.075
 
     resultFeeTokens <- submit owner do
-        exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetFeeTokens with caller = owner
+        exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetFeeTokens with
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = owner
     Set.fromList resultFeeTokens === Set.fromList [instrumentIdLINK, instrumentIdUSDC]
 
     -- test ApplyFeeQuoterDestChainConfigUpdates
@@ -343,7 +354,8 @@ setup = script do
 
     result <- submit owner do
         exerciseCmd fq CCIP.CoreV1.FeeQuoter.GetTokenPrice with
-            instrumentId = instrumentIdLINK
+            token = instrumentIdLINK
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = owner
     result.price === 30.0
 
@@ -424,7 +436,7 @@ testFeeQuoter_ApplyPriceUpdatersUpdate = script do
 
     fq <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter"
             feeTokens = Set.empty
             destChainConfigs = Map.empty
@@ -533,7 +545,7 @@ testFinalizeFeeUsesEVMScaledPrices = script do
 
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-finalize"
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
@@ -708,7 +720,7 @@ testFinalizeFee_PremiumAndExecutor = script do
     -- feeTokenPrice = 20.0 (20 USD per LINK)
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-premium"
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig with linkFeeMultiplierPercent = 90.0)]
@@ -831,7 +843,7 @@ testFinalizeFee_SmallFee = script do
     -- feeTokenPrice = $20, non-LINK uses the implicit 100% multiplier.
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-small"
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
@@ -936,7 +948,7 @@ testFinalizeFee_LinkCapAfterConversion = script do
     -- network fee = $1.50 -> 1.5 fee tokens -> 0.1 LINK
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-link-cap"
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
@@ -1025,7 +1037,7 @@ testFinalizeFee_LinkCapDirect = script do
     -- $1.50 fee at $15/LINK -> 0.1 LINK
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-link-direct-cap"
             feeTokens = Set.fromList [linkToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
@@ -1113,7 +1125,7 @@ testFinalizeFee_LinkCapMixedFees = script do
 
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-link-mixed-cap"
             feeTokens = Set.fromList [linkToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
@@ -1247,7 +1259,7 @@ testCalculateFeeResult_CCVRoundingMatchesFinalizeFee = script do
 
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-ccv-rounding-quote"
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
@@ -1271,7 +1283,6 @@ testCalculateFeeResult_CCVRoundingMatchesFinalizeFee = script do
                 rmnRemote = Chainlink.InstanceAddress.make "rmn-ccv-rounding-quote" owner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-ccv-rounding-quote" owner
                 feeQuoter = Chainlink.InstanceAddress.make "test-feequoter-ccv-rounding-quote" owner
-                ccvRegistry = Chainlink.InstanceAddress.make "ccvregistry-ccv-rounding-quote" owner
 
     feeQuote <- submit owner do
         exerciseCmd onRamp CCIP.RuntimeV1.OnRamp.GetFeeFromRouter with
@@ -1298,12 +1309,14 @@ testCalculateFeeResult_CCVRoundingMatchesFinalizeFee = script do
                     feeUSDCents = 1.0
                     gasForVerification = 0
                     payloadSizeBytes = 0
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 , CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierFeeQuote with
                     ccvInstanceId = "ccv-rounding-quote-2"
                     ccvOwner = owner
                     feeUSDCents = 1.0
                     gasForVerification = 0
                     payloadSizeBytes = 0
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 ]
             tokenPoolFeeQuote = None
             executorFeeQuote = None
@@ -1327,7 +1340,7 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_MixedFees = script do
 
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-receipt-mixed"
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
@@ -1468,7 +1481,7 @@ testFinalizeFee_ReceiptSumsMatchQuoteInputs_CCVAndExecutor = script do
 
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-receipt-msg"
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList [(456.0, testDestChainConfig)]
@@ -1594,7 +1607,7 @@ testFinalizeFee_PayloadBytesCountedOnce = script do
 
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-payload-once"
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList
@@ -1694,6 +1707,7 @@ testFinalizeFee_PayloadBytesCountedOnce = script do
             nonCalldataGas = sm.executorDestGasLimit
             calldataSize = sm.executorDestBytesOverhead
             feeToken = feeToken
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = owner
     quote.totalGas === expectedGas
     quote.gasCostUSDCents === expectedExecutionCost

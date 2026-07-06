@@ -169,6 +169,7 @@ setupTokenAdminRegistryWithPool ccipOwner poolOwner tokenAdminRegistryInstanceId
             tokenConfigCid = None
             instrumentId = instrumentId
             newAdmin = poolOwner
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccipOwner
     let tokenAdminRegistry = proposeResult.tokenAdminRegistryCid
         tokenConfigCid0 = proposeResult.tokenConfigCid
@@ -178,6 +179,7 @@ setupTokenAdminRegistryWithPool ccipOwner poolOwner tokenAdminRegistryInstanceId
         exerciseCmd tokenAdminRegistry CCIP.CoreV1.TokenAdminRegistry.AcceptAdminRole with
             tokenConfigCid = tokenConfigCid0
             instrumentId = instrumentId
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
@@ -188,6 +190,7 @@ setupTokenAdminRegistryWithPool ccipOwner poolOwner tokenAdminRegistryInstanceId
             tokenPool = Some CCIP.CoreV1.TokenAdminRegistry.PoolRegistration with
                 poolOwner = poolOwner
                 poolInstanceId = tokenPoolInstanceId
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = poolOwner
 
     pure (tokenAdminRegistry, tokenConfigCid2)
@@ -260,6 +263,7 @@ testLockOrBurn = script do
             tokenConfigCid
             instrumentId = testInstrumentId
             transferFactory = Some (toInterfaceContractId transferFactory)
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = poolOwner
 
     badTransferFactory <- submit ccipOwner do
@@ -391,7 +395,7 @@ testLockOrBurn = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 0.0 
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
+            context = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     -- Test that LockOrBurn with a negative amount fails.
@@ -406,7 +410,7 @@ testLockOrBurn = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = -5.0
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
+            context = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     -- Configured TokenConfig pins the real transfer factory and rejects a mismatched context factory.
@@ -421,7 +425,7 @@ testLockOrBurn = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5.0
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId badTransferFactory) [] [(poolOwner, poolPreapproval)]
+            context = mkPoolContext outboundRateLimiter (toInterfaceContractId badTransferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     -- LockOrBurn stores token data via AddTokenSend
@@ -436,7 +440,7 @@ testLockOrBurn = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5.0
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
+            context = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     -- Verify pool received tokens (5 tokens)
@@ -639,7 +643,7 @@ testLockOrBurnValidatesExistingPoolHoldingsAndPreservesThem = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5.0
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId existingPoolHolding] [(poolOwner, poolPreapproval)]
+            context = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId existingPoolHolding] [(poolOwner, poolPreapproval)]
             caller = sender
 
     assertMsg "Pool should see one new holding plus one existing holding" (length result.poolChangeCids == 2)
@@ -828,7 +832,7 @@ testLockOrBurnDeductsFeeBps = script do
             senderInputCids = [toInterfaceContractId senderHolding]
             amount = 5.0
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
+            context = mkPoolContext outboundRateLimiter (toInterfaceContractId transferFactory) [] [(poolOwner, poolPreapproval)]
             caller = sender
 
     Some sm <- queryContractId ccipOwner (coerceContractId result.sendingMessageCid : ContractId CCIP.CoreV1.SendingMessage.SendingMessage)
@@ -967,7 +971,7 @@ testReleaseFromTicket = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     -- Verify result is completed
@@ -1161,7 +1165,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongOwnerFactory) [toInterfaceContractId poolHolding] []
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongOwnerFactory) [toInterfaceContractId poolHolding] []
             caller = receiver
 
     submitMustFail (actAs receiver
@@ -1172,7 +1176,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongInstrumentFactory) [toInterfaceContractId poolHolding] []
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongInstrumentFactory) [toInterfaceContractId poolHolding] []
             caller = receiver
 
     submitMustFail (actAs receiver
@@ -1183,7 +1187,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongAmountFactory) [toInterfaceContractId poolHolding] []
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongAmountFactory) [toInterfaceContractId poolHolding] []
             caller = receiver
 
     submitMustFail (actAs receiver
@@ -1194,7 +1198,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badPendingWrongInstrumentFactory) [toInterfaceContractId poolHolding] []
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId badPendingWrongInstrumentFactory) [toInterfaceContractId poolHolding] []
             caller = receiver
 
     submitMustFail (actAs receiver
@@ -1205,7 +1209,7 @@ testReleaseFromTicketRejectsBadTransferFactoryResults = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongInstrumentFactory) [toInterfaceContractId badPoolHolding] []
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId badWrongInstrumentFactory) [toInterfaceContractId badPoolHolding] []
             caller = receiver
 
 -- | Test ReleaseFromTicket remains valid after post-ticket inbound CCV config drift.
@@ -1348,7 +1352,7 @@ testReleaseFromTicketIgnoresPostTicketInboundConfigDrift = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     case result.output of
@@ -1499,7 +1503,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     submitMustFail (actAs receiver
@@ -1511,7 +1515,7 @@ testReleaseFromTicketRejectsWrongCCVInstance = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
 -- | Test ReleaseFromTicket converts source decimals to local decimals.
@@ -1633,7 +1637,7 @@ testReleaseFromTicketDecimalConversion = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     case result.output of
@@ -1778,7 +1782,7 @@ testReleaseFromTicketRawUint256AmountAboveNumeric0Downscales = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     case result.output of
@@ -1913,7 +1917,7 @@ testReleaseFromTicketDecimalConversionOverflowFails = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     receiverHoldings <- query @TestToken.TestHolding receiver
@@ -2049,7 +2053,7 @@ testReleaseFromTicketDecimalConversionTruncatesToZeroFails = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     receiverHoldings <- query @TestToken.TestHolding receiver
@@ -2189,7 +2193,7 @@ testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory = script do
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            context = mkPoolContext inboundRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
             caller = receiver
 
     debug "testReleaseFromTicketRejectsVerifiedCCVOwnerNotSignatory: PASSED"
@@ -2903,7 +2907,7 @@ testVerifyInboundMessage = script do
         exerciseCmd tokenPool CCIP.LockReleaseTokenPoolV1.VerifyInboundMessage with
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             caller = receiver
 
@@ -3021,7 +3025,7 @@ testVerifyInboundMessageAllowsSafeFinalityConfig = script do
         exerciseCmd tokenPool CCIP.LockReleaseTokenPoolV1.VerifyInboundMessage with
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             caller = receiver
 
@@ -3140,7 +3144,7 @@ testVerifyInboundMessageInvalidSourcePool = script do
         exerciseCmd tokenPool CCIP.LockReleaseTokenPoolV1.VerifyInboundMessage with
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             caller = receiver
 
@@ -3252,7 +3256,7 @@ testVerifyInboundMessageMissingChainConfig = script do
         exerciseCmd tokenPool CCIP.LockReleaseTokenPoolV1.VerifyInboundMessage with
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             caller = receiver
 
@@ -3363,7 +3367,7 @@ testVerifyInboundMessage_RejectsMismatchedSourceToken = script do
         exerciseCmd tokenPool CCIP.LockReleaseTokenPoolV1.VerifyInboundMessage with
             tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
             tokenConfigCid = coerceContractId tokenConfigCid
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             caller = receiver
 
@@ -3392,7 +3396,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
 
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             instanceId = feeQuoterInstanceId
             feeTokens = Set.fromList [feeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
@@ -3511,7 +3515,7 @@ testCalculateFeeFallsBackToFeeQuoter = script do
             CCIP.InterfacesV1.TokenPool.TokenPool_CalculateFee with
                 tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
                 tokenConfigCid = coerceContractId tokenConfigCid
-                extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 sendingMessageCid = coerceContractId sendingMessageCid
                 feeQuoterCid = coerceContractId feeQuoter
                 tokenInstrumentId = testInstrumentId
@@ -3542,7 +3546,7 @@ testCalculateFeePrefersPoolOverride = script do
 
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             instanceId = "test-feequoter-pool-override"
             feeTokens = Set.fromList [feeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
@@ -3666,10 +3670,10 @@ testCalculateFeePrefersPoolOverride = script do
             CCIP.InterfacesV1.TokenPool.TokenPool_CalculateFee with
                 tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
                 tokenConfigCid = coerceContractId tokenConfigCid
-                extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 sendingMessageCid = coerceContractId sendingMessageCid
                 feeQuoterCid = coerceContractId feeQuoter
                 tokenInstrumentId = testInstrumentId
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 caller = sender
 
     Some sm <- queryContractId ccipOwner (coerceContractId sendingMessageCid : ContractId CCIP.CoreV1.SendingMessage.SendingMessage)
@@ -3697,7 +3701,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
 
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             instanceId = "test-feequoter-pool-disabled"
             feeTokens = Set.fromList [feeTokenId]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
@@ -3820,7 +3824,7 @@ testCalculateFeeFallsBackWhenPoolFeeDisabled = script do
             CCIP.InterfacesV1.TokenPool.TokenPool_CalculateFee with
                 tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
                 tokenConfigCid = coerceContractId tokenConfigCid
-                extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 sendingMessageCid = coerceContractId sendingMessageCid
                 feeQuoterCid = coerceContractId feeQuoter
                 tokenInstrumentId = testInstrumentId
@@ -3848,7 +3852,7 @@ testFeeQuoterGetTokenTransferFee_Defaults = script do
 
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-defaults"
             feeTokens = Set.fromList [linkToken]
             destChainConfigs = Map.fromList [(destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
@@ -3895,7 +3899,7 @@ testFeeQuoterGetTokenTransferFee_PerDestination = script do
 
     feeQuoter <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
-            owner = owner
+            ccipOwner = owner
             instanceId = "test-feequoter-per-dest"
             feeTokens = Set.fromList [linkToken]
             destChainConfigs = Map.empty

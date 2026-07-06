@@ -72,6 +72,7 @@ setupTokenAdminRegistryWithPool ccipOwner poolOwner tokenAdminRegistryInstanceId
             tokenConfigCid = None
             instrumentId = instrumentId
             newAdmin = poolOwner
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccipOwner
     let tokenAdminRegistry = proposeResult.tokenAdminRegistryCid
         tokenConfigCid0 = proposeResult.tokenConfigCid
@@ -81,6 +82,7 @@ setupTokenAdminRegistryWithPool ccipOwner poolOwner tokenAdminRegistryInstanceId
         exerciseCmd tokenAdminRegistry CCIP.CoreV1.TokenAdminRegistry.AcceptAdminRole with
             tokenConfigCid = tokenConfigCid0
             instrumentId = instrumentId
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = poolOwner
 
     disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
@@ -91,6 +93,7 @@ setupTokenAdminRegistryWithPool ccipOwner poolOwner tokenAdminRegistryInstanceId
             tokenPool = Some CCIP.CoreV1.TokenAdminRegistry.PoolRegistration with
                 poolOwner = poolOwner
                 poolInstanceId = tokenPoolInstanceId
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = poolOwner
 
     pure (tokenAdminRegistry, tokenConfigCid2)

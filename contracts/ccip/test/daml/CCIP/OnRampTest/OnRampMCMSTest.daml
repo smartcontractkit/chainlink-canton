@@ -28,7 +28,6 @@ testOnRampMCMSEntrypoint_SetDeps = script do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn-old@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar-old@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq-old@owner"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv-old@owner"
 
   onRampCid <- submit ccipOwner do
     createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
@@ -45,7 +44,6 @@ testOnRampMCMSEntrypoint_SetDeps = script do
         rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn-new@owner")
         tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar-new@owner")
         feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq-new@owner")
-        ccvRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "ccv-new@owner")
 
       encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams newDeps
 
@@ -62,12 +60,11 @@ testOnRampMCMSEntrypoint_SetDeps = script do
       onRamp.deps.rmnRemote === Chainlink.InstanceAddress.RawInstanceAddress "rmn-new@owner"
       onRamp.deps.tokenAdminRegistry === Chainlink.InstanceAddress.RawInstanceAddress "tar-new@owner"
       onRamp.deps.feeQuoter === Chainlink.InstanceAddress.RawInstanceAddress "fq-new@owner"
-      onRamp.deps.ccvRegistry === Chainlink.InstanceAddress.RawInstanceAddress "ccv-new@owner"
     _ -> abort "Expected exactly one OnRamp contract"
 
   pure ()
 
--- | Test partial update: only update feeQuoter and ccvRegistry
+-- | Test partial update: only update feeQuoter
 testOnRampMCMSEntrypoint_SetDeps_Partial : Script ()
 testOnRampMCMSEntrypoint_SetDeps_Partial = script do
   ccipOwner <- allocateParty "ccip_owner"
@@ -78,7 +75,6 @@ testOnRampMCMSEntrypoint_SetDeps_Partial = script do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn-old@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar-old@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq-old@owner"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv-old@owner"
 
   onRampCid <- submit ccipOwner do
     createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
@@ -95,7 +91,6 @@ testOnRampMCMSEntrypoint_SetDeps_Partial = script do
         rmnRemote = None
         tokenAdminRegistry = None
         feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq-new@owner")
-        ccvRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "ccv-new@owner")
 
       encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams partialDeps
 
@@ -112,7 +107,6 @@ testOnRampMCMSEntrypoint_SetDeps_Partial = script do
       onRamp.deps.rmnRemote === Chainlink.InstanceAddress.RawInstanceAddress "rmn-old@owner"
       onRamp.deps.tokenAdminRegistry === Chainlink.InstanceAddress.RawInstanceAddress "tar-old@owner"
       onRamp.deps.feeQuoter === Chainlink.InstanceAddress.RawInstanceAddress "fq-new@owner"
-      onRamp.deps.ccvRegistry === Chainlink.InstanceAddress.RawInstanceAddress "ccv-new@owner"
     _ -> abort "Expected exactly one OnRamp contract"
 
   pure ()
@@ -128,7 +122,6 @@ testOnRampMCMSEntrypoint_SetDeps_Replace = script do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn1@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar1@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq1@owner"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv1@owner"
 
   onRampCid <- submit ccipOwner do
     createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
@@ -145,7 +138,6 @@ testOnRampMCMSEntrypoint_SetDeps_Replace = script do
         rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn2@owner")
         tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar2@owner")
         feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq2@owner")
-        ccvRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "ccv2@owner")
       encoded1 = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams deps2
 
   newContractIds1 <- submit ccipOwner do
@@ -165,7 +157,6 @@ testOnRampMCMSEntrypoint_SetDeps_Replace = script do
             rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn3@owner")
             tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar3@owner")
             feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq3@owner")
-            ccvRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "ccv3@owner")
           encoded2 = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams deps3
 
       newContractIds2 <- submit ccipOwner do
@@ -199,7 +190,6 @@ testOnRampMCMSEntrypoint_UnknownFunction = script do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv@owner"
 
   onRampCid <- submit ccipOwner do
     createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
@@ -229,7 +219,6 @@ testOnRampMCMSEntrypoint_InvalidParams = script do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv@owner"
 
   onRampCid <- submit ccipOwner do
     createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
@@ -259,7 +248,6 @@ testOnRampMCMSEntrypoint_MissingSelfCid = script do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv@owner"
 
   onRampCid <- submit ccipOwner do
     createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
@@ -274,8 +262,7 @@ testOnRampMCMSEntrypoint_MissingSelfCid = script do
         globalConfig = Some deps.globalConfig
         rmnRemote = Some deps.rmnRemote
         tokenAdminRegistry = Some deps.tokenAdminRegistry
-        feeQuoter = Some deps.feeQuoter
-        ccvRegistry = Some deps.ccvRegistry)
+        feeQuoter = Some deps.feeQuoter)
 
   submitMustFail ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with

@@ -298,6 +298,7 @@ template LockReleaseTokenPool
                 owner = poolOwner
                 ccipOwner = ccipOwner
                 instrumentId = instrumentId
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             tokenPool_getRequiredCCVsImpl self arg = do
                 let finality = fromSomeNote "Invalid finality" (CCIP.CodecV1.FinalityConfig.decodeRequestedFinality arg.finality)
@@ -315,8 +316,8 @@ template LockReleaseTokenPool
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         tokenConfigCid = arg.tokenConfigCid
-                        extraContext = arg.extraContext
                         executingMessageCid = arg.executingMessageCid
+                        context = arg.context
                         caller = arg.caller
 
             tokenPool_verifyOutboundCCVsImpl self arg = do
@@ -324,9 +325,9 @@ template LockReleaseTokenPool
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         tokenConfigCid = arg.tokenConfigCid
-                        extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         amount = arg.amount
+                        context = arg.context
                         caller = arg.caller
 
             tokenPool_releaseFromTicketImpl self arg = do
@@ -335,8 +336,8 @@ template LockReleaseTokenPool
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         tokenConfigCid = arg.tokenConfigCid
                         rmnRemoteCid = arg.rmnRemoteCid
-                        extraContext = arg.extraContext
                         tokenReceiveTicketCid = arg.tokenReceiveTicketCid
+                        context = arg.context
                         caller = arg.caller
 
             tokenPool_lockOrBurnImpl self arg = do
@@ -345,10 +346,10 @@ template LockReleaseTokenPool
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         tokenConfigCid = arg.tokenConfigCid
                         rmnRemoteCid = arg.rmnRemoteCid
-                        extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         senderInputCids = arg.senderInputCids
                         amount = arg.amount
+                        context = arg.context
                         caller = arg.caller
 
             tokenPool_calculateFeeImpl self arg = do
@@ -356,10 +357,10 @@ template LockReleaseTokenPool
                     with
                         tokenAdminRegistryCid = arg.tokenAdminRegistryCid
                         tokenConfigCid = arg.tokenConfigCid
-                        extraContext = arg.extraContext
                         sendingMessageCid = arg.sendingMessageCid
                         feeQuoterCid = arg.feeQuoterCid
                         tokenInstrumentId = arg.tokenInstrumentId
+                        context = arg.context
                         caller = arg.caller
 
             tokenPool_getFeeImpl self arg = do
@@ -368,6 +369,7 @@ template LockReleaseTokenPool
                         feeQuoterCid = arg.feeQuoterCid
                         destChainSelector = arg.destChainSelector
                         tokenInstrumentId = arg.tokenInstrumentId
+                        context = arg.context
                         caller = arg.caller
 
         -- Sets the dynamic configuration for the pool.
@@ -618,8 +620,8 @@ template LockReleaseTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
-                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -628,6 +630,7 @@ template LockReleaseTokenPool
                 tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.APIV1.TokenAdminRegistry.TokenAdminRegistry_PublicFetch
                     with
                         expectedAddress = deps.tokenAdminRegistry
+                        context = context
                         caller = caller
                 Chainlink.InstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
@@ -663,6 +666,7 @@ template LockReleaseTokenPool
                         executingMessageCid
                         poolInstanceId = instanceId
                         poolCCVs = remoteChainCfg.inboundCCVs
+                        context = context
                         caller = poolOwner
 
         -- Declare outbound CCV requirements on SendingMessageV1 via TAR.
@@ -671,9 +675,9 @@ template LockReleaseTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
-                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
                 amount : Decimal
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -684,6 +688,7 @@ template LockReleaseTokenPool
                 tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.APIV1.TokenAdminRegistry.TokenAdminRegistry_PublicFetch
                     with
                         expectedAddress = deps.tokenAdminRegistry
+                        context = context
                         caller = caller
                 Chainlink.InstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
@@ -704,6 +709,7 @@ template LockReleaseTokenPool
                         sendingMessageCid = sendingMessageCid
                         poolInstanceId = instanceId
                         poolCCVs = poolCCVs
+                        context = context
                         caller = poolOwner
 
         -- Release tokens by consuming a TokenReceiveTicket via TokenAdminRegistry.
@@ -715,8 +721,8 @@ template LockReleaseTokenPool
                 tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
                 rmnRemoteCid : ContractId CCIP.APIV1.RMNRemote.IRMNRemote
-                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 tokenReceiveTicketCid : ContractId CCIP.APIV1.ExecutingMessage.ITokenReceiveTicket
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -726,6 +732,7 @@ template LockReleaseTokenPool
                 tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.APIV1.TokenAdminRegistry.TokenAdminRegistry_PublicFetch
                     with 
                         expectedAddress = deps.tokenAdminRegistry
+                        context = context
                         caller = caller
                 Chainlink.InstanceAddress.assertEqual "ReleaseFromTicket: tokenAdminRegistry mismatch"
                     tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
@@ -733,6 +740,7 @@ template LockReleaseTokenPool
                     CCIP.APIV1.TokenAdminRegistry.TokenAdminRegistry_FetchTokenConfig with
                         tokenConfigCid
                         instrumentId = instrumentId
+                        context = context
                         caller = poolOwner
                 assertMsg "ReleaseFromTicket: ticket tokenAdminRegistry instance mismatch"
                     (ticket.tokenAdminRegistryInstanceId == tokenAdminRegistryView.instanceId)
@@ -740,6 +748,7 @@ template LockReleaseTokenPool
                     (ticket.ccipOwner == tokenAdminRegistryView.ccipOwner)
                 rmnRemoteView <- exercise rmnRemoteCid CCIP.APIV1.RMNRemote.RMNRemote_PublicFetch with
                     expectedAddress = deps.rmnRemote
+                    context = context
                     caller = caller
                 Chainlink.InstanceAddress.assertEqual "ReleaseFromTicket: rmn mismatch"
                     rmnRemoteView.instanceId rmnRemoteView.rmnOwner deps.rmnRemote
@@ -791,7 +800,7 @@ template LockReleaseTokenPool
                 let expectedRateLimiter = if useCustomFinalityRateLimiter
                         then remoteChainCfg.inboundCustomBlockConfirmationsRateLimiter
                         else remoteChainCfg.inboundRateLimiter
-                rateLimiterCid <- CCIP.UtilsV1.Context.getFromContextU extraContext CCIP.RateLimiterV1.rateLimiterContextKey
+                rateLimiterCid <- CCIP.UtilsV1.Context.getFromContextU context CCIP.RateLimiterV1.rateLimiterContextKey
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "ReleaseFromTicket: rateLimiter"
@@ -822,21 +831,23 @@ template LockReleaseTokenPool
                         tokenReceiveTicketCid = tokenReceiveTicketCid
                         instrumentId = instrumentId
                         poolInstanceId = instanceId
+                        context = context
                         caller = poolOwner
 
-                -- Get inputs from extraContext
-                tokenPoolHoldings <- CCIP.UtilsV1.Context.getFromContextU extraContext tokenPoolHoldingsContextKey
+                -- Get inputs from context
+                tokenPoolHoldings <- CCIP.UtilsV1.Context.getFromContextU context tokenPoolHoldingsContextKey
                 _ <- sumCheckedHoldingAmounts
                     "ReleaseFromTicket: tokenPoolHoldings"
                     poolOwner
                     instrumentId
                     tokenPoolHoldings
-                transferFactory <- lookupTransferFactory extraContext
+                transferFactory <- lookupTransferFactory context
                 _ <- exercise tokenConfigCid CCIP.APIV1.TokenAdminRegistry.TokenConfig_AssertConfiguredTransferFactory with
                     suppliedFactory = transferFactory
+                    context = context
                     caller = poolOwner
-                extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
-                extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
+                extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues context
+                extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues context
 
                 -- Transfer tokens from pool to receiver via TransferFactory.
                 -- If receiver has preapproval, completes immediately. Otherwise creates pending
@@ -902,6 +913,7 @@ template LockReleaseTokenPool
                             output
                             poolChangeCids = transferResult.senderChangeCids
                             claimedEventCid = coerceContractId claimedEventCid
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid -> do
                         assertTransferInstructionMatches
                             "ReleaseFromTicket"
@@ -937,6 +949,7 @@ template LockReleaseTokenPool
                             output
                             poolChangeCids = transferResult.senderChangeCids
                             claimedEventCid = coerceContractId claimedEventCid
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     _ -> abort "ReleaseFromTicket: unexpected failed transfer"
 
         -- Calculate fee for outbound token transfer (USD cents only).
@@ -946,10 +959,10 @@ template LockReleaseTokenPool
             with
                 tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
-                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
                 feeQuoterCid : ContractId CCIP.APIV1.FeeQuoter.IFeeQuoter
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -958,6 +971,7 @@ template LockReleaseTokenPool
                 tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.APIV1.TokenAdminRegistry.TokenAdminRegistry_PublicFetch
                     with
                         expectedAddress = deps.tokenAdminRegistry
+                        context = context
                         caller
                 Chainlink.InstanceAddress.assertEqual "pool: tokenAdminRegistry mismatch"
                     tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
@@ -969,6 +983,7 @@ template LockReleaseTokenPool
                     (tokenInstrumentId == instrumentId)
                 feeQuoterView <- exercise feeQuoterCid CCIP.APIV1.FeeQuoter.FeeQuoter_PublicFetch with
                     expectedAddress = deps.feeQuoter
+                    context = context
                     caller
                 Chainlink.InstanceAddress.assertEqual "pool: feeQuoter mismatch"
                     feeQuoterView.instanceId feeQuoterView.ccipOwner deps.feeQuoter
@@ -998,6 +1013,7 @@ template LockReleaseTokenPool
                         feeUSDCents = feeUSDCents
                         destGasOverhead = destGasOverhead
                         destBytesOverhead = destBytesOverhead
+                        context = context
                         caller = poolOwner
 
         -- Quote fee for outbound token transfer (USD cents only).
@@ -1007,6 +1023,7 @@ template LockReleaseTokenPool
                 feeQuoterCid : ContractId CCIP.APIV1.FeeQuoter.IFeeQuoter
                 destChainSelector : Numeric 0
                 tokenInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -1015,7 +1032,8 @@ template LockReleaseTokenPool
 
                 feeQuoterView <- exercise feeQuoterCid CCIP.APIV1.FeeQuoter.FeeQuoter_PublicFetch with
                     expectedAddress = deps.feeQuoter
-                    caller
+                    context = context
+                    caller = caller
                 Chainlink.InstanceAddress.assertEqual "pool: feeQuoter mismatch"
                     feeQuoterView.instanceId feeQuoterView.ccipOwner deps.feeQuoter
 
@@ -1029,6 +1047,7 @@ template LockReleaseTokenPool
                             destBytesOverhead = feeConfig.destBytesOverhead
                             tokenFeeBps = feeConfig.feeBps
                             isEnabled = True
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     _ -> do
                         (feeUSDCents, destGasOverhead, destBytesOverhead) <- exercise feeQuoterCid
                             CCIP.APIV1.FeeQuoter.FeeQuoter_GetTokenTransferFee with
@@ -1044,6 +1063,7 @@ template LockReleaseTokenPool
                             destBytesOverhead = destBytesOverhead
                             tokenFeeBps = 0.0
                             isEnabled = False
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
         -- Lock tokens for outbound transfer and append token send data.
         -- Reads from SendingMessageV1 instead of taking separate params.
@@ -1053,10 +1073,10 @@ template LockReleaseTokenPool
                 tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry
                 tokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
                 rmnRemoteCid : ContractId CCIP.APIV1.RMNRemote.IRMNRemote
-                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
                 senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
                 amount : Decimal
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -1068,6 +1088,7 @@ template LockReleaseTokenPool
                 tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.APIV1.TokenAdminRegistry.TokenAdminRegistry_PublicFetch
                     with
                         expectedAddress = deps.tokenAdminRegistry
+                        context = context
                         caller = caller
                 Chainlink.InstanceAddress.assertEqual "LockOrBurn: tokenAdminRegistry mismatch"
                     tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
@@ -1075,6 +1096,7 @@ template LockReleaseTokenPool
                     CCIP.APIV1.TokenAdminRegistry.TokenAdminRegistry_FetchTokenConfig with
                         tokenConfigCid
                         instrumentId
+                        context = context
                         caller = poolOwner
                 assertMsg "LockOrBurn: sending message ccipOwner mismatch"
                     (sendingMsgView.ccipOwner == tokenAdminRegistryView.ccipOwner)
@@ -1082,6 +1104,7 @@ template LockReleaseTokenPool
                     (sendingMsgView.tokenAdminRegistry == deps.tokenAdminRegistry)
                 rmnRemoteView <- exercise rmnRemoteCid CCIP.APIV1.RMNRemote.RMNRemote_PublicFetch with
                     expectedAddress = deps.rmnRemote
+                    context = context
                     caller = caller
                 Chainlink.InstanceAddress.assertEqual "LockOrBurn: rmn mismatch"
                     rmnRemoteView.instanceId rmnRemoteView.rmnOwner deps.rmnRemote
@@ -1107,7 +1130,7 @@ template LockReleaseTokenPool
                 let amountAfterFeeBps = amountNumeric0 - calculateFeeFromBps amountNumeric0 tokenFeeBps
 
                 let expectedRateLimiter = remoteChainCfg.outboundRateLimiter
-                rateLimiterCid <- CCIP.UtilsV1.Context.getFromContextU extraContext CCIP.RateLimiterV1.rateLimiterContextKey
+                rateLimiterCid <- CCIP.UtilsV1.Context.getFromContextU context CCIP.RateLimiterV1.rateLimiterContextKey
                 rateLimiter <- fetch rateLimiterCid
                 assertRateLimiter
                     "LockOrBurn: rateLimiter"
@@ -1120,8 +1143,8 @@ template LockReleaseTokenPool
                 _ <- exercise rateLimiterCid CCIP.RateLimiterV1.ConsumeCapacity with
                     requested = amountAfterFeeBps
 
-                -- Get inputs from extraContext
-                tokenPoolHoldings <- CCIP.UtilsV1.Context.getFromContextU extraContext tokenPoolHoldingsContextKey
+                -- Get inputs from context
+                tokenPoolHoldings <- CCIP.UtilsV1.Context.getFromContextU context tokenPoolHoldingsContextKey
                 _ <- sumCheckedHoldingAmounts
                     "LockOrBurn: existing tokenPoolHoldings"
                     poolOwner
@@ -1132,12 +1155,13 @@ template LockReleaseTokenPool
                     caller
                     instrumentId
                     senderInputCids
-                transferFactory <- lookupTransferFactory extraContext
+                transferFactory <- lookupTransferFactory context
                 _ <- exercise tokenConfigCid CCIP.APIV1.TokenAdminRegistry.TokenConfig_AssertConfiguredTransferFactory with
                     suppliedFactory = transferFactory
+                    context = context
                     caller = poolOwner
-                extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues extraContext
-                extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues extraContext
+                extraArgsContextValues <- lookupTransferFactoryExtraArgsContextValues context
+                extraArgsMetaValues <- lookupTransferFactoryExtraArgsMetaValues context
 
                 -- Merge the pool's receive context with the extra args context values
                 let mergedContext = Splice.Api.Token.MetadataV1.ChoiceContext with
@@ -1191,12 +1215,14 @@ template LockReleaseTokenPool
                         amount = amountAfterFeeBpsBytes
                         destTokenAddress = destTokenAddr
                         extraData = extraData
+                        context = context
                         caller = poolOwner
 
                 pure CCIP.InterfacesV1.TokenPool.LockOrBurnResult with
                     poolChangeCids = receiverCids ++ tokenPoolHoldings
                     senderChangeCids = transferResult.senderChangeCids
                     sendingMessageCid = coerceContractId newSendingMessageCid
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
         interface instance MCMSReceiver for LockReleaseTokenPool where
           view = MCMSReceiverView with

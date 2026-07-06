@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-executor"
-	PackageID   = "3320bb8cf3379ecbb6590ddf3510160ad5e04f640af35a65802782d8fa4cf43f"
+	PackageID   = "1475d4dab2588f8e032f6b2efa28eb5d1ab53df0f71f89daccd46bec1c37db8c"
 	SDKVersion  = "3.4.11"
 )
 
@@ -271,7 +271,7 @@ type CalculateFee struct {
 	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller            types.PARTY                                `json:"caller"`
 }
 
@@ -285,7 +285,7 @@ func (t CalculateFee) ToMap() map[string]any {
 
 	m["executorArgs"] = string(t.ExecutorArgs)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -319,7 +319,7 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 type CalculateFeeMCMSParams struct {
 	ExpectedExecutor chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
 	ExecutorArgs     types.TEXT                                 `json:"executorArgs"`
-	ExtraContext     splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context          splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -1022,10 +1022,11 @@ func (t *GetDynamicConfigMCMSParams) UnmarshalHex(data string) error {
 
 // GetFee is a Record type
 type GetFee struct {
-	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
-	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
-	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
-	Caller            types.PARTY                       `json:"caller"`
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	RequiredCCVs      []chainlinkapi.RawInstanceAddress          `json:"requiredCCVs"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GetFee to a map for DAML arguments
@@ -1043,6 +1044,8 @@ func (t GetFee) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1074,9 +1077,10 @@ func (t *GetFee) UnmarshalHex(data string) error {
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeMCMSParams struct {
-	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
-	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
-	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	RequiredCCVs      []chainlinkapi.RawInstanceAddress          `json:"requiredCCVs"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetFeeMCMSParams to hex string for MCMS operationData.

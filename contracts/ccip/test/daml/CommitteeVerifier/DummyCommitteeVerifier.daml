@@ -34,6 +34,7 @@ template DummyCommitteeVerifier
                 owner = owner
                 ccipOwner = ccipOwner
                 storageLocations = ["ipfs://dummy"]
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             crossChainVerifier_verifyMessageImpl self arg = do
                 case arg.verifierResults of
@@ -62,6 +63,7 @@ template DummyCommitteeVerifier
                     feeUSDCents = feeUSDCents
                     gasForVerification = destGasLimit
                     payloadSizeBytes = destBytesOverhead
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @DummyCommitteeVerifier self)

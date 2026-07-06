@@ -474,7 +474,6 @@ testDeployOnRamp_MCMS = script do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv@owner"
         maxUSDCentsPerMsg = 12345.0
       encoded = encodeDeployOnRampParams params
 

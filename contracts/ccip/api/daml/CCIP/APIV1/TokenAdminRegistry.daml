@@ -4,6 +4,7 @@ import DA.Crypto.Text (BytesHex)
 
 import qualified Splice.Api.Token.BurnMintV1
 import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified Chainlink.InstanceAddress
@@ -22,6 +23,13 @@ interface ITokenAdminRegistry where
 
     tokenAdminRegistry_publicFetchImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_PublicFetch -> Update TokenAdminRegistryView
     tokenAdminRegistry_fetchTokenConfigImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_FetchTokenConfig -> Update TokenConfigView
+    tokenAdminRegistry_setPoolImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_SetPool -> Update (ContractId ITokenConfig)
+    tokenAdminRegistry_setTransferFactoryImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_SetTransferFactory -> Update (ContractId ITokenConfig)
+    tokenAdminRegistry_setBurnMintFactoryImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_SetBurnMintFactory -> Update (ContractId ITokenConfig)
+    tokenAdminRegistry_proposeAdministratorImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_ProposeAdministrator -> Update ProposeAdministratorResult
+    tokenAdminRegistry_acceptAdminRoleImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_AcceptAdminRole -> Update (ContractId ITokenConfig)
+    tokenAdminRegistry_transferAdminRoleImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_TransferAdminRole -> Update (ContractId ITokenConfig)
+    tokenAdminRegistry_isAdministratorImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_IsAdministrator -> Update Bool
     tokenAdminRegistry_setInboundPoolCCVsImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_SetInboundPoolCCVs -> Update (ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage)
     tokenAdminRegistry_setOutboundPoolCCVsImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_SetOutboundPoolCCVs -> Update (ContractId CCIP.APIV1.SendingMessage.ISendingMessage)
     tokenAdminRegistry_addTokenSendImpl : ContractId ITokenAdminRegistry -> TokenAdminRegistry_AddTokenSend -> Update (ContractId CCIP.APIV1.SendingMessage.ISendingMessage)
@@ -31,6 +39,7 @@ interface ITokenAdminRegistry where
     nonconsuming choice TokenAdminRegistry_PublicFetch : TokenAdminRegistryView
         with
             expectedAddress : Chainlink.InstanceAddress.RawInstanceAddress
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenAdminRegistry_publicFetchImpl this self arg
@@ -39,9 +48,79 @@ interface ITokenAdminRegistry where
         with
             tokenConfigCid : ContractId ITokenConfig
             instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenAdminRegistry_fetchTokenConfigImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_SetPool : ContractId ITokenConfig
+        with
+            tokenConfigCid : ContractId ITokenConfig
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            tokenPool : Optional PoolRegistration
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_setPoolImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_SetTransferFactory : ContractId ITokenConfig
+        with
+            tokenConfigCid : ContractId ITokenConfig
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            transferFactory : Optional (ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory)
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_setTransferFactoryImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_SetBurnMintFactory : ContractId ITokenConfig
+        with
+            tokenConfigCid : ContractId ITokenConfig
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            burnMintFactory : Optional (ContractId Splice.Api.Token.BurnMintV1.BurnMintFactory)
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_setBurnMintFactoryImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_ProposeAdministrator : ProposeAdministratorResult
+        with
+            tokenConfigCid : Optional (ContractId ITokenConfig)
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            newAdmin : Party
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_proposeAdministratorImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_AcceptAdminRole : ContractId ITokenConfig
+        with
+            tokenConfigCid : ContractId ITokenConfig
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_acceptAdminRoleImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_TransferAdminRole : ContractId ITokenConfig
+        with
+            tokenConfigCid : ContractId ITokenConfig
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            newAdmin : Party
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_transferAdminRoleImpl this self arg
+
+    nonconsuming choice TokenAdminRegistry_IsAdministrator : Bool
+        with
+            instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+            tokenConfigCid : Optional (ContractId ITokenConfig)
+            administrator : Party
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do tokenAdminRegistry_isAdministratorImpl this self arg
 
     nonconsuming choice TokenAdminRegistry_SetInboundPoolCCVs : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
         with
@@ -49,6 +128,7 @@ interface ITokenAdminRegistry where
             executingMessageCid : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
             poolInstanceId : Text
             poolCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenAdminRegistry_setInboundPoolCCVsImpl this self arg
@@ -59,6 +139,7 @@ interface ITokenAdminRegistry where
             sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             poolInstanceId : Text
             poolCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenAdminRegistry_setOutboundPoolCCVsImpl this self arg
@@ -72,6 +153,7 @@ interface ITokenAdminRegistry where
             amount : BytesHex
             destTokenAddress : BytesHex
             extraData : BytesHex
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenAdminRegistry_addTokenSendImpl this self arg
@@ -84,6 +166,7 @@ interface ITokenAdminRegistry where
             feeUSDCents : Numeric 0
             destGasOverhead : Int
             destBytesOverhead : Int
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenAdminRegistry_addTokenSendFeeImpl this self arg
@@ -94,6 +177,7 @@ interface ITokenAdminRegistry where
             tokenReceiveTicketCid : ContractId CCIP.APIV1.ExecutingMessage.ITokenReceiveTicket
             instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
             poolInstanceId : Text
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenAdminRegistry_consumeReceiveTicketImpl this self arg
@@ -114,6 +198,7 @@ interface ITokenConfig where
     nonconsuming choice TokenConfig_PublicFetch : TokenConfigView
         with
             expectedAddress : Chainlink.InstanceAddress.RawInstanceAddress
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenConfig_publicFetchImpl this self arg
@@ -121,6 +206,7 @@ interface ITokenConfig where
     nonconsuming choice TokenConfig_AssertConfiguredTransferFactory : ()
         with
             suppliedFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenConfig_assertConfiguredTransferFactoryImpl this self arg
@@ -128,6 +214,7 @@ interface ITokenConfig where
     nonconsuming choice TokenConfig_AssertConfiguredBurnMintFactory : ()
         with
             suppliedFactory : ContractId Splice.Api.Token.BurnMintV1.BurnMintFactory
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do tokenConfig_assertConfiguredBurnMintFactoryImpl this self arg
@@ -137,4 +224,21 @@ data TokenConfigView = TokenConfigView
         ccipOwner : Party
         instanceId : Text
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        tokenPool : Optional PoolRegistration
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+data PoolRegistration = PoolRegistration
+    with
+        poolOwner : Party
+        poolInstanceId : Text
+    deriving (Eq, Show)
+
+data ProposeAdministratorResult = ProposeAdministratorResult
+    with
+        tokenAdminRegistryCid : ContractId ITokenAdminRegistry
+        tokenConfigCid : ContractId ITokenConfig
+        created : Bool
+        index : Int
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)

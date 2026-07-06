@@ -1320,9 +1320,9 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			Amount: types.NUMERIC(outgoingMessage.TokenTransfer.Amount),
 		}
 		sendArgs.TokenTransferInput = &ccipsender.TokenTransferInput{
-			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(c.nextTransferCID)},
-			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
-			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(c.nextTransferCID)},
+			TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
+			Context:         tokenPoolSendDisclosure.ChoiceContext,
 		}
 		tokenPoolRequiredCCVs = tokenPoolSendDisclosure.RequiredCCVs
 		disclosedContracts = append(disclosedContracts, tokenPoolSendDisclosure.DisclosedContracts...)
@@ -1353,9 +1353,9 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get CCV Send disclosure for CCV %q: %w", v, err)
 		}
 		sendArgs.CcvSendInputs = append(sendArgs.CcvSendInputs, ccipsender.CCVSendInput{
-			CcvAddress:      ccvSendDisclosure.Address.Binding(),
-			CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-			CcvExtraContext: ccvSendDisclosure.ChoiceContext,
+			CcvAddress: ccvSendDisclosure.Address.Binding(),
+			CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+			Context:    ccvSendDisclosure.ChoiceContext,
 		})
 		sendArgs.Message.ExtraArgs.V3.Ccvs = append(sendArgs.Message.ExtraArgs.V3.Ccvs, clientapi.CCVExtraArg{
 			CcvAddress: ccvSendDisclosure.Address.Binding(),
@@ -1379,8 +1379,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Executor Send disclosure for Executor %q: %w", *ccipSendDisclosure.Executor, err)
 		}
 		sendArgs.ExecutorInput = &ccipsender.ExecutorInput{
-			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
-			ExecutorExtraContext: executorSendDisclosure.ChoiceContext,
+			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
+			Context:     executorSendDisclosure.ChoiceContext,
 		}
 		disclosedContracts = append(disclosedContracts, executorSendDisclosure.DisclosedContracts...)
 	}

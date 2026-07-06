@@ -18,7 +18,15 @@ data MessageExecutionState
 interface IExecutingMessage where
     viewtype ExecutingMessageView
 
+    executingMessage_cancelExecuteImpl : ContractId IExecutingMessage -> ExecutingMessage_CancelExecute -> Update ()
     executingMessage_addCCVVerificationImpl : ContractId IExecutingMessage -> ExecutingMessage_AddCCVVerification -> Update (ContractId IExecutingMessage)
+
+    nonconsuming choice ExecutingMessage_CancelExecute : ()
+        with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do executingMessage_cancelExecuteImpl this self arg
 
     nonconsuming choice ExecutingMessage_AddCCVVerification : ContractId IExecutingMessage
         with
@@ -55,4 +63,5 @@ data TokenReceiveTicketView = TokenReceiveTicketView
         ccipOwner : Party
         poolOwner : Party
         ccvOwners : [Party]
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)

@@ -20,9 +20,9 @@ interface ICrossChainVerifier where
     nonconsuming choice CrossChainVerifier_VerifyMessage : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
         with
             rmnRemoteCid : ContractId CCIP.APIV1.RMNRemote.IRMNRemote
-            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             executingMessageCid : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
             verifierResults : BytesHex
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do crossChainVerifier_verifyMessageImpl this self arg
@@ -31,7 +31,7 @@ interface ICrossChainVerifier where
     nonconsuming choice CrossChainVerifier_CalculateFee : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
         with
             sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
-            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do crossChainVerifier_calculateFeeImpl this self arg
@@ -50,9 +50,9 @@ interface ICrossChainVerifier where
     nonconsuming choice CrossChainVerifier_ForwardToVerifier : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
         with
             rmnRemoteCid : ContractId CCIP.APIV1.RMNRemote.IRMNRemote
-            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
             sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             verifierArgs : BytesHex
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do crossChainVerifier_forwardToVerifierImpl this self arg
@@ -63,6 +63,7 @@ data CrossChainVerifierView = CrossChainVerifierView
         owner : Party
         ccipOwner : Party
         storageLocations : [Text]
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data CrossChainVerifierFeeQuote = CrossChainVerifierFeeQuote
@@ -72,4 +73,5 @@ data CrossChainVerifierFeeQuote = CrossChainVerifierFeeQuote
         feeUSDCents : Numeric 0
         gasForVerification : Int
         payloadSizeBytes : Int
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)

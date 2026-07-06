@@ -111,21 +111,22 @@ template CommitteeVerifier
                 owner = owner
                 ccipOwner = ccipOwner
                 storageLocations = storageLocations
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             crossChainVerifier_verifyMessageImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) VerifyMessage
                     with
                         rmnRemoteCid = arg.rmnRemoteCid
-                        extraContext = arg.extraContext
                         executingMessageCid = arg.executingMessageCid
                         verifierResults = arg.verifierResults
+                        context = arg.context
                         caller = arg.caller
 
             crossChainVerifier_calculateFeeImpl self arg = do
                 exercise (fromInterfaceContractId @CommitteeVerifier self) CalculateFee
                     with
                         sendingMessageCid = arg.sendingMessageCid
-                        extraContext = arg.extraContext
+                        context = arg.context
                         caller = arg.caller
 
             crossChainVerifier_getFeeImpl self arg = do
@@ -139,7 +140,7 @@ template CommitteeVerifier
                 exercise (fromInterfaceContractId @CommitteeVerifier self) ForwardToVerifier
                     with
                         rmnRemoteCid = arg.rmnRemoteCid
-                        extraContext = arg.extraContext
+                        context = arg.context
                         sendingMessageCid = arg.sendingMessageCid
                         verifierArgs = arg.verifierArgs
                         caller = arg.caller
@@ -307,7 +308,7 @@ template CommitteeVerifier
         nonconsuming choice VerifyMessage : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
             with
                 rmnRemoteCid : ContractId CCIP.APIV1.RMNRemote.IRMNRemote
-                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 executingMessageCid : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
                 verifierResults : BytesHex
                 caller : Party
@@ -383,7 +384,7 @@ template CommitteeVerifier
         nonconsuming choice CalculateFee : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             with
                 sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
-                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -417,13 +418,14 @@ template CommitteeVerifier
                     feeUSDCents = chainConfig.feeUSDCents
                     gasForVerification = chainConfig.gasForVerification
                     payloadSizeBytes = chainConfig.payloadSizeBytes
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
         -- | Forward message for verification. Exercises AddVerifierData
         -- directly on SendingMessageV1.
         nonconsuming choice ForwardToVerifier : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             with
                 rmnRemoteCid : ContractId CCIP.APIV1.RMNRemote.IRMNRemote
-                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
                 verifierArgs : BytesHex
                 caller : Party

@@ -43,13 +43,14 @@ template Executor
             view = CCIP.InterfacesV1.Executor.ExecutorView with
                 instanceId = instanceId
                 owner = owner
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             executor_calculateFeeImpl self arg = do
                 exercise (fromInterfaceContractId @Executor self) CalculateFee with
                     expectedExecutor = arg.expectedExecutor
                     sendingMessageCid = arg.sendingMessageCid
                     executorArgs = arg.executorArgs
-                    extraContext = arg.extraContext
+                    context = arg.context
                     caller = arg.caller
 
             executor_getFeeImpl self arg = do
@@ -57,6 +58,7 @@ template Executor
                     expectedExecutor = arg.expectedExecutor
                     destChainSelector = arg.destChainSelector
                     requiredCCVs = arg.requiredCCVs
+                    context = arg.context
                     caller = arg.caller
 
         choice ApplyDestChainUpdates : ContractId Executor
@@ -140,7 +142,7 @@ template Executor
                 expectedExecutor : Chainlink.InstanceAddress.RawInstanceAddress
                 sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
                 executorArgs : BytesHex
-                extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -177,6 +179,7 @@ template Executor
                 expectedExecutor : Chainlink.InstanceAddress.RawInstanceAddress
                 destChainSelector : Numeric 0
                 requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -202,6 +205,7 @@ template Executor
                     executorInstanceId = instanceId
                     executorOwner = owner
                     feeUSDCents = remoteCfg.feeUSDCents
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
         interface instance MCMSReceiver for Executor where
             view = MCMSReceiverView with

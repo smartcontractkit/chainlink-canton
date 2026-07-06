@@ -42,7 +42,7 @@ import CCIP.CoreV1.FeeQuoterTypes (
 
 
 rawInstanceAddress : FeeQuoter -> Chainlink.InstanceAddress.RawInstanceAddress
-rawInstanceAddress feeQuoter = Chainlink.InstanceAddress.make feeQuoter.instanceId feeQuoter.owner
+rawInstanceAddress feeQuoter = Chainlink.InstanceAddress.make feeQuoter.instanceId feeQuoter.ccipOwner
 
 gasCostUsdCents : Decimal -> Int -> Numeric 0
 gasCostUsdCents usdPerUnitGas gasUnits =
@@ -51,7 +51,7 @@ gasCostUsdCents usdPerUnitGas gasUnits =
 template FeeQuoter
     with
         instanceId : Text
-        owner : Party
+        ccipOwner : Party
 
         -- | Set of fee tokens that can be used to pay for fees.
         feeTokens : Set.Set Splice.Api.Token.HoldingV1.InstrumentId
@@ -65,25 +65,67 @@ template FeeQuoter
         -- | List of parties that are authorized to update prices, they'll be observers on the contract.
         priceUpdaters : [Party]
     where
-        signatory owner
+        signatory ccipOwner
         observer priceUpdaters
         ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId && unique priceUpdaters
 
         interface instance CCIP.APIV1.FeeQuoter.IFeeQuoter for FeeQuoter where
             view = CCIP.APIV1.FeeQuoter.FeeQuoterView with
-                ccipOwner = owner
-                instanceId
+                ccipOwner = ccipOwner
+                instanceId = instanceId
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             feeQuoter_publicFetchImpl self arg = do
-                Chainlink.InstanceAddress.assertEqual "FeeQuoter: expected address mismatch" instanceId owner arg.expectedAddress
+                Chainlink.InstanceAddress.assertEqual "FeeQuoter: expected address mismatch" instanceId ccipOwner arg.expectedAddress
                 pure CCIP.APIV1.FeeQuoter.FeeQuoterView with
-                    ccipOwner = owner
-                    instanceId
+                    ccipOwner = ccipOwner
+                    instanceId = instanceId
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+            feeQuoter_getTokenPriceImpl self arg = do
+                price <- exercise (fromInterfaceContractId @FeeQuoter self) GetTokenPrice with
+                    token = arg.token
+                    context = arg.context
+                    caller = arg.caller
+                pure CCIP.APIV1.FeeQuoter.TimestampedPrice with
+                    price = price.price
+                    timestamp = price.timestamp
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+            feeQuoter_getDestinationChainGasPriceImpl self arg = do
+                price <- exercise (fromInterfaceContractId @FeeQuoter self) GetDestinationChainGasPrice with
+                    destChainSelector = arg.destChainSelector
+                    context = arg.context
+                    caller = arg.caller
+                pure CCIP.APIV1.FeeQuoter.TimestampedPrice with
+                    price = price.price
+                    timestamp = price.timestamp
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             feeQuoter_getTokenTransferFeeImpl self arg = do
                 exercise (fromInterfaceContractId @FeeQuoter self) GetTokenTransferFee with
                     destChainSelector = arg.destChainSelector
                     token = arg.token
+                    context = arg.context
+                    caller = arg.caller
+
+            feeQuoter_quoteGasForExecImpl self arg = do
+                result <- exercise (fromInterfaceContractId @FeeQuoter self) QuoteGasForExec with
+                    destChainSelector = arg.destChainSelector
+                    nonCalldataGas = arg.nonCalldataGas
+                    calldataSize = arg.calldataSize
+                    feeToken = arg.feeToken
+                    context = arg.context
+                    caller = arg.caller
+                pure CCIP.APIV1.FeeQuoter.QuoteGasForExecResult with
+                    totalGas = result.totalGas
+                    gasCostUSDCents = result.gasCostUSDCents
+                    feeTokenPrice = result.feeTokenPrice
+                    premiumMultiplier = result.premiumMultiplier
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+            feeQuoter_getFeeTokensImpl self arg = do
+                exercise (fromInterfaceContractId @FeeQuoter self) GetFeeTokens with
                     context = arg.context
                     caller = arg.caller
 
@@ -100,16 +142,18 @@ template FeeQuoter
         -- | Get the `tokenPrice` for a given token.
         nonconsuming choice GetTokenPrice : TimestampedPrice
             with
-                instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+                token : Splice.Api.Token.HoldingV1.InstrumentId
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
-                return (fromSomeNote ("No price found for " <> instrumentId.id) (Map.lookup instrumentId usdPerToken))
+                return (fromSomeNote ("No price found for " <> token.id) (Map.lookup token usdPerToken))
 
         -- | Get the gas price for a given destination chain.
         nonconsuming choice GetDestinationChainGasPrice : TimestampedPrice
             with
                 destChainSelector : Numeric 0
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -122,34 +166,34 @@ template FeeQuoter
         -- addedPriceUpdaters: list of parties to add to the list of authorized price updaters
         -- removedPriceUpdaters: list of parties to remove from the list of authorized price updaters
         --
-        -- Only callable by the owner.
+        -- Only callable by the ccipOwner.
         choice ApplyPriceUpdatersUpdate : ContractId FeeQuoter
             with
                 addedPriceUpdaters : [Party]
                 removedPriceUpdaters : [Party]
-            controller owner
+            controller ccipOwner
             do
                 let newPriceUpdaters =
-                        filter (/= owner) (dedup ((priceUpdaters \\ removedPriceUpdaters) ++ addedPriceUpdaters))
+                        filter (/= ccipOwner) (dedup ((priceUpdaters \\ removedPriceUpdaters) ++ addedPriceUpdaters))
                 create this with priceUpdaters = newPriceUpdaters
 
         -- Update the price for given tokens and gas prices for given chains.
         --
         -- Params:
         -- priceUpdates: The price updates to apply.
-        -- caller: Listed price updater, or the contract owner (owner need not appear in priceUpdaters).
+        -- caller: Listed price updater, or the contract ccipOwner (ccipOwner need not appear in priceUpdaters).
         --
-        -- Callable when caller is in priceUpdaters or caller is owner.
+        -- Callable when caller is in priceUpdaters or caller is ccipOwner.
         choice UpdatePrices : ContractId FeeQuoter
             with
                 priceUpdates : PriceUpdates
                 caller : Party
             controller caller
             do
-                -- The caller must be an authorized price updater or the owner.
+                -- The caller must be an authorized price updater or the ccipOwner.
                 assertMsg
-                    ("Caller is not an authorized price updater or owner: " <> show caller)
-                    (caller `elem` priceUpdaters || caller == owner)
+                    ("Caller is not an authorized price updater or ccipOwner: " <> show caller)
+                    (caller `elem` priceUpdaters || caller == ccipOwner)
 
                 -- Validate price bounds
                 Foldable.mapA_ (\tpu ->
@@ -175,17 +219,17 @@ template FeeQuoter
         choice AddPriceUpdaters : ContractId FeeQuoter
             with
                 parties : [Party]
-            controller owner
+            controller ccipOwner
             do
                 create this with
                     priceUpdaters =
-                        filter (/= owner)
+                        filter (/= ccipOwner)
                             (dedup (priceUpdaters ++ parties))
 
         choice RemovePriceUpdaters : ContractId FeeQuoter
             with
                 parties : [Party]
-            controller owner
+            controller ccipOwner
             do
                 create this with
                     priceUpdaters = filter (`notElem` parties) priceUpdaters
@@ -230,6 +274,7 @@ template FeeQuoter
                 nonCalldataGas : Int
                 calldataSize : Int
                 feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -248,11 +293,13 @@ template FeeQuoter
                     (Set.member feeToken feeTokens)
 
                 gasPrice <- exercise self GetDestinationChainGasPrice with
-                    destChainSelector
-                    caller
+                    destChainSelector = destChainSelector
+                    context = context
+                    caller = caller
                 feeTokenPrice <- exercise self GetTokenPrice with
-                    instrumentId = feeToken
-                    caller
+                    token = feeToken
+                    context = context
+                    caller = caller
                 -- LINK gets a discounted multiplier (e.g. 90% → 9e9 in E10); other tokens get
                 -- premiumIdentity (1e10 = 100%).
                 let premiumMultiplier =
@@ -274,6 +321,7 @@ template FeeQuoter
         -- | Get the list of supported fee tokens.
         nonconsuming choice GetFeeTokens : [Splice.Api.Token.HoldingV1.InstrumentId]
             with
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do
@@ -282,7 +330,7 @@ template FeeQuoter
         choice RemoveFeeTokens : ContractId FeeQuoter
             with
                 feeTokensToRemove : [Splice.Api.Token.HoldingV1.InstrumentId]
-            controller owner
+            controller ccipOwner
             do
                 let newFeeTokens = foldl (\acc tk -> Set.delete tk acc) feeTokens feeTokensToRemove
                 let newUsdPerToken = foldl (\acc tk -> Map.delete tk acc) usdPerToken feeTokensToRemove
@@ -305,7 +353,7 @@ template FeeQuoter
         choice ApplyFeeQuoterDestChainConfigUpdates : ContractId FeeQuoter
             with
                 destChainConfigArgs : [FeeQuoterDestChainConfigArgs]
-            controller owner
+            controller ccipOwner
             do
                 -- destChainSelector must be greater than zero
                 -- defaultTxGasLimit must be set, must be less than maxPerMsgGasLimit
@@ -321,11 +369,11 @@ template FeeQuoter
 
         interface instance MCMSReceiver for FeeQuoter where
             view = MCMSReceiverView with
-                mcmsController = owner
+                mcmsController = ccipOwner
                 instanceId
 
             mcmsEntrypoint functionName operationData contractIds = do
-                let instAddr = instanceId <> "@" <> partyToText owner
+                let instAddr = instanceId <> "@" <> partyToText ccipOwner
                 selfCid <- case Map.lookup instAddr contractIds of
                     None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
                     Some cid -> pure (coerceContractId cid : ContractId FeeQuoter)

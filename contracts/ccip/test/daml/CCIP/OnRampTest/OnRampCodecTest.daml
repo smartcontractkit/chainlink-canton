@@ -21,7 +21,6 @@ testSetDepsParamsRoundtrip_AllSome = do
         rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn-instance@another-party")
         tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar-instance@yet-another")
         feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq-instance@fee-owner")
-        ccvRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "ccv-registry@registry-owner")
 
       encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams params
 
@@ -38,7 +37,6 @@ testSetDepsParamsRoundtrip_AllNone = do
         rmnRemote = None
         tokenAdminRegistry = None
         feeQuoter = None
-        ccvRegistry = None
 
       encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams params
 
@@ -55,7 +53,6 @@ testSetDepsParamsRoundtrip_Mixed = do
         rmnRemote = None
         tokenAdminRegistry = None
         feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq@owner")
-        ccvRegistry = None
 
       encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams params
 
@@ -76,7 +73,6 @@ testOnRampDepsRoundtrip = do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmnremote@ccip_owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@ccip_owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "feequoter@ccip_owner"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccvregistry@ccip_owner"
 
       encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeOnRampDeps deps
 
@@ -87,7 +83,6 @@ testOnRampDepsRoundtrip = do
       decoded.rmnRemote === deps.rmnRemote
       decoded.tokenAdminRegistry === deps.tokenAdminRegistry
       decoded.feeQuoter === deps.feeQuoter
-      decoded.ccvRegistry === deps.ccvRegistry
 
   pure ()
 
@@ -98,7 +93,6 @@ testOnRampDepsSpecialCharacters = do
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn_with_underscores@party2::namespace2"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar.with.dots@party3"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq/with/slashes@party4"
-        ccvRegistry = Chainlink.InstanceAddress.RawInstanceAddress "ccv:with:colons@party5"
 
       encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeOnRampDeps deps
 
@@ -109,7 +103,6 @@ testOnRampDepsSpecialCharacters = do
       decoded.rmnRemote === deps.rmnRemote
       decoded.tokenAdminRegistry === deps.tokenAdminRegistry
       decoded.feeQuoter === deps.feeQuoter
-      decoded.ccvRegistry === deps.ccvRegistry
 
   pure ()
 

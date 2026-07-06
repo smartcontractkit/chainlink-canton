@@ -36,7 +36,7 @@ var (
 
 const (
 	PackageName = "ccip-factory"
-	PackageID   = "d281d9d6c2db22f8f65f96bdc8042bbd372222e115a78404811a508efbc6635d"
+	PackageID   = "a422a55ecbda292f3527b096a0c87ce7ae45029f430583cb7101b00a89dbda86"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1323,7 +1323,6 @@ type DeployOnRampParams struct {
 	RmnRemote          chainlinkapi.RawInstanceAddress `json:"rmnRemote"`
 	TokenAdminRegistry chainlinkapi.RawInstanceAddress `json:"tokenAdminRegistry"`
 	FeeQuoter          chainlinkapi.RawInstanceAddress `json:"feeQuoter"`
-	CcvRegistry        chainlinkapi.RawInstanceAddress `json:"ccvRegistry"`
 	MaxUSDCentsPerMsg  types.NUMERIC                   `json:"maxUSDCentsPerMsg"`
 }
 
@@ -1340,8 +1339,6 @@ func (t DeployOnRampParams) ToMap() map[string]any {
 	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
 
 	m["feeQuoter"] = model.NestedToDAMLValue(t.FeeQuoter)
-
-	m["ccvRegistry"] = model.NestedToDAMLValue(t.CcvRegistry)
 
 	m["maxUSDCentsPerMsg"] = t.MaxUSDCentsPerMsg
 

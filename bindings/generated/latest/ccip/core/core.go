@@ -30,7 +30,7 @@ var (
 
 const (
 	PackageName = "ccip-core"
-	PackageID   = "e886fab26a7f61461170d6340f41cde00dd5057492e507e41eadda102f558422"
+	PackageID   = "081dbadff19668a3aa11943f97e460bc47cda717b4e63daaf6d061bfa5f2cb2d"
 	SDKVersion  = "3.4.11"
 )
 
@@ -100,9 +100,10 @@ func (t *AcceptAdminParams) UnmarshalHex(data string) error {
 
 // AcceptAdminRole is a Record type
 type AcceptAdminRole struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Caller         types.PARTY                              `json:"caller"`
+	TokenConfigCid types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts AcceptAdminRole to a map for DAML arguments
@@ -112,6 +113,8 @@ func (t AcceptAdminRole) ToMap() map[string]any {
 	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1188,12 +1191,15 @@ func (t *CCVVerification) UnmarshalHex(data string) error {
 
 // CancelExecute is a Record type
 type CancelExecute struct {
-	Caller types.PARTY `json:"caller"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CancelExecute to a map for DAML arguments
 func (t CancelExecute) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1225,6 +1231,7 @@ func (t *CancelExecute) UnmarshalHex(data string) error {
 // CancelExecuteMCMSParams is CancelExecute without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type CancelExecuteMCMSParams struct {
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes CancelExecuteMCMSParams to hex string for MCMS operationData.
@@ -2131,6 +2138,27 @@ func (t ExecutingMessage) ArchiveWithPackageID(contractID string, packageID stri
 	}
 }
 
+// ExecutingMessageCancelExecute exercises the ExecutingMessage_CancelExecute choice on this ExecutingMessage contract via the IIExecutingMessage interface
+// This method uses the package name in the template ID
+func (t ExecutingMessage) ExecutingMessageCancelExecute(contractID string, args ccipapi.ExecutingMessageCancelExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "IExecutingMessage"),
+		ContractID: contractID,
+		Choice:     "ExecutingMessage_CancelExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ExecutingMessageCancelExecuteWithPackageID exercises the ExecutingMessage_CancelExecute choice using the provided package ID instead of package name
+func (t ExecutingMessage) ExecutingMessageCancelExecuteWithPackageID(contractID string, packageID string, args ccipapi.ExecutingMessageCancelExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "IExecutingMessage"),
+		ContractID: contractID,
+		Choice:     "ExecutingMessage_CancelExecute",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // ExecutingMessageAddCCVVerification exercises the ExecutingMessage_AddCCVVerification choice on this ExecutingMessage contract via the IIExecutingMessage interface
 // This method uses the package name in the template ID
 func (t ExecutingMessage) ExecutingMessageAddCCVVerification(contractID string, args ccipapi.ExecutingMessageAddCCVVerification) *model.ExerciseCommand {
@@ -2334,11 +2362,11 @@ func (t *ExecutorFee) UnmarshalHex(data string) error {
 // FeeQuoter is a Template type
 type FeeQuoter struct {
 	InstanceId                       types.TEXT                                 `json:"instanceId"`
-	Owner                            types.PARTY                                `json:"owner"`
+	CcipOwner                        types.PARTY                                `json:"ccipOwner"`
 	FeeTokens                        types.SET                                  `json:"feeTokens"`
 	DestChainConfigs                 map[types.NUMERIC]FeeQuoterDestChainConfig `json:"destChainConfigs"`
 	TokenTransferFeeConfigs          map[types.NUMERIC]types.GENMAP             `json:"tokenTransferFeeConfigs"`
-	UsdPerUnitGasByDestChainSelector map[types.NUMERIC]TimestampedPrice         `json:"usdPerUnitGasByDestChainSelector"`
+	UsdPerUnitGasByDestChainSelector map[types.NUMERIC]TimestampedPrice2        `json:"usdPerUnitGasByDestChainSelector"`
 	UsdPerToken                      types.GENMAP                               `json:"usdPerToken"`
 	LinkTokenInstrumentId            splice_api_token_holding_v1.InstrumentId   `json:"linkTokenInstrumentId"`
 	PriceUpdaters                    []types.PARTY                              `json:"priceUpdaters"`
@@ -2362,7 +2390,7 @@ func (t FeeQuoter) CreateCommand() *model.CreateCommand {
 	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
+	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = model.NestedToDAMLValue(t.FeeTokens)
@@ -2425,7 +2453,7 @@ func (t FeeQuoter) CreateCommandWithPackageID(packageID string) *model.CreateCom
 	args["instanceId"] = string(t.InstanceId)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["owner"] = t.Owner.ToMap()
+	args["ccipOwner"] = t.CcipOwner.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeTokens"] = model.NestedToDAMLValue(t.FeeTokens)
@@ -2840,6 +2868,48 @@ func (t FeeQuoter) FeeQuoterPublicFetchWithPackageID(contractID string, packageI
 	}
 }
 
+// FeeQuoterGetTokenPrice exercises the FeeQuoter_GetTokenPrice choice on this FeeQuoter contract via the IIFeeQuoter interface
+// This method uses the package name in the template ID
+func (t FeeQuoter) FeeQuoterGetTokenPrice(contractID string, args ccipapi.FeeQuoterGetTokenPrice) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_GetTokenPrice",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FeeQuoterGetTokenPriceWithPackageID exercises the FeeQuoter_GetTokenPrice choice using the provided package ID instead of package name
+func (t FeeQuoter) FeeQuoterGetTokenPriceWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterGetTokenPrice) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_GetTokenPrice",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FeeQuoterGetDestinationChainGasPrice exercises the FeeQuoter_GetDestinationChainGasPrice choice on this FeeQuoter contract via the IIFeeQuoter interface
+// This method uses the package name in the template ID
+func (t FeeQuoter) FeeQuoterGetDestinationChainGasPrice(contractID string, args ccipapi.FeeQuoterGetDestinationChainGasPrice) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_GetDestinationChainGasPrice",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FeeQuoterGetDestinationChainGasPriceWithPackageID exercises the FeeQuoter_GetDestinationChainGasPrice choice using the provided package ID instead of package name
+func (t FeeQuoter) FeeQuoterGetDestinationChainGasPriceWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterGetDestinationChainGasPrice) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_GetDestinationChainGasPrice",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // FeeQuoterGetTokenTransferFee exercises the FeeQuoter_GetTokenTransferFee choice on this FeeQuoter contract via the IIFeeQuoter interface
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args ccipapi.FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
@@ -2857,6 +2927,48 @@ func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetTokenTransferFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FeeQuoterQuoteGasForExec exercises the FeeQuoter_QuoteGasForExec choice on this FeeQuoter contract via the IIFeeQuoter interface
+// This method uses the package name in the template ID
+func (t FeeQuoter) FeeQuoterQuoteGasForExec(contractID string, args ccipapi.FeeQuoterQuoteGasForExec) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_QuoteGasForExec",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FeeQuoterQuoteGasForExecWithPackageID exercises the FeeQuoter_QuoteGasForExec choice using the provided package ID instead of package name
+func (t FeeQuoter) FeeQuoterQuoteGasForExecWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterQuoteGasForExec) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_QuoteGasForExec",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FeeQuoterGetFeeTokens exercises the FeeQuoter_GetFeeTokens choice on this FeeQuoter contract via the IIFeeQuoter interface
+// This method uses the package name in the template ID
+func (t FeeQuoter) FeeQuoterGetFeeTokens(contractID string, args ccipapi.FeeQuoterGetFeeTokens) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_GetFeeTokens",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// FeeQuoterGetFeeTokensWithPackageID exercises the FeeQuoter_GetFeeTokens choice using the provided package ID instead of package name
+func (t FeeQuoter) FeeQuoterGetFeeTokensWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterGetFeeTokens) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		ContractID: contractID,
+		Choice:     "FeeQuoter_GetFeeTokens",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -2968,12 +3080,15 @@ func (t *FeeQuoterDestChainConfigArgs) UnmarshalHex(data string) error {
 
 // FeeTokenAmount is a Record type
 type FeeTokenAmount struct {
-	Caller types.PARTY `json:"caller"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts FeeTokenAmount to a map for DAML arguments
 func (t FeeTokenAmount) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -3005,6 +3120,7 @@ func (t *FeeTokenAmount) UnmarshalHex(data string) error {
 // FeeTokenAmountMCMSParams is FeeTokenAmount without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type FeeTokenAmountMCMSParams struct {
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes FeeTokenAmountMCMSParams to hex string for MCMS operationData.
@@ -3471,8 +3587,9 @@ func (t *GetDestChainConfigMCMSParams) UnmarshalHex(data string) error {
 
 // GetDestinationChainGasPrice is a Record type
 type GetDestinationChainGasPrice struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
-	Caller            types.PARTY   `json:"caller"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GetDestinationChainGasPrice to a map for DAML arguments
@@ -3480,6 +3597,8 @@ func (t GetDestinationChainGasPrice) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -3511,7 +3630,8 @@ func (t *GetDestinationChainGasPrice) UnmarshalHex(data string) error {
 // GetDestinationChainGasPriceMCMSParams is GetDestinationChainGasPrice without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetDestinationChainGasPriceMCMSParams struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetDestinationChainGasPriceMCMSParams to hex string for MCMS operationData.
@@ -3528,12 +3648,15 @@ func (t *GetDestinationChainGasPriceMCMSParams) UnmarshalHex(data string) error 
 
 // GetFeeTokens is a Record type
 type GetFeeTokens struct {
-	Caller types.PARTY `json:"caller"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GetFeeTokens to a map for DAML arguments
 func (t GetFeeTokens) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -3565,6 +3688,7 @@ func (t *GetFeeTokens) UnmarshalHex(data string) error {
 // GetFeeTokensMCMSParams is GetFeeTokens without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeTokensMCMSParams struct {
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetFeeTokensMCMSParams to hex string for MCMS operationData.
@@ -3638,9 +3762,10 @@ func (t *GetSourceChainConfigMCMSParams) UnmarshalHex(data string) error {
 
 // GetTokenConfigByCid is a Record type
 type GetTokenConfigByCid struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Caller         types.PARTY                              `json:"caller"`
+	TokenConfigCid types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GetTokenConfigByCid to a map for DAML arguments
@@ -3650,6 +3775,8 @@ func (t GetTokenConfigByCid) ToMap() map[string]any {
 	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -3681,7 +3808,8 @@ func (t *GetTokenConfigByCid) UnmarshalHex(data string) error {
 // GetTokenConfigByCidMCMSParams is GetTokenConfigByCid without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetTokenConfigByCidMCMSParams struct {
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Context      splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetTokenConfigByCidMCMSParams to hex string for MCMS operationData.
@@ -3698,15 +3826,18 @@ func (t *GetTokenConfigByCidMCMSParams) UnmarshalHex(data string) error {
 
 // GetTokenPrice is a Record type
 type GetTokenPrice struct {
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Caller       types.PARTY                              `json:"caller"`
+	Token   splice_api_token_holding_v1.InstrumentId   `json:"token"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GetTokenPrice to a map for DAML arguments
 func (t GetTokenPrice) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+	m["token"] = model.NestedToDAMLValue(t.Token)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -3738,7 +3869,8 @@ func (t *GetTokenPrice) UnmarshalHex(data string) error {
 // GetTokenPriceMCMSParams is GetTokenPrice without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetTokenPriceMCMSParams struct {
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Token   splice_api_token_holding_v1.InstrumentId   `json:"token"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetTokenPriceMCMSParams to hex string for MCMS operationData.
@@ -3820,11 +3952,11 @@ func (t *GetTokenTransferFeeMCMSParams) UnmarshalHex(data string) error {
 
 // GlobalConfig is a Template type
 type GlobalConfig struct {
-	InstanceId         types.TEXT                          `json:"instanceId"`
-	CcipOwner          types.PARTY                         `json:"ccipOwner"`
-	ChainSelector      types.NUMERIC                       `json:"chainSelector"`
-	DestChainConfigs   map[types.NUMERIC]DestChainConfig2  `json:"destChainConfigs"`
-	SourceChainConfigs map[types.NUMERIC]SourceChainConfig `json:"sourceChainConfigs"`
+	InstanceId         types.TEXT                           `json:"instanceId"`
+	CcipOwner          types.PARTY                          `json:"ccipOwner"`
+	ChainSelector      types.NUMERIC                        `json:"chainSelector"`
+	DestChainConfigs   map[types.NUMERIC]DestChainConfig2   `json:"destChainConfigs"`
+	SourceChainConfigs map[types.NUMERIC]SourceChainConfig2 `json:"sourceChainConfigs"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -4101,6 +4233,27 @@ func (t GlobalConfig) GlobalConfigGetDestChainConfigWithPackageID(contractID str
 	}
 }
 
+// GlobalConfigGetSourceChainConfig exercises the GlobalConfig_GetSourceChainConfig choice on this GlobalConfig contract via the IIGlobalConfig interface
+// This method uses the package name in the template ID
+func (t GlobalConfig) GlobalConfigGetSourceChainConfig(contractID string, args ccipapi.GlobalConfigGetSourceChainConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "IGlobalConfig"),
+		ContractID: contractID,
+		Choice:     "GlobalConfig_GetSourceChainConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GlobalConfigGetSourceChainConfigWithPackageID exercises the GlobalConfig_GetSourceChainConfig choice using the provided package ID instead of package name
+func (t GlobalConfig) GlobalConfigGetSourceChainConfigWithPackageID(contractID string, packageID string, args ccipapi.GlobalConfigGetSourceChainConfig) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "IGlobalConfig"),
+		ContractID: contractID,
+		Choice:     "GlobalConfig_GetSourceChainConfig",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // Verify interface implementations for GlobalConfig
 
 var _ api.IMCMSReceiver = (*GlobalConfig)(nil)
@@ -4157,17 +4310,16 @@ func (t *InboundPoolVerification) UnmarshalHex(data string) error {
 
 // IsAdministrator is a Record type
 type IsAdministrator struct {
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	TokenConfigCid *types.CONTRACT_ID                       `json:"tokenConfigCid" hex:"optional"`
-	Administrator  types.PARTY                              `json:"administrator"`
-	Caller         types.PARTY                              `json:"caller"`
+	TokenConfigCid *types.CONTRACT_ID                         `json:"tokenConfigCid" hex:"optional"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Administrator  types.PARTY                                `json:"administrator"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts IsAdministrator to a map for DAML arguments
 func (t IsAdministrator) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	if t.TokenConfigCid != nil {
 		m["tokenConfigCid"] = map[string]any{
@@ -4181,7 +4333,11 @@ func (t IsAdministrator) ToMap() map[string]any {
 		}
 	}
 
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
 	m["administrator"] = t.Administrator.ToMap()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -4213,8 +4369,9 @@ func (t *IsAdministrator) UnmarshalHex(data string) error {
 // IsAdministratorMCMSParams is IsAdministrator without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type IsAdministratorMCMSParams struct {
-	InstrumentId  splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Administrator types.PARTY                              `json:"administrator"`
+	InstrumentId  splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Administrator types.PARTY                                `json:"administrator"`
+	Context       splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes IsAdministratorMCMSParams to hex string for MCMS operationData.
@@ -4347,14 +4504,14 @@ func (t *IsCursedForChainMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// PoolRegistration is a Record type
-type PoolRegistration struct {
+// PoolRegistration2 is a Record type
+type PoolRegistration2 struct {
 	PoolOwner      types.PARTY `json:"poolOwner"`
 	PoolInstanceId types.TEXT  `json:"poolInstanceId"`
 }
 
-// ToMap converts PoolRegistration to a map for DAML arguments
-func (t PoolRegistration) ToMap() map[string]any {
+// ToMap converts PoolRegistration2 to a map for DAML arguments
+func (t PoolRegistration2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["poolOwner"] = t.PoolOwner.ToMap()
@@ -4364,24 +4521,24 @@ func (t PoolRegistration) ToMap() map[string]any {
 	return m
 }
 
-func (t PoolRegistration) MarshalJSON() ([]byte, error) {
+func (t PoolRegistration2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *PoolRegistration) UnmarshalJSON(data []byte) error {
+func (t *PoolRegistration2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes PoolRegistration to hex string (Canton MCMS format)
-func (t PoolRegistration) MarshalHex() (string, error) {
+// MarshalHex encodes PoolRegistration2 to hex string (Canton MCMS format)
+func (t PoolRegistration2) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes PoolRegistration from hex string (Canton MCMS format)
-func (t *PoolRegistration) UnmarshalHex(data string) error {
+// UnmarshalHex decodes PoolRegistration2 from hex string (Canton MCMS format)
+func (t *PoolRegistration2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -4478,10 +4635,11 @@ func (t *ProposeAdminParams) UnmarshalHex(data string) error {
 
 // ProposeAdministrator is a Record type
 type ProposeAdministrator struct {
-	TokenConfigCid *types.CONTRACT_ID                       `json:"tokenConfigCid" hex:"optional"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	NewAdmin       types.PARTY                              `json:"newAdmin"`
-	Caller         types.PARTY                              `json:"caller"`
+	TokenConfigCid *types.CONTRACT_ID                         `json:"tokenConfigCid" hex:"optional"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	NewAdmin       types.PARTY                                `json:"newAdmin"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts ProposeAdministrator to a map for DAML arguments
@@ -4503,6 +4661,8 @@ func (t ProposeAdministrator) ToMap() map[string]any {
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -4531,16 +4691,16 @@ func (t *ProposeAdministrator) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// ProposeAdministratorResult is a Record type
-type ProposeAdministratorResult struct {
+// ProposeAdministratorResult2 is a Record type
+type ProposeAdministratorResult2 struct {
 	TokenAdminRegistryCid types.CONTRACT_ID `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID `json:"tokenConfigCid"`
 	Created               types.BOOL        `json:"created"`
 	Index                 types.INT64       `json:"index"`
 }
 
-// ToMap converts ProposeAdministratorResult to a map for DAML arguments
-func (t ProposeAdministratorResult) ToMap() map[string]any {
+// ToMap converts ProposeAdministratorResult2 to a map for DAML arguments
+func (t ProposeAdministratorResult2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
@@ -4554,35 +4714,36 @@ func (t ProposeAdministratorResult) ToMap() map[string]any {
 	return m
 }
 
-func (t ProposeAdministratorResult) MarshalJSON() ([]byte, error) {
+func (t ProposeAdministratorResult2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *ProposeAdministratorResult) UnmarshalJSON(data []byte) error {
+func (t *ProposeAdministratorResult2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes ProposeAdministratorResult to hex string (Canton MCMS format)
-func (t ProposeAdministratorResult) MarshalHex() (string, error) {
+// MarshalHex encodes ProposeAdministratorResult2 to hex string (Canton MCMS format)
+func (t ProposeAdministratorResult2) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes ProposeAdministratorResult from hex string (Canton MCMS format)
-func (t *ProposeAdministratorResult) UnmarshalHex(data string) error {
+// UnmarshalHex decodes ProposeAdministratorResult2 from hex string (Canton MCMS format)
+func (t *ProposeAdministratorResult2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
 // QuoteGasForExec is a Record type
 type QuoteGasForExec struct {
-	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
-	NonCalldataGas    types.INT64                              `json:"nonCalldataGas"`
-	CalldataSize      types.INT64                              `json:"calldataSize"`
-	FeeToken          splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
-	Caller            types.PARTY                              `json:"caller"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	NonCalldataGas    types.INT64                                `json:"nonCalldataGas"`
+	CalldataSize      types.INT64                                `json:"calldataSize"`
+	FeeToken          splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts QuoteGasForExec to a map for DAML arguments
@@ -4596,6 +4757,8 @@ func (t QuoteGasForExec) ToMap() map[string]any {
 	m["calldataSize"] = int64(t.CalldataSize)
 
 	m["feeToken"] = model.NestedToDAMLValue(t.FeeToken)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -4627,10 +4790,11 @@ func (t *QuoteGasForExec) UnmarshalHex(data string) error {
 // QuoteGasForExecMCMSParams is QuoteGasForExec without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type QuoteGasForExecMCMSParams struct {
-	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
-	NonCalldataGas    types.INT64                              `json:"nonCalldataGas"`
-	CalldataSize      types.INT64                              `json:"calldataSize"`
-	FeeToken          splice_api_token_holding_v1.InstrumentId `json:"feeToken"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	NonCalldataGas    types.INT64                                `json:"nonCalldataGas"`
+	CalldataSize      types.INT64                                `json:"calldataSize"`
+	FeeToken          splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes QuoteGasForExecMCMSParams to hex string for MCMS operationData.
@@ -4645,16 +4809,16 @@ func (t *QuoteGasForExecMCMSParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// QuoteGasForExecResult is a Record type
-type QuoteGasForExecResult struct {
+// QuoteGasForExecResult2 is a Record type
+type QuoteGasForExecResult2 struct {
 	TotalGas          types.INT64   `json:"totalGas"`
 	GasCostUSDCents   types.NUMERIC `json:"gasCostUSDCents"`
 	FeeTokenPrice     types.NUMERIC `json:"feeTokenPrice"`
 	PremiumMultiplier types.NUMERIC `json:"premiumMultiplier"`
 }
 
-// ToMap converts QuoteGasForExecResult to a map for DAML arguments
-func (t QuoteGasForExecResult) ToMap() map[string]any {
+// ToMap converts QuoteGasForExecResult2 to a map for DAML arguments
+func (t QuoteGasForExecResult2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["totalGas"] = int64(t.TotalGas)
@@ -4668,24 +4832,24 @@ func (t QuoteGasForExecResult) ToMap() map[string]any {
 	return m
 }
 
-func (t QuoteGasForExecResult) MarshalJSON() ([]byte, error) {
+func (t QuoteGasForExecResult2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *QuoteGasForExecResult) UnmarshalJSON(data []byte) error {
+func (t *QuoteGasForExecResult2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes QuoteGasForExecResult to hex string (Canton MCMS format)
-func (t QuoteGasForExecResult) MarshalHex() (string, error) {
+// MarshalHex encodes QuoteGasForExecResult2 to hex string (Canton MCMS format)
+func (t QuoteGasForExecResult2) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes QuoteGasForExecResult from hex string (Canton MCMS format)
-func (t *QuoteGasForExecResult) UnmarshalHex(data string) error {
+// UnmarshalHex decodes QuoteGasForExecResult2 from hex string (Canton MCMS format)
+func (t *QuoteGasForExecResult2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -6293,6 +6457,27 @@ func (t SendingMessage) ArchiveWithPackageID(contractID string, packageID string
 	}
 }
 
+// SendingMessageFeeTokenAmount exercises the SendingMessage_FeeTokenAmount choice on this SendingMessage contract via the IISendingMessage interface
+// This method uses the package name in the template ID
+func (t SendingMessage) SendingMessageFeeTokenAmount(contractID string, args ccipapi.SendingMessageFeeTokenAmount) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_FeeTokenAmount",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SendingMessageFeeTokenAmountWithPackageID exercises the SendingMessage_FeeTokenAmount choice using the provided package ID instead of package name
+func (t SendingMessage) SendingMessageFeeTokenAmountWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageFeeTokenAmount) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		ContractID: contractID,
+		Choice:     "SendingMessage_FeeTokenAmount",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // SendingMessageAddCCVFee exercises the SendingMessage_AddCCVFee choice on this SendingMessage contract via the IISendingMessage interface
 // This method uses the package name in the template ID
 func (t SendingMessage) SendingMessageAddCCVFee(contractID string, args ccipapi.SendingMessageAddCCVFee) *model.ExerciseCommand {
@@ -6463,10 +6648,11 @@ var _ types.ENUM = SendingMessageState("")
 
 // SetBurnMintFactory is a Record type
 type SetBurnMintFactory struct {
-	TokenConfigCid  types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	BurnMintFactory *types.CONTRACT_ID                       `json:"burnMintFactory" hex:"optional"`
-	Caller          types.PARTY                              `json:"caller"`
+	TokenConfigCid  types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	BurnMintFactory *types.CONTRACT_ID                         `json:"burnMintFactory" hex:"optional"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts SetBurnMintFactory to a map for DAML arguments
@@ -6488,6 +6674,8 @@ func (t SetBurnMintFactory) ToMap() map[string]any {
 			"value": nil,
 		}
 	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -6519,8 +6707,9 @@ func (t *SetBurnMintFactory) UnmarshalHex(data string) error {
 // SetBurnMintFactoryMCMSParams is SetBurnMintFactory without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type SetBurnMintFactoryMCMSParams struct {
-	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	BurnMintFactory *types.CONTRACT_ID                       `json:"burnMintFactory" hex:"optional"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	BurnMintFactory *types.CONTRACT_ID                         `json:"burnMintFactory" hex:"optional"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes SetBurnMintFactoryMCMSParams to hex string for MCMS operationData.
@@ -6732,10 +6921,11 @@ func (t *SetOutboundPoolCCVsMCMSParams) UnmarshalHex(data string) error {
 
 // SetPool is a Record type
 type SetPool struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	TokenPool      *PoolRegistration                        `json:"tokenPool" hex:"optional"`
-	Caller         types.PARTY                              `json:"caller"`
+	TokenConfigCid types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	TokenPool      *PoolRegistration2                         `json:"tokenPool" hex:"optional"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts SetPool to a map for DAML arguments
@@ -6757,6 +6947,8 @@ func (t SetPool) ToMap() map[string]any {
 			"value": nil,
 		}
 	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -6788,8 +6980,9 @@ func (t *SetPool) UnmarshalHex(data string) error {
 // SetPoolMCMSParams is SetPool without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type SetPoolMCMSParams struct {
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	TokenPool    *PoolRegistration                        `json:"tokenPool" hex:"optional"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	TokenPool    *PoolRegistration2                         `json:"tokenPool" hex:"optional"`
+	Context      splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes SetPoolMCMSParams to hex string for MCMS operationData.
@@ -6807,7 +7000,7 @@ func (t *SetPoolMCMSParams) UnmarshalHex(data string) error {
 // SetPoolParams is a Record type
 type SetPoolParams struct {
 	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	TokenPool    *PoolRegistration                        `json:"tokenPool" hex:"optional"`
+	TokenPool    *PoolRegistration2                       `json:"tokenPool" hex:"optional"`
 }
 
 // ToMap converts SetPoolParams to a map for DAML arguments
@@ -6855,10 +7048,11 @@ func (t *SetPoolParams) UnmarshalHex(data string) error {
 
 // SetTransferFactory is a Record type
 type SetTransferFactory struct {
-	TokenConfigCid  types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	TransferFactory *types.CONTRACT_ID                       `json:"transferFactory" hex:"optional"`
-	Caller          types.PARTY                              `json:"caller"`
+	TokenConfigCid  types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	TransferFactory *types.CONTRACT_ID                         `json:"transferFactory" hex:"optional"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts SetTransferFactory to a map for DAML arguments
@@ -6880,6 +7074,8 @@ func (t SetTransferFactory) ToMap() map[string]any {
 			"value": nil,
 		}
 	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -6911,8 +7107,9 @@ func (t *SetTransferFactory) UnmarshalHex(data string) error {
 // SetTransferFactoryMCMSParams is SetTransferFactory without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type SetTransferFactoryMCMSParams struct {
-	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	TransferFactory *types.CONTRACT_ID                       `json:"transferFactory" hex:"optional"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	TransferFactory *types.CONTRACT_ID                         `json:"transferFactory" hex:"optional"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes SetTransferFactoryMCMSParams to hex string for MCMS operationData.
@@ -6976,16 +7173,16 @@ func (t *SetTransferFactoryParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// SourceChainConfig is a Record type
-type SourceChainConfig struct {
+// SourceChainConfig2 is a Record type
+type SourceChainConfig2 struct {
 	IsEnabled        types.BOOL                        `json:"isEnabled"`
 	OnRampAddresses  []types.TEXT                      `json:"onRampAddresses" hex:"[]bytes"`
 	DefaultCCVs      []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
 	LaneMandatedCCVs []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
 }
 
-// ToMap converts SourceChainConfig to a map for DAML arguments
-func (t SourceChainConfig) ToMap() map[string]any {
+// ToMap converts SourceChainConfig2 to a map for DAML arguments
+func (t SourceChainConfig2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["isEnabled"] = bool(t.IsEnabled)
@@ -7017,24 +7214,24 @@ func (t SourceChainConfig) ToMap() map[string]any {
 	return m
 }
 
-func (t SourceChainConfig) MarshalJSON() ([]byte, error) {
+func (t SourceChainConfig2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *SourceChainConfig) UnmarshalJSON(data []byte) error {
+func (t *SourceChainConfig2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes SourceChainConfig to hex string (Canton MCMS format)
-func (t SourceChainConfig) MarshalHex() (string, error) {
+// MarshalHex encodes SourceChainConfig2 to hex string (Canton MCMS format)
+func (t SourceChainConfig2) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes SourceChainConfig from hex string (Canton MCMS format)
-func (t *SourceChainConfig) UnmarshalHex(data string) error {
+// UnmarshalHex decodes SourceChainConfig2 from hex string (Canton MCMS format)
+func (t *SourceChainConfig2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -7105,14 +7302,14 @@ func (t *SourceChainConfigArgs) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// TimestampedPrice is a Record type
-type TimestampedPrice struct {
+// TimestampedPrice2 is a Record type
+type TimestampedPrice2 struct {
 	Price     types.NUMERIC   `json:"price"`
 	Timestamp types.TIMESTAMP `json:"timestamp"`
 }
 
-// ToMap converts TimestampedPrice to a map for DAML arguments
-func (t TimestampedPrice) ToMap() map[string]any {
+// ToMap converts TimestampedPrice2 to a map for DAML arguments
+func (t TimestampedPrice2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["price"] = t.Price
@@ -7122,24 +7319,24 @@ func (t TimestampedPrice) ToMap() map[string]any {
 	return m
 }
 
-func (t TimestampedPrice) MarshalJSON() ([]byte, error) {
+func (t TimestampedPrice2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *TimestampedPrice) UnmarshalJSON(data []byte) error {
+func (t *TimestampedPrice2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes TimestampedPrice to hex string (Canton MCMS format)
-func (t TimestampedPrice) MarshalHex() (string, error) {
+// MarshalHex encodes TimestampedPrice2 to hex string (Canton MCMS format)
+func (t TimestampedPrice2) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes TimestampedPrice from hex string (Canton MCMS format)
-func (t *TimestampedPrice) UnmarshalHex(data string) error {
+// UnmarshalHex decodes TimestampedPrice2 from hex string (Canton MCMS format)
+func (t *TimestampedPrice2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -7622,6 +7819,153 @@ func (t TokenAdminRegistry) TokenAdminRegistryFetchTokenConfigWithPackageID(cont
 	}
 }
 
+// TokenAdminRegistrySetPool exercises the TokenAdminRegistry_SetPool choice on this TokenAdminRegistry contract via the IITokenAdminRegistry interface
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistrySetPool(contractID string, args ccipapi.TokenAdminRegistrySetPool) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetPool",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetPoolWithPackageID exercises the TokenAdminRegistry_SetPool choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistrySetPoolWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistrySetPool) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetPool",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetTransferFactory exercises the TokenAdminRegistry_SetTransferFactory choice on this TokenAdminRegistry contract via the IITokenAdminRegistry interface
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistrySetTransferFactory(contractID string, args ccipapi.TokenAdminRegistrySetTransferFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetTransferFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetTransferFactoryWithPackageID exercises the TokenAdminRegistry_SetTransferFactory choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistrySetTransferFactoryWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistrySetTransferFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetTransferFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetBurnMintFactory exercises the TokenAdminRegistry_SetBurnMintFactory choice on this TokenAdminRegistry contract via the IITokenAdminRegistry interface
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistrySetBurnMintFactory(contractID string, args ccipapi.TokenAdminRegistrySetBurnMintFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetBurnMintFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistrySetBurnMintFactoryWithPackageID exercises the TokenAdminRegistry_SetBurnMintFactory choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistrySetBurnMintFactoryWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistrySetBurnMintFactory) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_SetBurnMintFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryProposeAdministrator exercises the TokenAdminRegistry_ProposeAdministrator choice on this TokenAdminRegistry contract via the IITokenAdminRegistry interface
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministrator(contractID string, args ccipapi.TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_ProposeAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryProposeAdministratorWithPackageID exercises the TokenAdminRegistry_ProposeAdministrator choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministratorWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_ProposeAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryAcceptAdminRole exercises the TokenAdminRegistry_AcceptAdminRole choice on this TokenAdminRegistry contract via the IITokenAdminRegistry interface
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistryAcceptAdminRole(contractID string, args ccipapi.TokenAdminRegistryAcceptAdminRole) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_AcceptAdminRole",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryAcceptAdminRoleWithPackageID exercises the TokenAdminRegistry_AcceptAdminRole choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryAcceptAdminRoleWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryAcceptAdminRole) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_AcceptAdminRole",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryTransferAdminRole exercises the TokenAdminRegistry_TransferAdminRole choice on this TokenAdminRegistry contract via the IITokenAdminRegistry interface
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRole(contractID string, args ccipapi.TokenAdminRegistryTransferAdminRole) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_TransferAdminRole",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryTransferAdminRoleWithPackageID exercises the TokenAdminRegistry_TransferAdminRole choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRoleWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryTransferAdminRole) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_TransferAdminRole",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryIsAdministrator exercises the TokenAdminRegistry_IsAdministrator choice on this TokenAdminRegistry contract via the IITokenAdminRegistry interface
+// This method uses the package name in the template ID
+func (t TokenAdminRegistry) TokenAdminRegistryIsAdministrator(contractID string, args ccipapi.TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IsAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// TokenAdminRegistryIsAdministratorWithPackageID exercises the TokenAdminRegistry_IsAdministrator choice using the provided package ID instead of package name
+func (t TokenAdminRegistry) TokenAdminRegistryIsAdministratorWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		ContractID: contractID,
+		Choice:     "TokenAdminRegistry_IsAdministrator",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // TokenAdminRegistrySetInboundPoolCCVs exercises the TokenAdminRegistry_SetInboundPoolCCVs choice on this TokenAdminRegistry contract via the IITokenAdminRegistry interface
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVs(contractID string, args ccipapi.TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
@@ -7743,7 +8087,7 @@ type TokenConfig struct {
 	InstrumentId       splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	Admin              *types.PARTY                             `json:"admin" hex:"optional"`
 	PendingAdmin       *types.PARTY                             `json:"pendingAdmin" hex:"optional"`
-	TokenPool          *PoolRegistration                        `json:"tokenPool" hex:"optional"`
+	TokenPool          *PoolRegistration2                       `json:"tokenPool" hex:"optional"`
 	TransferFactory    *types.CONTRACT_ID                       `json:"transferFactory" hex:"optional"`
 	BurnMintFactory    *types.CONTRACT_ID                       `json:"burnMintFactory" hex:"optional"`
 }
@@ -8270,10 +8614,11 @@ func (t *TransferAdminParams) UnmarshalHex(data string) error {
 
 // TransferAdminRole is a Record type
 type TransferAdminRole struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	NewAdmin       types.PARTY                              `json:"newAdmin"`
-	Caller         types.PARTY                              `json:"caller"`
+	TokenConfigCid types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	NewAdmin       types.PARTY                                `json:"newAdmin"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TransferAdminRole to a map for DAML arguments
@@ -8285,6 +8630,8 @@ func (t TransferAdminRole) ToMap() map[string]any {
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 

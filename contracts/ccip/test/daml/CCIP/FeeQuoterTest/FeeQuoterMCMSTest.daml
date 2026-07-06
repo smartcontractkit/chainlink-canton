@@ -44,7 +44,7 @@ testFeeQuoterMCMSEntrypoint_RemoveFeeTokens = script do
     fqCid <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.fromList [instrumentId1]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -93,7 +93,7 @@ testFeeQuoterMCMSEntrypoint_RemoveFeeTokens_Multiple = script do
     fqCid <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.fromList [instrumentId1, instrumentId2, instrumentId3]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -143,7 +143,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeQuoterDestChainConfigUpdates = script do
     fqCid <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -203,7 +203,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeQuoterDestChainConfigUpdates_Multiple = scri
     fqCid <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -261,7 +261,7 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters = script do
   fqCid <- submit owner do
     createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
       instanceId
-      owner
+      ccipOwner = owner
       feeTokens = Set.empty
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
@@ -307,7 +307,7 @@ testFeeQuoterMCMSEntrypoint_RemovePriceUpdaters = script do
   fqCid <- submit owner do
     createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
       instanceId
-      owner
+      ccipOwner = owner
       feeTokens = Set.empty
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
@@ -352,7 +352,7 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters_FiltersOwner = script do
   fqCid <- submit owner do
     createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
       instanceId
-      owner
+      ccipOwner = owner
       feeTokens = Set.empty
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
@@ -398,7 +398,7 @@ testFeeQuoterMCMSEntrypoint_UnknownFunction = script do
     fqCid <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -429,7 +429,7 @@ testFeeQuoterMCMSEntrypoint_InvalidParams = script do
     fqCid <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -460,7 +460,7 @@ testFeeQuoterMCMSEntrypoint_MissingSelfCid = script do
     fqCid <- submit owner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty

@@ -510,7 +510,6 @@ data DeployOnRampParams = DeployOnRampParams
         rmnRemote : Chainlink.InstanceAddress.RawInstanceAddress
         tokenAdminRegistry : Chainlink.InstanceAddress.RawInstanceAddress
         feeQuoter : Chainlink.InstanceAddress.RawInstanceAddress
-        ccvRegistry : Chainlink.InstanceAddress.RawInstanceAddress
         maxUSDCentsPerMsg : Numeric 0
     deriving (Eq, Show)
 
@@ -625,7 +624,7 @@ mkGlobalConfigContract ccipOwner params = CCIP.CoreV1.GlobalConfig.GlobalConfig 
 mkFeeQuoterContract : Party -> DeployFeeQuoterParams -> CCIP.CoreV1.FeeQuoter.FeeQuoter
 mkFeeQuoterContract owner params = CCIP.CoreV1.FeeQuoter.FeeQuoter with
     instanceId = params.instanceId
-    owner
+    ccipOwner = owner
     feeTokens = Set.empty
     destChainConfigs = Map.empty
     tokenTransferFeeConfigs = Map.empty
@@ -657,7 +656,6 @@ mkOnRampContract ccipOwner params = CCIP.RuntimeV1.OnRamp.OnRamp with
         rmnRemote = params.rmnRemote
         tokenAdminRegistry = params.tokenAdminRegistry
         feeQuoter = params.feeQuoter
-        ccvRegistry = params.ccvRegistry
 
 mkOffRampContract : Party -> DeployOffRampParams -> CCIP.RuntimeV1.OffRamp.OffRamp
 mkOffRampContract ccipOwner params = CCIP.RuntimeV1.OffRamp.OffRamp with
@@ -812,8 +810,7 @@ decodeDeployOnRampParams encoded = do
     (rmnRemote, offset3) <- decodeRawInstanceAddressAt encoded offset2
     (tokenAdminRegistry, offset4) <- decodeRawInstanceAddressAt encoded offset3
     (feeQuoter, offset5) <- decodeRawInstanceAddressAt encoded offset4
-    (ccvRegistry, offset6) <- decodeRawInstanceAddressAt encoded offset5
-    (maxUSDCentsPerMsg, finalOffset) <- decodeNumeric0At encoded offset6
+    (maxUSDCentsPerMsg, finalOffset) <- decodeNumeric0At encoded offset5
     assertOffset finalOffset (byteCount encoded)
     Some DeployOnRampParams with
         instanceId
@@ -821,7 +818,6 @@ decodeDeployOnRampParams encoded = do
         rmnRemote
         tokenAdminRegistry
         feeQuoter
-        ccvRegistry
         maxUSDCentsPerMsg
 
 decodeDeployOffRampParams : BytesHex -> Optional DeployOffRampParams

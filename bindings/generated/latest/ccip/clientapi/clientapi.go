@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-client-api"
-	PackageID   = "0a5cbae6e8d1e802128c663bbd912d09c49c049511eb5e19e6d9dac05d88bc38"
+	PackageID   = "556d37da759e61d9868a28782cdbd207b0330317ccac88cd4bd4d58021c6942a"
 	SDKVersion  = "3.4.11"
 )
 
@@ -110,8 +110,9 @@ func argsToMap(args any) map[string]any {
 
 // CCIPMessageSentView is a Record type
 type CCIPMessageSentView struct {
-	CcipOwner types.PARTY `json:"ccipOwner"`
-	MessageId types.TEXT  `json:"messageId"`
+	CcipOwner types.PARTY                                `json:"ccipOwner"`
+	MessageId types.TEXT                                 `json:"messageId"`
+	Context   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts CCIPMessageSentView to a map for DAML arguments
@@ -121,6 +122,8 @@ func (t CCIPMessageSentView) ToMap() map[string]any {
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
 	m["messageId"] = string(t.MessageId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -149,11 +152,12 @@ func (t *CCIPMessageSentView) UnmarshalHex(data string) error {
 
 // CCIPSendResult is a Record type
 type CCIPSendResult struct {
-	Router                 types.CONTRACT_ID   `json:"router"`
-	CcipMessageSent        types.CONTRACT_ID   `json:"ccipMessageSent"`
-	MessageId              types.TEXT          `json:"messageId"`
-	FeeChangeCids          []types.CONTRACT_ID `json:"feeChangeCids"`
-	PendingFeeInstructions []types.CONTRACT_ID `json:"pendingFeeInstructions"`
+	Router                 types.CONTRACT_ID                          `json:"router"`
+	CcipMessageSent        types.CONTRACT_ID                          `json:"ccipMessageSent"`
+	MessageId              types.TEXT                                 `json:"messageId"`
+	FeeChangeCids          []types.CONTRACT_ID                        `json:"feeChangeCids"`
+	PendingFeeInstructions []types.CONTRACT_ID                        `json:"pendingFeeInstructions"`
+	Context                splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts CCIPSendResult to a map for DAML arguments
@@ -181,6 +185,8 @@ func (t CCIPSendResult) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -306,12 +312,13 @@ func (t *Canton2AnyMessage) UnmarshalHex(data string) error {
 
 // ExecuteResult is a Record type
 type ExecuteResult struct {
-	Router                types.CONTRACT_ID             `json:"router"`
-	TokenReceiveTicket    *types.CONTRACT_ID            `json:"tokenReceiveTicket" hex:"optional"`
-	ExecutionStateChanged types.CONTRACT_ID             `json:"executionStateChanged"`
-	MessageId             types.TEXT                    `json:"messageId"`
-	Message               ccipcodec.MessageV1           `json:"message"`
-	State                 ccipapi.MessageExecutionState `json:"state"`
+	Router                types.CONTRACT_ID                          `json:"router"`
+	TokenReceiveTicket    *types.CONTRACT_ID                         `json:"tokenReceiveTicket" hex:"optional"`
+	ExecutionStateChanged types.CONTRACT_ID                          `json:"executionStateChanged"`
+	MessageId             types.TEXT                                 `json:"messageId"`
+	Message               ccipcodec.MessageV1                        `json:"message"`
+	State                 ccipapi.MessageExecutionState              `json:"state"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts ExecuteResult to a map for DAML arguments
@@ -340,6 +347,8 @@ func (t ExecuteResult) ToMap() map[string]any {
 
 	m["state"] = model.NestedToDAMLValue(t.State)
 
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
 	return m
 }
 
@@ -367,9 +376,10 @@ func (t *ExecuteResult) UnmarshalHex(data string) error {
 
 // ExecutionStateChangedView is a Record type
 type ExecutionStateChangedView struct {
-	CcipOwner types.PARTY                   `json:"ccipOwner"`
-	MessageId types.TEXT                    `json:"messageId"`
-	State     ccipapi.MessageExecutionState `json:"state"`
+	CcipOwner types.PARTY                                `json:"ccipOwner"`
+	MessageId types.TEXT                                 `json:"messageId"`
+	State     ccipapi.MessageExecutionState              `json:"state"`
+	Context   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts ExecutionStateChangedView to a map for DAML arguments
@@ -381,6 +391,8 @@ func (t ExecutionStateChangedView) ToMap() map[string]any {
 	m["messageId"] = string(t.MessageId)
 
 	m["state"] = model.NestedToDAMLValue(t.State)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -658,7 +670,8 @@ func (t *GenericExtraArgsV3) UnmarshalHex(data string) error {
 
 // GetFeeResult is a Record type
 type GetFeeResult struct {
-	FeeTokenAmount types.NUMERIC `json:"feeTokenAmount"`
+	FeeTokenAmount types.NUMERIC                              `json:"feeTokenAmount"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts GetFeeResult to a map for DAML arguments
@@ -666,6 +679,8 @@ func (t GetFeeResult) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["feeTokenAmount"] = t.FeeTokenAmount
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -790,17 +805,17 @@ func (t *PerPartyRouterCCIPSend) UnmarshalHex(data string) error {
 
 // PerPartyRouterExecute is a Record type
 type PerPartyRouterExecute struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts PerPartyRouterExecute to a map for DAML arguments
 func (t PerPartyRouterExecute) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = model.NestedToDAMLValue(t.Context)
-
 	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -910,19 +925,17 @@ func (t *PerPartyRouterGetExecutionState) UnmarshalHex(data string) error {
 
 // PerPartyRouterGetFee is a Record type
 type PerPartyRouterGetFee struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
 	Message           Canton2AnyMessage                          `json:"message"`
 	CcvFeeQuotes      []extensionapi.CrossChainVerifierFeeQuote  `json:"ccvFeeQuotes"`
 	TokenPoolFeeQuote *extensionapi.TokenPoolFeeQuote            `json:"tokenPoolFeeQuote" hex:"optional"`
 	ExecutorFeeQuote  *extensionapi.ExecutorFeeQuote             `json:"executorFeeQuote" hex:"optional"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts PerPartyRouterGetFee to a map for DAML arguments
 func (t PerPartyRouterGetFee) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["destChainSelector"] = t.DestChainSelector
 
@@ -960,6 +973,8 @@ func (t PerPartyRouterGetFee) ToMap() map[string]any {
 		}
 	}
 
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
 	return m
 }
 
@@ -987,19 +1002,17 @@ func (t *PerPartyRouterGetFee) UnmarshalHex(data string) error {
 
 // PerPartyRouterGetRequiredCCVsForExecute is a Record type
 type PerPartyRouterGetRequiredCCVsForExecute struct {
-	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Message                   ccipcodec.MessageV1                        `json:"message"`
 	ReceiverRequiredCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
 	TokenPoolRequiredCCVs     []chainlinkapi.RawInstanceAddress          `json:"tokenPoolRequiredCCVs"`
+	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts PerPartyRouterGetRequiredCCVsForExecute to a map for DAML arguments
 func (t PerPartyRouterGetRequiredCCVsForExecute) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
 
@@ -1029,6 +1042,8 @@ func (t PerPartyRouterGetRequiredCCVsForExecute) ToMap() map[string]any {
 		return res
 	}()
 
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
 	return m
 }
 
@@ -1056,17 +1071,15 @@ func (t *PerPartyRouterGetRequiredCCVsForExecute) UnmarshalHex(data string) erro
 
 // PerPartyRouterGetRequiredCCVsForSend is a Record type
 type PerPartyRouterGetRequiredCCVsForSend struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
 	Message           Canton2AnyMessage                          `json:"message"`
 	PoolReportedCCVs  []chainlinkapi.RawInstanceAddress          `json:"poolReportedCCVs"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts PerPartyRouterGetRequiredCCVsForSend to a map for DAML arguments
 func (t PerPartyRouterGetRequiredCCVsForSend) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["destChainSelector"] = t.DestChainSelector
 
@@ -1079,6 +1092,8 @@ func (t PerPartyRouterGetRequiredCCVsForSend) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -1146,7 +1161,6 @@ func (t *PerPartyRouterGetSequenceNumber) UnmarshalHex(data string) error {
 
 // PerPartyRouterPrepareExecute is a Record type
 type PerPartyRouterPrepareExecute struct {
-	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	EncodedMessage            types.TEXT                                 `json:"encodedMessage"`
 	ReceiverParty             types.PARTY                                `json:"receiverParty"`
 	TokenReceiverParty        *types.PARTY                               `json:"tokenReceiverParty" hex:"optional"`
@@ -1154,14 +1168,13 @@ type PerPartyRouterPrepareExecute struct {
 	ReceiverOptionalCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
 	ReceiverFinalityConfig    ccipcodec.FinalityConfig                   `json:"receiverFinalityConfig"`
+	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                    types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts PerPartyRouterPrepareExecute to a map for DAML arguments
 func (t PerPartyRouterPrepareExecute) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["encodedMessage"] = string(t.EncodedMessage)
 
@@ -1198,6 +1211,8 @@ func (t PerPartyRouterPrepareExecute) ToMap() map[string]any {
 	m["receiverOptionalThreshold"] = int64(t.ReceiverOptionalThreshold)
 
 	m["receiverFinalityConfig"] = model.NestedToDAMLValue(t.ReceiverFinalityConfig)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 

@@ -4,6 +4,7 @@ import DA.Crypto.Text (BytesHex)
 import DA.List (dedup)
 
 import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified Chainlink.InstanceAddress
@@ -28,6 +29,7 @@ template CCIPMessageSent
             view = CCIP.ClientV1.CCIPMessageSentView with
                 ccipOwner = ccipOwner
                 messageId = event.messageId
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
 data CCIPMessageSentEvent = CCIPMessageSentEvent
     with
@@ -56,6 +58,7 @@ template ExecutionStateChanged
                 ccipOwner = ccipOwner
                 messageId = event.messageId
                 state = event.state
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
 data ExecutionStateChangedEvent = ExecutionStateChangedEvent
     with

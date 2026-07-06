@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver"
-	PackageID   = "40b85f4a41d7767a8dca74cfffd4f0c9311ae4a3ef2e6cfab8bf74e11abe2ddf"
+	PackageID   = "b41eca10afee68eb7b2cf52cd5e45dde7071a5ba98d28542a601297a00109e9c"
 	SDKVersion  = "3.4.11"
 )
 
@@ -399,7 +399,7 @@ func (t CCIPReceiver) UpdateRequiredCCVsWithPackageID(contractID string, package
 type CCVInput struct {
 	CcvCid          types.CONTRACT_ID                          `json:"ccvCid"`
 	VerifierResults types.TEXT                                 `json:"verifierResults"`
-	CcvExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"ccvExtraContext"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts CCVInput to a map for DAML arguments
@@ -410,7 +410,7 @@ func (t CCVInput) ToMap() map[string]any {
 
 	m["verifierResults"] = string(t.VerifierResults)
 
-	m["ccvExtraContext"] = model.NestedToDAMLValue(t.CcvExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -439,18 +439,16 @@ func (t *CCVInput) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid      types.CONTRACT_ID                          `json:"routerCid"`
 	EncodedMessage types.TEXT                                 `json:"encodedMessage"`
 	TokenTransfer  *TokenTransferInput                        `json:"tokenTransfer" hex:"optional"`
 	CcvInputs      []CCVInput                                 `json:"ccvInputs"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
 func (t Execute) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
@@ -475,6 +473,8 @@ func (t Execute) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -503,17 +503,15 @@ func (t *Execute) UnmarshalHex(data string) error {
 
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
-	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid      types.CONTRACT_ID                          `json:"routerCid"`
 	EncodedMessage types.TEXT                                 `json:"encodedMessage"`
 	TokenPoolCid   *types.CONTRACT_ID                         `json:"tokenPoolCid" hex:"optional"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts GetRequiredCCVs to a map for DAML arguments
 func (t GetRequiredCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
@@ -530,6 +528,8 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 			"value": nil,
 		}
 	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -560,7 +560,7 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 type TokenTransferInput struct {
 	TokenPoolCid       types.CONTRACT_ID                          `json:"tokenPoolCid"`
 	TokenReceiverParty types.PARTY                                `json:"tokenReceiverParty"`
-	PoolExtraContext   splice_api_token_metadata_v1.ChoiceContext `json:"poolExtraContext"`
+	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -571,7 +571,7 @@ func (t TokenTransferInput) ToMap() map[string]any {
 
 	m["tokenReceiverParty"] = t.TokenReceiverParty.ToMap()
 
-	m["poolExtraContext"] = model.NestedToDAMLValue(t.PoolExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }

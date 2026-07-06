@@ -60,7 +60,7 @@ func TestSetPoolViaMCMS(t *testing.T) {
 	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
 
 	// Build set_pool operation
-	poolReg := &core.PoolRegistration{
+	poolReg := &core.PoolRegistration2{
 		PoolOwner:      types.PARTY(ccipOwner),
 		PoolInstanceId: types.TEXT("test-pool-001"),
 	}
@@ -155,7 +155,7 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 	tokenConfigInstanceAddr := makeTokenConfigInstanceAddr(ccipOwner, testInstrumentId)
 
 	// Set initial pool directly (not via MCMS) so we have something to clear
-	initialPool := &core.PoolRegistration{
+	initialPool := &core.PoolRegistration2{
 		PoolOwner:      types.PARTY(ccipOwner),
 		PoolInstanceId: types.TEXT("initial-pool"),
 	}
@@ -348,7 +348,7 @@ func exerciseSetPoolDirectly(
 	tarCid string,
 	tokenConfigCid string,
 	instrumentId splice.InstrumentId,
-	pool *core.PoolRegistration,
+	pool *core.PoolRegistration2,
 ) string {
 	t.Helper()
 

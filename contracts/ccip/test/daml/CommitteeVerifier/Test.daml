@@ -123,7 +123,7 @@ testCommitteeVerifier = script do
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv1 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults1
             caller = owner
@@ -152,7 +152,7 @@ testCommitteeVerifier = script do
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv2 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults2
             caller = owner
@@ -201,7 +201,7 @@ testCommitteeVerifier = script do
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv4 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults4
             caller = owner
@@ -228,7 +228,7 @@ testCommitteeVerifier = script do
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv5 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults5
             caller = owner
@@ -255,7 +255,7 @@ testCommitteeVerifier = script do
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv6 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults6
             caller = owner
@@ -317,7 +317,7 @@ testCommitteeVerifier = script do
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults =
                 "01234567" <> -- invalid version tag
@@ -327,7 +327,7 @@ testCommitteeVerifier = script do
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults =
                 CCIP.CommitteeVerifierV1.versionTagV2_0_0 <> -- version tag
@@ -337,7 +337,7 @@ testCommitteeVerifier = script do
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv9 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults =
                 CCIP.CommitteeVerifierV1.versionTagV2_0_0 <> -- version tag
@@ -368,7 +368,7 @@ testCommitteeVerifier = script do
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv10 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2]
             caller = owner
@@ -386,7 +386,7 @@ testCommitteeVerifier = script do
     submit (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv10 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
             caller = owner
@@ -399,7 +399,7 @@ testCommitteeVerifier = script do
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccv10 CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
             caller = owner
@@ -882,7 +882,7 @@ testVerifyMessage_RejectsCrossDomainExecutingMessage = script do
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
         exerciseCmd ccvCid CCIP.CommitteeVerifierV1.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
-            extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults = verifierResults
             caller = owner
@@ -1084,7 +1084,7 @@ testForwardToVerifier_AllowlistChecksSender = script do
   submitMustFail (actAs allowlistedParty <> disclose disclosedCcv <> disclose disclosedRmn) do
     exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ForwardToVerifier with
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
-      extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       sendingMessageCid = toInterfaceContractId nonAllowlistedMsgCid
       verifierArgs = ""
       caller = allowlistedParty
@@ -1097,7 +1097,7 @@ testForwardToVerifier_AllowlistChecksSender = script do
   submit (actAs allowlistedParty <> disclose disclosedCcv <> disclose disclosedRmn) do
     exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ForwardToVerifier with
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
-      extraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       sendingMessageCid = toInterfaceContractId allowlistedMsgCid
       verifierArgs = ""
       caller = allowlistedParty

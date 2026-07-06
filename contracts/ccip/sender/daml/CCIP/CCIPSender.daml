@@ -33,7 +33,7 @@ data CCVSendInput = CCVSendInput
         -- Used to match this CCV to its verifier args in the client-provided CCVExtraArgs.
         ccvAddress : Chainlink.InstanceAddress.RawInstanceAddress
         ccvCid : ContractId CCIP.InterfacesV1.CrossChainVerifier.ICrossChainVerifier
-        ccvExtraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data FeeTokenInput = FeeTokenInput
@@ -48,13 +48,13 @@ data TokenTransferInput = TokenTransferInput
     with
         senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
         tokenPoolCid : ContractId CCIP.InterfacesV1.TokenPool.ITokenPool
-        poolExtraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data ExecutorInput = ExecutorInput
     with
         executorCid : ContractId CCIP.InterfacesV1.Executor.IExecutor
-        executorExtraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data GetFeeResult = GetFeeResult
@@ -113,9 +113,9 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.ClientV1.Canton2AnyMessage
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 routerCid : ContractId CCIP.ClientV1.PerPartyRouter
                 tokenPoolCid : Optional (ContractId CCIP.InterfacesV1.TokenPool.ITokenPool)
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller owner
             do
                 extraArgs <- case message.extraArgs of
@@ -138,6 +138,7 @@ template CCIPSender
                                 finality = CCIP.CodecV1.FinalityConfig.waitForFinalityFlag
                                 extraData = extraArgs.tokenArgs
                                 direction = CCIP.InterfacesV1.TokenPool.Outbound
+                                context = context
                                 caller = owner
 
                 exercise routerCid CCIP.ClientV1.PerPartyRouter_GetRequiredCCVsForSend with
@@ -150,11 +151,11 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.ClientV1.Canton2AnyMessage
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 routerCid : ContractId CCIP.ClientV1.PerPartyRouter
                 ccvSendInputs : [CCVSendInput]
                 tokenTransferInput : Optional TokenTransferInput
                 executorInput : Optional ExecutorInput
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller owner
             do
                 feeQuoterCid : ContractId CCIP.APIV1.FeeQuoter.IFeeQuoter <- CCIP.UtilsV1.Context.getFromContextU context CCIP.APIV1.FeeQuoter.feeQuoterContextKey
@@ -201,6 +202,7 @@ template CCIPSender
                             feeQuoterCid = feeQuoterCid
                             destChainSelector = destinationChainSelector
                             tokenInstrumentId = tt.token
+                            context = tokenTransferInput.context
                             caller = owner
                         pure (Some q, q.tokenFeeBps)
                 executorFeeQuote <- case extraArgs.executor of
@@ -221,6 +223,7 @@ template CCIPSender
                                     expectedExecutor = expectedExecutor
                                     destChainSelector = destinationChainSelector
                                     requiredCCVs = requiredCCVs
+                                    context = executorInput.context
                                     caller = owner
                                 Chainlink.InstanceAddress.assertEqual "sender: executor fee quote executor mismatch"
                                     q.executorInstanceId q.executorOwner expectedExecutor
@@ -233,6 +236,7 @@ template CCIPSender
                                 expectedExecutor = expectedExecutor
                                 destChainSelector = destinationChainSelector
                                 requiredCCVs = requiredCCVs
+                                context = executorInput.context
                                 caller = owner
                             Chainlink.InstanceAddress.assertEqual "sender: executor fee quote executor mismatch"
                                 q.executorInstanceId q.executorOwner expectedExecutor
@@ -261,12 +265,12 @@ template CCIPSender
             with
                 destinationChainSelector : Numeric 0
                 message : CCIP.ClientV1.Canton2AnyMessage
-                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 routerCid : ContractId CCIP.ClientV1.PerPartyRouter
                 feeTokenInput : FeeTokenInput
                 ccvSendInputs : [CCVSendInput]
                 tokenTransferInput : Optional TokenTransferInput
                 executorInput : Optional ExecutorInput
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller owner
             do
                 feeQuoterCid : ContractId CCIP.APIV1.FeeQuoter.IFeeQuoter <- CCIP.UtilsV1.Context.getFromContextU context CCIP.APIV1.FeeQuoter.feeQuoterContextKey
@@ -288,7 +292,7 @@ template CCIPSender
                 smCid <- exercise routerCid CCIP.ClientV1.PerPartyRouter_PrepareSend with
                         destinationChainSelector = destinationChainSelector
                         message = message
-                        context
+                        context = context
 
                 smCid <- case message.tokenTransfer of
                     None -> do
@@ -302,7 +306,7 @@ template CCIPSender
                             exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV1.TokenPool.TokenPool_VerifyOutboundCCVs with
                                 tokenAdminRegistryCid = tokenAdminRegistryCid
                                 tokenConfigCid = tokenConfigCid
-                                extraContext = tokenTransferInput.poolExtraContext
+                                context = tokenTransferInput.context
                                 sendingMessageCid = smCid
                                 amount = tt.amount
                                 caller = owner
@@ -311,7 +315,7 @@ template CCIPSender
                     exercise input.ccvCid
                         CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifier_CalculateFee with
                             sendingMessageCid = cid
-                            extraContext = input.ccvExtraContext
+                            context = input.context
                             caller = owner
                     ) smCid ccvSendInputs
 
@@ -326,7 +330,7 @@ template CCIPSender
                         exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV1.TokenPool.TokenPool_CalculateFee with
                             tokenAdminRegistryCid = tokenAdminRegistryCid
                             tokenConfigCid = tokenConfigCid
-                            extraContext = tokenTransferInput.poolExtraContext
+                            context = tokenTransferInput.context
                             sendingMessageCid = smCid
                             feeQuoterCid = feeQuoterCid
                             tokenInstrumentId = tt.token
@@ -352,7 +356,7 @@ template CCIPSender
                                             expectedExecutor = expectedExecutor
                                             sendingMessageCid = smCid
                                             executorArgs = executorArgs
-                                            extraContext = executorInput.executorExtraContext
+                                            context = executorInput.context
                                             caller = owner
                     CCIP.ClientV1.Executor_WithAddress expectedExecutor executorArgs ->
                       case executorInput of
@@ -363,7 +367,7 @@ template CCIPSender
                                     expectedExecutor = expectedExecutor
                                     sendingMessageCid = smCid
                                     executorArgs = executorArgs
-                                    extraContext = executorInput.executorExtraContext
+                                    context = executorInput.context
                                     caller = owner
 
                 smCid <- exercise routerCid CCIP.ClientV1.PerPartyRouter_FinalizeFee with
@@ -382,7 +386,7 @@ template CCIPSender
                             tokenAdminRegistryCid = tokenAdminRegistryCid
                             tokenConfigCid = tokenConfigCid
                             rmnRemoteCid = rmnRemoteCid
-                            extraContext = tokenTransferInput.poolExtraContext
+                            context = tokenTransferInput.context
                             sendingMessageCid = smCid
                             senderInputCids = tokenTransferInput.senderInputCids
                             amount = tt.amount
@@ -394,7 +398,7 @@ template CCIPSender
                         exercise input.ccvCid
                             CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifier_ForwardToVerifier with
                                 rmnRemoteCid = rmnRemoteCid
-                                extraContext = input.ccvExtraContext
+                                context = input.context
                                 sendingMessageCid = cid
                                 verifierArgs = verifierArgs
                                 caller = owner

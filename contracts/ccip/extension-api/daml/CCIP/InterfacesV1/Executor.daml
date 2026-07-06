@@ -19,7 +19,7 @@ interface IExecutor where
             expectedExecutor : Chainlink.InstanceAddress.RawInstanceAddress
             sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             executorArgs : BytesHex
-            extraContext : Splice.Api.Token.MetadataV1.ChoiceContext
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do
@@ -32,6 +32,7 @@ interface IExecutor where
             expectedExecutor : Chainlink.InstanceAddress.RawInstanceAddress
             destChainSelector : Numeric 0
             requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
             caller : Party
         controller caller
         do
@@ -43,6 +44,7 @@ data ExecutorView = ExecutorView
     with
         instanceId : Text
         owner : Party
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 data ExecutorFeeQuote = ExecutorFeeQuote
@@ -50,4 +52,5 @@ data ExecutorFeeQuote = ExecutorFeeQuote
         executorInstanceId : Text
         executorOwner : Party
         feeUSDCents : Numeric 0
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)

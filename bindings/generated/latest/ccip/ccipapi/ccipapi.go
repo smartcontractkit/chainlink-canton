@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-api"
-	PackageID   = "b8bb8257ed8c2eeb4d3aca426522430b3f3605ef77400f9d14eb0aacd48eae92"
+	PackageID   = "c75fdf89323c8e97c8b2dc15e37402c69a5ad1c12c8073c7a296b1bef68bc963"
 	SDKVersion  = "3.4.11"
 )
 
@@ -38,6 +38,9 @@ type Template interface {
 
 // IIExecutingMessage is a DAML interface
 type IIExecutingMessage interface {
+
+	// ExecutingMessageCancelExecute executes the ExecutingMessage_CancelExecute choice
+	ExecutingMessageCancelExecute(contractID string, args ExecutingMessageCancelExecute) *model.ExerciseCommand
 
 	// ExecutingMessageAddCCVVerification executes the ExecutingMessage_AddCCVVerification choice
 	ExecutingMessageAddCCVVerification(contractID string, args ExecutingMessageAddCCVVerification) *model.ExerciseCommand
@@ -55,8 +58,20 @@ type IIFeeQuoter interface {
 	// FeeQuoterPublicFetch executes the FeeQuoter_PublicFetch choice
 	FeeQuoterPublicFetch(contractID string, args FeeQuoterPublicFetch) *model.ExerciseCommand
 
+	// FeeQuoterGetTokenPrice executes the FeeQuoter_GetTokenPrice choice
+	FeeQuoterGetTokenPrice(contractID string, args FeeQuoterGetTokenPrice) *model.ExerciseCommand
+
+	// FeeQuoterGetDestinationChainGasPrice executes the FeeQuoter_GetDestinationChainGasPrice choice
+	FeeQuoterGetDestinationChainGasPrice(contractID string, args FeeQuoterGetDestinationChainGasPrice) *model.ExerciseCommand
+
 	// FeeQuoterGetTokenTransferFee executes the FeeQuoter_GetTokenTransferFee choice
 	FeeQuoterGetTokenTransferFee(contractID string, args FeeQuoterGetTokenTransferFee) *model.ExerciseCommand
+
+	// FeeQuoterQuoteGasForExec executes the FeeQuoter_QuoteGasForExec choice
+	FeeQuoterQuoteGasForExec(contractID string, args FeeQuoterQuoteGasForExec) *model.ExerciseCommand
+
+	// FeeQuoterGetFeeTokens executes the FeeQuoter_GetFeeTokens choice
+	FeeQuoterGetFeeTokens(contractID string, args FeeQuoterGetFeeTokens) *model.ExerciseCommand
 }
 
 // IIGlobalConfig is a DAML interface
@@ -70,6 +85,9 @@ type IIGlobalConfig interface {
 
 	// GlobalConfigGetDestChainConfig executes the GlobalConfig_GetDestChainConfig choice
 	GlobalConfigGetDestChainConfig(contractID string, args GlobalConfigGetDestChainConfig) *model.ExerciseCommand
+
+	// GlobalConfigGetSourceChainConfig executes the GlobalConfig_GetSourceChainConfig choice
+	GlobalConfigGetSourceChainConfig(contractID string, args GlobalConfigGetSourceChainConfig) *model.ExerciseCommand
 }
 
 // IIRMNRemote is a DAML interface
@@ -97,6 +115,9 @@ type IISendingMessage interface {
 	// Archive executes the Archive choice
 	Archive(contractID string) *model.ExerciseCommand
 
+	// SendingMessageFeeTokenAmount executes the SendingMessage_FeeTokenAmount choice
+	SendingMessageFeeTokenAmount(contractID string, args SendingMessageFeeTokenAmount) *model.ExerciseCommand
+
 	// SendingMessageAddCCVFee executes the SendingMessage_AddCCVFee choice
 	SendingMessageAddCCVFee(contractID string, args SendingMessageAddCCVFee) *model.ExerciseCommand
 
@@ -118,6 +139,27 @@ type IITokenAdminRegistry interface {
 
 	// TokenAdminRegistryFetchTokenConfig executes the TokenAdminRegistry_FetchTokenConfig choice
 	TokenAdminRegistryFetchTokenConfig(contractID string, args TokenAdminRegistryFetchTokenConfig) *model.ExerciseCommand
+
+	// TokenAdminRegistrySetPool executes the TokenAdminRegistry_SetPool choice
+	TokenAdminRegistrySetPool(contractID string, args TokenAdminRegistrySetPool) *model.ExerciseCommand
+
+	// TokenAdminRegistrySetTransferFactory executes the TokenAdminRegistry_SetTransferFactory choice
+	TokenAdminRegistrySetTransferFactory(contractID string, args TokenAdminRegistrySetTransferFactory) *model.ExerciseCommand
+
+	// TokenAdminRegistrySetBurnMintFactory executes the TokenAdminRegistry_SetBurnMintFactory choice
+	TokenAdminRegistrySetBurnMintFactory(contractID string, args TokenAdminRegistrySetBurnMintFactory) *model.ExerciseCommand
+
+	// TokenAdminRegistryProposeAdministrator executes the TokenAdminRegistry_ProposeAdministrator choice
+	TokenAdminRegistryProposeAdministrator(contractID string, args TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand
+
+	// TokenAdminRegistryAcceptAdminRole executes the TokenAdminRegistry_AcceptAdminRole choice
+	TokenAdminRegistryAcceptAdminRole(contractID string, args TokenAdminRegistryAcceptAdminRole) *model.ExerciseCommand
+
+	// TokenAdminRegistryTransferAdminRole executes the TokenAdminRegistry_TransferAdminRole choice
+	TokenAdminRegistryTransferAdminRole(contractID string, args TokenAdminRegistryTransferAdminRole) *model.ExerciseCommand
+
+	// TokenAdminRegistryIsAdministrator executes the TokenAdminRegistry_IsAdministrator choice
+	TokenAdminRegistryIsAdministrator(contractID string, args TokenAdminRegistryIsAdministrator) *model.ExerciseCommand
 
 	// TokenAdminRegistrySetInboundPoolCCVs executes the TokenAdminRegistry_SetInboundPoolCCVs choice
 	TokenAdminRegistrySetInboundPoolCCVs(contractID string, args TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand
@@ -407,10 +449,50 @@ func (t *ExecutingMessageAddCCVVerification) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// ExecutingMessageCancelExecute is a Record type
+type ExecutingMessageCancelExecute struct {
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts ExecutingMessageCancelExecute to a map for DAML arguments
+func (t ExecutingMessageCancelExecute) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t ExecutingMessageCancelExecute) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ExecutingMessageCancelExecute) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ExecutingMessageCancelExecute to hex string (Canton MCMS format)
+func (t ExecutingMessageCancelExecute) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ExecutingMessageCancelExecute from hex string (Canton MCMS format)
+func (t *ExecutingMessageCancelExecute) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // FeeQuoterView is a Record type
 type FeeQuoterView struct {
-	CcipOwner  types.PARTY `json:"ccipOwner"`
-	InstanceId types.TEXT  `json:"instanceId"`
+	CcipOwner  types.PARTY                                `json:"ccipOwner"`
+	InstanceId types.TEXT                                 `json:"instanceId"`
+	Context    splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts FeeQuoterView to a map for DAML arguments
@@ -420,6 +502,8 @@ func (t FeeQuoterView) ToMap() map[string]any {
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
 	m["instanceId"] = string(t.InstanceId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -442,6 +526,129 @@ func (t FeeQuoterView) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes FeeQuoterView from hex string (Canton MCMS format)
 func (t *FeeQuoterView) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FeeQuoterGetDestinationChainGasPrice is a Record type
+type FeeQuoterGetDestinationChainGasPrice struct {
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts FeeQuoterGetDestinationChainGasPrice to a map for DAML arguments
+func (t FeeQuoterGetDestinationChainGasPrice) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t FeeQuoterGetDestinationChainGasPrice) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeQuoterGetDestinationChainGasPrice) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeQuoterGetDestinationChainGasPrice to hex string (Canton MCMS format)
+func (t FeeQuoterGetDestinationChainGasPrice) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterGetDestinationChainGasPrice from hex string (Canton MCMS format)
+func (t *FeeQuoterGetDestinationChainGasPrice) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FeeQuoterGetFeeTokens is a Record type
+type FeeQuoterGetFeeTokens struct {
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts FeeQuoterGetFeeTokens to a map for DAML arguments
+func (t FeeQuoterGetFeeTokens) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t FeeQuoterGetFeeTokens) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeQuoterGetFeeTokens) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeQuoterGetFeeTokens to hex string (Canton MCMS format)
+func (t FeeQuoterGetFeeTokens) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterGetFeeTokens from hex string (Canton MCMS format)
+func (t *FeeQuoterGetFeeTokens) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// FeeQuoterGetTokenPrice is a Record type
+type FeeQuoterGetTokenPrice struct {
+	Token   splice_api_token_holding_v1.InstrumentId   `json:"token"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts FeeQuoterGetTokenPrice to a map for DAML arguments
+func (t FeeQuoterGetTokenPrice) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["token"] = model.NestedToDAMLValue(t.Token)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t FeeQuoterGetTokenPrice) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeQuoterGetTokenPrice) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeQuoterGetTokenPrice to hex string (Canton MCMS format)
+func (t FeeQuoterGetTokenPrice) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterGetTokenPrice from hex string (Canton MCMS format)
+func (t *FeeQuoterGetTokenPrice) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -493,8 +700,9 @@ func (t *FeeQuoterGetTokenTransferFee) UnmarshalHex(data string) error {
 
 // FeeQuoterPublicFetch is a Record type
 type FeeQuoterPublicFetch struct {
-	ExpectedAddress chainlinkapi.RawInstanceAddress `json:"expectedAddress"`
-	Caller          types.PARTY                     `json:"caller"`
+	ExpectedAddress chainlinkapi.RawInstanceAddress            `json:"expectedAddress"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts FeeQuoterPublicFetch to a map for DAML arguments
@@ -502,6 +710,8 @@ func (t FeeQuoterPublicFetch) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["expectedAddress"] = model.NestedToDAMLValue(t.ExpectedAddress)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -530,9 +740,61 @@ func (t *FeeQuoterPublicFetch) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// FeeQuoterQuoteGasForExec is a Record type
+type FeeQuoterQuoteGasForExec struct {
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	NonCalldataGas    types.INT64                                `json:"nonCalldataGas"`
+	CalldataSize      types.INT64                                `json:"calldataSize"`
+	FeeToken          splice_api_token_holding_v1.InstrumentId   `json:"feeToken"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts FeeQuoterQuoteGasForExec to a map for DAML arguments
+func (t FeeQuoterQuoteGasForExec) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destChainSelector"] = t.DestChainSelector
+
+	m["nonCalldataGas"] = int64(t.NonCalldataGas)
+
+	m["calldataSize"] = int64(t.CalldataSize)
+
+	m["feeToken"] = model.NestedToDAMLValue(t.FeeToken)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t FeeQuoterQuoteGasForExec) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeQuoterQuoteGasForExec) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeQuoterQuoteGasForExec to hex string (Canton MCMS format)
+func (t FeeQuoterQuoteGasForExec) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeQuoterQuoteGasForExec from hex string (Canton MCMS format)
+func (t *FeeQuoterQuoteGasForExec) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GlobalConfigView is a Record type
 type GlobalConfigView struct {
-	CcipOwner types.PARTY `json:"ccipOwner"`
+	CcipOwner types.PARTY                                `json:"ccipOwner"`
+	Context   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts GlobalConfigView to a map for DAML arguments
@@ -540,6 +802,8 @@ func (t GlobalConfigView) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["ccipOwner"] = t.CcipOwner.ToMap()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -608,10 +872,53 @@ func (t *GlobalConfigGetDestChainConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// GlobalConfigGetSourceChainConfig is a Record type
+type GlobalConfigGetSourceChainConfig struct {
+	SourceChainSelector types.NUMERIC                              `json:"sourceChainSelector"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller              types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts GlobalConfigGetSourceChainConfig to a map for DAML arguments
+func (t GlobalConfigGetSourceChainConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["sourceChainSelector"] = t.SourceChainSelector
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t GlobalConfigGetSourceChainConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GlobalConfigGetSourceChainConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GlobalConfigGetSourceChainConfig to hex string (Canton MCMS format)
+func (t GlobalConfigGetSourceChainConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GlobalConfigGetSourceChainConfig from hex string (Canton MCMS format)
+func (t *GlobalConfigGetSourceChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // GlobalConfigPublicFetch is a Record type
 type GlobalConfigPublicFetch struct {
-	ExpectedAddress chainlinkapi.RawInstanceAddress `json:"expectedAddress"`
-	Caller          types.PARTY                     `json:"caller"`
+	ExpectedAddress chainlinkapi.RawInstanceAddress            `json:"expectedAddress"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GlobalConfigPublicFetch to a map for DAML arguments
@@ -619,6 +926,8 @@ func (t GlobalConfigPublicFetch) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["expectedAddress"] = model.NestedToDAMLValue(t.ExpectedAddress)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -694,6 +1003,141 @@ func (e *MessageExecutionState) UnmarshalHex(data string) error {
 }
 
 var _ types.ENUM = MessageExecutionState("")
+
+// PoolRegistration is a Record type
+type PoolRegistration struct {
+	PoolOwner      types.PARTY `json:"poolOwner"`
+	PoolInstanceId types.TEXT  `json:"poolInstanceId"`
+}
+
+// ToMap converts PoolRegistration to a map for DAML arguments
+func (t PoolRegistration) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
+
+	m["poolInstanceId"] = string(t.PoolInstanceId)
+
+	return m
+}
+
+func (t PoolRegistration) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *PoolRegistration) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes PoolRegistration to hex string (Canton MCMS format)
+func (t PoolRegistration) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes PoolRegistration from hex string (Canton MCMS format)
+func (t *PoolRegistration) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// ProposeAdministratorResult is a Record type
+type ProposeAdministratorResult struct {
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	Created               types.BOOL                                 `json:"created"`
+	Index                 types.INT64                                `json:"index"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+}
+
+// ToMap converts ProposeAdministratorResult to a map for DAML arguments
+func (t ProposeAdministratorResult) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenAdminRegistryCid"] = model.NestedToDAMLValue(t.TokenAdminRegistryCid)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
+
+	m["created"] = bool(t.Created)
+
+	m["index"] = int64(t.Index)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	return m
+}
+
+func (t ProposeAdministratorResult) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *ProposeAdministratorResult) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes ProposeAdministratorResult to hex string (Canton MCMS format)
+func (t ProposeAdministratorResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes ProposeAdministratorResult from hex string (Canton MCMS format)
+func (t *ProposeAdministratorResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// QuoteGasForExecResult is a Record type
+type QuoteGasForExecResult struct {
+	TotalGas          types.INT64                                `json:"totalGas"`
+	GasCostUSDCents   types.NUMERIC                              `json:"gasCostUSDCents"`
+	FeeTokenPrice     types.NUMERIC                              `json:"feeTokenPrice"`
+	PremiumMultiplier types.NUMERIC                              `json:"premiumMultiplier"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+}
+
+// ToMap converts QuoteGasForExecResult to a map for DAML arguments
+func (t QuoteGasForExecResult) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["totalGas"] = int64(t.TotalGas)
+
+	m["gasCostUSDCents"] = t.GasCostUSDCents
+
+	m["feeTokenPrice"] = t.FeeTokenPrice
+
+	m["premiumMultiplier"] = t.PremiumMultiplier
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	return m
+}
+
+func (t QuoteGasForExecResult) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *QuoteGasForExecResult) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes QuoteGasForExecResult to hex string (Canton MCMS format)
+func (t QuoteGasForExecResult) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes QuoteGasForExecResult from hex string (Canton MCMS format)
+func (t *QuoteGasForExecResult) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
 
 // RMNRemoteView is a Record type
 type RMNRemoteView struct {
@@ -859,8 +1303,9 @@ func (t *RMNRemoteIsCursedForChain) UnmarshalHex(data string) error {
 
 // RMNRemotePublicFetch is a Record type
 type RMNRemotePublicFetch struct {
-	ExpectedAddress chainlinkapi.RawInstanceAddress `json:"expectedAddress"`
-	Caller          types.PARTY                     `json:"caller"`
+	ExpectedAddress chainlinkapi.RawInstanceAddress            `json:"expectedAddress"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts RMNRemotePublicFetch to a map for DAML arguments
@@ -868,6 +1313,8 @@ func (t RMNRemotePublicFetch) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["expectedAddress"] = model.NestedToDAMLValue(t.ExpectedAddress)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1137,6 +1584,153 @@ func (t *SendingMessageAddVerifierData) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SendingMessageFeeTokenAmount is a Record type
+type SendingMessageFeeTokenAmount struct {
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller  types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts SendingMessageFeeTokenAmount to a map for DAML arguments
+func (t SendingMessageFeeTokenAmount) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t SendingMessageFeeTokenAmount) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SendingMessageFeeTokenAmount) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SendingMessageFeeTokenAmount to hex string (Canton MCMS format)
+func (t SendingMessageFeeTokenAmount) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SendingMessageFeeTokenAmount from hex string (Canton MCMS format)
+func (t *SendingMessageFeeTokenAmount) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SourceChainConfig is a Record type
+type SourceChainConfig struct {
+	IsEnabled        types.BOOL                                 `json:"isEnabled"`
+	OnRampAddresses  []types.TEXT                               `json:"onRampAddresses" hex:"[]bytes"`
+	DefaultCCVs      []chainlinkapi.RawInstanceAddress          `json:"defaultCCVs"`
+	LaneMandatedCCVs []chainlinkapi.RawInstanceAddress          `json:"laneMandatedCCVs"`
+	Context          splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+}
+
+// ToMap converts SourceChainConfig to a map for DAML arguments
+func (t SourceChainConfig) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["onRampAddresses"] = func() []any {
+		res := make([]any, 0, len(t.OnRampAddresses))
+		for _, e := range t.OnRampAddresses {
+			res = append(res, string(e))
+		}
+		return res
+	}()
+
+	m["defaultCCVs"] = func() []any {
+		res := make([]any, 0, len(t.DefaultCCVs))
+		for _, e := range t.DefaultCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	m["laneMandatedCCVs"] = func() []any {
+		res := make([]any, 0, len(t.LaneMandatedCCVs))
+		for _, e := range t.LaneMandatedCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	return m
+}
+
+func (t SourceChainConfig) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SourceChainConfig) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SourceChainConfig to hex string (Canton MCMS format)
+func (t SourceChainConfig) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SourceChainConfig from hex string (Canton MCMS format)
+func (t *SourceChainConfig) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TimestampedPrice is a Record type
+type TimestampedPrice struct {
+	Price     types.NUMERIC                              `json:"price"`
+	Timestamp types.TIMESTAMP                            `json:"timestamp"`
+	Context   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+}
+
+// ToMap converts TimestampedPrice to a map for DAML arguments
+func (t TimestampedPrice) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["price"] = t.Price
+
+	m["timestamp"] = t.Timestamp
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	return m
+}
+
+func (t TimestampedPrice) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TimestampedPrice) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TimestampedPrice to hex string (Canton MCMS format)
+func (t TimestampedPrice) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TimestampedPrice from hex string (Canton MCMS format)
+func (t *TimestampedPrice) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistryView is a Record type
 type TokenAdminRegistryView struct {
 	CcipOwner  types.PARTY `json:"ccipOwner"`
@@ -1176,16 +1770,62 @@ func (t *TokenAdminRegistryView) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// TokenAdminRegistryAcceptAdminRole is a Record type
+type TokenAdminRegistryAcceptAdminRole struct {
+	TokenConfigCid types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts TokenAdminRegistryAcceptAdminRole to a map for DAML arguments
+func (t TokenAdminRegistryAcceptAdminRole) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenAdminRegistryAcceptAdminRole) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAdminRegistryAcceptAdminRole) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistryAcceptAdminRole to hex string (Canton MCMS format)
+func (t TokenAdminRegistryAcceptAdminRole) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryAcceptAdminRole from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryAcceptAdminRole) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistryAddTokenSend is a Record type
 type TokenAdminRegistryAddTokenSend struct {
-	TokenConfigCid    types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT                               `json:"poolInstanceId"`
-	InstrumentId      splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount            types.TEXT                               `json:"amount"`
-	DestTokenAddress  types.TEXT                               `json:"destTokenAddress"`
-	ExtraData         types.TEXT                               `json:"extraData"`
-	Caller            types.PARTY                              `json:"caller"`
+	TokenConfigCid    types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	PoolInstanceId    types.TEXT                                 `json:"poolInstanceId"`
+	InstrumentId      splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Amount            types.TEXT                                 `json:"amount"`
+	DestTokenAddress  types.TEXT                                 `json:"destTokenAddress"`
+	ExtraData         types.TEXT                                 `json:"extraData"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryAddTokenSend to a map for DAML arguments
@@ -1205,6 +1845,8 @@ func (t TokenAdminRegistryAddTokenSend) ToMap() map[string]any {
 	m["destTokenAddress"] = string(t.DestTokenAddress)
 
 	m["extraData"] = string(t.ExtraData)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1235,13 +1877,14 @@ func (t *TokenAdminRegistryAddTokenSend) UnmarshalHex(data string) error {
 
 // TokenAdminRegistryAddTokenSendFee is a Record type
 type TokenAdminRegistryAddTokenSendFee struct {
-	TokenConfigCid    types.CONTRACT_ID `json:"tokenConfigCid"`
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT        `json:"poolInstanceId"`
-	FeeUSDCents       types.NUMERIC     `json:"feeUSDCents"`
-	DestGasOverhead   types.INT64       `json:"destGasOverhead"`
-	DestBytesOverhead types.INT64       `json:"destBytesOverhead"`
-	Caller            types.PARTY       `json:"caller"`
+	TokenConfigCid    types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	PoolInstanceId    types.TEXT                                 `json:"poolInstanceId"`
+	FeeUSDCents       types.NUMERIC                              `json:"feeUSDCents"`
+	DestGasOverhead   types.INT64                                `json:"destGasOverhead"`
+	DestBytesOverhead types.INT64                                `json:"destBytesOverhead"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryAddTokenSendFee to a map for DAML arguments
@@ -1259,6 +1902,8 @@ func (t TokenAdminRegistryAddTokenSendFee) ToMap() map[string]any {
 	m["destGasOverhead"] = int64(t.DestGasOverhead)
 
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1289,11 +1934,12 @@ func (t *TokenAdminRegistryAddTokenSendFee) UnmarshalHex(data string) error {
 
 // TokenAdminRegistryConsumeReceiveTicket is a Record type
 type TokenAdminRegistryConsumeReceiveTicket struct {
-	TokenConfigCid        types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	TokenReceiveTicketCid types.CONTRACT_ID                        `json:"tokenReceiveTicketCid"`
-	InstrumentId          splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	PoolInstanceId        types.TEXT                               `json:"poolInstanceId"`
-	Caller                types.PARTY                              `json:"caller"`
+	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
+	InstrumentId          splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	PoolInstanceId        types.TEXT                                 `json:"poolInstanceId"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller                types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryConsumeReceiveTicket to a map for DAML arguments
@@ -1307,6 +1953,8 @@ func (t TokenAdminRegistryConsumeReceiveTicket) ToMap() map[string]any {
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
 	m["poolInstanceId"] = string(t.PoolInstanceId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1337,9 +1985,10 @@ func (t *TokenAdminRegistryConsumeReceiveTicket) UnmarshalHex(data string) error
 
 // TokenAdminRegistryFetchTokenConfig is a Record type
 type TokenAdminRegistryFetchTokenConfig struct {
-	TokenConfigCid types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Caller         types.PARTY                              `json:"caller"`
+	TokenConfigCid types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryFetchTokenConfig to a map for DAML arguments
@@ -1349,6 +1998,8 @@ func (t TokenAdminRegistryFetchTokenConfig) ToMap() map[string]any {
 	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1377,10 +2028,127 @@ func (t *TokenAdminRegistryFetchTokenConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// TokenAdminRegistryIsAdministrator is a Record type
+type TokenAdminRegistryIsAdministrator struct {
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	TokenConfigCid *types.CONTRACT_ID                         `json:"tokenConfigCid" hex:"optional"`
+	Administrator  types.PARTY                                `json:"administrator"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts TokenAdminRegistryIsAdministrator to a map for DAML arguments
+func (t TokenAdminRegistryIsAdministrator) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	if t.TokenConfigCid != nil {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TokenConfigCid),
+		}
+	} else {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["administrator"] = t.Administrator.ToMap()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenAdminRegistryIsAdministrator) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAdminRegistryIsAdministrator) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistryIsAdministrator to hex string (Canton MCMS format)
+func (t TokenAdminRegistryIsAdministrator) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryIsAdministrator from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryIsAdministrator) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TokenAdminRegistryProposeAdministrator is a Record type
+type TokenAdminRegistryProposeAdministrator struct {
+	TokenConfigCid *types.CONTRACT_ID                         `json:"tokenConfigCid" hex:"optional"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	NewAdmin       types.PARTY                                `json:"newAdmin"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts TokenAdminRegistryProposeAdministrator to a map for DAML arguments
+func (t TokenAdminRegistryProposeAdministrator) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	if t.TokenConfigCid != nil {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TokenConfigCid),
+		}
+	} else {
+		m["tokenConfigCid"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenAdminRegistryProposeAdministrator) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAdminRegistryProposeAdministrator) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistryProposeAdministrator to hex string (Canton MCMS format)
+func (t TokenAdminRegistryProposeAdministrator) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryProposeAdministrator from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryProposeAdministrator) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistryPublicFetch is a Record type
 type TokenAdminRegistryPublicFetch struct {
-	ExpectedAddress chainlinkapi.RawInstanceAddress `json:"expectedAddress"`
-	Caller          types.PARTY                     `json:"caller"`
+	ExpectedAddress chainlinkapi.RawInstanceAddress            `json:"expectedAddress"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistryPublicFetch to a map for DAML arguments
@@ -1388,6 +2156,8 @@ func (t TokenAdminRegistryPublicFetch) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["expectedAddress"] = model.NestedToDAMLValue(t.ExpectedAddress)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1416,13 +2186,72 @@ func (t *TokenAdminRegistryPublicFetch) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// TokenAdminRegistrySetBurnMintFactory is a Record type
+type TokenAdminRegistrySetBurnMintFactory struct {
+	TokenConfigCid  types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	BurnMintFactory *types.CONTRACT_ID                         `json:"burnMintFactory" hex:"optional"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts TokenAdminRegistrySetBurnMintFactory to a map for DAML arguments
+func (t TokenAdminRegistrySetBurnMintFactory) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	if t.BurnMintFactory != nil {
+		m["burnMintFactory"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.BurnMintFactory),
+		}
+	} else {
+		m["burnMintFactory"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenAdminRegistrySetBurnMintFactory) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAdminRegistrySetBurnMintFactory) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistrySetBurnMintFactory to hex string (Canton MCMS format)
+func (t TokenAdminRegistrySetBurnMintFactory) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistrySetBurnMintFactory from hex string (Canton MCMS format)
+func (t *TokenAdminRegistrySetBurnMintFactory) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenAdminRegistrySetInboundPoolCCVs is a Record type
 type TokenAdminRegistrySetInboundPoolCCVs struct {
-	TokenConfigCid      types.CONTRACT_ID                 `json:"tokenConfigCid"`
-	ExecutingMessageCid types.CONTRACT_ID                 `json:"executingMessageCid"`
-	PoolInstanceId      types.TEXT                        `json:"poolInstanceId"`
-	PoolCCVs            []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
-	Caller              types.PARTY                       `json:"caller"`
+	TokenConfigCid      types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+	PoolInstanceId      types.TEXT                                 `json:"poolInstanceId"`
+	PoolCCVs            []chainlinkapi.RawInstanceAddress          `json:"poolCCVs"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller              types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistrySetInboundPoolCCVs to a map for DAML arguments
@@ -1442,6 +2271,8 @@ func (t TokenAdminRegistrySetInboundPoolCCVs) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1472,11 +2303,12 @@ func (t *TokenAdminRegistrySetInboundPoolCCVs) UnmarshalHex(data string) error {
 
 // TokenAdminRegistrySetOutboundPoolCCVs is a Record type
 type TokenAdminRegistrySetOutboundPoolCCVs struct {
-	TokenConfigCid    types.CONTRACT_ID                 `json:"tokenConfigCid"`
-	SendingMessageCid types.CONTRACT_ID                 `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT                        `json:"poolInstanceId"`
-	PoolCCVs          []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
-	Caller            types.PARTY                       `json:"caller"`
+	TokenConfigCid    types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	PoolInstanceId    types.TEXT                                 `json:"poolInstanceId"`
+	PoolCCVs          []chainlinkapi.RawInstanceAddress          `json:"poolCCVs"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenAdminRegistrySetOutboundPoolCCVs to a map for DAML arguments
@@ -1496,6 +2328,8 @@ func (t TokenAdminRegistrySetOutboundPoolCCVs) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1524,11 +2358,177 @@ func (t *TokenAdminRegistrySetOutboundPoolCCVs) UnmarshalHex(data string) error 
 	return hexCodec.Unmarshal(data, t)
 }
 
+// TokenAdminRegistrySetPool is a Record type
+type TokenAdminRegistrySetPool struct {
+	TokenConfigCid types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	TokenPool      *PoolRegistration                          `json:"tokenPool" hex:"optional"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts TokenAdminRegistrySetPool to a map for DAML arguments
+func (t TokenAdminRegistrySetPool) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	if t.TokenPool != nil {
+		m["tokenPool"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TokenPool),
+		}
+	} else {
+		m["tokenPool"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenAdminRegistrySetPool) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAdminRegistrySetPool) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistrySetPool to hex string (Canton MCMS format)
+func (t TokenAdminRegistrySetPool) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistrySetPool from hex string (Canton MCMS format)
+func (t *TokenAdminRegistrySetPool) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TokenAdminRegistrySetTransferFactory is a Record type
+type TokenAdminRegistrySetTransferFactory struct {
+	TokenConfigCid  types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	TransferFactory *types.CONTRACT_ID                         `json:"transferFactory" hex:"optional"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts TokenAdminRegistrySetTransferFactory to a map for DAML arguments
+func (t TokenAdminRegistrySetTransferFactory) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	if t.TransferFactory != nil {
+		m["transferFactory"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TransferFactory),
+		}
+	} else {
+		m["transferFactory"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenAdminRegistrySetTransferFactory) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAdminRegistrySetTransferFactory) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistrySetTransferFactory to hex string (Canton MCMS format)
+func (t TokenAdminRegistrySetTransferFactory) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistrySetTransferFactory from hex string (Canton MCMS format)
+func (t *TokenAdminRegistrySetTransferFactory) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// TokenAdminRegistryTransferAdminRole is a Record type
+type TokenAdminRegistryTransferAdminRole struct {
+	TokenConfigCid types.CONTRACT_ID                          `json:"tokenConfigCid"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	NewAdmin       types.PARTY                                `json:"newAdmin"`
+	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller         types.PARTY                                `json:"caller"`
+}
+
+// ToMap converts TokenAdminRegistryTransferAdminRole to a map for DAML arguments
+func (t TokenAdminRegistryTransferAdminRole) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["newAdmin"] = t.NewAdmin.ToMap()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	m["caller"] = t.Caller.ToMap()
+
+	return m
+}
+
+func (t TokenAdminRegistryTransferAdminRole) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *TokenAdminRegistryTransferAdminRole) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes TokenAdminRegistryTransferAdminRole to hex string (Canton MCMS format)
+func (t TokenAdminRegistryTransferAdminRole) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes TokenAdminRegistryTransferAdminRole from hex string (Canton MCMS format)
+func (t *TokenAdminRegistryTransferAdminRole) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // TokenConfigView is a Record type
 type TokenConfigView struct {
-	CcipOwner    types.PARTY                              `json:"ccipOwner"`
-	InstanceId   types.TEXT                               `json:"instanceId"`
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	CcipOwner    types.PARTY                                `json:"ccipOwner"`
+	InstanceId   types.TEXT                                 `json:"instanceId"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	TokenPool    *PoolRegistration                          `json:"tokenPool" hex:"optional"`
+	Context      splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts TokenConfigView to a map for DAML arguments
@@ -1540,6 +2540,20 @@ func (t TokenConfigView) ToMap() map[string]any {
 	m["instanceId"] = string(t.InstanceId)
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	if t.TokenPool != nil {
+		m["tokenPool"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TokenPool),
+		}
+	} else {
+		m["tokenPool"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -1568,8 +2582,9 @@ func (t *TokenConfigView) UnmarshalHex(data string) error {
 
 // TokenConfigAssertConfiguredBurnMintFactory is a Record type
 type TokenConfigAssertConfiguredBurnMintFactory struct {
-	SuppliedFactory types.CONTRACT_ID `json:"suppliedFactory"`
-	Caller          types.PARTY       `json:"caller"`
+	SuppliedFactory types.CONTRACT_ID                          `json:"suppliedFactory"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenConfigAssertConfiguredBurnMintFactory to a map for DAML arguments
@@ -1577,6 +2592,8 @@ func (t TokenConfigAssertConfiguredBurnMintFactory) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["suppliedFactory"] = model.NestedToDAMLValue(t.SuppliedFactory)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1607,8 +2624,9 @@ func (t *TokenConfigAssertConfiguredBurnMintFactory) UnmarshalHex(data string) e
 
 // TokenConfigAssertConfiguredTransferFactory is a Record type
 type TokenConfigAssertConfiguredTransferFactory struct {
-	SuppliedFactory types.CONTRACT_ID `json:"suppliedFactory"`
-	Caller          types.PARTY       `json:"caller"`
+	SuppliedFactory types.CONTRACT_ID                          `json:"suppliedFactory"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenConfigAssertConfiguredTransferFactory to a map for DAML arguments
@@ -1616,6 +2634,8 @@ func (t TokenConfigAssertConfiguredTransferFactory) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["suppliedFactory"] = model.NestedToDAMLValue(t.SuppliedFactory)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1646,8 +2666,9 @@ func (t *TokenConfigAssertConfiguredTransferFactory) UnmarshalHex(data string) e
 
 // TokenConfigPublicFetch is a Record type
 type TokenConfigPublicFetch struct {
-	ExpectedAddress chainlinkapi.RawInstanceAddress `json:"expectedAddress"`
-	Caller          types.PARTY                     `json:"caller"`
+	ExpectedAddress chainlinkapi.RawInstanceAddress            `json:"expectedAddress"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller          types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenConfigPublicFetch to a map for DAML arguments
@@ -1655,6 +2676,8 @@ func (t TokenConfigPublicFetch) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["expectedAddress"] = model.NestedToDAMLValue(t.ExpectedAddress)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1685,9 +2708,10 @@ func (t *TokenConfigPublicFetch) UnmarshalHex(data string) error {
 
 // TokenReceiveTicketView is a Record type
 type TokenReceiveTicketView struct {
-	CcipOwner types.PARTY   `json:"ccipOwner"`
-	PoolOwner types.PARTY   `json:"poolOwner"`
-	CcvOwners []types.PARTY `json:"ccvOwners"`
+	CcipOwner types.PARTY                                `json:"ccipOwner"`
+	PoolOwner types.PARTY                                `json:"poolOwner"`
+	CcvOwners []types.PARTY                              `json:"ccvOwners"`
+	Context   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts TokenReceiveTicketView to a map for DAML arguments
@@ -1705,6 +2729,8 @@ func (t TokenReceiveTicketView) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }

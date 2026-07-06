@@ -25,7 +25,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[core.FeeQuoter]{
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
 	Description:    "Deploys the CCIP FeeQuoter contract on Canton",
 	Validate: func(template core.FeeQuoter) error {
-		if template.Owner == "" {
+		if template.CcipOwner == "" {
 			return errors.New("owner cannot be empty")
 		}
 

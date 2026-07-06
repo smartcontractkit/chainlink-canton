@@ -180,7 +180,7 @@ func TestServer_GetTokenAdminRegistryToken(t *testing.T) {
 		Index:              1,
 		IsCCIPManaged:      false,
 		InstrumentId:       instrumentId,
-		TokenPool: &core.PoolRegistration{
+		TokenPool: &core.PoolRegistration2{
 			PoolOwner:      types.PARTY(tokenPoolAddress.Owner()),
 			PoolInstanceId: types.TEXT(tokenPoolAddress.InstanceID()),
 		},
@@ -397,7 +397,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 
 		return mockActiveContractStore, client
 	}
-	tokenConfigContract := func(contractId string, instrumentId splice_api_token_holding_v1.InstrumentId, tokenPool *core.PoolRegistration) *apiv2.ActiveContract {
+	tokenConfigContract := func(contractId string, instrumentId splice_api_token_holding_v1.InstrumentId, tokenPool *core.PoolRegistration2) *apiv2.ActiveContract {
 		encodedInstrumentId := contracts.EncodeInstrumentID(instrumentId)
 		return &apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 			ContractId: contractId,
@@ -416,7 +416,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			}),
 		}}
 	}
-	tokenPoolRegistration := &core.PoolRegistration{
+	tokenPoolRegistration := &core.PoolRegistration2{
 		PoolOwner:      types.PARTY(tokenPoolAddress.Owner()),
 		PoolInstanceId: types.TEXT(tokenPoolAddress.InstanceID()),
 	}
@@ -1363,7 +1363,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				RegistryOwner:      types.PARTY(tokenAdminRegistryAddress.Owner()),
 				Index:              0,
 				InstrumentId:       tokenInstrumentId,
-				TokenPool: &core.PoolRegistration{
+				TokenPool: &core.PoolRegistration2{
 					PoolOwner:      types.PARTY(tokenPoolAddress.Owner()),
 					PoolInstanceId: types.TEXT(tokenPoolAddress.InstanceID()),
 				},

@@ -637,14 +637,14 @@ func TestCCIPSend(t *testing.T) {
 		},
 		CcvSendInputs: []sender.CCVSendInput{
 			{
-				CcvAddress:      ccvSendDisclosure.Address.Binding(),
-				CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-				CcvExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+				CcvAddress: ccvSendDisclosure.Address.Binding(),
+				CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+				Context:    splice_api_token_metadata_v1.ChoiceContext{},
 			},
 		},
 		ExecutorInput: &sender.ExecutorInput{
-			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
-			ExecutorExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
+			Context:     splice_api_token_metadata_v1.ChoiceContext{},
 		},
 	}
 

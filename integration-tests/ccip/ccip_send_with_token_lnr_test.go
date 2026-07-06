@@ -856,19 +856,19 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		},
 		CcvSendInputs: []sender.CCVSendInput{
 			{
-				CcvAddress:      ccvSendDisclosure.Address.Binding(),
-				CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-				CcvExtraContext: ccvSendDisclosure.ChoiceContext,
+				CcvAddress: ccvSendDisclosure.Address.Binding(),
+				CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+				Context:    ccvSendDisclosure.ChoiceContext,
 			},
 		},
 		TokenTransferInput: &sender.TokenTransferInput{
-			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
-			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
-			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
+			TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
+			Context:         tokenPoolSendDisclosure.ChoiceContext,
 		},
 		ExecutorInput: &sender.ExecutorInput{
-			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
-			ExecutorExtraContext: executorSendDisclosure.ChoiceContext,
+			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
+			Context:     executorSendDisclosure.ChoiceContext,
 		},
 	}
 
@@ -903,11 +903,11 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
 	sendArgs.FeeTokenInput.FeeTokenConfigCid = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid)
 	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
-	sendArgs.CcvSendInputs[0].CcvExtraContext = ccvSendDisclosure.ChoiceContext
+	sendArgs.CcvSendInputs[0].Context = ccvSendDisclosure.ChoiceContext
 	sendArgs.TokenTransferInput.TokenPoolCid = types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId)
-	sendArgs.TokenTransferInput.PoolExtraContext = tokenPoolSendDisclosure.ChoiceContext
+	sendArgs.TokenTransferInput.Context = tokenPoolSendDisclosure.ChoiceContext
 	sendArgs.ExecutorInput.ExecutorCid = types.CONTRACT_ID(executorSendDisclosure.ContractId)
-	sendArgs.ExecutorInput.ExecutorExtraContext = executorSendDisclosure.ChoiceContext
+	sendArgs.ExecutorInput.Context = executorSendDisclosure.ChoiceContext
 	sendDisclosures = testhelpers.DeduplicateDisclosedContracts(slices.Concat(
 		transferFactoryDisclosures,
 		ccipSendDisclosure.DisclosedContracts,

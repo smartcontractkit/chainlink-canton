@@ -173,7 +173,6 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 		RmnRemote:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(rmnInstanceAddr)},
 		TokenAdminRegistry: chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(tarInstanceAddr)},
 		FeeQuoter:          chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(fqInstanceAddr)},
-		CcvRegistry:        chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(ccvInstanceAddr)},
 		MaxUSDCentsPerMsg:  types.NUMERIC("100000"),
 	}
 	factoryCid, mcmsCid = mcmsFactoryDeployWithMCMSQueryParty(t, participant, mcmsEncoder, ccipOwner, decentralizedParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployOnRampParams", onRampParams)

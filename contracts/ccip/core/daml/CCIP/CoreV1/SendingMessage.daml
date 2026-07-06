@@ -311,6 +311,11 @@ template SendingMessage
 
                 context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
+            sendingMessage_feeTokenAmountImpl self arg = do
+                exercise (fromInterfaceContractId @SendingMessage self) FeeTokenAmount with
+                    context = arg.context
+                    caller = arg.caller
+
             sendingMessage_addCCVFeeImpl self arg = do
                 coerceContractId <$> exercise (fromInterfaceContractId @SendingMessage self) AddCCVFee
                     with
@@ -646,6 +651,7 @@ template SendingMessage
         -- Requires FinalizeFee to have been called.
         nonconsuming choice FeeTokenAmount : Decimal
             with
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
                 caller : Party
             controller caller
             do

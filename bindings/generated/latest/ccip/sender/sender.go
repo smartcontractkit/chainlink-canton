@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "0eca1369436bbba5524e9e12def8223a9b596aef8f92debe1604e82e06ed9107"
+	PackageID   = "351b22ee942526605d5047cc300de9390bcbe70cdcbfd77a005d14ec5e7d3ca7"
 	SDKVersion  = "3.4.11"
 )
 
@@ -212,9 +212,9 @@ func (t CCIPSender) GetRequiredCCVsWithPackageID(contractID string, packageID st
 
 // CCVSendInput is a Record type
 type CCVSendInput struct {
-	CcvAddress      chainlinkapi.RawInstanceAddress            `json:"ccvAddress"`
-	CcvCid          types.CONTRACT_ID                          `json:"ccvCid"`
-	CcvExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"ccvExtraContext"`
+	CcvAddress chainlinkapi.RawInstanceAddress            `json:"ccvAddress"`
+	CcvCid     types.CONTRACT_ID                          `json:"ccvCid"`
+	Context    splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts CCVSendInput to a map for DAML arguments
@@ -225,7 +225,7 @@ func (t CCVSendInput) ToMap() map[string]any {
 
 	m["ccvCid"] = model.NestedToDAMLValue(t.CcvCid)
 
-	m["ccvExtraContext"] = model.NestedToDAMLValue(t.CcvExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -254,8 +254,8 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 
 // ExecutorInput is a Record type
 type ExecutorInput struct {
-	ExecutorCid          types.CONTRACT_ID                          `json:"executorCid"`
-	ExecutorExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"executorExtraContext"`
+	ExecutorCid types.CONTRACT_ID                          `json:"executorCid"`
+	Context     splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts ExecutorInput to a map for DAML arguments
@@ -264,7 +264,7 @@ func (t ExecutorInput) ToMap() map[string]any {
 
 	m["executorCid"] = model.NestedToDAMLValue(t.ExecutorCid)
 
-	m["executorExtraContext"] = model.NestedToDAMLValue(t.ExecutorExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -346,11 +346,11 @@ func (t *FeeTokenInput) UnmarshalHex(data string) error {
 type GetFee struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
 	Message                  clientapi.Canton2AnyMessage                `json:"message"`
-	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	CcvSendInputs            []CCVSendInput                             `json:"ccvSendInputs"`
 	TokenTransferInput       *TokenTransferInput                        `json:"tokenTransferInput" hex:"optional"`
 	ExecutorInput            *ExecutorInput                             `json:"executorInput" hex:"optional"`
+	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts GetFee to a map for DAML arguments
@@ -360,8 +360,6 @@ func (t GetFee) ToMap() map[string]any {
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
@@ -396,6 +394,8 @@ func (t GetFee) ToMap() map[string]any {
 			"value": nil,
 		}
 	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -465,9 +465,9 @@ func (t *GetFeeResult2) UnmarshalHex(data string) error {
 type GetRequiredCCVs struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
 	Message                  clientapi.Canton2AnyMessage                `json:"message"`
-	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	TokenPoolCid             *types.CONTRACT_ID                         `json:"tokenPoolCid" hex:"optional"`
+	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts GetRequiredCCVs to a map for DAML arguments
@@ -477,8 +477,6 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
@@ -493,6 +491,8 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 			"value": nil,
 		}
 	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -523,12 +523,12 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 type Send struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
 	Message                  clientapi.Canton2AnyMessage                `json:"message"`
-	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	FeeTokenInput            FeeTokenInput                              `json:"feeTokenInput"`
 	CcvSendInputs            []CCVSendInput                             `json:"ccvSendInputs"`
 	TokenTransferInput       *TokenTransferInput                        `json:"tokenTransferInput" hex:"optional"`
 	ExecutorInput            *ExecutorInput                             `json:"executorInput" hex:"optional"`
+	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts Send to a map for DAML arguments
@@ -538,8 +538,6 @@ func (t Send) ToMap() map[string]any {
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
@@ -577,6 +575,8 @@ func (t Send) ToMap() map[string]any {
 		}
 	}
 
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
 	return m
 }
 
@@ -604,9 +604,9 @@ func (t *Send) UnmarshalHex(data string) error {
 
 // TokenTransferInput is a Record type
 type TokenTransferInput struct {
-	SenderInputCids  []types.CONTRACT_ID                        `json:"senderInputCids"`
-	TokenPoolCid     types.CONTRACT_ID                          `json:"tokenPoolCid"`
-	PoolExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"poolExtraContext"`
+	SenderInputCids []types.CONTRACT_ID                        `json:"senderInputCids"`
+	TokenPoolCid    types.CONTRACT_ID                          `json:"tokenPoolCid"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -623,7 +623,7 @@ func (t TokenTransferInput) ToMap() map[string]any {
 
 	m["tokenPoolCid"] = model.NestedToDAMLValue(t.TokenPoolCid)
 
-	m["poolExtraContext"] = model.NestedToDAMLValue(t.PoolExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }

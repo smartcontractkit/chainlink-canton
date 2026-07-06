@@ -24,7 +24,6 @@ encodeOnRampDeps params =
     <> encodeRawInstanceAddress params.rmnRemote
     <> encodeRawInstanceAddress params.tokenAdminRegistry
     <> encodeRawInstanceAddress params.feeQuoter
-    <> encodeRawInstanceAddress params.ccvRegistry
 
 decodeOnRampDepsAt : BytesHex -> Int -> Optional (OnRampDeps, Int)
 decodeOnRampDepsAt encoded offset = do
@@ -32,7 +31,6 @@ decodeOnRampDepsAt encoded offset = do
     (rmnRemote, offset) <- decodeRawInstanceAddressAt encoded offset
     (tokenAdminRegistry, offset) <- decodeRawInstanceAddressAt encoded offset
     (feeQuoter, offset) <- decodeRawInstanceAddressAt encoded offset
-    (ccvRegistry, offset) <- decodeRawInstanceAddressAt encoded offset
     Some (OnRampDeps{..}, offset)
 
 
@@ -46,7 +44,6 @@ encodeSetDepsParams params =
     <> encodeOptional params.rmnRemote encodeRawInstanceAddress
     <> encodeOptional params.tokenAdminRegistry encodeRawInstanceAddress
     <> encodeOptional params.feeQuoter encodeRawInstanceAddress
-    <> encodeOptional params.ccvRegistry encodeRawInstanceAddress
 
 decodeSetDepsParamsAt : BytesHex -> Int -> Optional (SetDepsParams, Int)
 decodeSetDepsParamsAt encoded offset = do
@@ -54,7 +51,6 @@ decodeSetDepsParamsAt encoded offset = do
     (rmnRemote, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
     (tokenAdminRegistry, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
     (feeQuoter, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
-    (ccvRegistry, offset) <- decodeOptional encoded offset decodeRawInstanceAddressAt
     Some (SetDepsParams{..}, offset)
 
 

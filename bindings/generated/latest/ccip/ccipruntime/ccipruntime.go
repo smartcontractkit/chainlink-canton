@@ -32,7 +32,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime"
-	PackageID   = "bb157cb127e63076f562a112e5ef74aaeee206ab877bdda2a0bc7f6a8f937722"
+	PackageID   = "bbeb73396314ccc78b391a39efa3fa4e6bf7862a48f1d590db8c1a2b484160e8"
 	SDKVersion  = "3.4.11"
 )
 
@@ -289,19 +289,17 @@ func (t ArchivedExecutedMessages) ArchiveWithPackageID(contractID string, packag
 
 // CCIPSend is a Record type
 type CCIPSend struct {
-	Context                 splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	SendingMessageCid       types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	FeeTokenHoldingCids     []types.CONTRACT_ID                        `json:"feeTokenHoldingCids"`
 	FeeTokenConfigCid       types.CONTRACT_ID                          `json:"feeTokenConfigCid"`
 	FeeTokenTransferFactory types.CONTRACT_ID                          `json:"feeTokenTransferFactory"`
 	FeeTokenExtraArgs       splice_api_token_metadata_v1.ExtraArgs     `json:"feeTokenExtraArgs"`
+	Context                 splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts CCIPSend to a map for DAML arguments
 func (t CCIPSend) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
@@ -318,6 +316,8 @@ func (t CCIPSend) ToMap() map[string]any {
 	m["feeTokenTransferFactory"] = model.NestedToDAMLValue(t.FeeTokenTransferFactory)
 
 	m["feeTokenExtraArgs"] = model.NestedToDAMLValue(t.FeeTokenExtraArgs)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -614,17 +614,17 @@ func (t *CreateRouterResult) UnmarshalHex(data string) error {
 
 // Execute is a Record type
 type Execute struct {
-	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts Execute to a map for DAML arguments
 func (t Execute) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = model.NestedToDAMLValue(t.Context)
-
 	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -1001,17 +1001,17 @@ func (t *FeeCalculationResult) UnmarshalHex(data string) error {
 
 // FinalizeFee2 is a Record type
 type FinalizeFee2 struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts FinalizeFee2 to a map for DAML arguments
 func (t FinalizeFee2) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["context"] = model.NestedToDAMLValue(t.Context)
-
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -1348,19 +1348,17 @@ func (t *GetFeeFromRouterResult) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForExecute is a Record type
 type GetRequiredCCVsForExecute struct {
-	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Message                   ccipcodec.MessageV1                        `json:"message"`
 	ReceiverRequiredCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverRequiredCCVs"`
 	ReceiverOptionalCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
 	TokenPoolRequiredCCVs     []chainlinkapi.RawInstanceAddress          `json:"tokenPoolRequiredCCVs"`
+	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts GetRequiredCCVsForExecute to a map for DAML arguments
 func (t GetRequiredCCVsForExecute) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
 
@@ -1389,6 +1387,8 @@ func (t GetRequiredCCVsForExecute) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -1486,17 +1486,15 @@ func (t *GetRequiredCCVsForExecuteFromRouter) UnmarshalHex(data string) error {
 
 // GetRequiredCCVsForSend is a Record type
 type GetRequiredCCVsForSend struct {
-	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
 	Message           clientapi.Canton2AnyMessage                `json:"message"`
 	PoolReportedCCVs  []chainlinkapi.RawInstanceAddress          `json:"poolReportedCCVs"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts GetRequiredCCVsForSend to a map for DAML arguments
 func (t GetRequiredCCVsForSend) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["destChainSelector"] = t.DestChainSelector
 
@@ -1509,6 +1507,8 @@ func (t GetRequiredCCVsForSend) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -2235,7 +2235,6 @@ type OnRampDeps struct {
 	RmnRemote          chainlinkapi.RawInstanceAddress `json:"rmnRemote"`
 	TokenAdminRegistry chainlinkapi.RawInstanceAddress `json:"tokenAdminRegistry"`
 	FeeQuoter          chainlinkapi.RawInstanceAddress `json:"feeQuoter"`
-	CcvRegistry        chainlinkapi.RawInstanceAddress `json:"ccvRegistry"`
 }
 
 // ToMap converts OnRampDeps to a map for DAML arguments
@@ -2249,8 +2248,6 @@ func (t OnRampDeps) ToMap() map[string]any {
 	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
 
 	m["feeQuoter"] = model.NestedToDAMLValue(t.FeeQuoter)
-
-	m["ccvRegistry"] = model.NestedToDAMLValue(t.CcvRegistry)
 
 	return m
 }
@@ -3214,7 +3211,6 @@ var _ api.IMCMSReceiver = (*PerPartyRouterFactory)(nil)
 
 // PrepareExecute is a Record type
 type PrepareExecute struct {
-	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	EncodedMessage            types.TEXT                                 `json:"encodedMessage"`
 	ReceiverParty             types.PARTY                                `json:"receiverParty"`
 	TokenReceiverParty        *types.PARTY                               `json:"tokenReceiverParty" hex:"optional"`
@@ -3222,14 +3218,13 @@ type PrepareExecute struct {
 	ReceiverOptionalCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
 	ReceiverFinalityConfig    ccipcodec.FinalityConfig                   `json:"receiverFinalityConfig"`
+	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                    types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts PrepareExecute to a map for DAML arguments
 func (t PrepareExecute) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["encodedMessage"] = string(t.EncodedMessage)
 
@@ -3267,6 +3262,8 @@ func (t PrepareExecute) ToMap() map[string]any {
 
 	m["receiverFinalityConfig"] = model.NestedToDAMLValue(t.ReceiverFinalityConfig)
 
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
 	m["caller"] = t.Caller.ToMap()
 
 	return m
@@ -3297,7 +3294,6 @@ func (t *PrepareExecute) UnmarshalHex(data string) error {
 // PrepareExecuteMCMSParams is PrepareExecute without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type PrepareExecuteMCMSParams struct {
-	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	EncodedMessage            types.TEXT                                 `json:"encodedMessage"`
 	ReceiverParty             types.PARTY                                `json:"receiverParty"`
 	TokenReceiverParty        *types.PARTY                               `json:"tokenReceiverParty" hex:"optional"`
@@ -3305,6 +3301,7 @@ type PrepareExecuteMCMSParams struct {
 	ReceiverOptionalCCVs      []chainlinkapi.RawInstanceAddress          `json:"receiverOptionalCCVs"`
 	ReceiverOptionalThreshold types.INT64                                `json:"receiverOptionalThreshold"`
 	ReceiverFinalityConfig    ccipcodec.FinalityConfig                   `json:"receiverFinalityConfig"`
+	Context                   splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes PrepareExecuteMCMSParams to hex string for MCMS operationData.
@@ -3363,15 +3360,16 @@ func (t *PrepareSend) UnmarshalHex(data string) error {
 
 // PrepareSendFromRouter is a Record type
 type PrepareSendFromRouter struct {
-	DestChainSelector     types.NUMERIC               `json:"destChainSelector"`
-	Message               clientapi.Canton2AnyMessage `json:"message"`
-	RouterPartyOwner      types.PARTY                 `json:"routerPartyOwner"`
-	RouterInstanceId      types.TEXT                  `json:"routerInstanceId"`
-	GlobalConfigCid       types.CONTRACT_ID           `json:"globalConfigCid"`
-	TokenAdminRegistryCid types.CONTRACT_ID           `json:"tokenAdminRegistryCid"`
-	FeeQuoterCid          types.CONTRACT_ID           `json:"feeQuoterCid"`
-	RmnRemoteCid          types.CONTRACT_ID           `json:"rmnRemoteCid"`
-	CurrentSequenceNumber types.NUMERIC               `json:"currentSequenceNumber"`
+	DestChainSelector     types.NUMERIC                              `json:"destChainSelector"`
+	Message               clientapi.Canton2AnyMessage                `json:"message"`
+	RouterPartyOwner      types.PARTY                                `json:"routerPartyOwner"`
+	RouterInstanceId      types.TEXT                                 `json:"routerInstanceId"`
+	GlobalConfigCid       types.CONTRACT_ID                          `json:"globalConfigCid"`
+	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
+	FeeQuoterCid          types.CONTRACT_ID                          `json:"feeQuoterCid"`
+	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
+	CurrentSequenceNumber types.NUMERIC                              `json:"currentSequenceNumber"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts PrepareSendFromRouter to a map for DAML arguments
@@ -3395,6 +3393,8 @@ func (t PrepareSendFromRouter) ToMap() map[string]any {
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
 	m["currentSequenceNumber"] = t.CurrentSequenceNumber
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -3547,7 +3547,6 @@ type SetDepsParams struct {
 	RmnRemote          *chainlinkapi.RawInstanceAddress `json:"rmnRemote" hex:"optional"`
 	TokenAdminRegistry *chainlinkapi.RawInstanceAddress `json:"tokenAdminRegistry" hex:"optional"`
 	FeeQuoter          *chainlinkapi.RawInstanceAddress `json:"feeQuoter" hex:"optional"`
-	CcvRegistry        *chainlinkapi.RawInstanceAddress `json:"ccvRegistry" hex:"optional"`
 }
 
 // ToMap converts SetDepsParams to a map for DAML arguments
@@ -3597,18 +3596,6 @@ func (t SetDepsParams) ToMap() map[string]any {
 		}
 	} else {
 		m["feeQuoter"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
-
-	if t.CcvRegistry != nil {
-		m["ccvRegistry"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.CcvRegistry),
-		}
-	} else {
-		m["ccvRegistry"] = map[string]any{
 			"_type": "optional",
 			"value": nil,
 		}

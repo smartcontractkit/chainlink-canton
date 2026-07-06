@@ -81,7 +81,7 @@ executorInput
 executorInput executorCid =
     CCIP.CCIPSender.ExecutorInput with
         executorCid = toInterfaceContractId @CCIP.InterfacesV1.Executor.IExecutor executorCid
-        executorExtraContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
 executorFeeQuote
     : Chainlink.InstanceAddress.RawInstanceAddress
@@ -95,6 +95,7 @@ executorFeeQuote executorAddress feeUSDCents =
         executorInstanceId
         executorOwner
         feeUSDCents
+        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
 setupFeeFixture : Text -> Bool -> Script FeeFixture
 setupFeeFixture suffix useDefaultExecutor = do
@@ -143,7 +144,7 @@ setupFeeFixture suffix useDefaultExecutor = do
     feeQuoter <- submit ccipOwner do
         createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
-            owner = ccipOwner
+            ccipOwner = ccipOwner
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList
                 [ (destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
@@ -184,7 +185,6 @@ setupFeeFixture suffix useDefaultExecutor = do
                 rmnRemote = Chainlink.InstanceAddress.make ("rmn-unused-" <> suffix) ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make ("tar-unused-" <> suffix) ccipOwner
                 feeQuoter = Chainlink.InstanceAddress.make feeQuoterInstanceId ccipOwner
-                ccvRegistry = Chainlink.InstanceAddress.make ("ccvregistry-unused-" <> suffix) ccipOwner
 
     router <- submit ccipOwner do
         createCmd CCIP.RuntimeV1.PerPartyRouter.PerPartyRouter with
@@ -272,6 +272,7 @@ testExecutorInterfaceRejectsMismatchedExpectedExecutor = script do
                 expectedExecutor = f.executorBAddress
                 destChainSelector = f.destChainSelector
                 requiredCCVs = []
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 caller = f.user
 
 testSenderGetFeeRejectsWrongDefaultExecutorInput : Script ()

@@ -61,3 +61,4 @@ template TokenReceiveTicket
                 ccipOwner = ccipOwner
                 poolOwner = poolOwner
                 ccvOwners = ccvOwners
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext

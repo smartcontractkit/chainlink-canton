@@ -3,7 +3,6 @@ module CCIPSenderGetFee where
 import Daml.Script
 
 import DA.Optional (fromSome)
-import qualified DA.TextMap as TextMap
 
 import qualified Splice.Api.Token.MetadataV1
 
@@ -24,10 +23,6 @@ data SenderGetFeeFixture = SenderGetFeeFixture
         requiredVerifierAddress : Chainlink.InstanceAddress.RawInstanceAddress
         extraVerifierAddress : Chainlink.InstanceAddress.RawInstanceAddress
 
-emptyContext : Splice.Api.Token.MetadataV1.ChoiceContext
-emptyContext = Splice.Api.Token.MetadataV1.ChoiceContext with
-    values = TextMap.fromList []
-
 mkCCVSendInput
     : Chainlink.InstanceAddress.RawInstanceAddress
     -> ContractId CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier
@@ -36,7 +31,7 @@ mkCCVSendInput ccvAddress verifierCid =
     CCIP.CCIPSender.CCVSendInput with
         ccvAddress = ccvAddress
         ccvCid = coerceContractId verifierCid
-        ccvExtraContext = emptyContext
+        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
 messageRequiringRequiredVerifier
     : SenderGetFeeFixture

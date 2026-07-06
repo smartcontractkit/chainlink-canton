@@ -198,7 +198,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		executeArgs.CcvInputs[i] = ccipreceiver.CCVInput{
 			CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 			VerifierResults: types.TEXT(hex.EncodeToString(vr)),
-			CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+			Context:         ccvExecuteDisclosure.ChoiceContext,
 		}
 		disclosedContracts = append(disclosedContracts, ccvExecuteDisclosure.DisclosedContracts...)
 	}
@@ -219,7 +219,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		executeArgs.TokenTransfer = &ccipreceiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(executingParty),
-			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
+			Context:            tokenPoolDisclosure.ChoiceContext,
 		}
 		disclosedContracts = append(disclosedContracts, tokenPoolDisclosure.DisclosedContracts...)
 	}
