@@ -66,9 +66,12 @@ func TestEVM2Canton_Load(t *testing.T) {
 		[]Destination{cantonDest},
 		ccvAddr,
 		executorAddr,
-		utilstests.WaitTimeout(t),
+		LoadGunOptions{
+			ConfirmSend:        evmSourceConfirmSend(evmChain), // TODO: this confirmation will change on prod-testnet PR
+			ConfirmExecTimeout: utilstests.WaitTimeout(t),
+		},
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-evm2canton", loadSchedule(t), "message_only")
+	runWASP(t, gun, "canton-load-evm2canton", loadSchedule(t), "message_only", nil)
 }

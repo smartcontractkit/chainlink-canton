@@ -91,11 +91,14 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 		[]Destination{cantonDest},
 		ccvAddr,
 		executorAddr,
-		utilstests.WaitTimeout(t),
+		LoadGunOptions{
+			ConfirmSend:        evmSourceConfirmSend(evmChain), // TODO: this confirmation will change on prod-testnet PR
+			ConfirmExecTimeout: utilstests.WaitTimeout(t),
+		},
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-evm2canton-token", sched, "token_transfer")
+	runWASP(t, gun, "canton-load-evm2canton-token", sched, "token_transfer", nil)
 
 	totalHoldingsRat, err := testhelpers.GetHoldingsBalance(ctx, receiverParticipant, nil)
 	require.NoError(t, err)

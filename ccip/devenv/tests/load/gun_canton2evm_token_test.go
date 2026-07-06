@@ -78,11 +78,14 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 		destinations,
 		ccvAddr,
 		executorAddr,
-		utilstests.WaitTimeout(t),
+		LoadGunOptions{
+			ConfirmSend:        cantonSourceConfirmSend(cantonChain),
+			ConfirmExecTimeout: utilstests.WaitTimeout(t),
+		},
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-canton2evm-token", sched, "token_transfer")
+	runWASP(t, gun, "canton-load-canton2evm-token", sched, "token_transfer", nil)
 
 	receiverBalanceAfter, err := firstDest.Chain.GetTokenBalance(ctx, firstDest.Receiver, destToken)
 	require.NoError(t, err)
