@@ -17,7 +17,6 @@ import qualified CCIP.EventsV1.Events
 import qualified CCIP.InterfacesV1.CrossChainVerifier
 import qualified CCIP.InterfacesV1.Executor
 import qualified CCIP.InterfacesV1.TokenPool
-import qualified CCIP.TicketsV1
 
 interface PerPartyRouter where
     viewtype PerPartyRouterView
@@ -154,7 +153,7 @@ data CCIPSendResult = CCIPSendResult
 data ExecuteResult = ExecuteResult
     with
         router : ContractId PerPartyRouter
-        tokenReceiveTicket : Optional (ContractId CCIP.TicketsV1.TokenReceiveTicket)
+        tokenReceiveTicket : Optional (ContractId CCIP.APIV1.ExecutingMessage.ITokenReceiveTicket)
         executionStateChanged : ContractId CCIP.EventsV1.Events.ExecutionStateChanged
         messageId : BytesHex
         message : CCIP.CodecV1.MessageCodecV1.MessageV1

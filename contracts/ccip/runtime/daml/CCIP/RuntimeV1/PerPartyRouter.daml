@@ -390,9 +390,12 @@ template PerPartyRouter
                 result <- exercise (fromInterfaceContractId @PerPartyRouter self) Execute with
                     context = arg.context
                     executingMessageCid = coerceContractId arg.executingMessageCid
+                tokenReceiveTicket <- case result.tokenReceiveTicket of
+                    None -> pure None
+                    Some ticketCid -> pure (Some (coerceContractId @_ @CCIP.APIV1.ExecutingMessage.ITokenReceiveTicket ticketCid))
                 pure CCIP.ClientV1.ExecuteResult with
                     router = coerceContractId result.router
-                    tokenReceiveTicket = result.tokenReceiveTicket
+                    tokenReceiveTicket = tokenReceiveTicket
                     executionStateChanged = result.executionStateChanged
                     messageId = result.messageId
                     message = result.message

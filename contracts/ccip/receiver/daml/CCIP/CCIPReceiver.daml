@@ -137,7 +137,7 @@ template CCIPReceiver
                 tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry <- CCIP.UtilsV1.Context.getFromContextU context CCIP.APIV1.TokenAdminRegistry.tokenAdminRegistryContextKey
 
                 -- PrepareExecute: decode, validate, create ExecutingMessageV1
-                emCid <- coerceContractId <$> exercise routerCid CCIP.ClientV1.PerPartyRouter_PrepareExecute with
+                emCid <- exercise routerCid CCIP.ClientV1.PerPartyRouter_PrepareExecute with
                     context = context
                     encodedMessage = encodedMessage
                     receiverParty = owner
@@ -153,7 +153,7 @@ template CCIPReceiver
                     None -> pure emCid
                     Some tt -> do
                         tokenConfigCid <- CCIP.UtilsV1.Context.getFromContextU context CCIP.APIV1.TokenAdminRegistry.tokenConfigContextKey
-                        coerceContractId <$> exercise tt.tokenPoolCid
+                        exercise tt.tokenPoolCid
                             CCIP.InterfacesV1.TokenPool.TokenPool_VerifyInboundMessage with
                                 tokenAdminRegistryCid = tokenAdminRegistryCid
                                 tokenConfigCid = tokenConfigCid
@@ -163,7 +163,7 @@ template CCIPReceiver
 
                 -- CCV verification: thread executingMessageCid through each CCV
                 emCid <- foldlA (\cid input ->
-                    coerceContractId <$> exercise input.ccvCid
+                    exercise input.ccvCid
                         CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifier_VerifyMessage with
                             rmnRemoteCid = rmnRemoteCid
                             extraContext = input.ccvExtraContext
@@ -178,7 +178,7 @@ template CCIPReceiver
                     executingMessageCid = emCid
 
                 -- Token release
-                tokenReleaseResult <- case (tokenTransfer, coerceContractId <$> result.tokenReceiveTicket) of
+                tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of
                     (Some tt, Some ticketCid) -> do
                         tokenConfigCid <- CCIP.UtilsV1.Context.getFromContextU context CCIP.APIV1.TokenAdminRegistry.tokenConfigContextKey
                         releaseResult <- exercise tt.tokenPoolCid CCIP.InterfacesV1.TokenPool.TokenPool_ReleaseFromTicket with
