@@ -85,7 +85,7 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-canton2evm-token", sched, "token_transfer", nil)
+	runWASP(t, gun, "canton-load-canton2evm-token", sched, "token_transfer")
 
 	receiverBalanceAfter, err := firstDest.Chain.GetTokenBalance(ctx, firstDest.Receiver, destToken)
 	require.NoError(t, err)

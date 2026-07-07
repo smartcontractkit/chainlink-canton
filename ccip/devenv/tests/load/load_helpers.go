@@ -105,31 +105,21 @@ func printLoadMetrics(t *testing.T, gun *CCIPLoadGun) {
 	}
 }
 
-func logLoadMessageSummary(t *testing.T, gun *CCIPLoadGun, indexerEndpoints []string) {
+func logLoadMessageSummary(t *testing.T, gun *CCIPLoadGun) {
 	t.Helper()
 
 	ids := gun.MessageIDs()
 	lggr := ccv.Plog
 	lggr.Info().Int("count", len(ids)).Msg("Load message summary")
 
-	var indexerBase string
-	if len(indexerEndpoints) > 0 {
-		indexerBase = strings.TrimSuffix(indexerEndpoints[0], "/")
-	}
-
 	for i, id := range ids {
-		msgID := id.String()
-		ev := lggr.Info().Int("index", i+1).Str("messageID", msgID)
-		if indexerBase != "" {
-			ev = ev.Str("indexer", fmt.Sprintf("%s/v1/verifierresults/%s", indexerBase, msgID))
-		}
-		ev.Msg("Load message sent")
+		lggr.Info().Int("index", i+1).Str("messageID", id.String()).Msg("Load message sent")
 	}
 }
 
-func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfig, scenario string, indexerEndpoints []string) {
+func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfig, scenario string) {
 	t.Helper()
-	defer logLoadMessageSummary(t, gun, indexerEndpoints)
+	defer logLoadMessageSummary(t, gun)
 
 	callTimeout := waspCallTimeout(t, gun, sched)
 	ccv.Plog.Info().

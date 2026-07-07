@@ -319,5 +319,6 @@ func (g *CCIPLoadGun) MessageIDs() []protocol.Bytes32 {
 	defer g.mu.Unlock()
 	out := make([]protocol.Bytes32, len(g.messageIDs))
 	copy(out, g.messageIDs)
+
 	return out
 }
