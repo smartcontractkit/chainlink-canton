@@ -29,7 +29,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[core.TokenAdminRegistry]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPTokenAdminRegistry),
+	PackageName: string(contracts.CCIPCore),
 	Prefix:      "core",
 })
 

@@ -152,7 +152,7 @@ func TestMCMS_Execute(t *testing.T) {
 	participant := env.Chain.Participants[0]
 	randomUserParticipant := env.Chain.Participants[1]
 
-	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
+	mcmsDar, err := contracts.GetDar(contracts.MCMSCore, contracts.CurrentVersion)
 	require.NoError(t, err)
 
 	mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)

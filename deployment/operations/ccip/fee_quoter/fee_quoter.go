@@ -31,7 +31,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[core.FeeQuoter]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPFeeQuoter),
+	PackageName: string(contracts.CCIPCore),
 	Prefix:      "feequoter",
 })
 

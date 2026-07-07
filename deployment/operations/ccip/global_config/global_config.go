@@ -38,7 +38,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[core.GlobalConfig]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPCommon),
+	PackageName: string(contracts.CCIPCore),
 	Prefix:      "globalconfig",
 })
 

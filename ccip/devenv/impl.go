@@ -85,15 +85,10 @@ var (
 	errLockReleasePoolNotDeployed = errors.New("lock release token pool not deployed")
 	cantonDeployDarPackages       = []contracts.Package{
 		contracts.CCIPFactory,
-		contracts.CCIPCommon,
+		contracts.CCIPRuntime,
 		contracts.CCIPReceiver,
-		contracts.CCIPOffRamp,
-		contracts.CCIPOnRamp,
-		contracts.CCIPTokenAdminRegistry,
+		contracts.CCIPCore,
 		contracts.CCIPCommitteeVerifier,
-		contracts.CCIPPerPartyRouter,
-		contracts.CCIPFeeQuoter,
-		contracts.CCIPRMN,
 		contracts.CCIPSender,
 		contracts.CCIPExecutor,
 		contracts.CCIPTest,

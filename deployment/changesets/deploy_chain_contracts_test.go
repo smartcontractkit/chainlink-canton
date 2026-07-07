@@ -41,13 +41,10 @@ func TestDeployChainContracts(t *testing.T) {
 
 	// Upload Dars
 	uploadDARs(t, participant,
-		contracts.CCIPCommon,
-		contracts.CCIPOffRamp,
-		contracts.CCIPOnRamp,
-		contracts.CCIPTokenAdminRegistry,
+		contracts.CCIPRuntime,
+		contracts.CCIPCore,
 		contracts.CCIPCommitteeVerifier,
 		contracts.CCIPLockReleaseTokenPool,
-		contracts.CCIPPerPartyRouter,
 	)
 
 	reporter := cld_ops.NewMemoryReporter()

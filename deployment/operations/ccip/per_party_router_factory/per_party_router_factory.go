@@ -29,7 +29,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccipruntime.PerPartyRouter
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPPerPartyRouter),
+	PackageName: string(contracts.CCIPRuntime),
 	Prefix:      "perpartyrouterfactory",
 })
 

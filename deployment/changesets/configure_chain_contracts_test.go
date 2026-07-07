@@ -104,7 +104,7 @@ func TestConfigureGlobalConfig_MCMSProposal(t *testing.T) {
 	participant := cantonChain.Participants[0]
 	party := participant.PartyID
 
-	uploadDARs(t, participant, contracts.CCIPCommon, contracts.MCMS)
+	uploadDARs(t, participant, contracts.CCIPRuntime, contracts.MCMSCore)
 
 	gcAddrRef := deployGlobalConfig(t, bundle, *cantonChain, party)
 	gcRawAddr, err := contracts.RawInstanceAddressFromString(gcAddrRef.Labels.List()[0])
@@ -217,14 +217,10 @@ func uploadDARs(t *testing.T, participant canton.Participant, packages ...contra
 func uploadChainContractDARs(t *testing.T, participant canton.Participant) {
 	t.Helper()
 	uploadDARs(t, participant,
-		contracts.CCIPCommon,
-		contracts.CCIPOffRamp,
-		contracts.CCIPOnRamp,
-		contracts.CCIPTokenAdminRegistry,
+		contracts.CCIPRuntime,
+		contracts.CCIPCore,
 		contracts.CCIPCommitteeVerifier,
 		contracts.CCIPLockReleaseTokenPool,
-		contracts.CCIPPerPartyRouter,
-		contracts.CCIPRMN,
 	)
 }
 

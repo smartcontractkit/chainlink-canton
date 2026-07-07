@@ -43,9 +43,9 @@ func TestDeployTokenPool(t *testing.T) {
 	participant := cantonChain.Participants[0]
 	party := participant.PartyID
 
-	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
+	commonDar, err := contracts.GetDar(contracts.CCIPRuntime, contracts.CurrentVersion)
 	require.NoError(t, err)
-	tarDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
+	tarDar, err := contracts.GetDar(contracts.CCIPCore, contracts.CurrentVersion)
 	require.NoError(t, err)
 	poolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPool, contracts.CurrentVersion)
 	require.NoError(t, err)

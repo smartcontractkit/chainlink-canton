@@ -358,7 +358,7 @@ func deployMCMSWithDecentralizedParty(
 		DecentralizedPartyID: decentralizedParty,
 		SynchronizerID:       synchronizerID,
 		Packages: []contractdeploy.PackageRef{{
-			Name:    string(contracts.MCMS),
+			Name:    string(contracts.MCMSCore),
 			Version: contracts.CurrentVersion,
 		}},
 		TemplateModule: "MCMS.Main",
@@ -439,17 +439,12 @@ func uploadCCIPMCMSFactoryDARs(t *testing.T, participants []canton.Participant) 
 	t.Helper()
 
 	darPackages := []contracts.Package{
-		contracts.MCMS,
+		contracts.MCMSCore,
 		contracts.MCMSTest,
-		contracts.CCIPCommon,
-		contracts.CCIPRMN,
-		contracts.CCIPOffRamp,
-		contracts.CCIPOnRamp,
-		contracts.CCIPFeeQuoter,
-		contracts.CCIPTokenAdminRegistry,
+		contracts.CCIPRuntime,
+		contracts.CCIPCore,
 		contracts.CCIPCommitteeVerifier,
-		contracts.CCIPPerPartyRouter,
-		contracts.CCIPPoolInterfaces,
+		contracts.CCIPExtensionAPI,
 		contracts.CCIPLockReleaseTokenPool,
 		contracts.CCIPExecutor,
 		contracts.CCIPFactory,

@@ -35,7 +35,7 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	//   - V1 has NO MigrateToV2 choice at this point
 	// ===================================================================
 
-	mcmsDar, err := contracts.GetDar(contracts.MCMS, contracts.CurrentVersion)
+	mcmsDar, err := contracts.GetDar(contracts.MCMSCore, contracts.CurrentVersion)
 	require.NoError(t, err)
 	gcV1Dar, err := contracts.GetDar(contracts.GlobalConfig, "1.0.0")
 	require.NoError(t, err)

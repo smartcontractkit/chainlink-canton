@@ -18,12 +18,10 @@ const (
 	Coin = Package("coin")
 	Link = Package("link")
 
-	ChainlinkAPI         = Package("chainlink-api")
-	ChainlinkInstanceAPI = ChainlinkAPI
+	ChainlinkAPI = Package("chainlink-api")
 
 	MCMSAPI      = Package("mcms-api")
 	MCMSCore     = Package("mcms-core")
-	MCMS         = MCMSCore
 	MCMSTest     = Package("mcms-test")
 	GlobalConfig = Package("globalconfig")
 
@@ -37,7 +35,6 @@ const (
 	CCIPCore                 = Package("ccip-core")
 	CCIPExtensionAPI         = Package("ccip-extension-api")
 	CCIPRuntime              = Package("ccip-runtime")
-	CCIPMain                 = CCIPRuntime
 	CCIPSender               = Package("ccip-sender")
 	CCIPReceiver             = Package("ccip-receiver")
 	CCIPCommitteeVerifier    = Package("ccip-committee-verifier")
@@ -46,15 +43,6 @@ const (
 	CCIPBurnMintTokenPool    = Package("ccip-burn-mint-token-pool")
 	CCIPFactory              = Package("ccip-factory")
 	CCIPTest                 = Package("ccip-test")
-
-	CCIPCommon             = CCIPCore
-	CCIPFeeQuoter          = CCIPCore
-	CCIPTokenAdminRegistry = CCIPCore
-	CCIPRMN                = CCIPCore
-	CCIPOnRamp             = CCIPRuntime
-	CCIPOffRamp            = CCIPRuntime
-	CCIPPerPartyRouter     = CCIPRuntime
-	CCIPPoolInterfaces     = CCIPExtensionAPI
 
 	SpliceApiTokenBurnMintV1            = Package("splice-api-token-burn-mint-v1")
 	SpliceApiTokenHoldingV1             = Package("splice-api-token-holding-v1")

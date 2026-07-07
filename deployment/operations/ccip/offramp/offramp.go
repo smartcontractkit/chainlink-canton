@@ -26,6 +26,6 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccipruntime.OffRamp]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPOffRamp),
+	PackageName: string(contracts.CCIPRuntime),
 	Prefix:      "offramp",
 })

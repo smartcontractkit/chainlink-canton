@@ -101,21 +101,11 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	})
 
 	// Upload DARs
-	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
+	runtimeDar, err := contracts.GetDar(contracts.CCIPRuntime, contracts.CurrentVersion)
 	require.NoError(t, err)
-	offRampDar, err := contracts.GetDar(contracts.CCIPOffRamp, contracts.CurrentVersion)
-	require.NoError(t, err)
-	onRampDar, err := contracts.GetDar(contracts.CCIPOnRamp, contracts.CurrentVersion)
-	require.NoError(t, err)
-	feeQuoterDar, err := contracts.GetDar(contracts.CCIPFeeQuoter, contracts.CurrentVersion)
-	require.NoError(t, err)
-	tokenAdminRegistryDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
+	coreDat, err := contracts.GetDar(contracts.CCIPCore, contracts.CurrentVersion)
 	require.NoError(t, err)
 	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
-	require.NoError(t, err)
-	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
-	require.NoError(t, err)
-	rmnDar, err := contracts.GetDar(contracts.CCIPRMN, contracts.CurrentVersion)
 	require.NoError(t, err)
 	ccipSenderDar, err := contracts.GetDar(contracts.CCIPSender, contracts.CurrentVersion)
 	require.NoError(t, err)
@@ -128,7 +118,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	dars := [][]byte{commonDar, offRampDar, onRampDar, feeQuoterDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar, rmnDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, linkTokenDar, ccipTestDar}
+	dars := [][]byte{runtimeDar, coreDat, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, linkTokenDar, ccipTestDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, senderParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
