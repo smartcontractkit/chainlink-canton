@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 )
 
@@ -74,7 +74,7 @@ func TestToCantonFinalityConfig(t *testing.T) {
 	tests := []struct {
 		name string
 		cfg  tokenadaptersfinality.Config
-		want func(t *testing.T, got core.FinalityConfig)
+		want func(t *testing.T, got ccipcodec.FinalityConfig)
 	}{
 		{
 			name: "block depth takes precedence over wait for finality",
@@ -82,7 +82,7 @@ func TestToCantonFinalityConfig(t *testing.T) {
 				WaitForFinality: true,
 				BlockDepth:      1,
 			},
-			want: func(t *testing.T, got core.FinalityConfig) {
+			want: func(t *testing.T, got ccipcodec.FinalityConfig) {
 				t.Helper()
 				require.NotNil(t, got.BlockDepth)
 				require.Equal(t, types.INT64(1), *got.BlockDepth)
@@ -94,7 +94,7 @@ func TestToCantonFinalityConfig(t *testing.T) {
 			cfg: tokenadaptersfinality.Config{
 				WaitForSafe: true,
 			},
-			want: func(t *testing.T, got core.FinalityConfig) {
+			want: func(t *testing.T, got ccipcodec.FinalityConfig) {
 				t.Helper()
 				require.NotNil(t, got.WaitForSafe)
 			},
@@ -104,7 +104,7 @@ func TestToCantonFinalityConfig(t *testing.T) {
 			cfg: tokenadaptersfinality.Config{
 				WaitForFinality: true,
 			},
-			want: func(t *testing.T, got core.FinalityConfig) {
+			want: func(t *testing.T, got ccipcodec.FinalityConfig) {
 				t.Helper()
 				require.NotNil(t, got.WaitForFinality)
 			},

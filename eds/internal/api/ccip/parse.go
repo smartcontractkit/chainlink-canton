@@ -91,7 +91,7 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 	}, nil
 }
 
-func parseSourceChainConfig(sourceChainConfig core.SourceChainConfig) (SourceChainConfig, error) {
+func parseSourceChainConfig(sourceChainConfig core.SourceChainConfig2) (SourceChainConfig, error) {
 	laneMandatedCCVs, err := parse.RawInstanceAddressList(sourceChainConfig.LaneMandatedCCVs)
 	if err != nil {
 		return SourceChainConfig{}, fmt.Errorf("failed to parse lane mandated CCVs: %w", err)
@@ -108,7 +108,7 @@ func parseSourceChainConfig(sourceChainConfig core.SourceChainConfig) (SourceCha
 	}, nil
 }
 
-func parseDestChainConfig(destChainConfig core.DestChainConfig) (DestChainConfig, error) {
+func parseDestChainConfig(destChainConfig core.DestChainConfig2) (DestChainConfig, error) {
 	laneMandatedCCVs, err := parse.RawInstanceAddressList(destChainConfig.LaneMandatedCCVs)
 	if err != nil {
 		return DestChainConfig{}, fmt.Errorf("failed to parse lane mandated CCVs: %w", err)
@@ -146,7 +146,7 @@ func ParseTokenAdminRegistry(createdEvent *apiv2.CreatedEvent) (*TokenAdminRegis
 		return nil, fmt.Errorf("failed to unmarshal TokenAdminRegistry: %w", err)
 	}
 
-	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.Owner)
+	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.CcipOwner)
 
 	return &TokenAdminRegistry{
 		Address:    address,
@@ -160,7 +160,7 @@ type TokenConfig struct {
 	Index           types.INT64
 	InstrumentId    contracts.EncodedInstrumentID
 	IsCCIPManaged   types.BOOL
-	Pool            *core.PoolRegistration
+	Pool            *core.PoolRegistration2
 }
 
 func ParseTokenConfig(createdEvent *apiv2.CreatedEvent) (*TokenConfig, error) {

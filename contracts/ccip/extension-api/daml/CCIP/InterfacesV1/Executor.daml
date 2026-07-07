@@ -1,0 +1,56 @@
+module CCIP.InterfacesV1.Executor where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.APIV1.SendingMessage
+
+interface IExecutor where
+    viewtype ExecutorView
+
+    executor_calculateFeeImpl : ContractId IExecutor -> Executor_CalculateFee -> Update (ContractId CCIP.APIV1.SendingMessage.ISendingMessage)
+    executor_getFeeImpl : ContractId IExecutor -> Executor_GetFee -> Update ExecutorFeeQuote
+
+    nonconsuming choice Executor_CalculateFee : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
+        with
+            expectedExecutor : Chainlink.InstanceAddress.RawInstanceAddress
+            sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
+            executorArgs : BytesHex
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do
+            let executorView = view this
+            Chainlink.InstanceAddress.assertEqual "executor: expected executor mismatch" executorView.instanceId executorView.owner expectedExecutor
+            executor_calculateFeeImpl this self arg
+
+    nonconsuming choice Executor_GetFee : ExecutorFeeQuote
+        with
+            expectedExecutor : Chainlink.InstanceAddress.RawInstanceAddress
+            destChainSelector : Numeric 0
+            requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do
+            let executorView = view this
+            Chainlink.InstanceAddress.assertEqual "executor: expected executor mismatch" executorView.instanceId executorView.owner expectedExecutor
+            executor_getFeeImpl this self arg
+
+data ExecutorView = ExecutorView
+    with
+        instanceId : Text
+        owner : Party
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+data ExecutorFeeQuote = ExecutorFeeQuote
+    with
+        executorInstanceId : Text
+        executorOwner : Party
+        feeUSDCents : Numeric 0
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)

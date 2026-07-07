@@ -45,7 +45,9 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	ccipevents "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
@@ -1266,15 +1268,15 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	sendArgs := ccipsender.Send{
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(dest, 10)),
-		Message: core.Canton2AnyMessage{
+		Message: clientapi.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
 			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
 			FeeToken: c.feeTokenInstrument,
-			ExtraArgs: core.ExtraArgs{
-				V3: &core.GenericExtraArgsV3{
+			ExtraArgs: clientapi.ExtraArgs{
+				V3: &clientapi.GenericExtraArgsV3{
 					GasLimit: types.INT64(opts.ExecutionGasLimit),
-					Executor: core.ExecutorExtraArg{
-						ExecutorUseDefault: &core.ExecutorUseDefault{},
+					Executor: clientapi.ExecutorExtraArg{
+						ExecutorUseDefault: &clientapi.ExecutorUseDefault{},
 					},
 				},
 			},
@@ -1310,7 +1312,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Token Pool Send disclosure for token pool at address %s: %w", tokenPoolAddress.String(), err)
 		}
-		sendArgs.Message.TokenTransfer = &core.TokenTransfer{
+		sendArgs.Message.TokenTransfer = &clientapi.TokenTransfer{
 			Token: splice_api_token_holding_v1.InstrumentId{
 				Admin: types.PARTY(outgoingMessage.TokenTransfer.Token.Admin),
 				Id:    types.TEXT(outgoingMessage.TokenTransfer.Token.Id),
@@ -1318,9 +1320,9 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			Amount: types.NUMERIC(outgoingMessage.TokenTransfer.Amount),
 		}
 		sendArgs.TokenTransferInput = &ccipsender.TokenTransferInput{
-			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(c.nextTransferCID)},
-			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
-			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(c.nextTransferCID)},
+			TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
+			Context:         tokenPoolSendDisclosure.ChoiceContext,
 		}
 		tokenPoolRequiredCCVs = tokenPoolSendDisclosure.RequiredCCVs
 		disclosedContracts = append(disclosedContracts, tokenPoolSendDisclosure.DisclosedContracts...)
@@ -1351,11 +1353,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get CCV Send disclosure for CCV %q: %w", v, err)
 		}
 		sendArgs.CcvSendInputs = append(sendArgs.CcvSendInputs, ccipsender.CCVSendInput{
-			CcvAddress:      ccvSendDisclosure.Address.Binding(),
-			CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-			CcvExtraContext: ccvSendDisclosure.ChoiceContext,
+			CcvAddress: ccvSendDisclosure.Address.Binding(),
+			CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+			Context:    ccvSendDisclosure.ChoiceContext,
 		})
-		sendArgs.Message.ExtraArgs.V3.Ccvs = append(sendArgs.Message.ExtraArgs.V3.Ccvs, core.CCVExtraArg{
+		sendArgs.Message.ExtraArgs.V3.Ccvs = append(sendArgs.Message.ExtraArgs.V3.Ccvs, clientapi.CCVExtraArg{
 			CcvAddress: ccvSendDisclosure.Address.Binding(),
 			CcvArgs:    "",
 		})
@@ -1377,8 +1379,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Executor Send disclosure for Executor %q: %w", *ccipSendDisclosure.Executor, err)
 		}
 		sendArgs.ExecutorInput = &ccipsender.ExecutorInput{
-			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
-			ExecutorExtraContext: executorSendDisclosure.ChoiceContext,
+			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
+			Context:     executorSendDisclosure.ChoiceContext,
 		}
 		disclosedContracts = append(disclosedContracts, executorSendDisclosure.DisclosedContracts...)
 	}
@@ -1413,7 +1415,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 								{
 									IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
 										TemplateFilter: &apiv2.TemplateFilter{
-											TemplateId:              contracts.TemplateIDFromBinding(core.CCIPMessageSent{}).ToLedgerIdentifier(),
+											TemplateId:              contracts.TemplateIDFromBinding(ccipevents.CCIPMessageSent{}).ToLedgerIdentifier(),
 											IncludeCreatedEventBlob: true,
 										},
 									},
@@ -1479,7 +1481,7 @@ type ccipMessageSentFromSendUpdate struct {
 // before this send; returned seqNo is either previousSeq+1 or the sequence from the encoded payload
 // when that path is present.
 func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSeq uint64) (ccipMessageSentFromSendUpdate, error) {
-	messageSentTemplateID := contracts.TemplateIDFromBinding(core.CCIPMessageSent{})
+	messageSentTemplateID := contracts.TemplateIDFromBinding(ccipevents.CCIPMessageSent{})
 
 	// Find CCIPMessageSent event in the events
 	var created *apiv2.CreatedEvent
@@ -1500,7 +1502,7 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("no CCIPMessageSent event found in sender transaction")
 	}
 
-	parsed, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](created)
+	parsed, err := bindings.UnmarshalCreatedEvent[ccipevents.CCIPMessageSent](created)
 	if err != nil {
 		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("unmarshal CCIPMessageSent created event: %w", err)
 	}

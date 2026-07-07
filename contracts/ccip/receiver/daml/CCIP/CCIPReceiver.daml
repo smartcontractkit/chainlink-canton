@@ -12,33 +12,35 @@ import DA.Action (foldlA)
 import DA.List (unique)
 import DA.Optional (fromSomeNote)
 
-import Splice.Api.Token.MetadataV1 (ChoiceContext)
+import qualified Splice.Api.Token.MetadataV1
 
-import qualified CCIP.Context
-import qualified CCIP.FinalityConfig
-import qualified CCIP.Interfaces.CrossChainVerifier
-import qualified CCIP.Interfaces.TokenPool
-import qualified CCIP.MessageCodecV1
-import qualified CCIP.PerPartyRouter
-import Chainlink.InstanceAddress (RawInstanceAddress, assertValidInstanceId)
-import qualified CCIP.TokenAdminRegistry
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.APIV1.RMNRemote
+import qualified CCIP.APIV1.TokenAdminRegistry
+import qualified CCIP.CodecV1.FinalityConfig
+import qualified CCIP.CodecV1.MessageCodecV1
+import qualified CCIP.ClientV1
+import qualified CCIP.InterfacesV1.CrossChainVerifier
+import qualified CCIP.InterfacesV1.TokenPool
+import qualified CCIP.UtilsV1.Context
 
 -- | Per-CCV verification input. Pairs a verifier contract (via interface)
 -- with the attestation data and per-CCV extra context.
 data CCVInput = CCVInput
     with
-        ccvCid : ContractId CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier
+        ccvCid : ContractId CCIP.InterfacesV1.CrossChainVerifier.ICrossChainVerifier
         verifierResults : BytesHex
-        ccvExtraContext : ChoiceContext
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 -- | Token transfer input, provided only when the message includes a
 -- token transfer. Mirrors how TokenReceiveTicket is Optional on the OffRamp.
 data TokenTransferInput = TokenTransferInput
     with
-        tokenPoolCid : ContractId CCIP.Interfaces.TokenPool.ITokenPool
+        tokenPoolCid : ContractId CCIP.InterfacesV1.TokenPool.ITokenPool
         tokenReceiverParty : Party
-        poolExtraContext : ChoiceContext
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
     deriving (Eq, Show)
 
 template CCIPReceiver
@@ -48,31 +50,31 @@ template CCIPReceiver
         -- Receiver's required CCV instance addresses, analogous to
         -- IAny2EVMMessageReceiverV2.getCCVs() in the EVM implementation.
         -- Passed to PerPartyRouter.Execute as receiverRequiredCCVs.
-        requiredCCVs : [RawInstanceAddress]
-        optionalCCVs : [RawInstanceAddress]
+        requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        optionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
         optionalThreshold : Int
         -- Allowed finality policy for inbound execution.
-        receiverFinalityConfig : CCIP.FinalityConfig.FinalityConfig
+        receiverFinalityConfig : CCIP.CodecV1.FinalityConfig.FinalityConfig
     where
         signatory owner
         -- Ensure that requiredCCVs are unique
-        ensure assertValidInstanceId instanceId
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
             && unique requiredCCVs
-            && CCIP.FinalityConfig.isValidFinalityConfig receiverFinalityConfig
+            && CCIP.CodecV1.FinalityConfig.isValidFinalityConfig receiverFinalityConfig
 
         -- | Query the final required CCVs for executing an inbound message.
         -- Aggregates receiver policy with token-pool requirements and delegates
         -- protocol-level resolution to PerPartyRouter/OffRamp.
-        nonconsuming choice GetRequiredCCVs : [RawInstanceAddress]
+        nonconsuming choice GetRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             with
-                context : ChoiceContext
-                routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
+                routerCid : ContractId CCIP.ClientV1.PerPartyRouter
                 encodedMessage : BytesHex
-                tokenPoolCid : Optional (ContractId CCIP.Interfaces.TokenPool.ITokenPool)
+                tokenPoolCid : Optional (ContractId CCIP.InterfacesV1.TokenPool.ITokenPool)
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller owner
             do
                 let message = fromSomeNote "receiver: failed to decode message"
-                        (CCIP.MessageCodecV1.decodeMessageV1 encodedMessage)
+                        (CCIP.CodecV1.MessageCodecV1.decodeMessageV1 encodedMessage)
 
                 tokenPoolRequiredCCVs <- case (message.tokenTransfer, tokenPoolCid) of
                     (None, None) -> pure []
@@ -84,15 +86,16 @@ template CCIPReceiver
                         let tokenExtraData : BytesHex = tt.extraData
                         in
                         exercise poolCid
-                            CCIP.Interfaces.TokenPool.TokenPool_GetRequiredCCVs with
+                            CCIP.InterfacesV1.TokenPool.TokenPool_GetRequiredCCVs with
                                 remoteChainSelector = message.sourceChainSelector
                                 sourceAmount = tt.amount
-                                finality = message.finality.requested
+                                finality = message.finality.raw
                                 extraData = tokenExtraData
-                                direction = CCIP.Interfaces.TokenPool.Inbound
+                                direction = CCIP.InterfacesV1.TokenPool.Inbound
+                                context = context
                                 caller = owner
 
-                exercise routerCid CCIP.PerPartyRouter.GetRequiredCCVsForExecute with
+                exercise routerCid CCIP.ClientV1.PerPartyRouter_GetRequiredCCVsForExecute with
                     context = context
                     message = message
                     receiverRequiredCCVs = requiredCCVs
@@ -103,7 +106,7 @@ template CCIPReceiver
         -- | Update CCV requirements.
         choice UpdateRequiredCCVs : ContractId CCIPReceiver
             with
-                newRequiredCCVs : [RawInstanceAddress]
+                newRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             controller owner
             do
                 assertMsg "DuplicateCCVNotAllowed: duplicate CCVs in new required CCVs" (unique newRequiredCCVs)
@@ -113,11 +116,8 @@ template CCIPReceiver
         -- TODO: consider allowing arbitrary callers
         nonconsuming choice Execute : ContractId CCIPMessageReceived
             with
-                -- CCIP context for internal orchestration (PerPartyRouter calls).
-                context : ChoiceContext
-
                 -- CCIP contract IDs
-                routerCid : ContractId CCIP.PerPartyRouter.PerPartyRouter
+                routerCid : ContractId CCIP.ClientV1.PerPartyRouter
 
                 -- The encoded CCIP message (hex-encoded bytes)
                 encodedMessage : BytesHex
@@ -128,14 +128,17 @@ template CCIPReceiver
                 -- One entry per CCV that should verify this message.
                 -- Accepts any ICrossChainVerifier implementation.
                 ccvInputs : [CCVInput]
+
+                -- CCIP context for internal orchestration (PerPartyRouter calls).
+                context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller owner
             do
                 -- Extract CIDs from context using typed accessors for pool/CCV calls.
-                rmnRemoteCid <- CCIP.Context.lookupRmnRemoteCid context
-                tokenAdminRegistryCid <- CCIP.TokenAdminRegistry.lookupTokenAdminRegistryCid context
+                rmnRemoteCid : ContractId CCIP.APIV1.RMNRemote.IRMNRemote <- CCIP.UtilsV1.Context.getFromContextU context CCIP.APIV1.RMNRemote.rmnRemoteContextKey
+                tokenAdminRegistryCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenAdminRegistry <- CCIP.UtilsV1.Context.getFromContextU context CCIP.APIV1.TokenAdminRegistry.tokenAdminRegistryContextKey
 
                 -- PrepareExecute: decode, validate, create ExecutingMessageV1
-                emCid <- exercise routerCid CCIP.PerPartyRouter.PrepareExecute with
+                emCid <- exercise routerCid CCIP.ClientV1.PerPartyRouter_PrepareExecute with
                     context = context
                     encodedMessage = encodedMessage
                     receiverParty = owner
@@ -150,40 +153,40 @@ template CCIPReceiver
                 emCid <- case tokenTransfer of
                     None -> pure emCid
                     Some tt -> do
-                        tokenConfigCid <- CCIP.TokenAdminRegistry.lookupTokenConfigCid context
+                        tokenConfigCid <- CCIP.UtilsV1.Context.getFromContextU context CCIP.APIV1.TokenAdminRegistry.tokenConfigContextKey
                         exercise tt.tokenPoolCid
-                            CCIP.Interfaces.TokenPool.TokenPool_VerifyInboundMessage with
+                            CCIP.InterfacesV1.TokenPool.TokenPool_VerifyInboundMessage with
                                 tokenAdminRegistryCid = tokenAdminRegistryCid
                                 tokenConfigCid = tokenConfigCid
-                                extraContext = tt.poolExtraContext
+                                context = tt.context
                                 executingMessageCid = emCid
                                 caller = owner
 
                 -- CCV verification: thread executingMessageCid through each CCV
                 emCid <- foldlA (\cid input ->
                     exercise input.ccvCid
-                        CCIP.Interfaces.CrossChainVerifier.CrossChainVerifier_VerifyMessage with
+                        CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifier_VerifyMessage with
                             rmnRemoteCid = rmnRemoteCid
-                            extraContext = input.ccvExtraContext
+                            context = input.context
                             executingMessageCid = cid
                             verifierResults = input.verifierResults
                             caller = owner
                     ) emCid ccvInputs
 
                 -- Execute with the final executingMessageCid
-                result <- exercise routerCid CCIP.PerPartyRouter.Execute with
+                result <- exercise routerCid CCIP.ClientV1.PerPartyRouter_Execute with
                     context = context
                     executingMessageCid = emCid
 
                 -- Token release
                 tokenReleaseResult <- case (tokenTransfer, result.tokenReceiveTicket) of
                     (Some tt, Some ticketCid) -> do
-                        tokenConfigCid <- CCIP.TokenAdminRegistry.lookupTokenConfigCid context
-                        releaseResult <- exercise tt.tokenPoolCid CCIP.Interfaces.TokenPool.TokenPool_ReleaseFromTicket with
+                        tokenConfigCid <- CCIP.UtilsV1.Context.getFromContextU context CCIP.APIV1.TokenAdminRegistry.tokenConfigContextKey
+                        releaseResult <- exercise tt.tokenPoolCid CCIP.InterfacesV1.TokenPool.TokenPool_ReleaseFromTicket with
                             tokenAdminRegistryCid = tokenAdminRegistryCid
                             tokenConfigCid = tokenConfigCid
                             rmnRemoteCid = rmnRemoteCid
-                            extraContext = tt.poolExtraContext
+                            context = tt.context
                             tokenReceiveTicketCid = ticketCid
                             caller = owner
                         pure (Some releaseResult)
@@ -204,9 +207,9 @@ template CCIPReceiver
 template CCIPMessageReceived
     with
         owner : Party
-        router : ContractId CCIP.PerPartyRouter.PerPartyRouter
+        router : ContractId CCIP.ClientV1.PerPartyRouter
         messageId : BytesHex
-        message : CCIP.MessageCodecV1.MessageV1
-        tokenReleaseResult : Optional CCIP.Interfaces.TokenPool.ReleaseOrMintResult
+        message : CCIP.CodecV1.MessageCodecV1.MessageV1
+        tokenReleaseResult : Optional CCIP.InterfacesV1.TokenPool.ReleaseOrMintResult
     where
         signatory owner

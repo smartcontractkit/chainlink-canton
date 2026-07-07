@@ -5,8 +5,8 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Optional (fromSome)
 
-import CCIP.RMNRemoteCodecGen
-import CCIP.RMNRemoteTypes
+import qualified CCIP.CoreV1.RMNRemote
+import qualified CCIP.CoreV1.RMNRemoteCodecGen
 
 -- ===========================================================================
 -- CURSE PARAMS ENCODING/DECODING TESTS
@@ -16,24 +16,24 @@ testCurseParamsRoundtrip : Script ()
 testCurseParamsRoundtrip = do
   -- Test with global curse subject
   let globalSubject = "01000000000000000000000000000001"
-      params = CurseParams with subject = globalSubject
-      encoded = encodeCurseParams params
-  fst (fromSome (decodeCurseParamsAt encoded 0)) === params
+      params = CCIP.CoreV1.RMNRemote.CurseParams with subject = globalSubject
+      encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseParams params
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseParamsAt encoded 0)) === params
 
   -- Test with chain-specific subject
   let chainSubject = "00000000000000000000000000000089"  -- Chain 137
-      params2 = CurseParams with subject = chainSubject
-      encodedChain = encodeCurseParams params2
-  fst (fromSome (decodeCurseParamsAt encodedChain 0)) === params2
+      params2 = CCIP.CoreV1.RMNRemote.CurseParams with subject = chainSubject
+      encodedChain = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseParams params2
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseParamsAt encodedChain 0)) === params2
 
   pure ()
 
 testUncurseParamsRoundtrip : Script ()
 testUncurseParamsRoundtrip = do
   let subject = "01000000000000000000000000000001"
-      params = UncurseParams with subject
-      encoded = encodeUncurseParams params
-  fst (fromSome (decodeUncurseParamsAt encoded 0)) === params
+      params = CCIP.CoreV1.RMNRemote.UncurseParams with subject
+      encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeUncurseParams params
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeUncurseParamsAt encoded 0)) === params
 
   pure ()
 
@@ -45,42 +45,42 @@ testCurseChainParamsRoundtrip : Script ()
 testCurseChainParamsRoundtrip = do
   -- Test with chain selector 1 (Ethereum mainnet)
   let chainSelector1 : Numeric 0 = 1.0
-      params1 = CurseChainParams with chainSelector = chainSelector1
-      encoded1 = encodeCurseChainParams params1
-  fst (fromSome (decodeCurseChainParamsAt encoded1 0)) === params1
+      params1 = CCIP.CoreV1.RMNRemote.CurseChainParams with chainSelector = chainSelector1
+      encoded1 = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseChainParams params1
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseChainParamsAt encoded1 0)) === params1
 
   -- Test with larger chain selector (137 = Polygon)
   let chainSelector137 : Numeric 0 = 137.0
-      params137 = CurseChainParams with chainSelector = chainSelector137
-      encoded137 = encodeCurseChainParams params137
-  fst (fromSome (decodeCurseChainParamsAt encoded137 0)) === params137
+      params137 = CCIP.CoreV1.RMNRemote.CurseChainParams with chainSelector = chainSelector137
+      encoded137 = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseChainParams params137
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseChainParamsAt encoded137 0)) === params137
 
   -- Test with very large chain selector
   let largeSelector : Numeric 0 = 16015286601757825753.0  -- Avalanche Fuji testnet selector
-      paramsLarge = CurseChainParams with chainSelector = largeSelector
-      encodedLarge = encodeCurseChainParams paramsLarge
-  fst (fromSome (decodeCurseChainParamsAt encodedLarge 0)) === paramsLarge
+      paramsLarge = CCIP.CoreV1.RMNRemote.CurseChainParams with chainSelector = largeSelector
+      encodedLarge = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseChainParams paramsLarge
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseChainParamsAt encodedLarge 0)) === paramsLarge
 
   -- Test zero selector
   let zeroSelector : Numeric 0 = 0.0
-      paramsZero = CurseChainParams with chainSelector = zeroSelector
-      encodedZero = encodeCurseChainParams paramsZero
-  fst (fromSome (decodeCurseChainParamsAt encodedZero 0)) === paramsZero
+      paramsZero = CCIP.CoreV1.RMNRemote.CurseChainParams with chainSelector = zeroSelector
+      encodedZero = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseChainParams paramsZero
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseChainParamsAt encodedZero 0)) === paramsZero
 
   -- Test max uint64 selector
   let maxUint64 : Numeric 0 = 18446744073709551615.0
-      paramsMax = CurseChainParams with chainSelector = maxUint64
-      encodedMax = encodeCurseChainParams paramsMax
-  fst (fromSome (decodeCurseChainParamsAt encodedMax 0)) === paramsMax
+      paramsMax = CCIP.CoreV1.RMNRemote.CurseChainParams with chainSelector = maxUint64
+      encodedMax = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseChainParams paramsMax
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseChainParamsAt encodedMax 0)) === paramsMax
 
   pure ()
 
 testUncurseChainParamsRoundtrip : Script ()
 testUncurseChainParamsRoundtrip = do
   let chainSelector : Numeric 0 = 42161.0  -- Arbitrum One
-      params = UncurseChainParams with chainSelector
-      encoded = encodeUncurseChainParams params
-  fst (fromSome (decodeUncurseChainParamsAt encoded 0)) === params
+      params = CCIP.CoreV1.RMNRemote.UncurseChainParams with chainSelector
+      encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeUncurseChainParams params
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeUncurseChainParamsAt encoded 0)) === params
 
   pure ()
 
@@ -95,9 +95,9 @@ testCurseMultipleParamsRoundtrip = do
         "00000000000000000000000000000001",  -- Chain 1
         "00000000000000000000000000000089"   -- Chain 137
         ]
-      params = CurseMultipleParams with subjects
-      encoded = encodeCurseMultipleParams params
-      decoded = fst (fromSome (decodeCurseMultipleParamsAt encoded 0))
+      params = CCIP.CoreV1.RMNRemote.CurseMultipleParams with subjects
+      encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseMultipleParams params
+      decoded = fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseMultipleParamsAt encoded 0))
   length decoded.subjects === 3
   decoded === params
 
@@ -105,9 +105,9 @@ testCurseMultipleParamsRoundtrip = do
 
 testCurseMultipleParamsEmptyList : Script ()
 testCurseMultipleParamsEmptyList = do
-  let params = CurseMultipleParams with subjects = []
-      encoded = encodeCurseMultipleParams params
-  fst (fromSome (decodeCurseMultipleParamsAt encoded 0)) === params
+  let params = CCIP.CoreV1.RMNRemote.CurseMultipleParams with subjects = []
+      encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeCurseMultipleParams params
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseMultipleParamsAt encoded 0)) === params
 
   pure ()
 
@@ -117,9 +117,9 @@ testUncurseMultipleParamsRoundtrip = do
         "00000000000000000000000000000001",
         "00000000000000000000000000000002"
         ]
-      params = UncurseMultipleParams with subjects
-      encoded = encodeUncurseMultipleParams params
-  fst (fromSome (decodeUncurseMultipleParamsAt encoded 0)) === params
+      params = CCIP.CoreV1.RMNRemote.UncurseMultipleParams with subjects
+      encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeUncurseMultipleParams params
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeUncurseMultipleParamsAt encoded 0)) === params
 
   pure ()
 
@@ -134,9 +134,9 @@ testAddCustomObserversParamsRoundtrip = do
   party3 <- allocateParty "Observer3"
 
   let parties = [party1, party2, party3]
-      params = AddCustomObserversParams with parties
-      encoded = encodeAddCustomObserversParams params
-      decoded = fst (fromSome (decodeAddCustomObserversParamsAt encoded 0))
+      params = CCIP.CoreV1.RMNRemote.AddCustomObserversParams with parties
+      encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeAddCustomObserversParams params
+      decoded = fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeAddCustomObserversParamsAt encoded 0))
   length decoded.parties === 3
   decoded === params
 
@@ -144,9 +144,9 @@ testAddCustomObserversParamsRoundtrip = do
 
 testAddCustomObserversParamsEmptyList : Script ()
 testAddCustomObserversParamsEmptyList = do
-  let params = AddCustomObserversParams with parties = []
-      encoded = encodeAddCustomObserversParams params
-  fst (fromSome (decodeAddCustomObserversParamsAt encoded 0)) === params
+  let params = CCIP.CoreV1.RMNRemote.AddCustomObserversParams with parties = []
+      encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeAddCustomObserversParams params
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeAddCustomObserversParamsAt encoded 0)) === params
 
   pure ()
 
@@ -156,9 +156,9 @@ testRemoveCustomObserversParamsRoundtrip = do
   party2 <- allocateParty "Observer2"
 
   let parties = [party1, party2]
-      params = RemoveCustomObserversParams with parties
-      encoded = encodeRemoveCustomObserversParams params
-  fst (fromSome (decodeRemoveCustomObserversParamsAt encoded 0)) === params
+      params = CCIP.CoreV1.RMNRemote.RemoveCustomObserversParams with parties
+      encoded = CCIP.CoreV1.RMNRemoteCodecGen.encodeRemoveCustomObserversParams params
+  fst (fromSome (CCIP.CoreV1.RMNRemoteCodecGen.decodeRemoveCustomObserversParamsAt encoded 0)) === params
 
   pure ()
 
@@ -169,12 +169,12 @@ testRemoveCustomObserversParamsRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail for curse params
-  case decodeCurseParamsAt "" 0 of
+  case CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseParamsAt "" 0 of
     None -> pure ()  -- Expected
     Some _ -> abort "Expected decodeCurseParamsAt to fail on empty data"
 
   -- Truncated chain selector should fail
-  case decodeCurseChainParamsAt "0001" 0 of
+  case CCIP.CoreV1.RMNRemoteCodecGen.decodeCurseChainParamsAt "0001" 0 of
     None -> pure ()  -- Expected - need 8 bytes
     Some _ -> abort "Expected decodeCurseChainParamsAt to fail on truncated data"
 

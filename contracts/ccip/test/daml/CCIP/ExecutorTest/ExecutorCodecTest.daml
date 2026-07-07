@@ -5,22 +5,16 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Optional (fromSome)
 
-import CCIP.FinalityConfig qualified as FinalityCodec
-import CCIP.ExecutorCodecGen qualified as ExecutorCodecGen
-import CCIP.ExecutorTypes (
-    RemoteChainConfig(..),
-    RemoteChainConfigArgs(..),
-    DynamicConfig(..),
-    ApplyDestChainUpdatesParams(..),
-    SetDynamicConfigParams(..),
-    ApplyAllowedCCVUpdatesParams(..),
-    )
-import Chainlink.InstanceAddress (RawInstanceAddress(..))
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.CodecV1.FinalityConfig
+import qualified CCIP.ExecutorV1
+import qualified CCIP.ExecutorV1.ExecutorCodecGen
 
 finalityConfig n =
     if n == 0
-    then FinalityCodec.WaitForFinality
-    else FinalityCodec.BlockDepth n
+    then CCIP.CodecV1.FinalityConfig.WaitForFinality
+    else CCIP.CodecV1.FinalityConfig.BlockDepth n
 
 -- ===============================================
 -- |            ApplyDestChainUpdates            |
@@ -29,33 +23,33 @@ finalityConfig n =
 testApplyDestChainUpdatesParamsRoundtrip : Script ()
 testApplyDestChainUpdatesParamsRoundtrip = do
     -- empty args
-    let args = ApplyDestChainUpdatesParams with
+    let args = CCIP.ExecutorV1.ApplyDestChainUpdatesParams with
             destChainSelectorsToRemove = []
             destChainSelectorsToAdd = []
-        encoded = ExecutorCodecGen.encodeApplyDestChainUpdatesParams args
-    fst (fromSome (ExecutorCodecGen.decodeApplyDestChainUpdatesParamsAt encoded 0)) === args
+        encoded = CCIP.ExecutorV1.ExecutorCodecGen.encodeApplyDestChainUpdatesParams args
+    fst (fromSome (CCIP.ExecutorV1.ExecutorCodecGen.decodeApplyDestChainUpdatesParamsAt encoded 0)) === args
     -- non-empty args
-    let args = ApplyDestChainUpdatesParams with
+    let args = CCIP.ExecutorV1.ApplyDestChainUpdatesParams with
             destChainSelectorsToRemove = [2.0, 3.0]
             destChainSelectorsToAdd =
-                [ RemoteChainConfigArgs with
+                [ CCIP.ExecutorV1.RemoteChainConfigArgs with
                     destChainSelector = 1.0
-                    config = RemoteChainConfig with
+                    config = CCIP.ExecutorV1.RemoteChainConfig with
                         feeUSDCents = 100.0
                         enabled = True
-                , RemoteChainConfigArgs with
+                , CCIP.ExecutorV1.RemoteChainConfigArgs with
                     destChainSelector = 18446744073709551615.0 -- max uint64
-                    config = RemoteChainConfig with
+                    config = CCIP.ExecutorV1.RemoteChainConfig with
                         feeUSDCents = 0.0
                         enabled = False
-                , RemoteChainConfigArgs with
+                , CCIP.ExecutorV1.RemoteChainConfigArgs with
                     destChainSelector = 0.0
-                    config = RemoteChainConfig with
+                    config = CCIP.ExecutorV1.RemoteChainConfig with
                         feeUSDCents = 999.0
                         enabled = True
                 ]
-        encoded = ExecutorCodecGen.encodeApplyDestChainUpdatesParams args
-    fst (fromSome (ExecutorCodecGen.decodeApplyDestChainUpdatesParamsAt encoded 0)) === args
+        encoded = CCIP.ExecutorV1.ExecutorCodecGen.encodeApplyDestChainUpdatesParams args
+    fst (fromSome (CCIP.ExecutorV1.ExecutorCodecGen.decodeApplyDestChainUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |              SetDynamicConfig               |
@@ -64,40 +58,40 @@ testApplyDestChainUpdatesParamsRoundtrip = do
 testSetDynamicConfigParamsRoundtrip : Script ()
 testSetDynamicConfigParamsRoundtrip = do
     -- with feeAggregator = None
-    let args = SetDynamicConfigParams with
-            newDynamicConfig = DynamicConfig with
+    let args = CCIP.ExecutorV1.SetDynamicConfigParams with
+            newDynamicConfig = CCIP.ExecutorV1.DynamicConfig with
                 feeAggregator = None
                 allowedFinalityConfig = finalityConfig 0
                 ccvAllowlistEnabled = False
-        encoded = ExecutorCodecGen.encodeSetDynamicConfigParams args
-    fst (fromSome (ExecutorCodecGen.decodeSetDynamicConfigParamsAt encoded 0)) === args
+        encoded = CCIP.ExecutorV1.ExecutorCodecGen.encodeSetDynamicConfigParams args
+    fst (fromSome (CCIP.ExecutorV1.ExecutorCodecGen.decodeSetDynamicConfigParamsAt encoded 0)) === args
     -- with feeAggregator = Some
     feeAgg <- allocateParty "fee_aggregator"
-    let args = SetDynamicConfigParams with
-            newDynamicConfig = DynamicConfig with
+    let args = CCIP.ExecutorV1.SetDynamicConfigParams with
+            newDynamicConfig = CCIP.ExecutorV1.DynamicConfig with
                 feeAggregator = Some feeAgg
                 allowedFinalityConfig = finalityConfig 7
                 ccvAllowlistEnabled = True
-        encoded = ExecutorCodecGen.encodeSetDynamicConfigParams args
-    fst (fromSome (ExecutorCodecGen.decodeSetDynamicConfigParamsAt encoded 0)) === args
+        encoded = CCIP.ExecutorV1.ExecutorCodecGen.encodeSetDynamicConfigParams args
+    fst (fromSome (CCIP.ExecutorV1.ExecutorCodecGen.decodeSetDynamicConfigParamsAt encoded 0)) === args
 
 testSetDynamicConfigParamsRejectsInvalidBlockDepth : Script ()
 testSetDynamicConfigParamsRejectsInvalidBlockDepth = do
     let encodeWith finality =
-            ExecutorCodecGen.encodeSetDynamicConfigParams (SetDynamicConfigParams with
-                newDynamicConfig = DynamicConfig with
+            CCIP.ExecutorV1.ExecutorCodecGen.encodeSetDynamicConfigParams (CCIP.ExecutorV1.SetDynamicConfigParams with
+                newDynamicConfig = CCIP.ExecutorV1.DynamicConfig with
                     feeAggregator = None
                     allowedFinalityConfig = finality
                     ccvAllowlistEnabled = False)
         assertDecodeFails finality =
-            case ExecutorCodecGen.decodeSetDynamicConfigParamsAt (encodeWith finality) 0 of
+            case CCIP.ExecutorV1.ExecutorCodecGen.decodeSetDynamicConfigParamsAt (encodeWith finality) 0 of
                 None -> pure ()
                 Some _ -> abort "expected SetDynamicConfig decode to reject invalid BlockDepth"
 
-    assertDecodeFails (FinalityCodec.BlockDepth 0)
-    assertDecodeFails (FinalityCodec.BlockDepth (-1))
-    assertDecodeFails (FinalityCodec.BlockDepth 65536)
-    assertDecodeFails (FinalityCodec.BlockDepth 70000)
+    assertDecodeFails (CCIP.CodecV1.FinalityConfig.BlockDepth 0)
+    assertDecodeFails (CCIP.CodecV1.FinalityConfig.BlockDepth (-1))
+    assertDecodeFails (CCIP.CodecV1.FinalityConfig.BlockDepth 65536)
+    assertDecodeFails (CCIP.CodecV1.FinalityConfig.BlockDepth 70000)
 
 -- ===============================================
 -- |           ApplyAllowedCCVUpdates            |
@@ -106,16 +100,16 @@ testSetDynamicConfigParamsRejectsInvalidBlockDepth = do
 testApplyAllowedCCVUpdatesParamsRoundtrip : Script ()
 testApplyAllowedCCVUpdatesParamsRoundtrip = do
     -- empty args
-    let args = ApplyAllowedCCVUpdatesParams with
+    let args = CCIP.ExecutorV1.ApplyAllowedCCVUpdatesParams with
             ccvsToRemove = []
             ccvsToAdd = []
             ccvAllowlistEnabled = False
-        encoded = ExecutorCodecGen.encodeApplyAllowedCCVUpdatesParams args
-    fst (fromSome (ExecutorCodecGen.decodeApplyAllowedCCVUpdatesParamsAt encoded 0)) === args
+        encoded = CCIP.ExecutorV1.ExecutorCodecGen.encodeApplyAllowedCCVUpdatesParams args
+    fst (fromSome (CCIP.ExecutorV1.ExecutorCodecGen.decodeApplyAllowedCCVUpdatesParamsAt encoded 0)) === args
     -- non-empty args
-    let args = ApplyAllowedCCVUpdatesParams with
-            ccvsToRemove = [RawInstanceAddress "ccv-remove-1@party1", RawInstanceAddress "ccv-remove-2@party2"]
-            ccvsToAdd = [RawInstanceAddress "ccv-add-1@party3", RawInstanceAddress "ccv-add-2@party4"]
+    let args = CCIP.ExecutorV1.ApplyAllowedCCVUpdatesParams with
+            ccvsToRemove = [Chainlink.InstanceAddress.RawInstanceAddress "ccv-remove-1@party1", Chainlink.InstanceAddress.RawInstanceAddress "ccv-remove-2@party2"]
+            ccvsToAdd = [Chainlink.InstanceAddress.RawInstanceAddress "ccv-add-1@party3", Chainlink.InstanceAddress.RawInstanceAddress "ccv-add-2@party4"]
             ccvAllowlistEnabled = True
-        encoded = ExecutorCodecGen.encodeApplyAllowedCCVUpdatesParams args
-    fst (fromSome (ExecutorCodecGen.decodeApplyAllowedCCVUpdatesParamsAt encoded 0)) === args
+        encoded = CCIP.ExecutorV1.ExecutorCodecGen.encodeApplyAllowedCCVUpdatesParams args
+    fst (fromSome (CCIP.ExecutorV1.ExecutorCodecGen.decodeApplyAllowedCCVUpdatesParamsAt encoded 0)) === args

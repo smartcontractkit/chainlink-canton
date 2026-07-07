@@ -13,7 +13,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -33,7 +33,7 @@ func TestServer_FilterContracts(t *testing.T) {
 	tokenPool1 := burnminttokenpool.BurnMintTokenPool{
 		RemoteChainConfigs: map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{
 			types.NUMERIC("123"): {
-				FinalityConfig:     core.FinalityConfig{WaitForFinality: new(types.UNIT)}, // Unit types must be set in order for the unmarshal to work
+				FinalityConfig:     ccipcodec.FinalityConfig{WaitForFinality: new(types.UNIT)}, // Unit types must be set in order for the unmarshal to work
 				InboundRateLimiter: rl1.Binding(),
 				InboundCustomBlockConfirmationsRateLimiter: rl2.Binding(),
 				OutboundRateLimiter:                        rl3.Binding(),
@@ -47,7 +47,7 @@ func TestServer_FilterContracts(t *testing.T) {
 	tokenPool2 := lockreleasetokenpool.LockReleaseTokenPool{
 		RemoteChainConfigs: map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{
 			"456": {
-				FinalityConfig:     core.FinalityConfig{WaitForFinality: new(types.UNIT)},
+				FinalityConfig:     ccipcodec.FinalityConfig{WaitForFinality: new(types.UNIT)},
 				InboundRateLimiter: rl4.Binding(),
 				InboundCustomBlockConfirmationsRateLimiter: rl5.Binding(),
 				OutboundRateLimiter:                        rl6.Binding(),

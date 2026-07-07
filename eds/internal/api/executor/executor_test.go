@@ -12,10 +12,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
+
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -58,7 +59,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 			Owner:         types.PARTY(executorAddress.Owner()),
 			MaxCCVsPerMsg: 2,
 			DynamicConfig: executorBinding.DynamicConfig{
-				AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: new(types.UNIT)},
+				AllowedFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: new(types.UNIT)},
 				CcvAllowlistEnabled:   true,
 			},
 			AllowedCCVs: []chainlinkapi.RawInstanceAddress{
@@ -396,7 +397,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 			Owner:         types.PARTY(executorAddress.Owner()),
 			MaxCCVsPerMsg: 3,
 			DynamicConfig: executorBinding.DynamicConfig{
-				AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: new(types.UNIT)},
+				AllowedFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: new(types.UNIT)},
 				CcvAllowlistEnabled:   false, // allowlist disabled, CCVs in the request shouldn't be checked
 			},
 			AllowedCCVs: []chainlinkapi.RawInstanceAddress{
@@ -706,7 +707,7 @@ func TestServer_PostExecutorSend(t *testing.T) {
 				},
 				CreateArguments: bindings.MarshalTemplateToRecord(executorBinding.Executor{
 					DynamicConfig: executorBinding.DynamicConfig{
-						AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
+						AllowedFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
 					},
 					AllowedCCVs: []chainlinkapi.RawInstanceAddress{
 						chainlinkapi.RawInstanceAddress{Unpack: "invalidaddress"},

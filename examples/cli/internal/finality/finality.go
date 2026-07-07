@@ -8,13 +8,13 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 )
 
 // Parsed holds the EVM extraArgs finality and matching Canton receiver config.
 type Parsed struct {
 	EVM      protocol.Finality
-	Receiver core.FinalityConfig
+	Receiver ccipcodec.FinalityConfig
 	Label    string
 }
 
@@ -27,13 +27,13 @@ func Parse(s string) (Parsed, error) {
 	case "finality":
 		return Parsed{
 			EVM:      protocol.FinalityWaitForFinality,
-			Receiver: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
+			Receiver: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
 			Label:    "WaitForFinality",
 		}, nil
 	case "safe":
 		return Parsed{
 			EVM:      protocol.FinalityWaitForSafe,
-			Receiver: core.FinalityConfig{WaitForSafe: &types.UNIT{}},
+			Receiver: ccipcodec.FinalityConfig{WaitForSafe: &types.UNIT{}},
 			Label:    "WaitForSafe",
 		}, nil
 	default:
@@ -45,7 +45,7 @@ func Parse(s string) (Parsed, error) {
 
 		return Parsed{
 			EVM:      protocol.NewFinality().WithBlockDepth(depth),
-			Receiver: core.FinalityConfig{BlockDepth: new(types.INT64(int64(depth)))},
+			Receiver: ccipcodec.FinalityConfig{BlockDepth: new(types.INT64(int64(depth)))},
 			Label:    fmt.Sprintf("BlockDepth(%d)", depth),
 		}, nil
 	}

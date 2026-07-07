@@ -3,14 +3,16 @@ module CCIPSenderGetFee where
 import Daml.Script
 
 import DA.Optional (fromSome)
-import qualified DA.TextMap as TextMap
 
-import qualified CCIP.Client
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.ClientV1
 import qualified CCIP.CCIPSender
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
 import qualified CommitteeVerifier.DummyCommitteeVerifier
 import qualified CCVMaxBounds
-import qualified Splice.Api.Token.MetadataV1 as MetadataV1
 
 data SenderGetFeeFixture = SenderGetFeeFixture
     with
@@ -18,29 +20,25 @@ data SenderGetFeeFixture = SenderGetFeeFixture
         sender : ContractId CCIP.CCIPSender.CCIPSender
         requiredVerifier : ContractId CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier
         extraVerifier : ContractId CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier
-        requiredVerifierAddress : RawInstanceAddress.RawInstanceAddress
-        extraVerifierAddress : RawInstanceAddress.RawInstanceAddress
-
-emptyContext : MetadataV1.ChoiceContext
-emptyContext = MetadataV1.ChoiceContext with
-    values = TextMap.fromList []
+        requiredVerifierAddress : Chainlink.InstanceAddress.RawInstanceAddress
+        extraVerifierAddress : Chainlink.InstanceAddress.RawInstanceAddress
 
 mkCCVSendInput
-    : RawInstanceAddress.RawInstanceAddress
+    : Chainlink.InstanceAddress.RawInstanceAddress
     -> ContractId CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier
     -> CCIP.CCIPSender.CCVSendInput
 mkCCVSendInput ccvAddress verifierCid =
     CCIP.CCIPSender.CCVSendInput with
         ccvAddress = ccvAddress
         ccvCid = coerceContractId verifierCid
-        ccvExtraContext = emptyContext
+        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
 messageRequiringRequiredVerifier
     : SenderGetFeeFixture
-    -> CCIP.Client.Canton2AnyMessage
+    -> CCIP.ClientV1.Canton2AnyMessage
 messageRequiringRequiredVerifier f =
     CCVMaxBounds.messageOnly f.outbound
-        [ CCIP.Client.CCVExtraArg with
+        [ CCIP.ClientV1.CCVExtraArg with
             ccvAddress = f.requiredVerifierAddress
             ccvArgs = ""
         ]
@@ -54,7 +52,7 @@ setupSenderGetFeeFixture suffix = do
             owner = outbound.user
 
     let requiredVerifierAddress =
-            RawInstanceAddress.make ("required-ccv-getfee-" <> suffix) outbound.user
+            Chainlink.InstanceAddress.make ("required-ccv-getfee-" <> suffix) outbound.user
     requiredVerifier <- submit outbound.user do
         createCmd CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier with
             instanceId = "required-ccv-getfee-" <> suffix
@@ -66,7 +64,7 @@ setupSenderGetFeeFixture suffix = do
             destBytesOverhead = 13
 
     let extraVerifierAddress =
-            RawInstanceAddress.make ("extra-ccv-getfee-" <> suffix) outbound.user
+            Chainlink.InstanceAddress.make ("extra-ccv-getfee-" <> suffix) outbound.user
     extraVerifier <- submit outbound.user do
         createCmd CommitteeVerifier.DummyCommitteeVerifier.DummyCommitteeVerifier with
             instanceId = "extra-ccv-getfee-" <> suffix
@@ -87,7 +85,7 @@ setupSenderGetFeeFixture suffix = do
 
 submitGetFee
     : SenderGetFeeFixture
-    -> CCIP.Client.Canton2AnyMessage
+    -> CCIP.ClientV1.Canton2AnyMessage
     -> [CCIP.CCIPSender.CCVSendInput]
     -> Script CCIP.CCIPSender.GetFeeResult
 submitGetFee f message ccvSendInputs = do
@@ -106,14 +104,14 @@ submitGetFee f message ccvSendInputs = do
                 destinationChainSelector = f.outbound.destChainSelector
                 message = message
                 context = CCVMaxBounds.outboundContext f.outbound
-                routerCid = f.outbound.router
+                routerCid = coerceContractId f.outbound.router
                 ccvSendInputs = ccvSendInputs
                 tokenTransferInput = None
                 executorInput = None
 
 submitGetFeeMustFail
     : SenderGetFeeFixture
-    -> CCIP.Client.Canton2AnyMessage
+    -> CCIP.ClientV1.Canton2AnyMessage
     -> [CCIP.CCIPSender.CCVSendInput]
     -> Script ()
 submitGetFeeMustFail f message ccvSendInputs = do
@@ -132,7 +130,7 @@ submitGetFeeMustFail f message ccvSendInputs = do
                 destinationChainSelector = f.outbound.destChainSelector
                 message = message
                 context = CCVMaxBounds.outboundContext f.outbound
-                routerCid = f.outbound.router
+                routerCid = coerceContractId f.outbound.router
                 ccvSendInputs = ccvSendInputs
                 tokenTransferInput = None
                 executorInput = None

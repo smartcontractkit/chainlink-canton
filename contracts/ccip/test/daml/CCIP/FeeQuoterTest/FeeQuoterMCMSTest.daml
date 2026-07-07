@@ -8,14 +8,14 @@ import DA.Map qualified as Map
 import DA.Set qualified as Set
 
 import qualified Splice.Api.Token.HoldingV1
-import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
-import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
 import MCMS.Codec (encodePartyList)
-import CCIP.FeeQuoter
-import CCIP.FeeQuoterCodecGen (
-    encodeRemoveFeeTokensParams,
-    encodeApplyFeeQuoterDestChainConfigUpdatesParams,
-    )
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+
+import qualified CCIP.CoreV1.FeeQuoter
+import qualified CCIP.CoreV1.FeeQuoterCodecGen
 
 usd : Decimal -> Numeric 0
 usd d = intToNumeric (truncate (d * 100000000.0))
@@ -42,9 +42,9 @@ testFeeQuoterMCMSEntrypoint_RemoveFeeTokens = script do
 
     -- Create FeeQuoter with one existing fee token
     fqCid <- submit owner do
-        createCmd FeeQuoter with
+        createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.fromList [instrumentId1]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -57,7 +57,7 @@ testFeeQuoterMCMSEntrypoint_RemoveFeeTokens = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Encode RemoveFeeTokens params: remove USDC
-    let encoded = encodeRemoveFeeTokensParams (RemoveFeeTokensParams with
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeRemoveFeeTokensParams (CCIP.CoreV1.FeeQuoter.RemoveFeeTokensParams with
             feeTokensToRemove = [instrumentId1])
 
     -- Call mcmsEntrypoint
@@ -68,7 +68,7 @@ testFeeQuoterMCMSEntrypoint_RemoveFeeTokens = script do
             contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
     -- Verify state changed
-    contracts <- query @FeeQuoter owner
+    contracts <- query @CCIP.CoreV1.FeeQuoter.FeeQuoter owner
     case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
         [(_, fq)] -> do
             -- USDC should be removed
@@ -91,9 +91,9 @@ testFeeQuoterMCMSEntrypoint_RemoveFeeTokens_Multiple = script do
 
     -- Create FeeQuoter with multiple fee tokens
     fqCid <- submit owner do
-        createCmd FeeQuoter with
+        createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.fromList [instrumentId1, instrumentId2, instrumentId3]
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -106,7 +106,7 @@ testFeeQuoterMCMSEntrypoint_RemoveFeeTokens_Multiple = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Remove multiple fee tokens
-    let encoded = encodeRemoveFeeTokensParams (RemoveFeeTokensParams with
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeRemoveFeeTokensParams (CCIP.CoreV1.FeeQuoter.RemoveFeeTokensParams with
             feeTokensToRemove = [instrumentId1, instrumentId2, instrumentId3])
 
     -- Call mcmsEntrypoint
@@ -117,7 +117,7 @@ testFeeQuoterMCMSEntrypoint_RemoveFeeTokens_Multiple = script do
             contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
     -- Verify all tokens removed
-    contracts <- query @FeeQuoter owner
+    contracts <- query @CCIP.CoreV1.FeeQuoter.FeeQuoter owner
     case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
         [(_, fq)] -> do
             Set.size fq.feeTokens === 0
@@ -141,9 +141,9 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeQuoterDestChainConfigUpdates = script do
 
     -- Create FeeQuoter with no dest chain configs
     fqCid <- submit owner do
-        createCmd FeeQuoter with
+        createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -156,7 +156,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeQuoterDestChainConfigUpdates = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Create dest chain config
-    let destConfig = FeeQuoterDestChainConfig with
+    let destConfig = CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
             isEnabled = True
             maxDataBytes = 65535
             maxPerMsgGasLimit = 3000000
@@ -167,8 +167,8 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeQuoterDestChainConfigUpdates = script do
             defaultTokenFeeUSD = usdToCents 0.5
             defaultTokenDestGasOverhead = 50000
 
-        encoded = encodeApplyFeeQuoterDestChainConfigUpdatesParams (ApplyFeeQuoterDestChainConfigUpdatesParams with
-            destChainConfigArgs = [FeeQuoterDestChainConfigArgs 1.0 destConfig])
+        encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeApplyFeeQuoterDestChainConfigUpdatesParams (CCIP.CoreV1.FeeQuoter.ApplyFeeQuoterDestChainConfigUpdatesParams with
+            destChainConfigArgs = [CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfigArgs 1.0 destConfig])
 
     -- Call mcmsEntrypoint
     newContractIds <- submit owner do
@@ -178,7 +178,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeQuoterDestChainConfigUpdates = script do
             contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
     -- Verify dest chain config was added
-    contracts <- query @FeeQuoter owner
+    contracts <- query @CCIP.CoreV1.FeeQuoter.FeeQuoter owner
     case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
         [(_, fq)] -> do
             Map.size fq.destChainConfigs === 1
@@ -201,9 +201,9 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeQuoterDestChainConfigUpdates_Multiple = scri
 
     -- Create FeeQuoter
     fqCid <- submit owner do
-        createCmd FeeQuoter with
+        createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -216,10 +216,10 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeQuoterDestChainConfigUpdates_Multiple = scri
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Create multiple dest chain configs
-    let config1 = FeeQuoterDestChainConfig True 65535 3000000 100000 16 200000 100.0 (usdToCents 0.5) 50000
-        config2 = FeeQuoterDestChainConfig True 32768 1500000 50000 8 100000 90.0 (usdToCents 1.0) 25000
-        configArgs = [FeeQuoterDestChainConfigArgs 1.0 config1, FeeQuoterDestChainConfigArgs 137.0 config2]
-        encoded = encodeApplyFeeQuoterDestChainConfigUpdatesParams (ApplyFeeQuoterDestChainConfigUpdatesParams with
+    let config1 = CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig True 65535 3000000 100000 16 200000 100.0 (usdToCents 0.5) 50000
+        config2 = CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig True 32768 1500000 50000 8 100000 90.0 (usdToCents 1.0) 25000
+        configArgs = [CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfigArgs 1.0 config1, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfigArgs 137.0 config2]
+        encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeApplyFeeQuoterDestChainConfigUpdatesParams (CCIP.CoreV1.FeeQuoter.ApplyFeeQuoterDestChainConfigUpdatesParams with
             destChainConfigArgs = configArgs)
 
     -- Call mcmsEntrypoint
@@ -230,7 +230,7 @@ testFeeQuoterMCMSEntrypoint_ApplyFeeQuoterDestChainConfigUpdates_Multiple = scri
             contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
     -- Verify both configs were added
-    contracts <- query @FeeQuoter owner
+    contracts <- query @CCIP.CoreV1.FeeQuoter.FeeQuoter owner
     case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
         [(_, fq)] -> do
             Map.size fq.destChainConfigs === 2
@@ -259,9 +259,9 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters = script do
 
   -- Create FeeQuoter with no price updaters
   fqCid <- submit owner do
-    createCmd FeeQuoter with
+    createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
       instanceId
-      owner
+      ccipOwner = owner
       feeTokens = Set.empty
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
@@ -284,7 +284,7 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
   -- Verify updaters were added
-  contracts <- query @FeeQuoter owner
+  contracts <- query @CCIP.CoreV1.FeeQuoter.FeeQuoter owner
   case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
     [(_, fq)] -> do
       length fq.priceUpdaters === 2
@@ -305,9 +305,9 @@ testFeeQuoterMCMSEntrypoint_RemovePriceUpdaters = script do
 
   -- Create FeeQuoter with two price updaters
   fqCid <- submit owner do
-    createCmd FeeQuoter with
+    createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
       instanceId
-      owner
+      ccipOwner = owner
       feeTokens = Set.empty
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
@@ -331,7 +331,7 @@ testFeeQuoterMCMSEntrypoint_RemovePriceUpdaters = script do
       contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
   -- Verify updater1 was removed
-  contracts <- query @FeeQuoter owner
+  contracts <- query @CCIP.CoreV1.FeeQuoter.FeeQuoter owner
   case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
     [(_, fq)] -> do
       length fq.priceUpdaters === 1
@@ -350,9 +350,9 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters_FiltersOwner = script do
   let instanceId = "feequoter-filter-owner-test"
 
   fqCid <- submit owner do
-    createCmd FeeQuoter with
+    createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
       instanceId
-      owner
+      ccipOwner = owner
       feeTokens = Set.empty
       destChainConfigs = Map.empty
       tokenTransferFeeConfigs = Map.empty
@@ -374,7 +374,7 @@ testFeeQuoterMCMSEntrypoint_AddPriceUpdaters_FiltersOwner = script do
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId fqCid)]
 
-  contracts <- query @FeeQuoter owner
+  contracts <- query @CCIP.CoreV1.FeeQuoter.FeeQuoter owner
   case filter (\(_, fq) -> fq.instanceId == instanceId) contracts of
     [(_, fq)] -> do
       length fq.priceUpdaters === 1
@@ -396,9 +396,9 @@ testFeeQuoterMCMSEntrypoint_UnknownFunction = script do
     let instanceId = "feequoter-error-test"
 
     fqCid <- submit owner do
-        createCmd FeeQuoter with
+        createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -427,9 +427,9 @@ testFeeQuoterMCMSEntrypoint_InvalidParams = script do
     let instanceId = "feequoter-invalid-test"
 
     fqCid <- submit owner do
-        createCmd FeeQuoter with
+        createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -458,9 +458,9 @@ testFeeQuoterMCMSEntrypoint_MissingSelfCid = script do
     let instanceId = "feequoter-missing-cid-test"
 
     fqCid <- submit owner do
-        createCmd FeeQuoter with
+        createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
             instanceId
-            owner
+            ccipOwner = owner
             feeTokens = Set.empty
             destChainConfigs = Map.empty
             tokenTransferFeeConfigs = Map.empty
@@ -472,7 +472,7 @@ testFeeQuoterMCMSEntrypoint_MissingSelfCid = script do
     let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver fqCid
 
     -- Encode valid params
-    let encoded = encodeApplyFeeQuoterDestChainConfigUpdatesParams (ApplyFeeQuoterDestChainConfigUpdatesParams with
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeApplyFeeQuoterDestChainConfigUpdatesParams (CCIP.CoreV1.FeeQuoter.ApplyFeeQuoterDestChainConfigUpdatesParams with
             destChainConfigArgs = [])
 
     -- Call with empty contractIds map - should fail

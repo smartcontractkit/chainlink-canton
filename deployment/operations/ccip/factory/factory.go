@@ -245,7 +245,6 @@ func encodeDeployOnRamp(args factorybindings.DeployOnRamp) (*bind.EncodedChoice,
 		RmnRemote:          args.Contract.Deps.RmnRemote,
 		TokenAdminRegistry: args.Contract.Deps.TokenAdminRegistry,
 		FeeQuoter:          args.Contract.Deps.FeeQuoter,
-		CcvRegistry:        args.Contract.Deps.CcvRegistry,
 		MaxUSDCentsPerMsg:  args.Contract.MaxUSDCentsPerMsg,
 	})
 }

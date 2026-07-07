@@ -6,20 +6,20 @@ import DA.Assert
 import DA.Optional (fromSome)
 import DA.Time (seconds)
 
-import CCIP.RateLimiter qualified as RateLimiter
+import qualified CCIP.RateLimiterV1
 
 testRateLimiterConsumeAndRefill = script do
     poolOwner <- allocateParty "pool-owner"
 
     now <- getTime
     limiter <- submit poolOwner do
-        createCmd RateLimiter.RateLimiter with
+        createCmd CCIP.RateLimiterV1.RateLimiter with
             instanceId = "rl-refill"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
             remoteChainSelector = 123.0
-            direction = RateLimiter.RateLimitDirection_Outbound
-            mode = RateLimiter.RateLimitMode_DefaultFinality
+            direction = CCIP.RateLimiterV1.RateLimitDirection_Outbound
+            mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
             isEnabled = True
             capacity = 100.0
             rate = 5.0
@@ -27,7 +27,7 @@ testRateLimiterConsumeAndRefill = script do
             lastUpdated = now
 
     consumed <- submit poolOwner do
-        exerciseCmd limiter RateLimiter.ConsumeCapacity with
+        exerciseCmd limiter CCIP.RateLimiterV1.ConsumeCapacity with
             requested = 90.0
     consumed.availableBeforeConsume === 100.0
 
@@ -35,7 +35,7 @@ testRateLimiterConsumeAndRefill = script do
 
     limiterState <- fromSome <$> queryContractId poolOwner consumed.rateLimiterCid
     now2 <- getTime
-    RateLimiter.availableTokensAt now2 limiterState === 60.0
+    CCIP.RateLimiterV1.availableTokensAt now2 limiterState === 60.0
 
     debug "testRateLimiterConsumeAndRefill: PASSED"
 
@@ -44,13 +44,13 @@ testRateLimiterRejectsOverCapacity = script do
 
     now <- getTime
     limiter <- submit poolOwner do
-        createCmd RateLimiter.RateLimiter with
+        createCmd CCIP.RateLimiterV1.RateLimiter with
             instanceId = "rl-over-cap"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
             remoteChainSelector = 123.0
-            direction = RateLimiter.RateLimitDirection_Outbound
-            mode = RateLimiter.RateLimitMode_DefaultFinality
+            direction = CCIP.RateLimiterV1.RateLimitDirection_Outbound
+            mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
             isEnabled = True
             capacity = 100.0
             rate = 5.0
@@ -58,7 +58,7 @@ testRateLimiterRejectsOverCapacity = script do
             lastUpdated = now
 
     submitMustFail poolOwner do
-        exerciseCmd limiter RateLimiter.ConsumeCapacity with
+        exerciseCmd limiter CCIP.RateLimiterV1.ConsumeCapacity with
             requested = 101.0
 
     debug "testRateLimiterRejectsOverCapacity: PASSED"
@@ -68,13 +68,13 @@ testRateLimiterSetConfigResetsBucket = script do
 
     now <- getTime
     limiter <- submit poolOwner do
-        createCmd RateLimiter.RateLimiter with
+        createCmd CCIP.RateLimiterV1.RateLimiter with
             instanceId = "rl-set-config"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
             remoteChainSelector = 123.0
-            direction = RateLimiter.RateLimitDirection_Inbound
-            mode = RateLimiter.RateLimitMode_DefaultFinality
+            direction = CCIP.RateLimiterV1.RateLimitDirection_Inbound
+            mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
             isEnabled = True
             capacity = 100.0
             rate = 5.0
@@ -82,7 +82,7 @@ testRateLimiterSetConfigResetsBucket = script do
             lastUpdated = now
 
     limiter <- submit poolOwner do
-        exerciseCmd limiter RateLimiter.SetConfig with
+        exerciseCmd limiter CCIP.RateLimiterV1.SetConfig with
             newIsEnabled = True
             newCapacity = 200.0
             newRate = 10.0
@@ -99,13 +99,13 @@ testRateLimiterRejectsNegativeRequest = script do
 
     now <- getTime
     limiter <- submit poolOwner do
-        createCmd RateLimiter.RateLimiter with
+        createCmd CCIP.RateLimiterV1.RateLimiter with
             instanceId = "rl-negative"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
             remoteChainSelector = 123.0
-            direction = RateLimiter.RateLimitDirection_Outbound
-            mode = RateLimiter.RateLimitMode_DefaultFinality
+            direction = CCIP.RateLimiterV1.RateLimitDirection_Outbound
+            mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
             isEnabled = True
             capacity = 100.0
             rate = 5.0
@@ -113,7 +113,7 @@ testRateLimiterRejectsNegativeRequest = script do
             lastUpdated = now
 
     submitMustFail poolOwner do
-        exerciseCmd limiter RateLimiter.ConsumeCapacity with
+        exerciseCmd limiter CCIP.RateLimiterV1.ConsumeCapacity with
             requested = -20.0
 
     debug "testRateLimiterRejectsNegativeRequest: PASSED"
@@ -125,13 +125,13 @@ testRateLimiterRejectsNegativeConfig = script do
 
     -- Negative capacity must be rejected at creation
     submitMustFail poolOwner do
-        createCmd RateLimiter.RateLimiter with
+        createCmd CCIP.RateLimiterV1.RateLimiter with
             instanceId = "rl-neg-cap"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
             remoteChainSelector = 123.0
-            direction = RateLimiter.RateLimitDirection_Outbound
-            mode = RateLimiter.RateLimitMode_DefaultFinality
+            direction = CCIP.RateLimiterV1.RateLimitDirection_Outbound
+            mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
             isEnabled = True
             capacity = -1.0
             rate = 0.0
@@ -140,13 +140,13 @@ testRateLimiterRejectsNegativeConfig = script do
 
     -- Negative rate must be rejected at creation
     submitMustFail poolOwner do
-        createCmd RateLimiter.RateLimiter with
+        createCmd CCIP.RateLimiterV1.RateLimiter with
             instanceId = "rl-neg-rate"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
             remoteChainSelector = 123.0
-            direction = RateLimiter.RateLimitDirection_Outbound
-            mode = RateLimiter.RateLimitMode_DefaultFinality
+            direction = CCIP.RateLimiterV1.RateLimitDirection_Outbound
+            mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
             isEnabled = True
             capacity = 100.0
             rate = -5.0
@@ -154,13 +154,13 @@ testRateLimiterRejectsNegativeConfig = script do
             lastUpdated = now
 
     limiter <- submit poolOwner do
-        createCmd RateLimiter.RateLimiter with
+        createCmd CCIP.RateLimiterV1.RateLimiter with
             instanceId = "rl-neg-setconfig"
             poolInstanceId = "pool-1"
             poolOwner = poolOwner
             remoteChainSelector = 123.0
-            direction = RateLimiter.RateLimitDirection_Outbound
-            mode = RateLimiter.RateLimitMode_DefaultFinality
+            direction = CCIP.RateLimiterV1.RateLimitDirection_Outbound
+            mode = CCIP.RateLimiterV1.RateLimitMode_DefaultFinality
             isEnabled = True
             capacity = 100.0
             rate = 5.0
@@ -169,14 +169,14 @@ testRateLimiterRejectsNegativeConfig = script do
 
     -- Negative capacity must be rejected by SetConfig
     submitMustFail poolOwner do
-        exerciseCmd limiter RateLimiter.SetConfig with
+        exerciseCmd limiter CCIP.RateLimiterV1.SetConfig with
             newIsEnabled = True
             newCapacity = -1.0
             newRate = 0.0
 
     -- Negative rate must be rejected by SetConfig
     submitMustFail poolOwner do
-        exerciseCmd limiter RateLimiter.SetConfig with
+        exerciseCmd limiter CCIP.RateLimiterV1.SetConfig with
             newIsEnabled = True
             newCapacity = 100.0
             newRate = -5.0

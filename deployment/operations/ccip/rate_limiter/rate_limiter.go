@@ -6,7 +6,7 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -16,11 +16,11 @@ var ContractTypeOutbound = deployment.ContractType("CantonTokenPoolOutboundRateL
 
 var Version = semver.MustParse("2.0.0")
 
-var DeployInbound = contract.NewDeploy(contract.DeployParams[core.RateLimiter]{
+var DeployInbound = contract.NewDeploy(contract.DeployParams[ratelimiter.RateLimiter]{
 	Name:           "canton/ccip/token_pool_inbound_rate_limiter/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractTypeInbound, *Version),
 	Description:    "Deploys an Inbound Token Pool Rate Limiter contract on Canton",
-	Validate: func(template core.RateLimiter) error {
+	Validate: func(template ratelimiter.RateLimiter) error {
 		if template.PoolInstanceId == "" {
 			return fmt.Errorf("PoolInstanceId is required")
 		}
@@ -30,7 +30,7 @@ var DeployInbound = contract.NewDeploy(contract.DeployParams[core.RateLimiter]{
 		if template.RemoteChainSelector == "" {
 			return fmt.Errorf("RemoteChainSelector is required")
 		}
-		if template.Direction == core.RateLimitDirectionRateLimitDirection_Outbound {
+		if template.Direction == ratelimiter.RateLimitDirectionRateLimitDirection_Outbound {
 			return fmt.Errorf("cannot use this operation to deploy an outbound rate limiter")
 		}
 		if template.Mode == "" {
@@ -43,11 +43,11 @@ var DeployInbound = contract.NewDeploy(contract.DeployParams[core.RateLimiter]{
 	Prefix:      "inbound-rate-limiter",
 })
 
-var DeployOutbound = contract.NewDeploy(contract.DeployParams[core.RateLimiter]{
+var DeployOutbound = contract.NewDeploy(contract.DeployParams[ratelimiter.RateLimiter]{
 	Name:           "canton/ccip/token_pool_outbound_rate_limiter/deploy",
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractTypeOutbound, *Version),
 	Description:    "Deploys an Outbound Token Pool Rate Limiter contract on Canton",
-	Validate: func(template core.RateLimiter) error {
+	Validate: func(template ratelimiter.RateLimiter) error {
 		if template.PoolInstanceId == "" {
 			return fmt.Errorf("PoolInstanceId is required")
 		}
@@ -57,7 +57,7 @@ var DeployOutbound = contract.NewDeploy(contract.DeployParams[core.RateLimiter]{
 		if template.RemoteChainSelector == "" {
 			return fmt.Errorf("RemoteChainSelector is required")
 		}
-		if template.Direction == core.RateLimitDirectionRateLimitDirection_Inbound {
+		if template.Direction == ratelimiter.RateLimitDirectionRateLimitDirection_Inbound {
 			return fmt.Errorf("cannot use this operation to deploy an inbound rate limiter")
 		}
 		if template.Mode == "" {

@@ -2,10 +2,14 @@ module CommitteeVerifier.DummyCommitteeVerifier where
 
 import DA.Crypto.Text (BytesHex)
 
-import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.SendingMessageV1
-import CCIP.Interfaces.CrossChainVerifier
-import Chainlink.InstanceAddress (assertValidInstanceId)
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.APIV1.SendingMessage
+import qualified CCIP.CoreV1.ExecutingMessage
+import qualified CCIP.InterfacesV1.CrossChainVerifier
+
 
 -- | Dummy version tag for testing
 dummyVersionTag : BytesHex
@@ -22,59 +26,63 @@ template DummyCommitteeVerifier
         destBytesOverhead : Int
     where
         signatory owner
-        ensure assertValidInstanceId instanceId
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
 
-        interface instance CCIP.Interfaces.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
-            view = CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierView with
+        interface instance CCIP.InterfacesV1.CrossChainVerifier.ICrossChainVerifier for DummyCommitteeVerifier where
+            view = CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierView with
                 instanceId = instanceId
                 owner = owner
                 ccipOwner = ccipOwner
                 storageLocations = ["ipfs://dummy"]
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             crossChainVerifier_verifyMessageImpl self arg = do
                 case arg.verifierResults of
                     "01" -> error "DummyCommitteeVerifier: Simulated verification failure"
                     _ -> do
                         debug "DummyCommitteeVerifier: Simulated successful verification"
-                        exercise arg.executingMessageCid CCIP.ExecutingMessageV1.AddCCVVerification with
+                        coerceContractId <$> exercise (coerceContractId arg.executingMessageCid : ContractId CCIP.CoreV1.ExecutingMessage.ExecutingMessage) CCIP.CoreV1.ExecutingMessage.AddCCVVerification with
                             ccvInstanceId = instanceId
                             versionTag = versionTag
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                             caller = owner
 
             crossChainVerifier_calculateFeeImpl _self arg = do
-                exercise arg.sendingMessageCid CCIP.SendingMessageV1.AddCCVFee with
+                exercise arg.sendingMessageCid CCIP.APIV1.SendingMessage.SendingMessage_AddCCVFee with
                     ccvInstanceId = instanceId
                     feeUSDCents = feeUSDCents
                     destGasLimit = destGasLimit
                     destBytesOverhead = destBytesOverhead
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     caller = owner
 
             crossChainVerifier_getFeeImpl _self _arg = do
-                pure CCIP.Interfaces.CrossChainVerifier.CrossChainVerifierFeeQuote with
+                pure CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierFeeQuote with
                     ccvInstanceId = instanceId
                     ccvOwner = owner
                     feeUSDCents = feeUSDCents
                     gasForVerification = destGasLimit
                     payloadSizeBytes = destBytesOverhead
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
             crossChainVerifier_forwardToVerifierImpl self arg = do
                 exercise (fromInterfaceContractId @DummyCommitteeVerifier self)
                     ForwardToVerifier with
-                        sendingMessageCid = arg.sendingMessageCid
+                        sendingMessageCid = coerceContractId arg.sendingMessageCid
                         caller = arg.caller
 
-        nonconsuming choice ForwardToVerifier
-                : ContractId CCIP.SendingMessageV1.SendingMessageV1
+        nonconsuming choice ForwardToVerifier : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
             with
-                sendingMessageCid : ContractId CCIP.SendingMessageV1.SendingMessageV1
+                sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
                 caller : Party
             controller caller
             do
                 let verifierBlob = versionTag
 
-                exercise sendingMessageCid CCIP.SendingMessageV1.AddVerifierData with
+                exercise sendingMessageCid CCIP.APIV1.SendingMessage.SendingMessage_AddVerifierData with
                     ccvInstanceId = instanceId
                     versionTag = versionTag
                     verifierBlob = verifierBlob
                     messageSentObservers = [owner]
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                     caller = owner
