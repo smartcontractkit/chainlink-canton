@@ -265,17 +265,20 @@ func setupCantonTokenLoadHoldings(
 	t.Helper()
 
 	estimated := estimateMessages(sched)
-	feeMint := estimated * uint64(devenvtests.CantonToEVMFeeAmount)
-	transferMint := estimated * lane.TransferAmount.Uint64()
-	t.Logf("Pre-mint: estimatedMessages=%d feeMint=%d transferMint=%d",
-		estimated, feeMint, transferMint)
-	require.NoError(t, cantonImpl.MintTokens(ctx, feeMint))
-	require.NoError(t, cantonImpl.MintTokens(ctx, transferMint))
-	require.NoError(t, cantonImpl.SetupSend(
-		ctx,
-		uint64(devenvtests.CantonToEVMFeeAmount),
-		lane.TransferAmount.Uint64(),
-	))
+	fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
+	feeTotal := new(big.Rat).SetUint64(estimated * fee)
+	transferTotalFP := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(estimated)))
+	transferTotal := new(big.Rat).SetFrac(transferTotalFP, big.NewInt(cantondevenv.CantonFixedPointScale))
+	transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
+	t.Logf("Pre-mint: estimatedMessages=%d feeTotal=%s transferTotal=%s",
+		estimated, feeTotal.FloatString(10), transferTotal.FloatString(10))
+	require.NoError(t, cantonImpl.MintTokens(ctx, feeTotal))
+	require.NoError(t, cantonImpl.MintTokens(ctx, transferTotal))
+	if lane.TransferInstrument.Admin != "" {
+		require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
+	} else {
+		require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
+	}
 }
 
 func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress) Destination {

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -24,14 +25,23 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	ccipreceiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
+	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
 const perPartyRouterInstanceID = "test-router"
+
+func instanceIDFromEnv(key, defaultID string) contracts.InstanceID {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return contracts.InstanceID(v)
+	}
+	return contracts.InstanceID(defaultID)
+}
 
 // DeployPerPartyRouter uses the PerPartyRouterFactory to create a new PerPartyRouter instance for the given party.
 // partyOwner (client participant) exercises CreateRouter with factory disclosures from EDS.
@@ -94,6 +104,54 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, clientParticipant cant
 	}
 
 	return routerAddress, nil
+}
+
+// DeployCCIPSender returns a sender-owned CCIPSender instance address, deploying only when missing.
+func (c *Chain) DeployCCIPSender(ctx context.Context, participant canton.Participant, partyId string) (contracts.InstanceAddress, error) {
+	var unset contracts.InstanceAddress
+	if c.senderAddress != unset {
+		return c.senderAddress, nil
+	}
+
+	instanceID := instanceIDFromEnv("CANTON_SENDER_INSTANCE_ID", "e2e-ccipsender")
+	senderAddress := instanceID.RawInstanceAddress(types.PARTY(partyId)).InstanceAddress()
+
+	if _, err := contract.FindActiveContractIDByInstanceAddress(
+		ctx,
+		participant.LedgerServices.State,
+		contract.LedgerQueryParties(participant),
+		ccipsender.CCIPSender{}.GetTemplateID(),
+		senderAddress,
+	); err == nil {
+		c.senderAddress = senderAddress
+		return senderAddress, nil
+	}
+
+	_, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Deploy, c.chain, contract.DeployInput[ccipsender.CCIPSender]{
+		Qualifier:        nil,
+		ParticipantIndex: c.clientParticipantIndex(),
+		Template: ccipsender.CCIPSender{
+			InstanceId: types.TEXT(instanceID),
+			Owner:      types.PARTY(partyId),
+		},
+		OwnerParty: types.PARTY(partyId),
+	})
+	if err != nil {
+		if _, findErr := contract.FindActiveContractIDByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			contract.LedgerQueryParties(participant),
+			ccipsender.CCIPSender{}.GetTemplateID(),
+			senderAddress,
+		); findErr == nil {
+			c.senderAddress = senderAddress
+			return senderAddress, nil
+		}
+		return contracts.InstanceAddress{}, fmt.Errorf("failed to deploy ccip sender contract: %w", err)
+	}
+
+	c.senderAddress = senderAddress
+	return senderAddress, nil
 }
 
 func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Participant, partyId string, receiverFinality int64) (contracts.InstanceAddress, error) {

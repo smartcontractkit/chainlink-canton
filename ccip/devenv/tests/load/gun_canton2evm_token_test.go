@@ -50,7 +50,7 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 
 	evmSelectors := discoverEVMTokenSelectors(t, in)
 	require.NotEmpty(t, evmSelectors, "need at least one EVM token destination in the env file")
-	lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), evmSelectors)
+	lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, cantonChain.ChainSelector(), evmSelectors)
 	t.Logf("Token lane: pool=%s transfer=%s", lane.PoolRef.Qualifier, lane.TransferAmount.String())
 
 	destinations := discoverEVMTokenDestinations(t, in, chainMap, lane)
@@ -91,7 +91,7 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, receiverBalanceAfter)
 
-	expectedPerMessage := new(big.Int).Mul(lane.TransferAmount, big.NewInt(devenvtests.EVMDecimalsScale))
+	expectedPerMessage := new(big.Int).Mul(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointToEVMScale))
 	expectedDelta := new(big.Int).Mul(expectedPerMessage, big.NewInt(gun.CallCount()))
 	expectedBalance := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), expectedDelta)
 	t.Logf("EVM receiver token balance: before=%s after=%s expectedDelta=%s calls=%d",

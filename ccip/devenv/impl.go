@@ -70,8 +70,9 @@ import (
 )
 
 // TODO: move this to share between devenv and integration tests
-// and define a const for LINK instrument
 const AMTInstrument = types.TEXT("Amulet")
+const LINKInstrument = types.TEXT("LINK")
+
 const amuletTransferPreapprovalTemplateID = "#splice-amulet:Splice.AmuletRules:TransferPreapproval"
 
 var _ cciptestinterfaces.CCIP17 = &Chain{}
@@ -551,9 +552,10 @@ func (c *Chain) GetTokenExpansionConfigs(
 					"instrument-id:Amulet",
 				),
 			},
-			PoolType:              string(poolRef.Type),
-			TokenPoolQualifier:    poolRef.Qualifier,
-			AllowedFinalityConfig: finality.Config{WaitForFinality: true},
+			PoolType:           string(poolRef.Type),
+			TokenPoolQualifier: poolRef.Qualifier,
+			// BlockDepth 1: minimum FTF allowed by pool; messages may request finality>=1 via extra args.
+			AllowedFinalityConfig: finality.Config{BlockDepth: 1},
 		},
 	}}, nil
 }
@@ -761,8 +763,9 @@ func (c *Chain) GetTokenTransferConfigs(
 			Type:    datastore.ContractType(token_admin_registry.ContractType),
 			Version: token_admin_registry.Version,
 		},
-		RemoteChains:          remoteChains,
-		AllowedFinalityConfig: finality.Config{WaitForFinality: true},
+		RemoteChains: remoteChains,
+		// BlockDepth 1: pool must allow message FTF; WaitForFinality-only rejects BlockDepth requests.
+		AllowedFinalityConfig: finality.Config{BlockDepth: 1},
 	}}, nil
 }
 
@@ -1013,39 +1016,28 @@ func (c *Chain) SetupReceive(ctx context.Context) error {
 
 // SetupSend sets up Canton sender specific prerequisites for sending a message.
 // eg: deploy per-party router, deploy ccipsender contract...
+// transferInstrument defaults to Amulet under registryAdmin when omitted or Admin is empty.
 func (c *Chain) SetupSend(
 	ctx context.Context,
 	feeAmountPerMessage uint64,
-	transferAmountPerMessage uint64,
+	transferAmountPerMessage *big.Rat,
+	transferInstrument ...splice_api_token_holding_v1.InstrumentId,
 ) error {
-	participant, clientIdx, err := c.ClientParticipant()
+	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return fmt.Errorf("no canton participants configured: %w", err)
 	}
 	party := participant.PartyID
 
-	// Deploy contracts //
-	// Router for sender party.
 	routerAddress, err := c.DeployPerPartyRouter(ctx, participant, party)
 	if err != nil {
 		return fmt.Errorf("failed to deploy per-party router: %w", err)
 	}
 
-	// Deploy a sender-owned CCIPSender contract.
-	senderInstanceID := contracts.MustNewInstanceID("devenv-ccipsender")
-	out, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Deploy, c.chain, contract.DeployInput[ccipsender.CCIPSender]{
-		Qualifier:        nil,
-		ParticipantIndex: clientIdx,
-		Template: ccipsender.CCIPSender{
-			InstanceId: types.TEXT(senderInstanceID),
-			Owner:      types.PARTY(party),
-		},
-		OwnerParty: types.PARTY(party),
-	})
+	senderAddress, err := c.DeployCCIPSender(ctx, participant, party)
 	if err != nil {
 		return fmt.Errorf("failed to deploy ccip sender contract: %w", err)
 	}
-	senderAddress := contracts.HexToInstanceAddress(out.Output.Address)
 	registryAdmin, err := testhelpers.ResolveRegistryAdmin(ctx, participant)
 	if err != nil {
 		return fmt.Errorf("resolve registry admin: %w", err)
@@ -1054,14 +1046,11 @@ func (c *Chain) SetupSend(
 	c.routerAddress = routerAddress
 	c.senderAddress = senderAddress
 
-	// Clients setup //
 	_, err = c.getValidatorAPIClients()
 	if err != nil {
 		return fmt.Errorf("get validator API clients: %w", err)
 	}
 
-	// Tokens setup //
-	// Setup fee holding
 	feeTokenInstrument := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(registryAdmin),
 		Id:    AMTInstrument,
@@ -1085,25 +1074,24 @@ func (c *Chain) SetupSend(
 	c.feeTokenInstrument = feeTokenInstrument
 	c.nextFeeCID = selectedFee[0].ContractID
 
-	// End setup, no transfer holdings needed
-	if transferAmountPerMessage == 0 {
+	if transferAmountPerMessage == nil || transferAmountPerMessage.Sign() <= 0 {
 		return nil
 	}
 
-	// Setup transfer holdings
-	// TODO: add support for LINK instrument
 	transferTokenInstrument := &splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(registryAdmin),
 		Id:    AMTInstrument,
 	}
+	if len(transferInstrument) > 0 && transferInstrument[0].Admin != "" {
+		transferTokenInstrument = &transferInstrument[0]
+	}
 
-	// Select transfer holding using another call here because fee/token might use different instruments
-	filters := append(baseFilters, testhelpers.ExcludeCIDs([]string{c.nextFeeCID})) // this filter is here in case fee and transfer use the same instrument
+	filters := append(baseFilters, testhelpers.ExcludeCIDs([]string{c.nextFeeCID}))
 	transferRows, err := testhelpers.ListHoldingsForInstrument(ctx, participant, transferTokenInstrument, filters...)
 	if err != nil {
 		return fmt.Errorf("list transfer holdings for setup: %w", err)
 	}
-	transferMin := new(big.Rat).SetUint64(transferAmountPerMessage)
+	transferMin := new(big.Rat).Set(transferAmountPerMessage)
 	selectedTransfer, err := testhelpers.SelectHoldingsForInstrument(transferRows, []*big.Rat{transferMin})
 	if err != nil || len(selectedTransfer) == 0 {
 		return fmt.Errorf("select transfer holding for setup: %w", err)
@@ -1117,8 +1105,11 @@ func (c *Chain) SetupSend(
 
 // MintTokens mint tokens for transfer and fees. To be used on devenv tests only.
 // this method won't work in staging/prod tests
-// TODO: add support for LINK instrument
-func (c *Chain) MintTokens(ctx context.Context, amount uint64) error {
+func (c *Chain) MintTokens(ctx context.Context, amount *big.Rat) error {
+	if amount == nil || amount.Sign() <= 0 {
+		return nil
+	}
+
 	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return fmt.Errorf("no canton participants configured: %w", err)
@@ -1137,7 +1128,7 @@ func (c *Chain) MintTokens(ctx context.Context, amount uint64) error {
 		validatorAPIClients.transferClient,
 		validatorAPIClients.scanClient,
 		party,
-		strconv.FormatUint(amount, 10),
+		amount.FloatString(10),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to mint tokens: %w", err)
@@ -1166,7 +1157,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("canton SendMessage: token transfer amount must be positive")
 	}
 
-	hasTokenTransfer := c.transferTokenInstrument != nil && fields.TokenAmount.Amount != nil && fields.TokenAmount.Amount.Sign() > 0
+	hasTokenTransfer := fields.TokenAmount.Amount != nil &&
+		fields.TokenAmount.Amount.Sign() > 0
 
 	participant, clientIdx, err := c.ClientParticipant()
 	if err != nil {
@@ -1250,9 +1242,8 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Receiver: hex.EncodeToString(fields.Receiver),
 	}
 	if hasTokenTransfer {
-		// TODO: move this to the other line also branching by tokenTransfer
 		outgoingMessage.TokenTransfer = &oapiCommon.TokenTransfer{
-			Amount: fields.TokenAmount.Amount.String(),
+			Amount: new(big.Rat).SetFrac(fields.TokenAmount.Amount, big.NewInt(CantonFixedPointScale)).FloatString(10),
 			Token: oapiCommon.InstrumentId{
 				Admin: oapiCommon.PartyId(c.transferTokenInstrument.Admin),
 				Id:    string(c.transferTokenInstrument.Id),
@@ -1300,8 +1291,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	// Token Pool
 	var tokenPoolRequiredCCVs []string
 	if hasTokenTransfer {
-		// Get Token Pool
-		token := contracts.EncodeInstrumentID(c.feeTokenInstrument)
+		token := contracts.EncodeInstrumentID(*c.transferTokenInstrument)
 		tokenPoolAddress, err := c.GetTokenPoolForToken(ctx, token)
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("get token pool for token %s: %w", token.String(), err)
@@ -1451,7 +1441,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Msg("CCIP Send executed")
 
 	// Set next holdings
-	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, fields.TokenAmount.Amount)
+	var tokenAmount *big.Rat
+	if hasTokenTransfer {
+		tokenAmount = new(big.Rat).SetFrac(fields.TokenAmount.Amount, big.NewInt(CantonFixedPointScale))
+	}
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, tokenAmount)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
 	}
@@ -1570,7 +1564,7 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 // Created events from the send transaction. When no qualifying holding appears in those
 // events, the corresponding next CID is cleared (empty means no next holding available);
 // the current send already succeeded and a future SendMessage will fail its holding checks.
-func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, tokenAmount *big.Int) error {
+func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, tokenAmount *big.Rat) error {
 	participant, _, err := c.ClientParticipant()
 	if err != nil {
 		return fmt.Errorf("no canton participants configured: %w", err)
@@ -1621,7 +1615,7 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 		slices.Clone(refreshFilters),
 		testhelpers.ExcludeCIDs(append(spentCIDs, c.nextFeeCID)),
 	)
-	transferValue := new(big.Rat).SetInt(tokenAmount)
+	transferValue := new(big.Rat).Set(tokenAmount)
 	nextTransferCID, exhaustion, err := pickNextHolding(
 		events,
 		*c.transferTokenInstrument,

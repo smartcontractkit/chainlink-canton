@@ -126,7 +126,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		// Send params (transfer amount, gas limit, finality) come from token_transfer_config.toml.
-		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, srcSelector, []uint64{dstSelector})
+		lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, srcSelector, []uint64{dstSelector})
 		srcToken := lane.SrcToken
 		srcSender, err := srcChain.GetEOAReceiverAddress()
 		require.NoError(t, err)

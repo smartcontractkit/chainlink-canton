@@ -21,7 +21,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
+
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 )
 
 const (
@@ -34,8 +37,12 @@ const (
 // TokenLane describes a resolved token pool pairing for load or e2e tests.
 type TokenLane struct {
 	PoolRef datastore.AddressRef
-	// TransferAmount is the per-message token transfer amount.
+	// TransferAmount is the per-message token transfer amount (wei for EVM→Canton, 10^10 fixed-point for Canton→EVM).
 	TransferAmount *big.Int
+	// TransferInstrumentID is a TOML hint only (e.g. Amulet, LINK); prod resolution uses TransferInstrument.
+	TransferInstrumentID string
+	// TransferInstrument is the resolved Canton transfer instrument when Canton is the source.
+	TransferInstrument splice_api_token_holding_v1.InstrumentId
 	// ExecutionGasLimit is the per-message execution gas limit.
 	ExecutionGasLimit uint32
 	// FinalityConfig is the per-message finality configuration.
@@ -49,23 +56,42 @@ type TokenLane struct {
 }
 
 type tokenConfigTOML struct {
+	Devenv      tokenDirectionsTOML `toml:"devenv"`
+	ProdTestnet tokenDirectionsTOML `toml:"prod-testnet"`
+}
+
+type tokenDirectionsTOML struct {
 	EVMToCanton tokenDirectionTOML `toml:"evm_to_canton"`
 	CantonToEVM tokenDirectionTOML `toml:"canton_to_evm"`
 }
 
 type tokenDirectionTOML struct {
-	PoolType          string `toml:"pool_type"`
-	PoolVersion       string `toml:"pool_version"`
-	PoolQualifier     string `toml:"pool_qualifier"`
-	TransferAmount    string `toml:"transfer_amount"`
-	ExecutionGasLimit uint32 `toml:"execution_gas_limit"`
-	FinalityConfig    uint32 `toml:"finality_config"`
+	PoolType             string `toml:"pool_type"`
+	PoolVersion          string `toml:"pool_version"`
+	PoolQualifier        string `toml:"pool_qualifier"`
+	TransferAmount       string `toml:"transfer_amount"`
+	ExecutionGasLimit    uint32 `toml:"execution_gas_limit"`
+	FinalityConfig       uint32 `toml:"finality_config"`
+	RemotePoolType       string `toml:"remote_pool_type"`
+	RemotePoolVersion    string `toml:"remote_pool_version"`
+	RemotePoolQualifier  string `toml:"remote_pool_qualifier"`
+	TransferInstrumentID string `toml:"transfer_instrument_id"`
+}
+
+type tokenDirectionParsed struct {
+	PoolRef              datastore.AddressRef
+	RemotePoolRef        *datastore.AddressRef
+	TransferAmount       *big.Int
+	TransferInstrumentID string
+	ExecutionGasLimit    uint32
+	FinalityConfig       protocol.Finality
 }
 
 // ResolveTokenLane loads send params from TOML, matches the pool on the source chain,
 // and resolves source/destination token addresses for the requested destinations.
 func ResolveTokenLane(
 	t *testing.T,
+	env CCIPEnv,
 	in *ccv.Cfg,
 	lib ccv.Lib,
 	chainMap map[uint64]cciptestinterfaces.CCIP17,
@@ -74,68 +100,64 @@ func ResolveTokenLane(
 ) TokenLane {
 	t.Helper()
 
-	// Load the CLDF environment and datastore used to resolve on-chain addresses.
-	env, err := lib.CLDFEnvironment()
+	cldfEnv, err := lib.CLDFEnvironment()
 	require.NoError(t, err)
-	require.NotNil(t, env)
+	require.NotNil(t, cldfEnv)
 
 	srcChain, ok := chainMap[srcSelector]
 	require.True(t, ok, "source chain %d not in harness chain map", srcSelector)
 
-	// Pick the TOML block from the source chain family (Canton<->EVM only).
 	direction := directionEVMToCanton
 	if isCantonSelector(srcSelector) {
 		direction = directionCantonToEVM
 	}
-	// Read pool identity and per-message send params from token_transfer_config.toml.
-	poolRef, transferAmount, gasLimit, finalityConfig := loadTokenDirection(t, direction)
+	dir := loadTokenDirection(t, env, direction)
 
-	// List token transfer configs deployed on the source chain for the requested destinations.
 	srcProvider := tokenConfigProvider(srcChain)
-	cfgs, err := srcProvider.GetTokenTransferConfigs(env, srcSelector, destSelectors, in.EnvironmentTopology)
+	cfgs, err := srcProvider.GetTokenTransferConfigs(cldfEnv, srcSelector, destSelectors, in.EnvironmentTopology)
 	require.NoError(t, err, "get token transfer configs for source chain %d", srcSelector)
 
-	// Require exactly one config whose pool ref matches the TOML declaration.
-	cfg := selectTokenConfig(t, cfgs, poolRef, srcSelector)
+	cfg, matched := trySelectTokenConfig(cfgs, dir.PoolRef)
+	if !matched {
+		t.Fatalf("no token transfer config on chain %d matches pool %s (have %s)",
+			srcSelector, poolRefString(dir.PoolRef), poolRefsString(cfgs))
+	}
 
-	// Fail fast if any requested destination is missing from that lane's RemoteChains.
 	for _, sel := range destSelectors {
 		if _, present := cfg.RemoteChains[sel]; !present {
 			t.Fatalf("destination %d not configured for pool %s on chain %d (have %v)",
-				sel, poolRefString(poolRef), srcSelector, sortedRemoteSelectors(cfg))
+				sel, poolRefString(dir.PoolRef), srcSelector, sortedRemoteSelectors(cfg))
 		}
 	}
 
-	// Assemble the lane with TOML send params; token addresses are filled in below.
 	lane := TokenLane{
-		PoolRef:             poolRef,
-		TransferAmount:      transferAmount,
-		ExecutionGasLimit:   gasLimit,
-		FinalityConfig:      finalityConfig,
-		DestTokenBySelector: make(map[uint64]protocol.UnknownAddress, len(destSelectors)),
+		PoolRef:              dir.PoolRef,
+		TransferAmount:       dir.TransferAmount,
+		TransferInstrumentID: dir.TransferInstrumentID,
+		ExecutionGasLimit:    dir.ExecutionGasLimit,
+		FinalityConfig:       dir.FinalityConfig,
+		DestTokenBySelector:  make(map[uint64]protocol.UnknownAddress, len(destSelectors)),
 	}
 
-	// EVM source: resolve the ERC-20 from the matched config's TokenRef in the datastore.
-	// Canton source: instrument is chosen in SetupSend, so SrcToken stays empty.
 	if !isCantonSelector(srcSelector) {
-		srcToken, err := resolveTokenRef(env.DataStore, srcSelector, cfg.TokenRef)
+		srcToken, err := resolveTokenRef(cldfEnv.DataStore, srcSelector, cfg.TokenRef)
 		require.NoError(t, err, "resolve source token on chain %d", srcSelector)
 		lane.SrcToken = srcToken
+	} else {
+		lane.TransferInstrument = resolveCantonTransferInstrument(t, cldfEnv.DataStore, srcSelector, cfg.TokenRef, dir.PoolRef, dir.TransferInstrumentID)
 	}
 
-	// EVM destinations: look up each dest chain's config for the remote pool and resolve TokenRef.
-	// Canton destinations are skipped (no EVM-style token address for balance checks).
 	for _, sel := range destSelectors {
 		if isCantonSelector(sel) {
 			continue
 		}
-		lane.DestTokenBySelector[sel] = resolveDestToken(t, env, in, chainMap, srcSelector, sel, cfg.RemoteChains[sel], poolRef)
+		lane.DestTokenBySelector[sel] = resolveDestToken(t, cldfEnv, in, chainMap, srcSelector, sel, cfg.RemoteChains[sel], dir.PoolRef)
 	}
 
 	return lane
 }
 
-func loadTokenDirection(t *testing.T, direction string) (poolRef datastore.AddressRef, transferAmount *big.Int, gasLimit uint32, finalityConfig protocol.Finality) {
+func loadTokenDirection(t *testing.T, env CCIPEnv, direction string) tokenDirectionParsed {
 	t.Helper()
 
 	path := os.Getenv(envTokenTestConfig)
@@ -147,40 +169,88 @@ func loadTokenDirection(t *testing.T, direction string) (poolRef datastore.Addre
 	_, err := toml.DecodeFile(path, &cfg)
 	require.NoError(t, err, "decode token transfer config %q (set %s to override)", path, envTokenTestConfig)
 
+	dirs, err := tokenDirectionsForEnv(cfg, env)
+	require.NoError(t, err, "%s: no token transfer config for env %q", path, env)
+
 	var dir tokenDirectionTOML
 	switch direction {
 	case directionEVMToCanton:
-		dir = cfg.EVMToCanton
+		dir = dirs.EVMToCanton
 	case directionCantonToEVM:
-		dir = cfg.CantonToEVM
+		dir = dirs.CantonToEVM
 	default:
 		t.Fatalf("unknown token transfer direction %q (expected %q or %q)", direction, directionEVMToCanton, directionCantonToEVM)
 	}
 
-	require.NotEmpty(t, dir.PoolType, "%s: pool_type is required for direction %q", path, direction)
-	require.NotEmpty(t, dir.PoolVersion, "%s: pool_version is required for direction %q", path, direction)
-	require.NotEmpty(t, dir.PoolQualifier, "%s: pool_qualifier is required for direction %q", path, direction)
+	require.NotEmpty(t, dir.PoolType, "%s: pool_type is required for env %q direction %q", path, env, direction)
+	require.NotEmpty(t, dir.PoolVersion, "%s: pool_version is required for env %q direction %q", path, env, direction)
+	require.NotEmpty(t, dir.PoolQualifier, "%s: pool_qualifier is required for env %q direction %q", path, env, direction)
 
 	version, err := semver.NewVersion(dir.PoolVersion)
-	require.NoError(t, err, "%s: invalid pool_version %q for direction %q", path, dir.PoolVersion, direction)
+	require.NoError(t, err, "%s: invalid pool_version %q for env %q direction %q", path, dir.PoolVersion, env, direction)
 
-	amount, ok := new(big.Int).SetString(strings.TrimSpace(dir.TransferAmount), 10)
-	require.True(t, ok && amount.Sign() > 0, "%s: transfer_amount %q must be a positive integer for direction %q", path, dir.TransferAmount, direction)
-
-	require.NotZero(t, dir.ExecutionGasLimit, "%s: execution_gas_limit is required for direction %q", path, direction)
-
-	poolRef = datastore.AddressRef{
-		Type:      datastore.ContractType(dir.PoolType),
-		Version:   version,
-		Qualifier: dir.PoolQualifier,
+	amountStr := strings.TrimSpace(dir.TransferAmount)
+	intAmount, ok := new(big.Int).SetString(amountStr, 10)
+	switch direction {
+	case directionEVMToCanton:
+		require.True(t, ok && intAmount.Sign() > 0, "%s: transfer_amount %q must be a positive integer wei for env %q direction %q", path, dir.TransferAmount, env, direction)
+	case directionCantonToEVM:
+		require.True(t, ok && intAmount.Sign() > 0, "%s: transfer_amount %q must be a positive integer fixed-point (10^10 scale) for env %q direction %q", path, dir.TransferAmount, env, direction)
+	default:
+		t.Fatalf("unknown token transfer direction %q", direction)
 	}
 
-	return poolRef, amount, dir.ExecutionGasLimit, protocol.Finality(dir.FinalityConfig)
+	require.NotZero(t, dir.ExecutionGasLimit, "%s: execution_gas_limit is required for env %q direction %q", path, env, direction)
+
+	parsed := tokenDirectionParsed{
+		PoolRef: datastore.AddressRef{
+			Type:      datastore.ContractType(dir.PoolType),
+			Version:   version,
+			Qualifier: dir.PoolQualifier,
+		},
+		TransferAmount:       intAmount,
+		TransferInstrumentID: strings.TrimSpace(dir.TransferInstrumentID),
+		ExecutionGasLimit:    dir.ExecutionGasLimit,
+		FinalityConfig:       protocol.Finality(dir.FinalityConfig),
+	}
+
+	if dir.RemotePoolType != "" || dir.RemotePoolVersion != "" || dir.RemotePoolQualifier != "" {
+		require.NotEmpty(t, dir.RemotePoolType, "%s: remote_pool_type is required when remote pool fields are set (env %q direction %q)", path, env, direction)
+		require.NotEmpty(t, dir.RemotePoolVersion, "%s: remote_pool_version is required when remote pool fields are set (env %q direction %q)", path, env, direction)
+		require.NotEmpty(t, dir.RemotePoolQualifier, "%s: remote_pool_qualifier is required when remote pool fields are set (env %q direction %q)", path, env, direction)
+
+		remoteVersion, err := semver.NewVersion(dir.RemotePoolVersion)
+		require.NoError(t, err, "%s: invalid remote_pool_version %q for env %q direction %q", path, dir.RemotePoolVersion, env, direction)
+
+		remoteRef := datastore.AddressRef{
+			Type:      datastore.ContractType(dir.RemotePoolType),
+			Version:   remoteVersion,
+			Qualifier: dir.RemotePoolQualifier,
+		}
+		parsed.RemotePoolRef = &remoteRef
+	}
+
+	return parsed
 }
 
-func selectTokenConfig(t *testing.T, cfgs []tokenscore.TokenTransferConfig, poolRef datastore.AddressRef, srcSelector uint64) tokenscore.TokenTransferConfig {
-	t.Helper()
+func tokenDirectionsForEnv(cfg tokenConfigTOML, env CCIPEnv) (tokenDirectionsTOML, error) {
+	switch env {
+	case EnvDevenv:
+		if cfg.Devenv.EVMToCanton.PoolType == "" && cfg.Devenv.CantonToEVM.PoolType == "" {
+			return tokenDirectionsTOML{}, fmt.Errorf("missing [devenv.*] sections")
+		}
+		return cfg.Devenv, nil
+	case EnvProdTestnet:
+		if cfg.ProdTestnet.EVMToCanton.PoolType == "" && cfg.ProdTestnet.CantonToEVM.PoolType == "" {
+			return tokenDirectionsTOML{}, fmt.Errorf("missing [prod-testnet.*] sections")
+		}
+		return cfg.ProdTestnet, nil
+	default:
+		return tokenDirectionsTOML{}, fmt.Errorf("unsupported ccip env %q", env)
+	}
+}
 
+func trySelectTokenConfig(cfgs []tokenscore.TokenTransferConfig, poolRef datastore.AddressRef) (tokenscore.TokenTransferConfig, bool) {
 	matches := make([]tokenscore.TokenTransferConfig, 0, 1)
 	for _, cfg := range cfgs {
 		if poolRefEqual(cfg.TokenPoolRef, poolRef) {
@@ -189,16 +259,10 @@ func selectTokenConfig(t *testing.T, cfgs []tokenscore.TokenTransferConfig, pool
 	}
 	switch len(matches) {
 	case 1:
-		return matches[0]
-	case 0:
-		t.Fatalf("no token transfer config on chain %d matches pool %s (have %s)",
-			srcSelector, poolRefString(poolRef), poolRefsString(cfgs))
+		return matches[0], true
 	default:
-		t.Fatalf("pool %s matched %d configs on chain %d (expected one): %s",
-			poolRefString(poolRef), len(matches), srcSelector, poolRefsString(matches))
+		return tokenscore.TokenTransferConfig{}, false
 	}
-
-	return tokenscore.TokenTransferConfig{}
 }
 
 func resolveDestToken(
@@ -243,6 +307,102 @@ func tokenConfigProvider(chain cciptestinterfaces.CCIP17) cciptestinterfaces.Tok
 	return evm.NewEmptyCCIP17EVM()
 }
 
+func resolveCantonTransferInstrument(
+	t *testing.T,
+	ds datastore.DataStore,
+	chainSelector uint64,
+	tokenRef datastore.AddressRef,
+	poolRef datastore.AddressRef,
+	transferInstrumentIDHint string,
+) splice_api_token_holding_v1.InstrumentId {
+	t.Helper()
+
+	addrRef, err := ds.Addresses().Get(datastore.NewAddressRefKey(chainSelector, tokenRef.Type, tokenRef.Version, tokenRef.Qualifier))
+	require.NoError(t, err, "resolve Canton token ref %s on chain %d", poolRefString(tokenRef), chainSelector)
+
+	poolAddrRef, err := ds.Addresses().Get(datastore.NewAddressRefKey(chainSelector, poolRef.Type, poolRef.Version, poolRef.Qualifier))
+	require.NoError(t, err, "resolve Canton pool ref %s on chain %d", poolRefString(poolRef), chainSelector)
+
+	instrument, err := resolveInstrumentFromTokenRefWithFallback(addrRef, poolAddrRef, transferInstrumentIDHint)
+	require.NoError(t, err, "parse instrument from token ref %s on chain %d", poolRefString(tokenRef), chainSelector)
+
+	return instrument
+}
+
+func resolveInstrumentFromTokenRefWithFallback(
+	tokenRef datastore.AddressRef,
+	poolRef datastore.AddressRef,
+	transferInstrumentIDHint string,
+) (splice_api_token_holding_v1.InstrumentId, error) {
+	if instrument, err := parseInstrumentIDFromTokenRefLabels(tokenRef); err == nil {
+		return instrument, nil
+	}
+
+	ccipOwner := ccipOwnerFromRefLabels(poolRef)
+	if ccipOwner == "" {
+		return splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
+			"tokenRef labels must include instrument-admin:<party> and instrument-id:<id>",
+		)
+	}
+
+	instrumentID := normalizeTransferInstrumentID(transferInstrumentIDHint)
+	if instrumentID == "" {
+		return splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
+			"transfer_instrument_id is required when token ref labels are missing",
+		)
+	}
+
+	return splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(ccipOwner),
+		Id:    types.TEXT(instrumentID),
+	}, nil
+}
+
+func parseInstrumentIDFromTokenRefLabels(tokenRef datastore.AddressRef) (splice_api_token_holding_v1.InstrumentId, error) {
+	var instrumentAdmin, instrumentIDText string
+	for _, label := range tokenRef.Labels.List() {
+		switch {
+		case strings.HasPrefix(label, "instrument-admin:"):
+			instrumentAdmin = strings.TrimSpace(strings.TrimPrefix(label, "instrument-admin:"))
+		case strings.HasPrefix(label, "instrument-id:"):
+			instrumentIDText = strings.TrimSpace(strings.TrimPrefix(label, "instrument-id:"))
+		}
+	}
+	if instrumentAdmin == "" || instrumentIDText == "" {
+		return splice_api_token_holding_v1.InstrumentId{}, fmt.Errorf(
+			"tokenRef labels must include instrument-admin:<party> and instrument-id:<id>",
+		)
+	}
+
+	return splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(instrumentAdmin),
+		Id:    types.TEXT(instrumentIDText),
+	}, nil
+}
+
+func ccipOwnerFromRefLabels(ref datastore.AddressRef) string {
+	for _, label := range ref.Labels.List() {
+		if party, ok := strings.CutPrefix(label, "ccip-owner:"); ok {
+			return strings.TrimSpace(party)
+		}
+		if idx := strings.LastIndex(label, "@ccipOwner::"); idx >= 0 {
+			return strings.TrimSpace(label[idx+1:])
+		}
+	}
+
+	return ""
+}
+
+func normalizeTransferInstrumentID(hint string) string {
+	hint = strings.TrimSpace(hint)
+	switch strings.ToLower(hint) {
+	case "link":
+		return "link-token"
+	default:
+		return hint
+	}
+}
+
 func resolveTokenRef(ds datastore.DataStore, chainSelector uint64, ref datastore.AddressRef) (protocol.UnknownAddress, error) {
 	addrRef, err := ds.Addresses().Get(datastore.NewAddressRefKey(chainSelector, ref.Type, ref.Version, ref.Qualifier))
 	if err != nil {
@@ -280,7 +440,6 @@ func defaultTokenConfigPath() string {
 	return filepath.Join(filepath.Dir(file), defaultTokenConfigFile)
 }
 
-// Helpers for logging //
 func poolRefsString(cfgs []tokenscore.TokenTransferConfig) string {
 	if len(cfgs) == 0 {
 		return "none"

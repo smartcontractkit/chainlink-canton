@@ -59,8 +59,8 @@ func setupCanton2EVMSendFixtureWithHoldings(t *testing.T, withFeeHoldings bool) 
 	require.True(t, ok)
 
 	if withFeeHoldings {
-		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)))
-		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), 0))
+		require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(uint64(cantondevenv.CantonToEVMFeeAmount))))
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantondevenv.CantonToEVMFeeAmount), nil))
 	}
 
 	ds, err := lib.DataStore()
@@ -229,8 +229,8 @@ func TestCanton2EVM_SendValidation(t *testing.T) {
 
 	t.Run("Unsupported token on lane", func(t *testing.T) {
 		f := setupCanton2EVMSendFixture(t)
-		require.NoError(t, f.cantonImpl.MintTokens(f.ctx, 1000))
-		require.NoError(t, f.cantonImpl.SetupSend(f.ctx, uint64(devenvtests.CantonToEVMFeeAmount), 1000))
+		require.NoError(t, f.cantonImpl.MintTokens(f.ctx, big.NewRat(1000, 1)))
+		require.NoError(t, f.cantonImpl.SetupSend(f.ctx, uint64(cantondevenv.CantonToEVMFeeAmount), big.NewRat(1000, 1)))
 		f.cantonImpl.SetTransferTokenInstrumentForTest(splice_api_token_holding_v1.InstrumentId{
 			Admin: types.PARTY("unsupported-token-admin"),
 			Id:    types.TEXT("UnsupportedToken"),
@@ -252,8 +252,8 @@ func TestCanton2EVM_SendValidation(t *testing.T) {
 
 	t.Run("Zero token amount", func(t *testing.T) {
 		f := setupCanton2EVMSendFixture(t)
-		require.NoError(t, f.cantonImpl.MintTokens(f.ctx, 1000))
-		require.NoError(t, f.cantonImpl.SetupSend(f.ctx, uint64(devenvtests.CantonToEVMFeeAmount), 1000))
+		require.NoError(t, f.cantonImpl.MintTokens(f.ctx, big.NewRat(1000, 1)))
+		require.NoError(t, f.cantonImpl.SetupSend(f.ctx, uint64(cantondevenv.CantonToEVMFeeAmount), big.NewRat(1000, 1)))
 
 		err := f.send(
 			cciptestinterfaces.MessageFields{
