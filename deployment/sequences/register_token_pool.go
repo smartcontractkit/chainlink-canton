@@ -174,7 +174,7 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 		Args: core.SetPool{
 			TokenConfigCid: tokenConfigCid,
 			InstrumentId:   instrumentId,
-			TokenPool: &core.PoolRegistration{
+			TokenPool: &core.PoolRegistration2{
 				PoolOwner:      poolOwnerPartyTyped,
 				PoolInstanceId: types.TEXT(input.PoolInstanceID),
 			},

@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
@@ -27,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-extension-api"
-	PackageID   = "ee0ce484b84662844791067b50f89f98959b9259841bb00b7a70d60a768ff351"
+	PackageID   = "fddd2b2b8b1e423231232a39ffbe654b1888be99cdb27686ab43f83b119366e2"
 	SDKVersion  = "3.4.11"
 )
 
@@ -117,11 +116,12 @@ func argsToMap(args any) map[string]any {
 
 // CrossChainVerifierFeeQuote is a Record type
 type CrossChainVerifierFeeQuote struct {
-	CcvInstanceId      types.TEXT    `json:"ccvInstanceId"`
-	CcvOwner           types.PARTY   `json:"ccvOwner"`
-	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
-	GasForVerification types.INT64   `json:"gasForVerification"`
-	PayloadSizeBytes   types.INT64   `json:"payloadSizeBytes"`
+	CcvInstanceId      types.TEXT                                 `json:"ccvInstanceId"`
+	CcvOwner           types.PARTY                                `json:"ccvOwner"`
+	FeeUSDCents        types.NUMERIC                              `json:"feeUSDCents"`
+	GasForVerification types.INT64                                `json:"gasForVerification"`
+	PayloadSizeBytes   types.INT64                                `json:"payloadSizeBytes"`
+	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts CrossChainVerifierFeeQuote to a map for DAML arguments
@@ -137,6 +137,8 @@ func (t CrossChainVerifierFeeQuote) ToMap() map[string]any {
 	m["gasForVerification"] = int64(t.GasForVerification)
 
 	m["payloadSizeBytes"] = int64(t.PayloadSizeBytes)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -165,10 +167,11 @@ func (t *CrossChainVerifierFeeQuote) UnmarshalHex(data string) error {
 
 // CrossChainVerifierView is a Record type
 type CrossChainVerifierView struct {
-	InstanceId       types.TEXT   `json:"instanceId"`
-	Owner            types.PARTY  `json:"owner"`
-	CcipOwner        types.PARTY  `json:"ccipOwner"`
-	StorageLocations []types.TEXT `json:"storageLocations"`
+	InstanceId       types.TEXT                                 `json:"instanceId"`
+	Owner            types.PARTY                                `json:"owner"`
+	CcipOwner        types.PARTY                                `json:"ccipOwner"`
+	StorageLocations []types.TEXT                               `json:"storageLocations"`
+	Context          splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts CrossChainVerifierView to a map for DAML arguments
@@ -188,6 +191,8 @@ func (t CrossChainVerifierView) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -217,7 +222,7 @@ func (t *CrossChainVerifierView) UnmarshalHex(data string) error {
 // CrossChainVerifierCalculateFee is a Record type
 type CrossChainVerifierCalculateFee struct {
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller            types.PARTY                                `json:"caller"`
 }
 
@@ -227,7 +232,7 @@ func (t CrossChainVerifierCalculateFee) ToMap() map[string]any {
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -259,9 +264,9 @@ func (t *CrossChainVerifierCalculateFee) UnmarshalHex(data string) error {
 // CrossChainVerifierForwardToVerifier is a Record type
 type CrossChainVerifierForwardToVerifier struct {
 	RmnRemoteCid      types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller            types.PARTY                                `json:"caller"`
 }
 
@@ -271,11 +276,11 @@ func (t CrossChainVerifierForwardToVerifier) ToMap() map[string]any {
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	m["verifierArgs"] = string(t.VerifierArgs)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -306,8 +311,9 @@ func (t *CrossChainVerifierForwardToVerifier) UnmarshalHex(data string) error {
 
 // CrossChainVerifierGetFee is a Record type
 type CrossChainVerifierGetFee struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
-	Caller            types.PARTY   `json:"caller"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts CrossChainVerifierGetFee to a map for DAML arguments
@@ -315,6 +321,8 @@ func (t CrossChainVerifierGetFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -346,9 +354,9 @@ func (t *CrossChainVerifierGetFee) UnmarshalHex(data string) error {
 // CrossChainVerifierVerifyMessage is a Record type
 type CrossChainVerifierVerifyMessage struct {
 	RmnRemoteCid        types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext        splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
 	VerifierResults     types.TEXT                                 `json:"verifierResults"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller              types.PARTY                                `json:"caller"`
 }
 
@@ -358,11 +366,11 @@ func (t CrossChainVerifierVerifyMessage) ToMap() map[string]any {
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
 
 	m["verifierResults"] = string(t.VerifierResults)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -393,9 +401,10 @@ func (t *CrossChainVerifierVerifyMessage) UnmarshalHex(data string) error {
 
 // ExecutorFeeQuote is a Record type
 type ExecutorFeeQuote struct {
-	ExecutorInstanceId types.TEXT    `json:"executorInstanceId"`
-	ExecutorOwner      types.PARTY   `json:"executorOwner"`
-	FeeUSDCents        types.NUMERIC `json:"feeUSDCents"`
+	ExecutorInstanceId types.TEXT                                 `json:"executorInstanceId"`
+	ExecutorOwner      types.PARTY                                `json:"executorOwner"`
+	FeeUSDCents        types.NUMERIC                              `json:"feeUSDCents"`
+	Context            splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts ExecutorFeeQuote to a map for DAML arguments
@@ -407,6 +416,8 @@ func (t ExecutorFeeQuote) ToMap() map[string]any {
 	m["executorOwner"] = t.ExecutorOwner.ToMap()
 
 	m["feeUSDCents"] = t.FeeUSDCents
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -435,8 +446,9 @@ func (t *ExecutorFeeQuote) UnmarshalHex(data string) error {
 
 // ExecutorView is a Record type
 type ExecutorView struct {
-	InstanceId types.TEXT  `json:"instanceId"`
-	Owner      types.PARTY `json:"owner"`
+	InstanceId types.TEXT                                 `json:"instanceId"`
+	Owner      types.PARTY                                `json:"owner"`
+	Context    splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts ExecutorView to a map for DAML arguments
@@ -446,6 +458,8 @@ func (t ExecutorView) ToMap() map[string]any {
 	m["instanceId"] = string(t.InstanceId)
 
 	m["owner"] = t.Owner.ToMap()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -477,7 +491,7 @@ type ExecutorCalculateFee struct {
 	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	ExecutorArgs      types.TEXT                                 `json:"executorArgs"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller            types.PARTY                                `json:"caller"`
 }
 
@@ -491,7 +505,7 @@ func (t ExecutorCalculateFee) ToMap() map[string]any {
 
 	m["executorArgs"] = string(t.ExecutorArgs)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -522,10 +536,11 @@ func (t *ExecutorCalculateFee) UnmarshalHex(data string) error {
 
 // ExecutorGetFee is a Record type
 type ExecutorGetFee struct {
-	ExpectedExecutor  chainlinkapi.RawInstanceAddress   `json:"expectedExecutor"`
-	DestChainSelector types.NUMERIC                     `json:"destChainSelector"`
-	RequiredCCVs      []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
-	Caller            types.PARTY                       `json:"caller"`
+	ExpectedExecutor  chainlinkapi.RawInstanceAddress            `json:"expectedExecutor"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	RequiredCCVs      []chainlinkapi.RawInstanceAddress          `json:"requiredCCVs"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts ExecutorGetFee to a map for DAML arguments
@@ -543,6 +558,8 @@ func (t ExecutorGetFee) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -573,9 +590,10 @@ func (t *ExecutorGetFee) UnmarshalHex(data string) error {
 
 // LockOrBurnResult is a Record type
 type LockOrBurnResult struct {
-	PoolChangeCids    []types.CONTRACT_ID `json:"poolChangeCids"`
-	SenderChangeCids  []types.CONTRACT_ID `json:"senderChangeCids"`
-	SendingMessageCid types.CONTRACT_ID   `json:"sendingMessageCid"`
+	PoolChangeCids    []types.CONTRACT_ID                        `json:"poolChangeCids"`
+	SenderChangeCids  []types.CONTRACT_ID                        `json:"senderChangeCids"`
+	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts LockOrBurnResult to a map for DAML arguments
@@ -599,6 +617,8 @@ func (t LockOrBurnResult) ToMap() map[string]any {
 	}()
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -627,9 +647,10 @@ func (t *LockOrBurnResult) UnmarshalHex(data string) error {
 
 // ReleaseOrMintResult is a Record type
 type ReleaseOrMintResult struct {
-	Output          ReleaseOrMintResultOutput `json:"output"`
-	PoolChangeCids  []types.CONTRACT_ID       `json:"poolChangeCids"`
-	ClaimedEventCid types.CONTRACT_ID         `json:"claimedEventCid"`
+	Output          ReleaseOrMintResultOutput                  `json:"output"`
+	PoolChangeCids  []types.CONTRACT_ID                        `json:"poolChangeCids"`
+	ClaimedEventCid types.CONTRACT_ID                          `json:"claimedEventCid"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts ReleaseOrMintResult to a map for DAML arguments
@@ -647,6 +668,8 @@ func (t ReleaseOrMintResult) ToMap() map[string]any {
 	}()
 
 	m["claimedEventCid"] = model.NestedToDAMLValue(t.ClaimedEventCid)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -813,13 +836,14 @@ func (t *ReleaseOrMintResultPending) UnmarshalHex(data string) error {
 
 // TokenPoolFeeQuote is a Record type
 type TokenPoolFeeQuote struct {
-	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
-	PoolOwner         types.PARTY   `json:"poolOwner"`
-	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
-	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
-	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
-	TokenFeeBps       types.NUMERIC `json:"tokenFeeBps"`
-	IsEnabled         types.BOOL    `json:"isEnabled"`
+	PoolInstanceId    types.TEXT                                 `json:"poolInstanceId"`
+	PoolOwner         types.PARTY                                `json:"poolOwner"`
+	FeeUSDCents       types.NUMERIC                              `json:"feeUSDCents"`
+	DestGasOverhead   types.INT64                                `json:"destGasOverhead"`
+	DestBytesOverhead types.INT64                                `json:"destBytesOverhead"`
+	TokenFeeBps       types.NUMERIC                              `json:"tokenFeeBps"`
+	IsEnabled         types.BOOL                                 `json:"isEnabled"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts TokenPoolFeeQuote to a map for DAML arguments
@@ -839,6 +863,8 @@ func (t TokenPoolFeeQuote) ToMap() map[string]any {
 	m["tokenFeeBps"] = t.TokenFeeBps
 
 	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -867,9 +893,10 @@ func (t *TokenPoolFeeQuote) UnmarshalHex(data string) error {
 
 // TokenPoolView is a Record type
 type TokenPoolView struct {
-	Owner        types.PARTY                              `json:"owner"`
-	CcipOwner    types.PARTY                              `json:"ccipOwner"`
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Owner        types.PARTY                                `json:"owner"`
+	CcipOwner    types.PARTY                                `json:"ccipOwner"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Context      splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts TokenPoolView to a map for DAML arguments
@@ -881,6 +908,8 @@ func (t TokenPoolView) ToMap() map[string]any {
 	m["ccipOwner"] = t.CcipOwner.ToMap()
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -911,10 +940,10 @@ func (t *TokenPoolView) UnmarshalHex(data string) error {
 type TokenPoolCalculateFee struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	FeeQuoterCid          types.CONTRACT_ID                          `json:"feeQuoterCid"`
 	TokenInstrumentId     splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -926,13 +955,13 @@ func (t TokenPoolCalculateFee) ToMap() map[string]any {
 
 	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	m["feeQuoterCid"] = model.NestedToDAMLValue(t.FeeQuoterCid)
 
 	m["tokenInstrumentId"] = model.NestedToDAMLValue(t.TokenInstrumentId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -963,10 +992,11 @@ func (t *TokenPoolCalculateFee) UnmarshalHex(data string) error {
 
 // TokenPoolGetFee is a Record type
 type TokenPoolGetFee struct {
-	FeeQuoterCid      types.CONTRACT_ID                        `json:"feeQuoterCid"`
-	DestChainSelector types.NUMERIC                            `json:"destChainSelector"`
-	TokenInstrumentId splice_api_token_holding_v1.InstrumentId `json:"tokenInstrumentId"`
-	Caller            types.PARTY                              `json:"caller"`
+	FeeQuoterCid      types.CONTRACT_ID                          `json:"feeQuoterCid"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	TokenInstrumentId splice_api_token_holding_v1.InstrumentId   `json:"tokenInstrumentId"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenPoolGetFee to a map for DAML arguments
@@ -978,6 +1008,8 @@ func (t TokenPoolGetFee) ToMap() map[string]any {
 	m["destChainSelector"] = t.DestChainSelector
 
 	m["tokenInstrumentId"] = model.NestedToDAMLValue(t.TokenInstrumentId)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1008,12 +1040,13 @@ func (t *TokenPoolGetFee) UnmarshalHex(data string) error {
 
 // TokenPoolGetRequiredCCVs is a Record type
 type TokenPoolGetRequiredCCVs struct {
-	RemoteChainSelector types.NUMERIC       `json:"remoteChainSelector"`
-	SourceAmount        types.TEXT          `json:"sourceAmount"`
-	Finality            core.FinalityConfig `json:"finality"`
-	ExtraData           types.TEXT          `json:"extraData"`
-	Direction           TransferDirection   `json:"direction"`
-	Caller              types.PARTY         `json:"caller"`
+	RemoteChainSelector types.NUMERIC                              `json:"remoteChainSelector"`
+	SourceAmount        types.TEXT                                 `json:"sourceAmount"`
+	Finality            types.TEXT                                 `json:"finality"`
+	ExtraData           types.TEXT                                 `json:"extraData"`
+	Direction           TransferDirection                          `json:"direction"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller              types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts TokenPoolGetRequiredCCVs to a map for DAML arguments
@@ -1024,11 +1057,13 @@ func (t TokenPoolGetRequiredCCVs) ToMap() map[string]any {
 
 	m["sourceAmount"] = string(t.SourceAmount)
 
-	m["finality"] = model.NestedToDAMLValue(t.Finality)
+	m["finality"] = string(t.Finality)
 
 	m["extraData"] = string(t.ExtraData)
 
 	m["direction"] = model.NestedToDAMLValue(t.Direction)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1062,10 +1097,10 @@ type TokenPoolLockOrBurn struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	SenderInputCids       []types.CONTRACT_ID                        `json:"senderInputCids"`
 	Amount                types.NUMERIC                              `json:"amount"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -1079,8 +1114,6 @@ func (t TokenPoolLockOrBurn) ToMap() map[string]any {
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	m["senderInputCids"] = func() []any {
@@ -1092,6 +1125,8 @@ func (t TokenPoolLockOrBurn) ToMap() map[string]any {
 	}()
 
 	m["amount"] = t.Amount
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1125,8 +1160,8 @@ type TokenPoolReleaseFromTicket struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
 	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	TokenReceiveTicketCid types.CONTRACT_ID                          `json:"tokenReceiveTicketCid"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -1140,9 +1175,9 @@ func (t TokenPoolReleaseFromTicket) ToMap() map[string]any {
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["tokenReceiveTicketCid"] = model.NestedToDAMLValue(t.TokenReceiveTicketCid)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1175,8 +1210,8 @@ func (t *TokenPoolReleaseFromTicket) UnmarshalHex(data string) error {
 type TokenPoolVerifyInboundMessage struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	ExecutingMessageCid   types.CONTRACT_ID                          `json:"executingMessageCid"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -1188,9 +1223,9 @@ func (t TokenPoolVerifyInboundMessage) ToMap() map[string]any {
 
 	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1223,9 +1258,9 @@ func (t *TokenPoolVerifyInboundMessage) UnmarshalHex(data string) error {
 type TokenPoolVerifyOutboundCCVs struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
-	ExtraContext          splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	Amount                types.NUMERIC                              `json:"amount"`
+	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
 
@@ -1237,11 +1272,11 @@ func (t TokenPoolVerifyOutboundCCVs) ToMap() map[string]any {
 
 	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
-
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
 	m["amount"] = t.Amount
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1282,12 +1317,12 @@ const (
 func (e TransferDirection) GetEnumConstructor() string { return string(e) }
 
 func (e TransferDirection) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Interfaces.TokenPool", "TransferDirection")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV1.TokenPool", "TransferDirection")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e TransferDirection) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Interfaces.TokenPool", "TransferDirection")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.InterfacesV1.TokenPool", "TransferDirection")
 }
 
 func (e TransferDirection) MarshalJSON() ([]byte, error) {
@@ -1316,32 +1351,32 @@ var _ types.ENUM = TransferDirection("")
 
 // IICrossChainVerifierInterfaceID returns the interface ID for the IICrossChainVerifier interface using the package name
 func IICrossChainVerifierInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Interfaces.CrossChainVerifier", "ICrossChainVerifier")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV1.CrossChainVerifier", "ICrossChainVerifier")
 }
 
 // IICrossChainVerifierInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IICrossChainVerifierInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Interfaces.CrossChainVerifier", "ICrossChainVerifier")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.InterfacesV1.CrossChainVerifier", "ICrossChainVerifier")
 }
 
 // IIExecutorInterfaceID returns the interface ID for the IIExecutor interface using the package name
 func IIExecutorInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Interfaces.Executor", "IExecutor")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV1.Executor", "IExecutor")
 }
 
 // IIExecutorInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IIExecutorInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Interfaces.Executor", "IExecutor")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.InterfacesV1.Executor", "IExecutor")
 }
 
 // IITokenPoolInterfaceID returns the interface ID for the IITokenPool interface using the package name
 func IITokenPoolInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Interfaces.TokenPool", "ITokenPool")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV1.TokenPool", "ITokenPool")
 }
 
 // IITokenPoolInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IITokenPoolInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.Interfaces.TokenPool", "ITokenPool")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.InterfacesV1.TokenPool", "ITokenPool")
 }
 
 // MCMSEncoder interface for typed encoding methods.

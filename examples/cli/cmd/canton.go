@@ -21,7 +21,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -101,9 +102,9 @@ func newCantonListEventsCmd(g *Globals) *cobra.Command {
 			var tmpl *apiv2.Identifier
 			switch eventName {
 			case "sent":
-				tmpl = &apiv2.Identifier{PackageId: "#ccip-core", ModuleName: "CCIP.Events", EntityName: "CCIPMessageSent"}
+				tmpl = contracts.IdentifierFromBinding(events.CCIPMessageSent{})
 			case "executed":
-				tmpl = &apiv2.Identifier{PackageId: "#ccip-core", ModuleName: "CCIP.Events", EntityName: "ExecutionStateChanged"}
+				tmpl = contracts.IdentifierFromBinding(events.ExecutionStateChanged{})
 			default:
 				return fmt.Errorf("invalid --event %q (sent|executed)", eventName)
 			}
@@ -120,7 +121,7 @@ func newCantonListEventsCmd(g *Globals) *cobra.Command {
 				tw.SetTitle("CCIPMessageSent Events")
 				tw.AppendHeader(table.Row{"Message ID", "Destination Chain", "Sequence Number", "Sender"})
 				for _, c := range active {
-					ev, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](c.GetCreatedEvent())
+					ev, err := bindings.UnmarshalCreatedEvent[events.CCIPMessageSent](c.GetCreatedEvent())
 					if err != nil {
 						return fmt.Errorf("unmarshal: %w", err)
 					}
@@ -135,7 +136,7 @@ func newCantonListEventsCmd(g *Globals) *cobra.Command {
 				tw.SetTitle("ExecutionStateChanged Events")
 				tw.AppendHeader(table.Row{"Message ID", "Source Chain", "Sequence Number", "State", "Receiver"})
 				for _, c := range active {
-					ev, err := bindings.UnmarshalCreatedEvent[core.ExecutionStateChanged](c.GetCreatedEvent())
+					ev, err := bindings.UnmarshalCreatedEvent[events.ExecutionStateChanged](c.GetCreatedEvent())
 					if err != nil {
 						return fmt.Errorf("unmarshal: %w", err)
 					}
@@ -453,7 +454,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		tokenTransferInput = &receiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolExecuteDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(b.Participant.PartyID),
-			PoolExtraContext:   tokenPoolExecuteDisclosure.ChoiceContext,
+			Context:            tokenPoolExecuteDisclosure.ChoiceContext,
 		}
 		allDisclosures = slices.Concat(
 			tokenPoolExecuteDisclosure.DisclosedContracts,
@@ -469,7 +470,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		CcvInputs: []receiver.CCVInput{{
 			CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 			VerifierResults: types.TEXT(hex.EncodeToString(vr.CCVData)),
-			CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+			Context:         ccvExecuteDisclosure.ChoiceContext,
 		}},
 	}
 
@@ -479,7 +480,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
+					TemplateId:     contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
 					ContractId:     receiverCid,
 					Choice:         "Execute",
 					ChoiceArgument: ledger.MapToValue(executeArgs),
@@ -758,7 +759,7 @@ func cantonSend(
 	var (
 		executorInput       *sender.ExecutorInput
 		executorDisclosures []*apiv2.DisclosedContract
-		executorExtraArg    core.ExecutorExtraArg
+		executorExtraArg    clientapi.ExecutorExtraArg
 	)
 	switch executorMode {
 	case "default":
@@ -771,29 +772,29 @@ func cantonSend(
 			return fmt.Errorf("executor send disclosure: %w", err)
 		}
 		executorInput = &sender.ExecutorInput{
-			ExecutorCid:          types.CONTRACT_ID(execDisc.ContractId),
-			ExecutorExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+			ExecutorCid: types.CONTRACT_ID(execDisc.ContractId),
+			Context:     splice_api_token_metadata_v1.ChoiceContext{},
 		}
 		executorDisclosures = execDisc.DisclosedContracts
-		executorExtraArg = core.ExecutorExtraArg{
-			ExecutorUseDefault: &core.ExecutorUseDefault{ExecutorArgs: ""},
+		executorExtraArg = clientapi.ExecutorExtraArg{
+			ExecutorUseDefault: &clientapi.ExecutorUseDefault{ExecutorArgs: ""},
 		}
 	case "none":
 		// No executor — message will not be auto-executed on the destination.
 		executorInput = nil
 		executorDisclosures = nil
-		executorExtraArg = core.ExecutorExtraArg{
+		executorExtraArg = clientapi.ExecutorExtraArg{
 			ExecutorNoExecutor: &types.UNIT{},
 		}
 	}
 
 	// --- Build sendArgs ---
-	canton2Any := core.Canton2AnyMessage{
+	canton2Any := clientapi.Canton2AnyMessage{
 		Receiver: types.TEXT(msg.Receiver),
 		Payload:  types.TEXT(msg.Payload),
 		FeeToken: *feeTokenInstrumentId,
-		ExtraArgs: core.ExtraArgs{
-			V3: &core.GenericExtraArgsV3{
+		ExtraArgs: clientapi.ExtraArgs{
+			V3: &clientapi.GenericExtraArgsV3{
 				GasLimit:      types.INT64(msg.GasLimit),
 				Ccvs:          nil,
 				Executor:      executorExtraArg,
@@ -803,7 +804,7 @@ func cantonSend(
 		},
 	}
 	if withToken {
-		canton2Any.TokenTransfer = &core.TokenTransfer{
+		canton2Any.TokenTransfer = &clientapi.TokenTransfer{
 			Token:  *linkInstrumentId,
 			Amount: types.NUMERIC(msg.TokenTransfer.Amount),
 		}
@@ -824,17 +825,17 @@ func cantonSend(
 			},
 		},
 		CcvSendInputs: []sender.CCVSendInput{{
-			CcvAddress:      ccvSendDisclosure.Address.Binding(),
-			CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-			CcvExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+			CcvAddress: ccvSendDisclosure.Address.Binding(),
+			CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+			Context:    splice_api_token_metadata_v1.ChoiceContext{},
 		}},
 		ExecutorInput: executorInput,
 	}
 	if withToken {
 		sendArgs.TokenTransferInput = &sender.TokenTransferInput{
-			SenderInputCids:  tokenTransferInputCids,
-			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
-			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
+			SenderInputCids: tokenTransferInputCids,
+			TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
+			Context:         tokenPoolSendDisclosure.ChoiceContext,
 		}
 	}
 
@@ -877,7 +878,7 @@ func cantonSend(
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					ContractId:     senderCid,
 					Choice:         "Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),

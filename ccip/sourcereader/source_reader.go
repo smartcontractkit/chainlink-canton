@@ -21,6 +21,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -265,7 +266,7 @@ func processCreatedEvent(
 		return nil, errMetadataMismatch
 	}
 
-	parsed, err := bindings.UnmarshalCreatedEvent[core.CCIPMessageSent](created)
+	parsed, err := bindings.UnmarshalCreatedEvent[events.CCIPMessageSent](created)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal CCIPMessageSent created event: %w", err)
 	}
@@ -291,7 +292,7 @@ func processCreatedEvent(
 
 // ccipMessageSentEventToProtocol converts the binding type common.CCIPMessageSentEvent
 // to protocol.MessageSentEvent (hex decoding, message decode, receipt mapping, validations).
-func ccipMessageSentEventToProtocol(evt *core.CCIPMessageSentEvent) (*protocol.MessageSentEvent, error) {
+func ccipMessageSentEventToProtocol(evt *events.CCIPMessageSentEvent) (*protocol.MessageSentEvent, error) {
 	messageSentEvent := &protocol.MessageSentEvent{}
 
 	messageID, err := hex.DecodeString(string(evt.MessageId))
@@ -349,7 +350,7 @@ func ccipMessageSentEventToProtocol(evt *core.CCIPMessageSentEvent) (*protocol.M
 }
 
 // receiptsBindingToProtocol converts binding []common.Receipt to []protocol.ReceiptWithBlob.
-func receiptsBindingToProtocol(receipts []core.Receipt) ([]protocol.ReceiptWithBlob, error) {
+func receiptsBindingToProtocol(receipts []events.Receipt) ([]protocol.ReceiptWithBlob, error) {
 	protoReceipts := make([]protocol.ReceiptWithBlob, 0, len(receipts))
 	for i, r := range receipts {
 		decoded, err := protocol.NewUnknownAddressFromHex(string(r.IssuerAddress))

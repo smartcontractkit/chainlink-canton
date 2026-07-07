@@ -1,0 +1,260 @@
+module CCIP.ClientV1 where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.APIV1.ExecutingMessage
+import qualified CCIP.APIV1.SendingMessage
+import qualified CCIP.APIV1.TokenAdminRegistry
+import qualified CCIP.CodecV1.FinalityConfig
+import qualified CCIP.CodecV1.MessageCodecV1
+import qualified CCIP.InterfacesV1.CrossChainVerifier
+import qualified CCIP.InterfacesV1.Executor
+import qualified CCIP.InterfacesV1.TokenPool
+
+interface PerPartyRouter where
+    viewtype PerPartyRouterView
+
+    perPartyRouter_getSequenceNumberImpl : ContractId PerPartyRouter -> PerPartyRouter_GetSequenceNumber -> Update (Numeric 0)
+    perPartyRouter_getRequiredCCVsForSendImpl : ContractId PerPartyRouter -> PerPartyRouter_GetRequiredCCVsForSend -> Update [Chainlink.InstanceAddress.RawInstanceAddress]
+    perPartyRouter_getFeeImpl : ContractId PerPartyRouter -> PerPartyRouter_GetFee -> Update GetFeeResult
+    perPartyRouter_prepareSendImpl : ContractId PerPartyRouter -> PerPartyRouter_PrepareSend -> Update (ContractId CCIP.APIV1.SendingMessage.ISendingMessage)
+    perPartyRouter_finalizeFeeImpl : ContractId PerPartyRouter -> PerPartyRouter_FinalizeFee -> Update (ContractId CCIP.APIV1.SendingMessage.ISendingMessage)
+    perPartyRouter_ccipSendImpl : ContractId PerPartyRouter -> PerPartyRouter_CCIPSend -> Update CCIPSendResult
+
+    perPartyRouter_getExecutionStateImpl : ContractId PerPartyRouter -> PerPartyRouter_GetExecutionState -> Update CCIP.APIV1.ExecutingMessage.MessageExecutionState
+    perPartyRouter_getRequiredCCVsForExecuteImpl : ContractId PerPartyRouter -> PerPartyRouter_GetRequiredCCVsForExecute -> Update [Chainlink.InstanceAddress.RawInstanceAddress]
+    perPartyRouter_prepareExecuteImpl : ContractId PerPartyRouter -> PerPartyRouter_PrepareExecute -> Update (ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage)
+    perPartyRouter_executeImpl : ContractId PerPartyRouter -> PerPartyRouter_Execute -> Update ExecuteResult
+
+    -- ===================
+    --   Message Sending
+    -- ===================
+
+    nonconsuming choice PerPartyRouter_GetSequenceNumber : Numeric 0
+        with
+            destChainSelector : Numeric 0
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller (view this).owner
+        do perPartyRouter_getSequenceNumberImpl this self arg
+
+    nonconsuming choice PerPartyRouter_GetRequiredCCVsForSend : [Chainlink.InstanceAddress.RawInstanceAddress]
+        with
+            destChainSelector : Numeric 0
+            message : Canton2AnyMessage
+            poolReportedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller (view this).owner
+        do perPartyRouter_getRequiredCCVsForSendImpl this self arg
+
+    nonconsuming choice PerPartyRouter_GetFee : GetFeeResult
+        with
+            destChainSelector : Numeric 0
+            message : Canton2AnyMessage
+            ccvFeeQuotes : [CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierFeeQuote]
+            tokenPoolFeeQuote : Optional CCIP.InterfacesV1.TokenPool.TokenPoolFeeQuote
+            executorFeeQuote : Optional CCIP.InterfacesV1.Executor.ExecutorFeeQuote
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller (view this).owner
+        do perPartyRouter_getFeeImpl this self arg
+
+    nonconsuming choice PerPartyRouter_PrepareSend : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
+        with
+            destinationChainSelector : Numeric 0
+            message : Canton2AnyMessage
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller (view this).owner
+        do perPartyRouter_prepareSendImpl this self arg
+
+    nonconsuming choice PerPartyRouter_FinalizeFee : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
+        with
+            sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller (view this).owner
+        do perPartyRouter_finalizeFeeImpl this self arg
+
+    nonconsuming choice PerPartyRouter_CCIPSend : CCIPSendResult
+        with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            sendingMessageCid : ContractId CCIP.APIV1.SendingMessage.ISendingMessage
+            feeTokenHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+            feeTokenConfigCid : ContractId CCIP.APIV1.TokenAdminRegistry.ITokenConfig
+            feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+            feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
+        controller (view this).owner
+        do perPartyRouter_ccipSendImpl this self arg
+
+    -- =====================
+    --   Message Execution
+    -- =====================
+
+    nonconsuming choice PerPartyRouter_GetExecutionState : CCIP.APIV1.ExecutingMessage.MessageExecutionState
+        with
+            messageHash : BytesHex
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do perPartyRouter_getExecutionStateImpl this self arg
+
+    nonconsuming choice PerPartyRouter_GetRequiredCCVsForExecute : [Chainlink.InstanceAddress.RawInstanceAddress]
+        with
+            message : CCIP.CodecV1.MessageCodecV1.MessageV1
+            receiverRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            receiverOptionalThreshold : Int
+            tokenPoolRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller (view this).owner
+        do perPartyRouter_getRequiredCCVsForExecuteImpl this self arg
+
+    nonconsuming choice PerPartyRouter_PrepareExecute : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
+        with
+            encodedMessage : BytesHex
+            receiverParty : Party
+            tokenReceiverParty : Optional Party
+            receiverRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            receiverOptionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+            receiverOptionalThreshold : Int
+            receiverFinalityConfig : CCIP.CodecV1.FinalityConfig.FinalityConfig
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller (view this).owner
+        do perPartyRouter_prepareExecuteImpl this self arg
+
+    nonconsuming choice PerPartyRouter_Execute : ExecuteResult
+        with
+            executingMessageCid : ContractId CCIP.APIV1.ExecutingMessage.IExecutingMessage
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller (view this).owner
+        do perPartyRouter_executeImpl this self arg
+
+data GetFeeResult = GetFeeResult
+    with
+        -- Final amount payable in the selected fee token, including CCV fees,
+        -- token-pool fee, CCIP network fee, executor flat fee, and execution gas cost.
+        feeTokenAmount : Numeric 0
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+interface ICCIPMessageSent where
+    viewtype CCIPMessageSentView
+
+data CCIPMessageSentView = CCIPMessageSentView
+    with
+        ccipOwner : Party
+        messageId : BytesHex
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+data CCIPSendResult = CCIPSendResult
+    with
+        router : ContractId PerPartyRouter
+        ccipMessageSent : ContractId ICCIPMessageSent
+        messageId : BytesHex
+        feeChangeCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        pendingFeeInstructions : [ContractId Splice.Api.Token.TransferInstructionV1.TransferInstruction]
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+interface IExecutionStateChanged where
+    viewtype ExecutionStateChangedView
+
+data ExecutionStateChangedView = ExecutionStateChangedView
+    with
+        ccipOwner : Party
+        messageId : BytesHex
+        state : CCIP.APIV1.ExecutingMessage.MessageExecutionState
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+data ExecuteResult = ExecuteResult
+    with
+        router : ContractId PerPartyRouter
+        tokenReceiveTicket : Optional (ContractId CCIP.APIV1.ExecutingMessage.ITokenReceiveTicket)
+        executionStateChanged : ContractId IExecutionStateChanged
+        messageId : BytesHex
+        message : CCIP.CodecV1.MessageCodecV1.MessageV1
+        state : CCIP.APIV1.ExecutingMessage.MessageExecutionState
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+data PerPartyRouterView = PerPartyRouterView
+    with
+        ccipOwner : Party
+        owner : Party
+
+-- Message types
+
+data Canton2AnyMessage = Canton2AnyMessage
+    with
+        receiver : BytesHex
+        payload : BytesHex
+        tokenTransfer : Optional TokenTransfer
+        feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+        extraArgs : ExtraArgs
+    deriving (Eq, Show)
+
+data TokenTransfer = TokenTransfer
+    with
+        token : Splice.Api.Token.HoldingV1.InstrumentId
+        amount : Decimal
+    deriving (Eq, Show)
+
+data CCVExtraArg = CCVExtraArg
+    with
+        ccvAddress : Chainlink.InstanceAddress.RawInstanceAddress
+        ccvArgs : BytesHex
+    deriving (Eq, Show)
+
+data ExecutorExtraArg
+    = Executor_NoExecutor
+    | Executor_UseDefault with
+        executorArgs : BytesHex
+    | Executor_WithAddress with
+        executorAddress : Chainlink.InstanceAddress.RawInstanceAddress
+        executorArgs : BytesHex
+    deriving (Eq, Show)
+
+data ExtraArgs
+    = V3 GenericExtraArgsV3
+    deriving (Eq, Show)
+
+data GenericExtraArgsV3 = GenericExtraArgsV3
+    with
+        -- | Gas limit for the callback on the destination chain.
+        -- | If the gas limit is zero and the message data length is also zero, no callback
+        -- | will be performed, even if a receiver is specified. A gas limit of zero is useful
+        -- | when only token transfers are desired, or when the receiver is an EOA account
+        -- | instead of a contract. Besides this gasLimit check, there are other checks on the
+        -- | destination chain that may prevent the callback from being executed, depending on
+        -- | the destination chain family.
+        -- | The sender is billed for the gas specified, not the gas actually used. Any unspent
+        -- | gas is not refunded. There are various ways to estimate the gas required for a
+        -- | callback on the destination chain, depending on the chain family. Please refer to
+        -- | the documentation for each chain for more details.
+        gasLimit : Int
+        -- | Sender-specified CCV addresses for the message.
+        -- | May be empty to indicate that the destination chain defaults should be used.
+        ccvs : [CCVExtraArg]
+        -- | How executor selection should be resolved for the message.
+        executor : ExecutorExtraArg
+        -- | Address of the token receiver on the destination chain, in bytes format. If an empty
+        -- | bytes array is provided, the receiver address from the message itself is used for
+        -- | token transfers. This field allows for scenarios where the token receiver is
+        -- | different from the message receiver.
+        -- | May be empty, the behavior differs depending on if there is a token transfer or not:
+        -- | - If there is a token transfer, the receiver from the message is used.
+        -- | - If there is no token transfer, this field should be empty.
+        tokenReceiver : BytesHex
+        -- | Additional arguments for token transfers.
+        -- | This field is passed into the token pool on the source chain and is not inspected by
+        -- | CCIP itself. The format of this field is therefore specific to the token pool being
+        -- | used and may vary between different pools.
+        -- | May be empty depending on the token pool.
+        tokenArgs : BytesHex
+    deriving (Eq, Show)

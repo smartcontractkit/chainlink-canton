@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	core "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	clientapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-sender"
-	PackageID   = "5783dfc7c23e899cdc6446dfdf113815bb2e029dffba0055139757253068350b"
+	PackageID   = "351b22ee942526605d5047cc300de9390bcbe70cdcbfd77a005d14ec5e7d3ca7"
 	SDKVersion  = "3.4.11"
 )
 
@@ -149,7 +149,7 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 
 // GetFee exercises the GetFee choice on this CCIPSender contract
 // This method uses the package name in the template ID
-func (t CCIPSender) GetFee(contractID string, args GetFee2) *model.ExerciseCommand {
+func (t CCIPSender) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
@@ -159,7 +159,7 @@ func (t CCIPSender) GetFee(contractID string, args GetFee2) *model.ExerciseComma
 }
 
 // GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
-func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee2) *model.ExerciseCommand {
+func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
@@ -212,9 +212,9 @@ func (t CCIPSender) GetRequiredCCVsWithPackageID(contractID string, packageID st
 
 // CCVSendInput is a Record type
 type CCVSendInput struct {
-	CcvAddress      chainlinkapi.RawInstanceAddress            `json:"ccvAddress"`
-	CcvCid          types.CONTRACT_ID                          `json:"ccvCid"`
-	CcvExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"ccvExtraContext"`
+	CcvAddress chainlinkapi.RawInstanceAddress            `json:"ccvAddress"`
+	CcvCid     types.CONTRACT_ID                          `json:"ccvCid"`
+	Context    splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts CCVSendInput to a map for DAML arguments
@@ -225,7 +225,7 @@ func (t CCVSendInput) ToMap() map[string]any {
 
 	m["ccvCid"] = model.NestedToDAMLValue(t.CcvCid)
 
-	m["ccvExtraContext"] = model.NestedToDAMLValue(t.CcvExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -254,8 +254,8 @@ func (t *CCVSendInput) UnmarshalHex(data string) error {
 
 // ExecutorInput is a Record type
 type ExecutorInput struct {
-	ExecutorCid          types.CONTRACT_ID                          `json:"executorCid"`
-	ExecutorExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"executorExtraContext"`
+	ExecutorCid types.CONTRACT_ID                          `json:"executorCid"`
+	Context     splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts ExecutorInput to a map for DAML arguments
@@ -264,7 +264,7 @@ func (t ExecutorInput) ToMap() map[string]any {
 
 	m["executorCid"] = model.NestedToDAMLValue(t.ExecutorCid)
 
-	m["executorExtraContext"] = model.NestedToDAMLValue(t.ExecutorExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -342,26 +342,24 @@ func (t *FeeTokenInput) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// GetFee2 is a Record type
-type GetFee2 struct {
+// GetFee is a Record type
+type GetFee struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  core.Canton2AnyMessage                     `json:"message"`
-	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	CcvSendInputs            []CCVSendInput                             `json:"ccvSendInputs"`
 	TokenTransferInput       *TokenTransferInput                        `json:"tokenTransferInput" hex:"optional"`
 	ExecutorInput            *ExecutorInput                             `json:"executorInput" hex:"optional"`
+	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
-// ToMap converts GetFee2 to a map for DAML arguments
-func (t GetFee2) ToMap() map[string]any {
+// ToMap converts GetFee to a map for DAML arguments
+func (t GetFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
@@ -397,39 +395,41 @@ func (t GetFee2) ToMap() map[string]any {
 		}
 	}
 
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
 	return m
 }
 
-func (t GetFee2) MarshalJSON() ([]byte, error) {
+func (t GetFee) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *GetFee2) UnmarshalJSON(data []byte) error {
+func (t *GetFee) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes GetFee2 to hex string (Canton MCMS format)
-func (t GetFee2) MarshalHex() (string, error) {
+// MarshalHex encodes GetFee to hex string (Canton MCMS format)
+func (t GetFee) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes GetFee2 from hex string (Canton MCMS format)
-func (t *GetFee2) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetFee from hex string (Canton MCMS format)
+func (t *GetFee) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
 
-// GetFeeResult is a Record type
-type GetFeeResult struct {
+// GetFeeResult2 is a Record type
+type GetFeeResult2 struct {
 	FeeTokenAmount     types.NUMERIC `json:"feeTokenAmount"`
 	PoolFeeTokenAmount types.NUMERIC `json:"poolFeeTokenAmount"`
 }
 
-// ToMap converts GetFeeResult to a map for DAML arguments
-func (t GetFeeResult) ToMap() map[string]any {
+// ToMap converts GetFeeResult2 to a map for DAML arguments
+func (t GetFeeResult2) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["feeTokenAmount"] = t.FeeTokenAmount
@@ -439,24 +439,24 @@ func (t GetFeeResult) ToMap() map[string]any {
 	return m
 }
 
-func (t GetFeeResult) MarshalJSON() ([]byte, error) {
+func (t GetFeeResult2) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *GetFeeResult) UnmarshalJSON(data []byte) error {
+func (t *GetFeeResult2) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes GetFeeResult to hex string (Canton MCMS format)
-func (t GetFeeResult) MarshalHex() (string, error) {
+// MarshalHex encodes GetFeeResult2 to hex string (Canton MCMS format)
+func (t GetFeeResult2) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes GetFeeResult from hex string (Canton MCMS format)
-func (t *GetFeeResult) UnmarshalHex(data string) error {
+// UnmarshalHex decodes GetFeeResult2 from hex string (Canton MCMS format)
+func (t *GetFeeResult2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -464,10 +464,10 @@ func (t *GetFeeResult) UnmarshalHex(data string) error {
 // GetRequiredCCVs is a Record type
 type GetRequiredCCVs struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  core.Canton2AnyMessage                     `json:"message"`
-	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	TokenPoolCid             *types.CONTRACT_ID                         `json:"tokenPoolCid" hex:"optional"`
+	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts GetRequiredCCVs to a map for DAML arguments
@@ -477,8 +477,6 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
@@ -493,6 +491,8 @@ func (t GetRequiredCCVs) ToMap() map[string]any {
 			"value": nil,
 		}
 	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -522,13 +522,13 @@ func (t *GetRequiredCCVs) UnmarshalHex(data string) error {
 // Send is a Record type
 type Send struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
-	Message                  core.Canton2AnyMessage                     `json:"message"`
-	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	FeeTokenInput            FeeTokenInput                              `json:"feeTokenInput"`
 	CcvSendInputs            []CCVSendInput                             `json:"ccvSendInputs"`
 	TokenTransferInput       *TokenTransferInput                        `json:"tokenTransferInput" hex:"optional"`
 	ExecutorInput            *ExecutorInput                             `json:"executorInput" hex:"optional"`
+	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts Send to a map for DAML arguments
@@ -538,8 +538,6 @@ func (t Send) ToMap() map[string]any {
 	m["destinationChainSelector"] = t.DestinationChainSelector
 
 	m["message"] = model.NestedToDAMLValue(t.Message)
-
-	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
@@ -577,6 +575,8 @@ func (t Send) ToMap() map[string]any {
 		}
 	}
 
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
 	return m
 }
 
@@ -604,9 +604,9 @@ func (t *Send) UnmarshalHex(data string) error {
 
 // TokenTransferInput is a Record type
 type TokenTransferInput struct {
-	SenderInputCids  []types.CONTRACT_ID                        `json:"senderInputCids"`
-	TokenPoolCid     types.CONTRACT_ID                          `json:"tokenPoolCid"`
-	PoolExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"poolExtraContext"`
+	SenderInputCids []types.CONTRACT_ID                        `json:"senderInputCids"`
+	TokenPoolCid    types.CONTRACT_ID                          `json:"tokenPoolCid"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts TokenTransferInput to a map for DAML arguments
@@ -623,7 +623,7 @@ func (t TokenTransferInput) ToMap() map[string]any {
 
 	m["tokenPoolCid"] = model.NestedToDAMLValue(t.TokenPoolCid)
 
-	m["poolExtraContext"] = model.NestedToDAMLValue(t.PoolExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -653,7 +653,7 @@ func (t *TokenTransferInput) UnmarshalHex(data string) error {
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
-	GetFee(args GetFee2) (*bind.EncodedChoice, error)
+	GetFee(args GetFee) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
 	Send(args Send) (*bind.EncodedChoice, error)
 }
@@ -686,7 +686,7 @@ func (c *Contract) Encoder() MCMSEncoder {
 }
 
 // GetFee encodes parameters for the GetFee choice.
-func (e *encoder) GetFee(args GetFee2) (*bind.EncodedChoice, error) {
+func (e *encoder) GetFee(args GetFee) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetFee", args)
 }
 

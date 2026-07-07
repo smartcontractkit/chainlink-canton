@@ -40,7 +40,7 @@ type DeployLockReleaseTokenPoolConfig struct {
 	// Optional; defaults to empty map.
 	RemoteChainConfigs map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig
 	// Optional; defaults to empty map.
-	TokenTransferFeeConfigs map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2
+	TokenTransferFeeConfigs map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig
 	// Optional; zero-value deps if not provided.
 	Deps lockreleasetokenpool.LockReleaseTokenPoolDeps
 	// If set, the pool is registered with this TokenAdminRegistry (ProposeAdministrator, AcceptAdminRole, SetPool) in the same changeset.
@@ -88,7 +88,7 @@ func (d DeployLockReleaseTokenPool) Apply(e cldf.Environment, config CantonCSDep
 	}
 	tokenTransferFeeConfigs := cfg.TokenTransferFeeConfigs
 	if tokenTransferFeeConfigs == nil {
-		tokenTransferFeeConfigs = map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{}
+		tokenTransferFeeConfigs = map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig{}
 	}
 
 	var rawPoolAddr contracts.RawInstanceAddress

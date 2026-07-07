@@ -5,7 +5,6 @@ generate-daml-codecs:
 .PHONY: compile-contracts
 compile-contracts: generate-daml-codecs
 	@echo "Compiling contracts..."
-	dpm clean --all --multi-package-path ./contracts/
 	go run ./contracts/cmd/compile -root ./contracts -artifacts ./contracts/dars
 
 .PHONY: generate-bindings

@@ -170,7 +170,7 @@ func TestServer_GetTokenAdminRegistryToken(t *testing.T) {
 
 	tokenAdminRegistry := core.TokenAdminRegistry{
 		InstanceId: types.TEXT(tokenAdminRegistryAddress.InstanceID()),
-		Owner:      types.PARTY(tokenAdminRegistryAddress.Owner()),
+		CcipOwner:  types.PARTY(tokenAdminRegistryAddress.Owner()),
 		EntryCount: 2,
 	}
 	tokenConfig := core.TokenConfig{
@@ -180,7 +180,7 @@ func TestServer_GetTokenAdminRegistryToken(t *testing.T) {
 		Index:              1,
 		IsCCIPManaged:      false,
 		InstrumentId:       instrumentId,
-		TokenPool: &core.PoolRegistration{
+		TokenPool: &core.PoolRegistration2{
 			PoolOwner:      types.PARTY(tokenPoolAddress.Owner()),
 			PoolInstanceId: types.TEXT(tokenPoolAddress.InstanceID()),
 		},
@@ -397,7 +397,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 
 		return mockActiveContractStore, client
 	}
-	tokenConfigContract := func(contractId string, instrumentId splice_api_token_holding_v1.InstrumentId, tokenPool *core.PoolRegistration) *apiv2.ActiveContract {
+	tokenConfigContract := func(contractId string, instrumentId splice_api_token_holding_v1.InstrumentId, tokenPool *core.PoolRegistration2) *apiv2.ActiveContract {
 		encodedInstrumentId := contracts.EncodeInstrumentID(instrumentId)
 		return &apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 			ContractId: contractId,
@@ -416,7 +416,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			}),
 		}}
 	}
-	tokenPoolRegistration := &core.PoolRegistration{
+	tokenPoolRegistration := &core.PoolRegistration2{
 		PoolOwner:      types.PARTY(tokenPoolAddress.Owner()),
 		PoolInstanceId: types.TEXT(tokenPoolAddress.InstanceID()),
 	}
@@ -444,7 +444,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				InstanceId:    "globalconfig",
 				CcipOwner:     "owner",
 				ChainSelector: types.NUMERIC(sourceSelector),
-				DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+				DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 					types.NUMERIC(destSelector): {
 						IsEnabled:       true,
 						DefaultExecutor: new(defaultExecutor.Binding()),
@@ -472,7 +472,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			},
 			CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 				InstanceId: "tokenadminregistry",
-				Owner:      "owner",
+				CcipOwner:  "owner",
 				EntryCount: 1,
 			}),
 		}}, true)
@@ -982,7 +982,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 false,
 							MessageNetworkFeeUSDCents: "0",
@@ -1012,7 +1012,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1043,7 +1043,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1074,7 +1074,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1110,7 +1110,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1140,7 +1140,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1153,7 +1153,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1179,7 +1179,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1192,7 +1192,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1217,7 +1217,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					InstanceId:    "globalconfig",
 					CcipOwner:     "owner",
 					ChainSelector: types.NUMERIC(sourceSelector),
-					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig{
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
 						types.NUMERIC(destSelector): {
 							IsEnabled:                 true,
 							MessageNetworkFeeUSDCents: "0",
@@ -1230,7 +1230,7 @@ func TestServer_PostCCIPSend(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1338,7 +1338,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 			},
 			CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 				InstanceId: "tokenadminregistry",
-				Owner:      "owner",
+				CcipOwner:  "owner",
 				EntryCount: 1,
 			}),
 		}}, true)
@@ -1363,7 +1363,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				RegistryOwner:      types.PARTY(tokenAdminRegistryAddress.Owner()),
 				Index:              0,
 				InstrumentId:       tokenInstrumentId,
-				TokenPool: &core.PoolRegistration{
+				TokenPool: &core.PoolRegistration2{
 					PoolOwner:      types.PARTY(tokenPoolAddress.Owner()),
 					PoolInstanceId: types.TEXT(tokenPoolAddress.InstanceID()),
 				},
@@ -1572,7 +1572,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1595,7 +1595,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)
@@ -1617,7 +1617,7 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 			mockActiveContractStore.EXPECT().Get(cfg.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
 				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
 					InstanceId: "tokenadminregistry",
-					Owner:      "owner",
+					CcipOwner:  "owner",
 					EntryCount: 1,
 				}),
 			}}, true)

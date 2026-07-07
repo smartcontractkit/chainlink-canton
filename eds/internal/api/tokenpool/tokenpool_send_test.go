@@ -15,7 +15,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -67,7 +67,7 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 		Decimals:     18,
 		RemoteChainConfigs: map[types.NUMERIC]lockreleasetokenpool.RemoteChainConfig{
 			"456": {
-				FinalityConfig:     core.FinalityConfig{WaitForFinality: new(types.UNIT)},
+				FinalityConfig:     ccipcodec.FinalityConfig{WaitForFinality: new(types.UNIT)},
 				InboundRateLimiter: inboundRL.Binding(),
 				InboundCustomBlockConfirmationsRateLimiter: inboundCustomRL.Binding(),
 				OutboundRateLimiter:                        outboundRL.Binding(),
@@ -419,7 +419,7 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 		Decimals:     18,
 		RemoteChainConfigs: map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{
 			"456": {
-				FinalityConfig:     core.FinalityConfig{WaitForFinality: new(types.UNIT)},
+				FinalityConfig:     ccipcodec.FinalityConfig{WaitForFinality: new(types.UNIT)},
 				InboundRateLimiter: inboundRL.Binding(),
 				InboundCustomBlockConfirmationsRateLimiter: inboundCustomRL.Binding(),
 				OutboundRateLimiter:                        outboundRL.Binding(),

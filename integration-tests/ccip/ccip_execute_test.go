@@ -48,6 +48,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
@@ -252,7 +253,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
+								AllowedFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -446,7 +447,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: contracts.IdentifierFromBinding(ccipruntime.PerPartyRouterFactory{}),
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
@@ -516,7 +517,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
+					TemplateId: contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
@@ -550,7 +551,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			{
 				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 				VerifierResults: types.TEXT(verifierResultsHex),
-				CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+				Context:         ccvExecuteDisclosure.ChoiceContext,
 			},
 		},
 	}
@@ -562,7 +563,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-receiver", ModuleName: "CCIP.CCIPReceiver", EntityName: "CCIPReceiver"},
+					TemplateId:     contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
 					ContractId:     ccipReceiverCid,
 					Choice:         "Execute",
 					ChoiceArgument: ledger.MapToValue(executeArgs),

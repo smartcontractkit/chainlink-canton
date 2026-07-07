@@ -7,10 +7,10 @@ import DA.Action (foldlA)
 import DA.Optional (fromOptional)
 import DA.TextMap qualified as TextMap
 
-import Splice.Api.Token.BurnMintV1 qualified as BurnMintV1
-import Splice.Api.Token.HoldingV1 qualified as HoldingV1
-import Splice.Api.Token.MetadataV1 qualified as MetadataV1
-import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
+import qualified Splice.Api.Token.BurnMintV1
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
 
 -- | Token holding template (like Amulet but simplified).
 -- No expiry, no fees - just a simple UTXO holding.
@@ -18,18 +18,18 @@ template TestHolding
   with
     owner : Party
     admin : Party  -- Registry admin (like DSO in Canton Coin)
-    instrumentId : HoldingV1.InstrumentId
+    instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
     amount : Decimal
   where
     signatory owner, admin
 
-    interface instance HoldingV1.Holding for TestHolding where
-      view = HoldingV1.HoldingView with
+    interface instance Splice.Api.Token.HoldingV1.Holding for TestHolding where
+      view = Splice.Api.Token.HoldingV1.HoldingView with
         owner
         instrumentId
         amount
         lock = None
-        meta = MetadataV1.emptyMetadata
+        meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
 -- | Holding fixture for malicious backend tests. The viewed owner does not need
 -- to be a signatory, which lets tests model a bad token backend returning
@@ -38,19 +38,19 @@ template BadHolding
   with
     admin : Party
     owner : Party
-    instrumentId : HoldingV1.InstrumentId
+    instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
     amount : Decimal
   where
     signatory admin
     observer owner
 
-    interface instance HoldingV1.Holding for BadHolding where
-      view = HoldingV1.HoldingView with
+    interface instance Splice.Api.Token.HoldingV1.Holding for BadHolding where
+      view = Splice.Api.Token.HoldingV1.HoldingView with
         owner
         instrumentId
         amount
         lock = None
-        meta = MetadataV1.emptyMetadata
+        meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
 -- | Transfer Preapproval (like Canton Coin's TransferPreapproval).
 -- Receiver + admin create this to allow ANY sender to send tokens directly.
@@ -63,12 +63,12 @@ template TestTransferPreapproval
 
     -- Direct send to receiver (like TransferPreapproval_Send).
     -- Controller is SENDER - any party can send if receiver has preapproved.
-    nonconsuming choice Send : TransferV1.TransferInstructionResult
+    nonconsuming choice Send : Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
       with
         sender : Party
         amount : Decimal
-        instrumentId : HoldingV1.InstrumentId
-        inputHoldingCids : [ContractId HoldingV1.Holding]
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        inputHoldingCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
       controller sender
       do
         -- Sum and validate inputs
@@ -84,29 +84,29 @@ template TestTransferPreapproval
         let change = inputTotal - amount
         senderChangeCids <- createChangeIfNeeded admin sender instrumentId change
 
-        pure TransferV1.TransferInstructionResult with
+        pure Splice.Api.Token.TransferInstructionV1.TransferInstructionResult with
           senderChangeCids
-          output = TransferV1.TransferInstructionResult_Completed with
+          output = Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
             receiverHoldingCids = [toInterfaceContractId receiverCid]
-          meta = MetadataV1.emptyMetadata
+          meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
 -- | Pending Transfer Instruction (like AmuletTransferInstruction).
 -- Created when receiver doesn't have preapproval.
 template TestTransferInstruction
   with
     admin : Party
-    transfer : TransferV1.Transfer
+    transfer : Splice.Api.Token.TransferInstructionV1.Transfer
     lockedHoldingCid : ContractId TestHolding  -- Sender's funds locked pending acceptance
   where
     signatory admin, transfer.sender
     observer transfer.receiver
 
-    interface instance TransferV1.TransferInstruction for TestTransferInstruction where
-      view = TransferV1.TransferInstructionView with
+    interface instance Splice.Api.Token.TransferInstructionV1.TransferInstruction for TestTransferInstruction where
+      view = Splice.Api.Token.TransferInstructionV1.TransferInstructionView with
         originalInstructionCid = None
         transfer
-        status = TransferV1.TransferPendingReceiverAcceptance
-        meta = MetadataV1.emptyMetadata
+        status = Splice.Api.Token.TransferInstructionV1.TransferPendingReceiverAcceptance
+        meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
       -- Receiver accepts: unlock and transfer
       transferInstruction_acceptImpl _self _arg = do
@@ -120,11 +120,11 @@ template TestTransferInstruction
           instrumentId = transfer.instrumentId
           amount = transfer.amount
 
-        pure TransferV1.TransferInstructionResult with
+        pure Splice.Api.Token.TransferInstructionV1.TransferInstructionResult with
           senderChangeCids = []  -- Change was already returned when instruction created
-          output = TransferV1.TransferInstructionResult_Completed with
+          output = Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
             receiverHoldingCids = [toInterfaceContractId receiverCid]
-          meta = MetadataV1.emptyMetadata
+          meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
       -- Receiver rejects: return funds to sender
       transferInstruction_rejectImpl _self _arg = do
@@ -138,10 +138,10 @@ template TestTransferInstruction
           instrumentId = transfer.instrumentId
           amount = lockedHolding.amount
 
-        pure TransferV1.TransferInstructionResult with
+        pure Splice.Api.Token.TransferInstructionV1.TransferInstructionResult with
           senderChangeCids = [toInterfaceContractId senderCid]
-          output = TransferV1.TransferInstructionResult_Failed
-          meta = MetadataV1.emptyMetadata
+          output = Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed
+          meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
       -- Sender withdraws: return funds
       transferInstruction_withdrawImpl _self _arg = do
@@ -154,25 +154,25 @@ template TestTransferInstruction
           instrumentId = transfer.instrumentId
           amount = lockedHolding.amount
 
-        pure TransferV1.TransferInstructionResult with
+        pure Splice.Api.Token.TransferInstructionV1.TransferInstructionResult with
           senderChangeCids = [toInterfaceContractId senderCid]
-          output = TransferV1.TransferInstructionResult_Failed
-          meta = MetadataV1.emptyMetadata
+          output = Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed
+          meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
       transferInstruction_updateImpl _self _arg =
         abort "TestTransferInstruction: update not supported"
 
 -- Looks up the preapproval CID from extraArgs.context keyed by show(receiver).
 -- Callers pass preapprovals via feeTokenExtraArgs.context (CCIPSend) or via the
--- transfer-factory-extra-args-context-values entry in the pool extraContext (LockOrBurn).
+-- transfer-factory-extra-args-context-values entry in the pool's context (LockOrBurn).
 template TestTransferFactory
   with
     admin : Party
   where
     signatory admin
 
-    interface instance TransferV1.TransferFactory for TestTransferFactory where
-      view = TransferV1.TransferFactoryView with admin, meta = MetadataV1.emptyMetadata
+    interface instance Splice.Api.Token.TransferInstructionV1.TransferFactory for TestTransferFactory where
+      view = Splice.Api.Token.TransferInstructionV1.TransferFactoryView with admin, meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
       transferFactory_transferImpl _self arg = do
         let transfer = arg.transfer
@@ -181,7 +181,7 @@ template TestTransferFactory
         -- Check if this is a self-transfer or has preapproval
         let isSelfTransfer = transfer.sender == transfer.receiver
         let preapprovalOpt = case TextMap.lookup (show transfer.receiver) arg.extraArgs.context.values of
-              Some (MetadataV1.AV_ContractId cid) -> Some (coerceContractId cid : ContractId TestTransferPreapproval)
+              Some (Splice.Api.Token.MetadataV1.AV_ContractId cid) -> Some (coerceContractId cid : ContractId TestTransferPreapproval)
               _ -> None
 
         case (isSelfTransfer, preapprovalOpt) of
@@ -200,22 +200,22 @@ template TestTransferFactory
           (False, None) -> createPendingTransfer admin transfer
 
       transferFactory_publicFetchImpl _self _arg =
-        pure (view (toInterface @TransferV1.TransferFactory this))
+        pure (view (toInterface @Splice.Api.Token.TransferInstructionV1.TransferFactory this))
 
 template BadTransferInstruction
   with
     admin : Party
-    transfer : TransferV1.Transfer
+    transfer : Splice.Api.Token.TransferInstructionV1.Transfer
   where
     signatory admin
     observer transfer.sender, transfer.receiver
 
-    interface instance TransferV1.TransferInstruction for BadTransferInstruction where
-      view = TransferV1.TransferInstructionView with
+    interface instance Splice.Api.Token.TransferInstructionV1.TransferInstruction for BadTransferInstruction where
+      view = Splice.Api.Token.TransferInstructionV1.TransferInstructionView with
         originalInstructionCid = None
         transfer
-        status = TransferV1.TransferPendingReceiverAcceptance
-        meta = MetadataV1.emptyMetadata
+        status = Splice.Api.Token.TransferInstructionV1.TransferPendingReceiverAcceptance
+        meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
       transferInstruction_acceptImpl _self _arg =
         abort "BadTransferInstruction: accept not supported"
@@ -233,14 +233,14 @@ template BadTransferFactory
   with
     admin : Party
     completedOwner : Optional Party
-    completedInstrumentId : Optional HoldingV1.InstrumentId
+    completedInstrumentId : Optional Splice.Api.Token.HoldingV1.InstrumentId
     completedAmount : Optional Decimal
-    pendingTransfer : Optional TransferV1.Transfer
+    pendingTransfer : Optional Splice.Api.Token.TransferInstructionV1.Transfer
   where
     signatory admin
 
-    interface instance TransferV1.TransferFactory for BadTransferFactory where
-      view = TransferV1.TransferFactoryView with admin, meta = MetadataV1.emptyMetadata
+    interface instance Splice.Api.Token.TransferInstructionV1.TransferFactory for BadTransferFactory where
+      view = Splice.Api.Token.TransferInstructionV1.TransferFactoryView with admin, meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
       transferFactory_transferImpl _self arg = do
         assertMsg "BadTransferFactory: expectedAdmin mismatch" (arg.expectedAdmin == admin)
@@ -250,30 +250,30 @@ template BadTransferFactory
             instrCid <- create BadTransferInstruction with
               admin
               transfer = pending
-            pure TransferV1.TransferInstructionResult with
+            pure Splice.Api.Token.TransferInstructionV1.TransferInstructionResult with
               senderChangeCids = []
-              output = TransferV1.TransferInstructionResult_Pending with
+              output = Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending with
                 transferInstructionCid = toInterfaceContractId instrCid
-              meta = MetadataV1.emptyMetadata
+              meta = Splice.Api.Token.MetadataV1.emptyMetadata
           None -> do
             receiverCid <- create BadHolding with
               admin
               owner = fromOptional transfer.receiver completedOwner
               instrumentId = fromOptional transfer.instrumentId completedInstrumentId
               amount = fromOptional transfer.amount completedAmount
-            pure TransferV1.TransferInstructionResult with
+            pure Splice.Api.Token.TransferInstructionV1.TransferInstructionResult with
               senderChangeCids = []
-              output = TransferV1.TransferInstructionResult_Completed with
+              output = Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
                 receiverHoldingCids = [toInterfaceContractId receiverCid]
-              meta = MetadataV1.emptyMetadata
+              meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
       transferFactory_publicFetchImpl _self _arg =
-        pure (view (toInterface @TransferV1.TransferFactory this))
+        pure (view (toInterface @Splice.Api.Token.TransferInstructionV1.TransferFactory this))
 
 data BadBurnMintOutput = BadBurnMintOutput
   with
     owner : Party
-    instrumentId : HoldingV1.InstrumentId
+    instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
     amount : Decimal
   deriving (Eq, Show)
 
@@ -284,8 +284,8 @@ template BadBurnMintFactory
   where
     signatory admin
 
-    interface instance BurnMintV1.BurnMintFactory for BadBurnMintFactory where
-      view = BurnMintV1.BurnMintFactoryView with admin, meta = MetadataV1.emptyMetadata
+    interface instance Splice.Api.Token.BurnMintV1.BurnMintFactory for BadBurnMintFactory where
+      view = Splice.Api.Token.BurnMintV1.BurnMintFactoryView with admin, meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
       burnMintFactory_burnMintImpl _self arg = do
         assertMsg "BadBurnMintFactory: expectedAdmin mismatch" (arg.expectedAdmin == admin)
@@ -299,14 +299,14 @@ template BadBurnMintFactory
             pure (acc ++ [toInterfaceContractId cid]))
           []
           outputs
-        pure BurnMintV1.BurnMintFactory_BurnMintResult with
+        pure Splice.Api.Token.BurnMintV1.BurnMintFactory_BurnMintResult with
           outputCids
 
       burnMintFactory_publicFetchImpl _self _arg =
-        pure (view (toInterface @BurnMintV1.BurnMintFactory this))
+        pure (view (toInterface @Splice.Api.Token.BurnMintV1.BurnMintFactory this))
 
 -- Helper: Sum inputs, validate ownership/instrument, and archive them.
-sumAndArchiveInputs : Party -> Party -> HoldingV1.InstrumentId -> [ContractId HoldingV1.Holding] -> Update Decimal
+sumAndArchiveInputs : Party -> Party -> Splice.Api.Token.HoldingV1.InstrumentId -> [ContractId Splice.Api.Token.HoldingV1.Holding] -> Update Decimal
 sumAndArchiveInputs admin sender instrumentId cids =
   foldlA
     (\acc cid -> do
@@ -320,7 +320,7 @@ sumAndArchiveInputs admin sender instrumentId cids =
     cids
 
 -- Helper: Create change holding if amount > 0.
-createChangeIfNeeded : Party -> Party -> HoldingV1.InstrumentId -> Decimal -> Update [ContractId HoldingV1.Holding]
+createChangeIfNeeded : Party -> Party -> Splice.Api.Token.HoldingV1.InstrumentId -> Decimal -> Update [ContractId Splice.Api.Token.HoldingV1.Holding]
 createChangeIfNeeded admin owner instrumentId change =
   if change > 0.0
     then do
@@ -329,7 +329,7 @@ createChangeIfNeeded admin owner instrumentId change =
     else pure []
 
 -- Helper: Execute direct self-transfer.
-executeDirect : Party -> TransferV1.Transfer -> Update TransferV1.TransferInstructionResult
+executeDirect : Party -> Splice.Api.Token.TransferInstructionV1.Transfer -> Update Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
 executeDirect admin transfer = do
   inputTotal <- sumAndArchiveInputs admin transfer.sender transfer.instrumentId transfer.inputHoldingCids
   assertMsg "insufficient input" (inputTotal >= transfer.amount)
@@ -339,14 +339,14 @@ executeDirect admin transfer = do
 
   senderChangeCids <- createChangeIfNeeded admin transfer.sender transfer.instrumentId (inputTotal - transfer.amount)
 
-  pure TransferV1.TransferInstructionResult with
+  pure Splice.Api.Token.TransferInstructionV1.TransferInstructionResult with
     senderChangeCids
-    output = TransferV1.TransferInstructionResult_Completed with
+    output = Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed with
       receiverHoldingCids = [toInterfaceContractId receiverCid]
-    meta = MetadataV1.emptyMetadata
+    meta = Splice.Api.Token.MetadataV1.emptyMetadata
 
 -- Helper: Create pending transfer instruction when no preapproval.
-createPendingTransfer : Party -> TransferV1.Transfer -> Update TransferV1.TransferInstructionResult
+createPendingTransfer : Party -> Splice.Api.Token.TransferInstructionV1.Transfer -> Update Splice.Api.Token.TransferInstructionV1.TransferInstructionResult
 createPendingTransfer admin transfer = do
   inputTotal <- sumAndArchiveInputs admin transfer.sender transfer.instrumentId transfer.inputHoldingCids
   assertMsg "insufficient input" (inputTotal >= transfer.amount)
@@ -364,8 +364,8 @@ createPendingTransfer admin transfer = do
   -- Create pending instruction
   instrCid <- create TestTransferInstruction with admin, transfer, lockedHoldingCid = lockedCid
 
-  pure TransferV1.TransferInstructionResult with
+  pure Splice.Api.Token.TransferInstructionV1.TransferInstructionResult with
     senderChangeCids
-    output = TransferV1.TransferInstructionResult_Pending with
+    output = Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending with
       transferInstructionCid = toInterfaceContractId instrCid
-    meta = MetadataV1.emptyMetadata
+    meta = Splice.Api.Token.MetadataV1.emptyMetadata

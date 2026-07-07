@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-committee-verifier"
-	PackageID   = "5ae7d01fcbf94b3a26bb9b5b8c8d1431eeebb652a951d3f6cbdf4d8991e62499"
+	PackageID   = "9d6be72567fd0d602a51bb77008efa306f34efcd81b1ff636e75ae56983f0626"
 	SDKVersion  = "3.4.11"
 )
 
@@ -447,7 +447,7 @@ func (t *ApplySignatureConfigsParams) UnmarshalHex(data string) error {
 // CalculateFee is a Record type
 type CalculateFee struct {
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller            types.PARTY                                `json:"caller"`
 }
 
@@ -457,7 +457,7 @@ func (t CalculateFee) ToMap() map[string]any {
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -489,7 +489,7 @@ func (t *CalculateFee) UnmarshalHex(data string) error {
 // CalculateFeeMCMSParams is CalculateFee without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type CalculateFeeMCMSParams struct {
-	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes CalculateFeeMCMSParams to hex string for MCMS operationData.
@@ -522,12 +522,12 @@ type CommitteeVerifier struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t CommitteeVerifier) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CommitteeVerifier) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -712,7 +712,7 @@ func (t *CommitteeVerifier) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) VerifyMessage(contractID string, args VerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "VerifyMessage",
 		Arguments:  argsToMap(args),
@@ -722,7 +722,7 @@ func (t CommitteeVerifier) VerifyMessage(contractID string, args VerifyMessage) 
 // VerifyMessageWithPackageID exercises the VerifyMessage choice using the provided package ID instead of package name
 func (t CommitteeVerifier) VerifyMessageWithPackageID(contractID string, packageID string, args VerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "VerifyMessage",
 		Arguments:  argsToMap(args),
@@ -733,7 +733,7 @@ func (t CommitteeVerifier) VerifyMessageWithPackageID(contractID string, package
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) ApplySignatureConfigs(contractID string, args ApplySignatureConfigs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ApplySignatureConfigs",
 		Arguments:  argsToMap(args),
@@ -743,7 +743,7 @@ func (t CommitteeVerifier) ApplySignatureConfigs(contractID string, args ApplySi
 // ApplySignatureConfigsWithPackageID exercises the ApplySignatureConfigs choice using the provided package ID instead of package name
 func (t CommitteeVerifier) ApplySignatureConfigsWithPackageID(contractID string, packageID string, args ApplySignatureConfigs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ApplySignatureConfigs",
 		Arguments:  argsToMap(args),
@@ -754,7 +754,7 @@ func (t CommitteeVerifier) ApplySignatureConfigsWithPackageID(contractID string,
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) ApplyAllowListUpdates(contractID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ApplyAllowListUpdates",
 		Arguments:  argsToMap(args),
@@ -764,7 +764,7 @@ func (t CommitteeVerifier) ApplyAllowListUpdates(contractID string, args ApplyAl
 // ApplyAllowListUpdatesWithPackageID exercises the ApplyAllowListUpdates choice using the provided package ID instead of package name
 func (t CommitteeVerifier) ApplyAllowListUpdatesWithPackageID(contractID string, packageID string, args ApplyAllowListUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ApplyAllowListUpdates",
 		Arguments:  argsToMap(args),
@@ -775,7 +775,7 @@ func (t CommitteeVerifier) ApplyAllowListUpdatesWithPackageID(contractID string,
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) ApplyRemoteChainConfigUpdates(contractID string, args ApplyRemoteChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ApplyRemoteChainConfigUpdates",
 		Arguments:  argsToMap(args),
@@ -785,7 +785,7 @@ func (t CommitteeVerifier) ApplyRemoteChainConfigUpdates(contractID string, args
 // ApplyRemoteChainConfigUpdatesWithPackageID exercises the ApplyRemoteChainConfigUpdates choice using the provided package ID instead of package name
 func (t CommitteeVerifier) ApplyRemoteChainConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyRemoteChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ApplyRemoteChainConfigUpdates",
 		Arguments:  argsToMap(args),
@@ -796,7 +796,7 @@ func (t CommitteeVerifier) ApplyRemoteChainConfigUpdatesWithPackageID(contractID
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) AcceptStorageLocationsAdmin(contractID string, args AcceptStorageLocationsAdmin) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "AcceptStorageLocationsAdmin",
 		Arguments:  argsToMap(args),
@@ -806,7 +806,7 @@ func (t CommitteeVerifier) AcceptStorageLocationsAdmin(contractID string, args A
 // AcceptStorageLocationsAdminWithPackageID exercises the AcceptStorageLocationsAdmin choice using the provided package ID instead of package name
 func (t CommitteeVerifier) AcceptStorageLocationsAdminWithPackageID(contractID string, packageID string, args AcceptStorageLocationsAdmin) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "AcceptStorageLocationsAdmin",
 		Arguments:  argsToMap(args),
@@ -817,7 +817,7 @@ func (t CommitteeVerifier) AcceptStorageLocationsAdminWithPackageID(contractID s
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) CalculateFee(contractID string, args CalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "CalculateFee",
 		Arguments:  argsToMap(args),
@@ -827,7 +827,7 @@ func (t CommitteeVerifier) CalculateFee(contractID string, args CalculateFee) *m
 // CalculateFeeWithPackageID exercises the CalculateFee choice using the provided package ID instead of package name
 func (t CommitteeVerifier) CalculateFeeWithPackageID(contractID string, packageID string, args CalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "CalculateFee",
 		Arguments:  argsToMap(args),
@@ -838,7 +838,7 @@ func (t CommitteeVerifier) CalculateFeeWithPackageID(contractID string, packageI
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) ForwardToVerifier(contractID string, args ForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ForwardToVerifier",
 		Arguments:  argsToMap(args),
@@ -848,7 +848,7 @@ func (t CommitteeVerifier) ForwardToVerifier(contractID string, args ForwardToVe
 // ForwardToVerifierWithPackageID exercises the ForwardToVerifier choice using the provided package ID instead of package name
 func (t CommitteeVerifier) ForwardToVerifierWithPackageID(contractID string, packageID string, args ForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "ForwardToVerifier",
 		Arguments:  argsToMap(args),
@@ -859,7 +859,7 @@ func (t CommitteeVerifier) ForwardToVerifierWithPackageID(contractID string, pac
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -869,7 +869,7 @@ func (t CommitteeVerifier) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CommitteeVerifier) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -880,7 +880,7 @@ func (t CommitteeVerifier) ArchiveWithPackageID(contractID string, packageID str
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
@@ -890,7 +890,7 @@ func (t CommitteeVerifier) GetFee(contractID string, args GetFee) *model.Exercis
 // GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
 func (t CommitteeVerifier) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "GetFee",
 		Arguments:  argsToMap(args),
@@ -901,7 +901,7 @@ func (t CommitteeVerifier) GetFeeWithPackageID(contractID string, packageID stri
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) SetDynamicConfig(contractID string, args SetDynamicConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "SetDynamicConfig",
 		Arguments:  argsToMap(args),
@@ -911,7 +911,7 @@ func (t CommitteeVerifier) SetDynamicConfig(contractID string, args SetDynamicCo
 // SetDynamicConfigWithPackageID exercises the SetDynamicConfig choice using the provided package ID instead of package name
 func (t CommitteeVerifier) SetDynamicConfigWithPackageID(contractID string, packageID string, args SetDynamicConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "SetDynamicConfig",
 		Arguments:  argsToMap(args),
@@ -922,7 +922,7 @@ func (t CommitteeVerifier) SetDynamicConfigWithPackageID(contractID string, pack
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) SetDeps(contractID string, args SetDeps) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "SetDeps",
 		Arguments:  argsToMap(args),
@@ -932,7 +932,7 @@ func (t CommitteeVerifier) SetDeps(contractID string, args SetDeps) *model.Exerc
 // SetDepsWithPackageID exercises the SetDeps choice using the provided package ID instead of package name
 func (t CommitteeVerifier) SetDepsWithPackageID(contractID string, packageID string, args SetDeps) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "SetDeps",
 		Arguments:  argsToMap(args),
@@ -943,7 +943,7 @@ func (t CommitteeVerifier) SetDepsWithPackageID(contractID string, packageID str
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) TransferStorageLocationsAdmin(contractID string, args TransferStorageLocationsAdmin) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "TransferStorageLocationsAdmin",
 		Arguments:  argsToMap(args),
@@ -953,7 +953,7 @@ func (t CommitteeVerifier) TransferStorageLocationsAdmin(contractID string, args
 // TransferStorageLocationsAdminWithPackageID exercises the TransferStorageLocationsAdmin choice using the provided package ID instead of package name
 func (t CommitteeVerifier) TransferStorageLocationsAdminWithPackageID(contractID string, packageID string, args TransferStorageLocationsAdmin) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "TransferStorageLocationsAdmin",
 		Arguments:  argsToMap(args),
@@ -964,7 +964,7 @@ func (t CommitteeVerifier) TransferStorageLocationsAdminWithPackageID(contractID
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) UpdateStorageLocations(contractID string, args UpdateStorageLocations) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "UpdateStorageLocations",
 		Arguments:  argsToMap(args),
@@ -974,7 +974,7 @@ func (t CommitteeVerifier) UpdateStorageLocations(contractID string, args Update
 // UpdateStorageLocationsWithPackageID exercises the UpdateStorageLocations choice using the provided package ID instead of package name
 func (t CommitteeVerifier) UpdateStorageLocationsWithPackageID(contractID string, packageID string, args UpdateStorageLocations) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "CommitteeVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "CommitteeVerifier"),
 		ContractID: contractID,
 		Choice:     "UpdateStorageLocations",
 		Arguments:  argsToMap(args),
@@ -985,7 +985,7 @@ func (t CommitteeVerifier) UpdateStorageLocationsWithPackageID(contractID string
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -995,7 +995,7 @@ func (t CommitteeVerifier) MCMSReceiverEntrypoint(contractID string, args api.MC
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
 func (t CommitteeVerifier) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -1006,7 +1006,7 @@ func (t CommitteeVerifier) MCMSReceiverEntrypointWithPackageID(contractID string
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) CrossChainVerifierVerifyMessage(contractID string, args extensionapi.CrossChainVerifierVerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "ICrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_VerifyMessage",
 		Arguments:  argsToMap(args),
@@ -1016,7 +1016,7 @@ func (t CommitteeVerifier) CrossChainVerifierVerifyMessage(contractID string, ar
 // CrossChainVerifierVerifyMessageWithPackageID exercises the CrossChainVerifier_VerifyMessage choice using the provided package ID instead of package name
 func (t CommitteeVerifier) CrossChainVerifierVerifyMessageWithPackageID(contractID string, packageID string, args extensionapi.CrossChainVerifierVerifyMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "ICrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_VerifyMessage",
 		Arguments:  argsToMap(args),
@@ -1027,7 +1027,7 @@ func (t CommitteeVerifier) CrossChainVerifierVerifyMessageWithPackageID(contract
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) CrossChainVerifierCalculateFee(contractID string, args extensionapi.CrossChainVerifierCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "ICrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_CalculateFee",
 		Arguments:  argsToMap(args),
@@ -1037,7 +1037,7 @@ func (t CommitteeVerifier) CrossChainVerifierCalculateFee(contractID string, arg
 // CrossChainVerifierCalculateFeeWithPackageID exercises the CrossChainVerifier_CalculateFee choice using the provided package ID instead of package name
 func (t CommitteeVerifier) CrossChainVerifierCalculateFeeWithPackageID(contractID string, packageID string, args extensionapi.CrossChainVerifierCalculateFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "ICrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_CalculateFee",
 		Arguments:  argsToMap(args),
@@ -1048,7 +1048,7 @@ func (t CommitteeVerifier) CrossChainVerifierCalculateFeeWithPackageID(contractI
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) CrossChainVerifierGetFee(contractID string, args extensionapi.CrossChainVerifierGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "ICrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_GetFee",
 		Arguments:  argsToMap(args),
@@ -1058,7 +1058,7 @@ func (t CommitteeVerifier) CrossChainVerifierGetFee(contractID string, args exte
 // CrossChainVerifierGetFeeWithPackageID exercises the CrossChainVerifier_GetFee choice using the provided package ID instead of package name
 func (t CommitteeVerifier) CrossChainVerifierGetFeeWithPackageID(contractID string, packageID string, args extensionapi.CrossChainVerifierGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "ICrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_GetFee",
 		Arguments:  argsToMap(args),
@@ -1069,7 +1069,7 @@ func (t CommitteeVerifier) CrossChainVerifierGetFeeWithPackageID(contractID stri
 // This method uses the package name in the template ID
 func (t CommitteeVerifier) CrossChainVerifierForwardToVerifier(contractID string, args extensionapi.CrossChainVerifierForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CommitteeVerifierV1", "ICrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_ForwardToVerifier",
 		Arguments:  argsToMap(args),
@@ -1079,7 +1079,7 @@ func (t CommitteeVerifier) CrossChainVerifierForwardToVerifier(contractID string
 // CrossChainVerifierForwardToVerifierWithPackageID exercises the CrossChainVerifier_ForwardToVerifier choice using the provided package ID instead of package name
 func (t CommitteeVerifier) CrossChainVerifierForwardToVerifierWithPackageID(contractID string, packageID string, args extensionapi.CrossChainVerifierForwardToVerifier) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifier", "ICrossChainVerifier"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CommitteeVerifierV1", "ICrossChainVerifier"),
 		ContractID: contractID,
 		Choice:     "CrossChainVerifier_ForwardToVerifier",
 		Arguments:  argsToMap(args),
@@ -1186,7 +1186,7 @@ func (t *DynamicConfig) UnmarshalHex(data string) error {
 // ForwardToVerifier is a Record type
 type ForwardToVerifier struct {
 	RmnRemoteCid      types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext      splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	SendingMessageCid types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	VerifierArgs      types.TEXT                                 `json:"verifierArgs"`
 	Caller            types.PARTY                                `json:"caller"`
@@ -1198,7 +1198,7 @@ func (t ForwardToVerifier) ToMap() map[string]any {
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
 
@@ -1234,7 +1234,7 @@ func (t *ForwardToVerifier) UnmarshalHex(data string) error {
 // ForwardToVerifierMCMSParams is ForwardToVerifier without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type ForwardToVerifierMCMSParams struct {
-	ExtraContext splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context      splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	VerifierArgs types.TEXT                                 `json:"verifierArgs"`
 }
 
@@ -1252,8 +1252,9 @@ func (t *ForwardToVerifierMCMSParams) UnmarshalHex(data string) error {
 
 // GetFee is a Record type
 type GetFee struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
-	Caller            types.PARTY   `json:"caller"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+	Caller            types.PARTY                                `json:"caller"`
 }
 
 // ToMap converts GetFee to a map for DAML arguments
@@ -1261,6 +1262,8 @@ func (t GetFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["destChainSelector"] = t.DestChainSelector
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["caller"] = t.Caller.ToMap()
 
@@ -1292,7 +1295,8 @@ func (t *GetFee) UnmarshalHex(data string) error {
 // GetFeeMCMSParams is GetFee without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type GetFeeMCMSParams struct {
-	DestChainSelector types.NUMERIC `json:"destChainSelector"`
+	DestChainSelector types.NUMERIC                              `json:"destChainSelector"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // MarshalHex encodes GetFeeMCMSParams to hex string for MCMS operationData.
@@ -1770,7 +1774,7 @@ func (t *UpdateStorageLocationsParams) UnmarshalHex(data string) error {
 // VerifyMessage is a Record type
 type VerifyMessage struct {
 	RmnRemoteCid        types.CONTRACT_ID                          `json:"rmnRemoteCid"`
-	ExtraContext        splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context             splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	ExecutingMessageCid types.CONTRACT_ID                          `json:"executingMessageCid"`
 	VerifierResults     types.TEXT                                 `json:"verifierResults"`
 	Caller              types.PARTY                                `json:"caller"`
@@ -1782,7 +1786,7 @@ func (t VerifyMessage) ToMap() map[string]any {
 
 	m["rmnRemoteCid"] = model.NestedToDAMLValue(t.RmnRemoteCid)
 
-	m["extraContext"] = model.NestedToDAMLValue(t.ExtraContext)
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
 
@@ -1818,7 +1822,7 @@ func (t *VerifyMessage) UnmarshalHex(data string) error {
 // VerifyMessageMCMSParams is VerifyMessage without the Caller field for MCMS operationData encoding.
 // ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type VerifyMessageMCMSParams struct {
-	ExtraContext    splice_api_token_metadata_v1.ChoiceContext `json:"extraContext"`
+	Context         splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	VerifierResults types.TEXT                                 `json:"verifierResults"`
 }
 

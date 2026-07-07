@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 // getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as
@@ -34,7 +35,7 @@ func quoteCCIPSenderFee(
 	ccipSenderCid string,
 	sendArgs sender.Send,
 	disclosures []*apiv2.DisclosedContract,
-) sender.GetFeeResult {
+) sender.GetFeeResult2 {
 	t.Helper()
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -42,7 +43,7 @@ func quoteCCIPSenderFee(
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					ContractId:     ccipSenderCid,
 					Choice:         "GetFee",
 					ChoiceArgument: ledger.MapToValue(getFeeChoiceArgumentMap(sendArgs)),
@@ -79,7 +80,7 @@ func quoteCCIPSenderFee(
 	fields := resultRecord.GetFields()
 	require.NotEmpty(t, fields, "GetFee should return fee fields")
 
-	quote := sender.GetFeeResult{
+	quote := sender.GetFeeResult2{
 		FeeTokenAmount: types.NUMERIC(fields[0].GetValue().GetNumeric()),
 	}
 	if len(fields) > 1 {

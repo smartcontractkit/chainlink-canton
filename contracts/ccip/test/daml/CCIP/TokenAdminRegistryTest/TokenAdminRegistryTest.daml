@@ -4,33 +4,36 @@ import Daml.Script
 import DA.Assert ((===))
 import DA.Optional (fromSome)
 
-import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.BurnMintV1
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
 import qualified Splice.Api.Token.TransferInstructionV1
-import qualified CCIP.ExecutingMessageV1
-import qualified CCIP.FinalityConfig
-import qualified CCIP.MessageCodecV1
-import qualified CCIP.Tickets
-import CCIP.TokenAdminRegistry
-import CCIP.TokenAdminRegistryTypes qualified as TokenAdminRegistryTypes
-import qualified Chainlink.InstanceAddress as RawInstanceAddress
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.CoreV1.ExecutingMessage
+import qualified CCIP.CodecV1.FinalityConfig
+import qualified CCIP.CodecV1.MessageCodecV1
+import qualified CCIP.TicketsV1
+import qualified CCIP.CoreV1.TokenAdminRegistry
+
 import qualified TestToken
 
 createRegistryWithAdmin
     : Party
     -> Text
     -> Splice.Api.Token.HoldingV1.InstrumentId
-    -> Script (ContractId TokenAdminRegistry, ContractId TokenConfig)
+    -> Script (ContractId CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry, ContractId CCIP.CoreV1.TokenAdminRegistry.TokenConfig)
 createRegistryWithAdmin owner instanceId instrumentId = do
   tarCid <- submit owner do
-    createCmd TokenAdminRegistry with
+    createCmd CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry with
       instanceId
-      owner
+      ccipOwner =owner
       entryCount = 1
 
   configCid <- submit owner do
-    createCmd TokenConfig with
-      instanceId = tokenConfigInstanceId instrumentId
+    createCmd CCIP.CoreV1.TokenAdminRegistry.TokenConfig with
+      instanceId = CCIP.CoreV1.TokenAdminRegistry.tokenConfigInstanceId instrumentId
       registryInstanceId = instanceId
       registryOwner = owner
       index = 0
@@ -56,10 +59,11 @@ testTransferAdminRoleRequiresAcceptance = script do
   (tarCid, configCid0) <- createRegistryWithAdmin owner instanceId instrumentId
 
   configCid1 <- submit owner do
-    exerciseCmd tarCid TransferAdminRole with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.TransferAdminRole with
       tokenConfigCid = configCid0
       instrumentId
       newAdmin
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = owner
 
   Some configAfterTransfer <- queryContractId owner configCid1
@@ -68,9 +72,10 @@ testTransferAdminRoleRequiresAcceptance = script do
 
   disclosedTar <- fromSome <$> queryDisclosure owner tarCid
   configCid2 <- submit (actAs newAdmin <> disclose disclosedTar) do
-    exerciseCmd tarCid AcceptAdminRole with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.AcceptAdminRole with
       tokenConfigCid = configCid1
       instrumentId
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = newAdmin
 
   Some configAfterAccept <- queryContractId owner configCid2
@@ -90,10 +95,11 @@ testTransferAdminRoleRejectsSameAdmin = script do
   (tarCid, configCid) <- createRegistryWithAdmin owner instanceId instrumentId
 
   submitMustFail owner do
-    exerciseCmd tarCid TransferAdminRole with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.TransferAdminRole with
       tokenConfigCid = configCid
       instrumentId
       newAdmin = owner
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = owner
 
   Some config <- queryContractId owner configCid
@@ -115,20 +121,22 @@ testSetTransferFactoryStoresAndClearsFactory = script do
       admin = owner
 
   configCid1 <- submit owner do
-    exerciseCmd tarCid SetTransferFactory with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.SetTransferFactory with
       tokenConfigCid = configCid0
       instrumentId
       transferFactory = Some (toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory factoryCid)
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = owner
 
   Some config1 <- queryContractId owner configCid1
   config1.transferFactory === Some (toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory factoryCid)
 
   configCid2 <- submit owner do
-    exerciseCmd tarCid SetTransferFactory with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.SetTransferFactory with
       tokenConfigCid = configCid1
       instrumentId
       transferFactory = None
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = owner
 
   Some config2 <- queryContractId owner configCid2
@@ -153,10 +161,11 @@ testSetTransferFactoryRejectsNonAdmin = script do
   disclosedConfig <- fromSome <$> queryDisclosure owner configCid
   disclosedFactory <- fromSome <$> queryDisclosure owner factoryCid
   submitMustFail (actAs other <> disclose disclosedTar <> disclose disclosedConfig <> disclose disclosedFactory) do
-    exerciseCmd tarCid SetTransferFactory with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.SetTransferFactory with
       tokenConfigCid = configCid
       instrumentId
       transferFactory = Some (toInterfaceContractId @Splice.Api.Token.TransferInstructionV1.TransferFactory factoryCid)
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = other
 
   pure ()
@@ -175,20 +184,22 @@ testSetBurnMintFactoryStoresAndClearsFactory = script do
       outputs = []
 
   configCid1 <- submit owner do
-    exerciseCmd tarCid SetBurnMintFactory with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.SetBurnMintFactory with
       tokenConfigCid = configCid0
       instrumentId
       burnMintFactory = Some (toInterfaceContractId @Splice.Api.Token.BurnMintV1.BurnMintFactory factoryCid)
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = owner
 
   Some config1 <- queryContractId owner configCid1
   config1.burnMintFactory === Some (toInterfaceContractId @Splice.Api.Token.BurnMintV1.BurnMintFactory factoryCid)
 
   configCid2 <- submit owner do
-    exerciseCmd tarCid SetBurnMintFactory with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.SetBurnMintFactory with
       tokenConfigCid = configCid1
       instrumentId
       burnMintFactory = None
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = owner
 
   Some config2 <- queryContractId owner configCid2
@@ -204,47 +215,48 @@ testFinalizeExecuteRejectsPoolChangedAfterInboundVerification = script do
 
   let registryInstanceId = "tar-finalize-pool-change"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "USDC"
-      poolV1 = TokenAdminRegistryTypes.PoolRegistration with
+      poolV1 = CCIP.CoreV1.TokenAdminRegistry.PoolRegistration with
         poolOwner
         poolInstanceId = "pool-v1"
-      poolV2 = TokenAdminRegistryTypes.PoolRegistration with
+      poolV2 = CCIP.CoreV1.TokenAdminRegistry.PoolRegistration with
         poolOwner
         poolInstanceId = "pool-v2"
-      tokenAddress = CCIP.MessageCodecV1.encodeInstrumentId instrumentId
+      tokenAddress = CCIP.CodecV1.MessageCodecV1.encodeInstrumentId instrumentId
 
   (tarCid, configCid0) <- createRegistryWithAdmin owner registryInstanceId instrumentId
 
   configCid1 <- submit owner do
-    exerciseCmd tarCid SetPool with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.SetPool with
       tokenConfigCid = configCid0
       instrumentId
       tokenPool = Some poolV1
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = owner
 
-  let message = CCIP.MessageCodecV1.MessageV1 with
+  let message = CCIP.CodecV1.MessageCodecV1.MessageV1 with
         sourceChainSelector = 1.0
         destChainSelector = 2.0
         sequenceNumber = 1.0
         executionGasLimit = 0
         ccipReceiveGasLimit = 0
-        finality = CCIP.FinalityConfig.waitForFinalityDecoded
+        finality = CCIP.CodecV1.FinalityConfig.waitForFinalityDecoded
         ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
         onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
         offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
         sender = "0000000000000000000000000000000000000000000000000000000000000003"
-        receiver = CCIP.MessageCodecV1.encodePartyAddress receiver
+        receiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
         destBlob = ""
-        tokenTransfer = Some (CCIP.MessageCodecV1.TokenTransferV1 with
+        tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
           sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000004"
           sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000005"
           destTokenAddress = tokenAddress
-          tokenReceiver = CCIP.MessageCodecV1.encodePartyAddress receiver
-          amount = fromSome (CCIP.MessageCodecV1.encodeUint256 1.0)
+          tokenReceiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
+          amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 1.0)
           extraData = "")
         messageData = ""
 
   executingMessageCid <- submit (actAs owner <> actAs poolOwner) do
-    createCmd CCIP.ExecutingMessageV1.ExecutingMessageV1 with
+    createCmd CCIP.CoreV1.ExecutingMessage.ExecutingMessage with
       ccipOwner = owner
       message
       messageId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -257,28 +269,29 @@ testFinalizeExecuteRejectsPoolChangedAfterInboundVerification = script do
       requiredCCVs = []
       optionalCCVs = []
       optionalCCVThreshold = 0
-      receiverFinalityConfig = CCIP.FinalityConfig.WaitForFinality
+      receiverFinalityConfig = CCIP.CodecV1.FinalityConfig.WaitForFinality
       sourceDefaultCCVs = []
-      inboundPoolVerification = Some (CCIP.ExecutingMessageV1.InboundPoolVerification with
+      inboundPoolVerification = Some (CCIP.CoreV1.ExecutingMessage.InboundPoolVerification with
         poolInstanceId = poolV1.poolInstanceId
         poolOwner = poolV1.poolOwner
         poolCCVs = [])
-      deps = CCIP.ExecutingMessageV1.ExecutingMessageDeps with
-        offRamp = RawInstanceAddress.make "offramp-finalize-pool-change" owner
-        globalConfig = RawInstanceAddress.make "global-finalize-pool-change" owner
-        rmnRemote = RawInstanceAddress.make "rmn-finalize-pool-change" owner
-        tokenAdminRegistry = RawInstanceAddress.make registryInstanceId owner
-      state = CCIP.ExecutingMessageV1.ExecutingMessageState_Prepared
+      deps = CCIP.CoreV1.ExecutingMessage.ExecutingMessageDeps with
+        offRamp = Chainlink.InstanceAddress.make "offramp-finalize-pool-change" owner
+        globalConfig = Chainlink.InstanceAddress.make "global-finalize-pool-change" owner
+        rmnRemote = Chainlink.InstanceAddress.make "rmn-finalize-pool-change" owner
+        tokenAdminRegistry = Chainlink.InstanceAddress.make registryInstanceId owner
+      state = CCIP.CoreV1.ExecutingMessage.ExecutingMessageState_Prepared
 
   configCid2 <- submit owner do
-    exerciseCmd tarCid SetPool with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.SetPool with
       tokenConfigCid = configCid1
       instrumentId
       tokenPool = Some poolV2
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = owner
 
   submitMustFail owner do
-    exerciseCmd tarCid FinalizeExecute with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.FinalizeExecute with
       tokenConfigCid = configCid2
       executingMessageCid
       ticketReceiver = receiver
@@ -292,22 +305,23 @@ testConsumeReceiveTicketRejectsPoolAddressMismatch = script do
 
   let registryInstanceId = "tar-consume-pool-address"
       instrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "USDC"
-      registeredPool = TokenAdminRegistryTypes.PoolRegistration with
+      registeredPool = CCIP.CoreV1.TokenAdminRegistry.PoolRegistration with
         poolOwner
         poolInstanceId = "pool-v2"
-      stalePoolAddress = RawInstanceAddress.make "pool-v1" poolOwner
+      stalePoolAddress = Chainlink.InstanceAddress.make "pool-v1" poolOwner
 
   (tarCid, configCid0) <- createRegistryWithAdmin owner registryInstanceId instrumentId
 
   configCid <- submit owner do
-    exerciseCmd tarCid SetPool with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.SetPool with
       tokenConfigCid = configCid0
       instrumentId
       tokenPool = Some registeredPool
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       caller = owner
 
   ticketCid <- submit (actAs owner <> actAs poolOwner) do
-    createCmd CCIP.Tickets.TokenReceiveTicket with
+    createCmd CCIP.TicketsV1.TokenReceiveTicket with
       ccipOwner = owner
       ccvOwners = []
       verifiedCCVs = []
@@ -318,18 +332,19 @@ testConsumeReceiveTicketRejectsPoolAddressMismatch = script do
       receiver
       tokenReceiver = receiver
       instrumentId
-      amount = fromSome (CCIP.MessageCodecV1.encodeUint256 1.0)
+      amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 1.0)
       sourcePoolData = ""
       messageId = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       sourceChainSelector = 1.0
-      finality = CCIP.FinalityConfig.WaitForFinality
+      finality = CCIP.CodecV1.FinalityConfig.WaitForFinality
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
   disclosedTar <- fromSome <$> queryDisclosure owner tarCid
   disclosedConfig <- fromSome <$> queryDisclosure owner configCid
   submitMustFail (actAs poolOwner <> disclose disclosedTar <> disclose disclosedConfig) do
-    exerciseCmd tarCid ConsumeReceiveTicket with
+    exerciseCmd tarCid CCIP.CoreV1.TokenAdminRegistry.ConsumeReceiveTicket with
       tokenConfigCid = configCid
-      ticketCid
+      tokenReceiveTicketCid = ticketCid
       instrumentId
       poolInstanceId = registeredPool.poolInstanceId
       caller = poolOwner

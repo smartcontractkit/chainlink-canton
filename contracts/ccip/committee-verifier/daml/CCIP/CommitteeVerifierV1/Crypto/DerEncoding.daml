@@ -1,0 +1,69 @@
+module CCIP.CommitteeVerifierV1.Crypto.DerEncoding where
+
+import DA.Crypto.Text (BytesHex, byteCount)
+import DA.Text qualified as Text
+
+import qualified CCIP.CommitteeVerifierV1.Crypto.Hex
+
+-- | Convert raw ECDSA signature (r, s) to DER format
+--
+-- DER SEQUENCE format:
+--   0x30 [total_length]
+--     0x02 [r_length] [r_bytes]
+--     0x02 [s_length] [s_bytes]
+--
+-- The function:
+--   1. Trims leading zeros from r and s
+--   2. Adds 0x00 padding byte if high bit is set (to maintain positive value)
+--   3. Encodes as DER INTEGER (0x02 + length + value)
+--   4. Wraps both in SEQUENCE (0x30 + total_length + contents)
+rawToDerSignature : BytesHex -> BytesHex -> BytesHex
+rawToDerSignature r s =
+  let
+    -- Validate input lengths for 256-bit ECDSA (max 32 bytes per component)
+    _ = if byteCount r < 1 || byteCount r > 32 then error "r component must be 1-32 bytes (256-bit max)" else ()
+    _ = if byteCount s < 1 || byteCount s > 32 then error "s component must be 1-32 bytes (256-bit max)" else ()
+
+    -- Remove zeroes to compress (0003 == 3)
+    rTrimmed = CCIP.CommitteeVerifierV1.Crypto.Hex.trimLeadingZeros r
+    sTrimmed = CCIP.CommitteeVerifierV1.Crypto.Hex.trimLeadingZeros s
+
+    -- r and s components are never negative so the sign byte is always 00
+    rWithPrefix = if CCIP.CommitteeVerifierV1.Crypto.Hex.highBitSet rTrimmed then "00" <> rTrimmed else rTrimmed
+    sWithPrefix = if CCIP.CommitteeVerifierV1.Crypto.Hex.highBitSet sTrimmed then "00" <> sTrimmed else sTrimmed
+
+    rLen = byteCount rWithPrefix
+    sLen = byteCount sWithPrefix
+
+    rLenHex = CCIP.CommitteeVerifierV1.Crypto.Hex.byteToHex rLen
+    sLenHex = CCIP.CommitteeVerifierV1.Crypto.Hex.byteToHex sLen
+
+    contentLen = 2 + rLen + 2 + sLen
+    totalLenHex = CCIP.CommitteeVerifierV1.Crypto.Hex.byteToHex contentLen
+
+  in "30" <> totalLenHex <> "02" <> rLenHex <> rWithPrefix <> "02" <> sLenHex <> sWithPrefix
+
+-- | Convert uncompressed secp256k1 public key to DER SubjectPublicKeyInfo format
+--
+-- Input: 65-byte uncompressed public key (0x04 + 32-byte X + 32-byte Y)
+-- Output: 88-byte DER-encoded SubjectPublicKeyInfo
+--
+-- DER SubjectPublicKeyInfo structure:
+--   SEQUENCE (0x30) [86 bytes]
+--     SEQUENCE (0x30) [16 bytes] - Algorithm Identifier
+--       OID (0x06) [7 bytes] - ecPublicKey (1.2.840.10045.2.1)
+--       OID (0x06) [5 bytes] - secp256k1 (1.3.132.0.10)
+--     BIT STRING (0x03) [66 bytes]
+--       0x00 - unused bits
+--       [65 bytes] - uncompressed public key
+--
+-- The algorithm identifier is fixed for secp256k1.
+secp256k1PublicKeyToDer : BytesHex -> BytesHex
+secp256k1PublicKeyToDer uncompressedKey =
+  let
+    keyLen = byteCount uncompressedKey
+    -- Validate uncompressed public key format (65 bytes: 0x04 + 32-byte X + 32-byte Y)
+    _ = if keyLen /= 65 then error "Public key must be exactly 65 bytes (uncompressed format)" else ()
+    _ = if Text.take 2 uncompressedKey /= "04" then error "Public key must start with 0x04 (uncompressed format)" else ()
+  in "3056301006072a8648ce3d020106052b8104000a034200" <> uncompressedKey
+

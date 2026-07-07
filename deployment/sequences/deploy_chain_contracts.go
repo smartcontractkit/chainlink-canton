@@ -146,7 +146,7 @@ var DeployChainContracts = operations.NewSequence(
 		// Deploy Token Admin Registry
 		deployTokenAdminRegistryReport, err := operations.ExecuteOperation(b, token_admin_registry.Deploy, deps, contract.DeployInput[core.TokenAdminRegistry]{
 			Template: core.TokenAdminRegistry{
-				Owner:      types.PARTY(input.CCIPOwnerParty),
+				CcipOwner:  types.PARTY(input.CCIPOwnerParty),
 				EntryCount: 0,
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),
@@ -171,7 +171,7 @@ var DeployChainContracts = operations.NewSequence(
 		}
 		deployFeeQuoterReport, err := operations.ExecuteOperation(b, fee_quoter.Deploy, deps, contract.DeployInput[core.FeeQuoter]{
 			Template: core.FeeQuoter{
-				Owner:                            types.PARTY(input.CCIPOwnerParty),
+				CcipOwner:                        types.PARTY(input.CCIPOwnerParty),
 				FeeTokens:                        types.SET{},
 				DestChainConfigs:                 nil,
 				TokenTransferFeeConfigs:          nil,
@@ -256,7 +256,6 @@ var DeployChainContracts = operations.NewSequence(
 					RmnRemote:          rmnRemoteRawInstanceAddress.Binding(),
 					TokenAdminRegistry: tokenAdminRegistryRawInstanceAddress.Binding(),
 					FeeQuoter:          feeQuoterRawInstanceAddress.Binding(),
-					CcvRegistry:        chainlinkapi.RawInstanceAddress{},
 				},
 			},
 			OwnerParty: types.PARTY(input.CCIPOwnerParty),

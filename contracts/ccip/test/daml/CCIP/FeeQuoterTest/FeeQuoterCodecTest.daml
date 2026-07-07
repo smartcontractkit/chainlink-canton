@@ -7,18 +7,8 @@ import DA.Optional (fromSome)
 
 import qualified Splice.Api.Token.HoldingV1
 
-import CCIP.FeeQuoterCodecGen qualified as FeeQuoterCodec
-import CCIP.FeeQuoterTypes (
-    PriceUpdates(..),
-    TokenPriceUpdate(..),
-    GasPriceUpdate(..),
-    FeeQuoterDestChainConfigArgs(..),
-    FeeQuoterDestChainConfig(..),
-    ApplyPriceUpdatersUpdateParams(..),
-    UpdatePricesParams(..),
-    RemoveFeeTokensParams(..),
-    ApplyFeeQuoterDestChainConfigUpdatesParams(..),
-    )
+import qualified CCIP.CoreV1.FeeQuoter
+import qualified CCIP.CoreV1.FeeQuoterCodecGen
 
 usdToCents : Decimal -> Numeric 0
 usdToCents d = intToNumeric (truncate (d * 100.0))
@@ -30,20 +20,20 @@ usdToCents d = intToNumeric (truncate (d * 100.0))
 testApplyPriceUpdatersUpdateRoundtrip : Script ()
 testApplyPriceUpdatersUpdateRoundtrip = do
     -- Empty lists
-    let args = ApplyPriceUpdatersUpdateParams with
+    let args = CCIP.CoreV1.FeeQuoter.ApplyPriceUpdatersUpdateParams with
             addedPriceUpdaters = []
             removedPriceUpdaters = []
-    let encoded = FeeQuoterCodec.encodeApplyPriceUpdatersUpdateParams args
-    fst (fromSome (FeeQuoterCodec.decodeApplyPriceUpdatersUpdateParamsAt encoded 0)) === args
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeApplyPriceUpdatersUpdateParams args
+    fst (fromSome (CCIP.CoreV1.FeeQuoterCodecGen.decodeApplyPriceUpdatersUpdateParamsAt encoded 0)) === args
     -- Non-empty lists
     party1 <- allocateParty "party1"
     party2 <- allocateParty "party2"
     party3 <- allocateParty "party3"
-    let args = ApplyPriceUpdatersUpdateParams with
+    let args = CCIP.CoreV1.FeeQuoter.ApplyPriceUpdatersUpdateParams with
             addedPriceUpdaters = [party1, party2]
             removedPriceUpdaters = [party3]
-    let encoded = FeeQuoterCodec.encodeApplyPriceUpdatersUpdateParams args
-    fst (fromSome (FeeQuoterCodec.decodeApplyPriceUpdatersUpdateParamsAt encoded 0)) === args
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeApplyPriceUpdatersUpdateParams args
+    fst (fromSome (CCIP.CoreV1.FeeQuoterCodecGen.decodeApplyPriceUpdatersUpdateParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |                UpdatePrices                 |
@@ -53,38 +43,38 @@ testApplyUpdatePricesRoundtrip : Script ()
 testApplyUpdatePricesRoundtrip = do
     caller <- allocateParty "caller"
     -- Empty updates
-    let args = UpdatePricesParams with
-            priceUpdates = PriceUpdates with
+    let args = CCIP.CoreV1.FeeQuoter.UpdatePricesParams with
+            priceUpdates = CCIP.CoreV1.FeeQuoter.PriceUpdates with
                 tokenPriceUpdates = []
                 gasPriceUpdates = []
             caller
-    let encoded = FeeQuoterCodec.encodeUpdatePricesParams args
-    fst (fromSome (FeeQuoterCodec.decodeUpdatePricesParamsAt encoded 0)) === args
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeUpdatePricesParams args
+    fst (fromSome (CCIP.CoreV1.FeeQuoterCodecGen.decodeUpdatePricesParamsAt encoded 0)) === args
 
     -- Non-empty updates
     issuer1 <- allocateParty "issuer1"
     issuer2 <- allocateParty "issuer2"
-    let args = UpdatePricesParams with
-            priceUpdates = PriceUpdates with
+    let args = CCIP.CoreV1.FeeQuoter.UpdatePricesParams with
+            priceUpdates = CCIP.CoreV1.FeeQuoter.PriceUpdates with
                 tokenPriceUpdates = [
-                    TokenPriceUpdate with
+                    CCIP.CoreV1.FeeQuoter.TokenPriceUpdate with
                         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC"
                         usdPerToken = 1.0
-                    , TokenPriceUpdate with
+                    , CCIP.CoreV1.FeeQuoter.TokenPriceUpdate with
                         instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
                         usdPerToken = 25.0
                     ]
                 gasPriceUpdates = [
-                    GasPriceUpdate with
+                    CCIP.CoreV1.FeeQuoter.GasPriceUpdate with
                         destChainSelector = 1.0
                         usdPerUnitGas = 0.00000002
-                    , GasPriceUpdate with
+                    , CCIP.CoreV1.FeeQuoter.GasPriceUpdate with
                         destChainSelector = 18446744073709551615.0 -- max uint64
                         usdPerUnitGas = 0.00000003
                     ]
             caller
-    let encoded = FeeQuoterCodec.encodeUpdatePricesParams args
-    fst (fromSome (FeeQuoterCodec.decodeUpdatePricesParamsAt encoded 0)) === args
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeUpdatePricesParams args
+    fst (fromSome (CCIP.CoreV1.FeeQuoterCodecGen.decodeUpdatePricesParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |              RemoveFeeTokens               |
@@ -93,20 +83,20 @@ testApplyUpdatePricesRoundtrip = do
 testRemoveFeeTokensRoundtrip : Script ()
 testRemoveFeeTokensRoundtrip = do
     -- Empty list
-    let args = RemoveFeeTokensParams with
+    let args = CCIP.CoreV1.FeeQuoter.RemoveFeeTokensParams with
             feeTokensToRemove = []
-    let encoded = FeeQuoterCodec.encodeRemoveFeeTokensParams args
-    fst (fromSome (FeeQuoterCodec.decodeRemoveFeeTokensParamsAt encoded 0)) === args
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeRemoveFeeTokensParams args
+    fst (fromSome (CCIP.CoreV1.FeeQuoterCodecGen.decodeRemoveFeeTokensParamsAt encoded 0)) === args
     -- Non-empty list
     issuer1 <- allocateParty "issuer1"
     issuer2 <- allocateParty "issuer2"
-    let args = RemoveFeeTokensParams with
+    let args = CCIP.CoreV1.FeeQuoter.RemoveFeeTokensParams with
             feeTokensToRemove =
                 [ Splice.Api.Token.HoldingV1.InstrumentId issuer1 "USDC"
                 , Splice.Api.Token.HoldingV1.InstrumentId issuer2 "LINK"
                 ]
-    let encoded = FeeQuoterCodec.encodeRemoveFeeTokensParams args
-    fst (fromSome (FeeQuoterCodec.decodeRemoveFeeTokensParamsAt encoded 0)) === args
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeRemoveFeeTokensParams args
+    fst (fromSome (CCIP.CoreV1.FeeQuoterCodecGen.decodeRemoveFeeTokensParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |         ApplyFeeQuoterDestChainConfigUpdates         |
@@ -114,14 +104,14 @@ testRemoveFeeTokensRoundtrip = do
 
 testApplyFeeQuoterDestChainConfigUpdatesRoundtrip : Script ()
 testApplyFeeQuoterDestChainConfigUpdatesRoundtrip = do
-    let config1 = FeeQuoterDestChainConfig True 1024 500000 21000 16 300000 90.0 (usdToCents 0.50) 25000
-        config2 = FeeQuoterDestChainConfig False 2048 1000000 30000 32 500000 100.0 (usdToCents 1.00) 35000
-        configArgs1 = FeeQuoterDestChainConfigArgs 1.0 config1
-        configArgs2 = FeeQuoterDestChainConfigArgs 18446744073709551615.0 config2  -- max uint64
-        args = ApplyFeeQuoterDestChainConfigUpdatesParams with
+    let config1 = CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig True 1024 500000 21000 16 300000 90.0 (usdToCents 0.50) 25000
+        config2 = CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig False 2048 1000000 30000 32 500000 100.0 (usdToCents 1.00) 35000
+        configArgs1 = CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfigArgs 1.0 config1
+        configArgs2 = CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfigArgs 18446744073709551615.0 config2  -- max uint64
+        args = CCIP.CoreV1.FeeQuoter.ApplyFeeQuoterDestChainConfigUpdatesParams with
             destChainConfigArgs = [configArgs1, configArgs2]
-    let encoded = FeeQuoterCodec.encodeApplyFeeQuoterDestChainConfigUpdatesParams args
-    fst (fromSome (FeeQuoterCodec.decodeApplyFeeQuoterDestChainConfigUpdatesParamsAt encoded 0)) === args
+    let encoded = CCIP.CoreV1.FeeQuoterCodecGen.encodeApplyFeeQuoterDestChainConfigUpdatesParams args
+    fst (fromSome (CCIP.CoreV1.FeeQuoterCodecGen.decodeApplyFeeQuoterDestChainConfigUpdatesParamsAt encoded 0)) === args
 
 -- ===========================================================================
 -- INVALID DATA REJECTION TESTS
@@ -130,13 +120,13 @@ testApplyFeeQuoterDestChainConfigUpdatesRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-    case FeeQuoterCodec.decodeRemoveFeeTokensParamsAt "" 0 of
+    case CCIP.CoreV1.FeeQuoterCodecGen.decodeRemoveFeeTokensParamsAt "" 0 of
         None -> pure ()  -- Expected
         Some _ -> abort "Expected decodeRemoveFeeTokensParams to fail on empty data"
 
   -- Truncated data should fail
-    case FeeQuoterCodec.decodeApplyFeeQuoterDestChainConfigUpdatesParamsAt "00" 0 of
+    case CCIP.CoreV1.FeeQuoterCodecGen.decodeApplyFeeQuoterDestChainConfigUpdatesParamsAt "00" 0 of
         None -> pure ()  -- Expected - count says 0 items but might be truncated
-        Some (ApplyFeeQuoterDestChainConfigUpdatesParams{..}, _) -> destChainConfigArgs === []  -- Also valid - 0 items
+        Some (CCIP.CoreV1.FeeQuoter.ApplyFeeQuoterDestChainConfigUpdatesParams{..}, _) -> destChainConfigArgs === []  -- Also valid - 0 items
 
     pure ()

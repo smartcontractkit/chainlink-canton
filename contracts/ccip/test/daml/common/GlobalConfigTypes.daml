@@ -2,8 +2,9 @@ module GlobalConfigTypes where
 
 import Daml.Script
 
-import qualified CCIP.GlobalConfigTypes
-import Chainlink.InstanceAddress (RawInstanceAddress(..))
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.CoreV1.GlobalConfigTypes
 
 template ValidationHarness
     with
@@ -13,33 +14,33 @@ template ValidationHarness
 
         nonconsuming choice RunValidateDefaultAndMandatedCCVs : ()
             with
-                defaultCCVs : [RawInstanceAddress]
-                laneMandatedCCVs : [RawInstanceAddress]
+                defaultCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+                laneMandatedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             controller owner
             do
-                CCIP.GlobalConfigTypes.validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
+                CCIP.CoreV1.GlobalConfigTypes.validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
         nonconsuming choice RunAssertNoDuplicates : ()
             with
-                addresses : [RawInstanceAddress]
+                addresses : [Chainlink.InstanceAddress.RawInstanceAddress]
             controller owner
             do
-                CCIP.GlobalConfigTypes.assertNoDuplicates addresses
+                CCIP.CoreV1.GlobalConfigTypes.assertNoDuplicates addresses
         
         nonconsuming choice RunValidateNoEmptyAddresses : ()
             with
-                addresses : [RawInstanceAddress]
+                addresses : [Chainlink.InstanceAddress.RawInstanceAddress]
             controller owner
             do
-                CCIP.GlobalConfigTypes.validateNoEmptyAddresses addresses
+                CCIP.CoreV1.GlobalConfigTypes.validateNoEmptyAddresses addresses
 
 testValidateDefaultAndMandatedCCVs : Script ()
 testValidateDefaultAndMandatedCCVs = do
     owner <- allocateParty "owner"
-    let ccv1 = RawInstanceAddress "ccv1@partyA"
-    let ccv2 = RawInstanceAddress "ccv2@partyB"
-    let ccv3 = RawInstanceAddress "ccv3@partyC"
-    let ccvEmpty = RawInstanceAddress ""
+    let ccv1 = Chainlink.InstanceAddress.RawInstanceAddress "ccv1@partyA"
+    let ccv2 = Chainlink.InstanceAddress.RawInstanceAddress "ccv2@partyB"
+    let ccv3 = Chainlink.InstanceAddress.RawInstanceAddress "ccv3@partyC"
+    let ccvEmpty = Chainlink.InstanceAddress.RawInstanceAddress ""
 
     harness <- submit owner do
         createCmd ValidationHarness with
@@ -102,8 +103,8 @@ testValidateDefaultAndMandatedCCVs = do
 testAssertNoDuplicates : Script ()
 testAssertNoDuplicates = do
     owner <- allocateParty "owner"
-    let ccv1 = RawInstanceAddress "ccv1@partyA"
-    let ccv2 = RawInstanceAddress "ccv2@partyB"
+    let ccv1 = Chainlink.InstanceAddress.RawInstanceAddress "ccv1@partyA"
+    let ccv2 = Chainlink.InstanceAddress.RawInstanceAddress "ccv2@partyB"
 
     harness <- submit owner do
         createCmd ValidationHarness with
@@ -132,9 +133,9 @@ testAssertNoDuplicates = do
 testValidateNoEmptyAddresses : Script ()
 testValidateNoEmptyAddresses = do
     owner <- allocateParty "owner"
-    let ccv1 = RawInstanceAddress "ccv1@partyA"
-    let ccv2 = RawInstanceAddress "ccv2@partyB"
-    let ccvEmpty = RawInstanceAddress ""
+    let ccv1 = Chainlink.InstanceAddress.RawInstanceAddress "ccv1@partyA"
+    let ccv2 = Chainlink.InstanceAddress.RawInstanceAddress "ccv2@partyB"
+    let ccvEmpty = Chainlink.InstanceAddress.RawInstanceAddress ""
 
     harness <- submit owner do
         createCmd ValidationHarness with

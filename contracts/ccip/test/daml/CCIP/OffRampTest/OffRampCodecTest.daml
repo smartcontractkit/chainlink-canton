@@ -4,9 +4,10 @@ module CCIP.OffRampTest.OffRampCodecTest where
 import Daml.Script
 import DA.Assert ((===))
 
-import CCIP.OffRampTypes (OffRampDeps(..), SetDepsParams(..))
-import CCIP.OffRampCodecGen (encodeSetDepsParams, decodeSetDepsParamsAt, encodeOffRampDeps, decodeOffRampDepsAt)
-import Chainlink.InstanceAddress (RawInstanceAddress(..))
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.RuntimeV1.OffRamp
+import qualified CCIP.RuntimeV1.OffRampCodecGen
 
 -- ===========================================================================
 -- SETDEPSPARAMS ENCODING/DECODING TESTS (Optional fields)
@@ -14,14 +15,14 @@ import Chainlink.InstanceAddress (RawInstanceAddress(..))
 
 testSetDepsParamsRoundtrip_AllSome : Script ()
 testSetDepsParamsRoundtrip_AllSome = do
-  let params = SetDepsParams with
-        globalConfig = Some (RawInstanceAddress "gc-instance@party::namespace")
-        rmnRemote = Some (RawInstanceAddress "rmn-instance@another-party")
-        tokenAdminRegistry = Some (RawInstanceAddress "tar-instance@yet-another")
+  let params = CCIP.RuntimeV1.OffRamp.SetDepsParams with
+        globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc-instance@party::namespace")
+        rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn-instance@another-party")
+        tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar-instance@yet-another")
 
-      encoded = encodeSetDepsParams params
+      encoded = CCIP.RuntimeV1.OffRampCodecGen.encodeSetDepsParams params
 
-  case fst <$> decodeSetDepsParamsAt encoded 0 of
+  case fst <$> CCIP.RuntimeV1.OffRampCodecGen.decodeSetDepsParamsAt encoded 0 of
     None -> abort "Failed to decode SetDepsParams (all Some)"
     Some decoded -> decoded === params
 
@@ -29,14 +30,14 @@ testSetDepsParamsRoundtrip_AllSome = do
 
 testSetDepsParamsRoundtrip_AllNone : Script ()
 testSetDepsParamsRoundtrip_AllNone = do
-  let params = SetDepsParams with
+  let params = CCIP.RuntimeV1.OffRamp.SetDepsParams with
         globalConfig = None
         rmnRemote = None
         tokenAdminRegistry = None
 
-      encoded = encodeSetDepsParams params
+      encoded = CCIP.RuntimeV1.OffRampCodecGen.encodeSetDepsParams params
 
-  case fst <$> decodeSetDepsParamsAt encoded 0 of
+  case fst <$> CCIP.RuntimeV1.OffRampCodecGen.decodeSetDepsParamsAt encoded 0 of
     None -> abort "Failed to decode SetDepsParams (all None)"
     Some decoded -> decoded === params
 
@@ -44,14 +45,14 @@ testSetDepsParamsRoundtrip_AllNone = do
 
 testSetDepsParamsRoundtrip_Mixed : Script ()
 testSetDepsParamsRoundtrip_Mixed = do
-  let params = SetDepsParams with
-        globalConfig = Some (RawInstanceAddress "gc@owner")
+  let params = CCIP.RuntimeV1.OffRamp.SetDepsParams with
+        globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc@owner")
         rmnRemote = None
-        tokenAdminRegistry = Some (RawInstanceAddress "tar@owner")
+        tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar@owner")
 
-      encoded = encodeSetDepsParams params
+      encoded = CCIP.RuntimeV1.OffRampCodecGen.encodeSetDepsParams params
 
-  case fst <$> decodeSetDepsParamsAt encoded 0 of
+  case fst <$> CCIP.RuntimeV1.OffRampCodecGen.decodeSetDepsParamsAt encoded 0 of
     None -> abort "Failed to decode SetDepsParams (mixed)"
     Some decoded -> decoded === params
 
@@ -63,14 +64,14 @@ testSetDepsParamsRoundtrip_Mixed = do
 
 testOffRampDepsRoundtrip : Script ()
 testOffRampDepsRoundtrip = do
-  let deps = OffRampDeps with
-        globalConfig = RawInstanceAddress "globalconfig@ccip_owner"
-        rmnRemote = RawInstanceAddress "rmnremote@ccip_owner"
-        tokenAdminRegistry = RawInstanceAddress "tar@ccip_owner"
+  let deps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+        globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "globalconfig@ccip_owner"
+        rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmnremote@ccip_owner"
+        tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@ccip_owner"
 
-      encoded = encodeOffRampDeps deps
+      encoded = CCIP.RuntimeV1.OffRampCodecGen.encodeOffRampDeps deps
 
-  case decodeOffRampDepsAt encoded 0 of
+  case CCIP.RuntimeV1.OffRampCodecGen.decodeOffRampDepsAt encoded 0 of
     None -> abort "Failed to decode OffRampDeps"
     Some (decoded, _) -> do
       decoded.globalConfig === deps.globalConfig
@@ -81,14 +82,14 @@ testOffRampDepsRoundtrip = do
 
 testOffRampDepsSpecialCharacters : Script ()
 testOffRampDepsSpecialCharacters = do
-  let deps = OffRampDeps with
-        globalConfig = RawInstanceAddress "config-with-dashes@party1::namespace1"
-        rmnRemote = RawInstanceAddress "rmn_with_underscores@party2::namespace2"
-        tokenAdminRegistry = RawInstanceAddress "tar.with.dots@party3"
+  let deps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+        globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "config-with-dashes@party1::namespace1"
+        rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn_with_underscores@party2::namespace2"
+        tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar.with.dots@party3"
 
-      encoded = encodeOffRampDeps deps
+      encoded = CCIP.RuntimeV1.OffRampCodecGen.encodeOffRampDeps deps
 
-  case decodeOffRampDepsAt encoded 0 of
+  case CCIP.RuntimeV1.OffRampCodecGen.decodeOffRampDepsAt encoded 0 of
     None -> abort "Failed to decode OffRampDeps with special characters"
     Some (decoded, _) -> do
       decoded.globalConfig === deps.globalConfig
@@ -103,11 +104,11 @@ testOffRampDepsSpecialCharacters = do
 
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
-  case decodeSetDepsParamsAt "" 0 of
+  case CCIP.RuntimeV1.OffRampCodecGen.decodeSetDepsParamsAt "" 0 of
     None -> pure ()
     Some _ -> abort "Expected decodeSetDepsParamsAt to fail on empty data"
 
-  case decodeSetDepsParamsAt "ff" 0 of
+  case CCIP.RuntimeV1.OffRampCodecGen.decodeSetDepsParamsAt "ff" 0 of
     None -> pure ()
     Some _ -> abort "Expected decodeSetDepsParamsAt to fail on invalid tag"
 

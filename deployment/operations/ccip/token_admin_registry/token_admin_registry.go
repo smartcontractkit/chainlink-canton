@@ -23,7 +23,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[core.TokenAdminRegistry]{
 	TypeAndVersion: deployment.NewTypeAndVersion(ContractType, *Version),
 	Description:    "Deploys the CCIP TokenAdminRegistry contract on Canton",
 	Validate: func(template core.TokenAdminRegistry) error {
-		if template.Owner == "" {
+		if template.CcipOwner == "" {
 			return errors.New("owner cannot be empty")
 		}
 

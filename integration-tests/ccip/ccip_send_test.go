@@ -35,9 +35,13 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
@@ -196,7 +200,7 @@ func TestCCIPSend(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
+								AllowedFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -432,7 +436,7 @@ func TestCCIPSend(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: contracts.IdentifierFromBinding(ccipruntime.PerPartyRouterFactory{}),
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
@@ -469,7 +473,7 @@ func TestCCIPSend(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId: contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipsender"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partySender}}},
@@ -484,13 +488,9 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("Deployed CCIPSender: %s", ccipSenderCid)
 
 	// Get disclosures for CCIPSender.Send
-	disclosedCCIPSender, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, &apiv2.Identifier{
-		PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender",
-	})
+	disclosedCCIPSender, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, contracts.IdentifierFromBinding(sender.CCIPSender{}))
 	require.NoError(t, err)
-	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, &apiv2.Identifier{
-		PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouter",
-	})
+	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, contracts.IdentifierFromBinding(ccipruntime.PerPartyRouter{}))
 	require.NoError(t, err)
 
 	// Prepare receiver address (destination party encoded as keccak256)
@@ -598,21 +598,21 @@ func TestCCIPSend(t *testing.T) {
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Message: core.Canton2AnyMessage{
+		Message: clientapi.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
 			FeeToken: nativeInstrumentId,
-			ExtraArgs: core.ExtraArgs{
-				V3: &core.GenericExtraArgsV3{
+			ExtraArgs: clientapi.ExtraArgs{
+				V3: &clientapi.GenericExtraArgsV3{
 					GasLimit: 100_000,
-					Ccvs: []core.CCVExtraArg{
+					Ccvs: []clientapi.CCVExtraArg{
 						{
 							CcvAddress: ccvRawAddr,
 							CcvArgs:    types.TEXT(""),
 						},
 					},
-					Executor: core.ExecutorExtraArg{
-						ExecutorWithAddress: &core.ExecutorWithAddress{
+					Executor: clientapi.ExecutorExtraArg{
+						ExecutorWithAddress: &clientapi.ExecutorWithAddress{
 							ExecutorAddress: execMcmsAddr,
 							ExecutorArgs:    types.TEXT(""),
 						},
@@ -637,14 +637,14 @@ func TestCCIPSend(t *testing.T) {
 		},
 		CcvSendInputs: []sender.CCVSendInput{
 			{
-				CcvAddress:      ccvSendDisclosure.Address.Binding(),
-				CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-				CcvExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+				CcvAddress: ccvSendDisclosure.Address.Binding(),
+				CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+				Context:    splice_api_token_metadata_v1.ChoiceContext{},
 			},
 		},
 		ExecutorInput: &sender.ExecutorInput{
-			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
-			ExecutorExtraContext: splice_api_token_metadata_v1.ChoiceContext{},
+			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
+			Context:     splice_api_token_metadata_v1.ChoiceContext{},
 		},
 	}
 
@@ -688,7 +688,7 @@ func TestCCIPSend(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					ContractId:     ccipSenderCid,
 					Choice:         "Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),
@@ -710,32 +710,28 @@ func TestCCIPSend(t *testing.T) {
 		}
 	}
 
-	// Extract messageId from CCIPMessageSent to verify success
-	var returnedMessageId string
-	var returnedEncodedMessage string
+	// Extract CIPMessageSent event to verify success
+	eventTemplateId := events.CCIPMessageSent{}.GetTemplateID()
+	var ccipMessageSent *events.CCIPMessageSent
 	for _, event := range res.GetTransaction().GetEvents() {
-		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-			if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
-				fields := e.Created.GetCreateArguments().GetFields()
-				if len(fields) >= 5 {
-					// fields[4] is the "event" field (CCIPMessageSentEvent)
-					// (ccipOwner, ccvOwners, sender, observers, event)
-					eventField := fields[4].GetValue().GetRecord()
-					if eventField != nil && len(eventField.Fields) >= 4 {
-						// eventField.Fields[2] is messageId, eventField.Fields[3] is encodedMessage
-						returnedMessageId = eventField.Fields[2].GetValue().GetText()
-						if len(eventField.Fields) >= 4 {
-							returnedEncodedMessage = eventField.Fields[3].GetValue().GetText()
-						}
-					}
+		if createdEvent := event.GetCreated(); createdEvent != nil {
+			if templateId := createdEvent.GetTemplateId(); templateId != nil {
+				gotTemplateId := fmt.Sprintf("#%s:%s:%s", createdEvent.GetPackageName(), templateId.GetModuleName(), templateId.GetEntityName())
+				if gotTemplateId == eventTemplateId {
+					// Found CCIPMessageSent event
+					ccipMessageSent, err = bindings.UnmarshalCreatedEvent[events.CCIPMessageSent](createdEvent)
+					require.NoError(t, err)
+					break
 				}
-
-				break
 			}
 		}
 	}
-	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
-	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
+	require.NotNil(t, ccipMessageSent, "CCIPMessageSent event not found")
+	require.NotEmpty(t, ccipMessageSent.Event.MessageId, "CCIPMessageSent should be created")
+	require.NotEmpty(t, ccipMessageSent.Event.EncodedMessage, "CCIPMessageSent should contain encoded message")
+
+	// Verify that the event contains the feeToken InstrumentId
+	require.Equal(t, nativeInstrumentId, ccipMessageSent.Event.FeeToken, "CCIPMessageSent should contain feeToken InstrumentId")
 
 	senderBalanceAfter, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
 	require.NoError(t, err)
@@ -752,9 +748,9 @@ func TestCCIPSend(t *testing.T) {
 	require.Zero(t, ccipOwnerDelta.Cmp(quotedFeeAmount), "ccipOwner should receive the full quoted fee (executor is also owned by ccipOwner in this test)")
 
 	t.Logf("Send completed")
-	t.Logf("  Message ID: %s", returnedMessageId)
+	t.Logf("  Message ID: %s", ccipMessageSent.Event.MessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
-	t.Logf("  Encoded message: %s", returnedEncodedMessage)
+	t.Logf("  Encoded message: %s", ccipMessageSent.Event.EncodedMessage)
 
 	t.Logf("✅ Success")
 }

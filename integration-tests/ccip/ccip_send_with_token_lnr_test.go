@@ -35,11 +35,16 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/bindings"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -208,7 +213,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
+								AllowedFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -357,15 +362,15 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 
 	// Setup token pool for outbound token transfer in Send.
 	poolInstanceID := "test-pool-send"
-	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[core.RateLimiter]{
+	outboundRateLimiterOut, err := cld_ops.ExecuteOperation(bundle, rate_limiter.DeployOutbound, env.Chain, contractops.DeployInput[ratelimiter.RateLimiter]{
 		ParticipantIndex: 1,
 		OwnerParty:       types.PARTY(partySender),
-		Template: core.RateLimiter{
+		Template: ratelimiter.RateLimiter{
 			PoolInstanceId:      types.TEXT(poolInstanceID),
 			PoolOwner:           types.PARTY(partySender),
 			RemoteChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-			Direction:           core.RateLimitDirectionRateLimitDirection_Outbound,
-			Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
+			Direction:           ratelimiter.RateLimitDirectionRateLimitDirection_Outbound,
+			Mode:                ratelimiter.RateLimitModeRateLimitMode_DefaultFinality,
 			IsEnabled:           true,
 			Capacity:            types.NUMERIC("10000000000"),
 			Rate:                types.NUMERIC("10000000000"),
@@ -409,14 +414,14 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 					RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
 					InboundCCVs:        []chainlinkapi.RawInstanceAddress{},
 					OutboundCCVs:       []chainlinkapi.RawInstanceAddress{},
-					FinalityConfig:     core.FinalityConfig{WaitForFinality: &types.UNIT{}},
+					FinalityConfig:     ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
 					InboundRateLimiter: outboundRateLimiterAddr.Binding(),
 					InboundCustomBlockConfirmationsRateLimiter: outboundRateLimiterAddr.Binding(),
 					OutboundRateLimiter:                        outboundRateLimiterAddr.Binding(),
 				},
 			},
 			// Set a custom token transfer fee config
-			TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig2{
+			TokenTransferFeeConfigs: map[types.NUMERIC]lockreleasetokenpool.TokenTransferFeeConfig{
 				types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): {
 					IsEnabled:         types.BOOL(true),
 					DestGasOverhead:   types.INT64(25_000),
@@ -636,7 +641,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipruntime.PackageName, ModuleName: "CCIP.PerPartyRouter", EntityName: "PerPartyRouterFactory"},
+					TemplateId: contracts.IdentifierFromBinding(ccipruntime.PerPartyRouterFactory{}),
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
 					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
@@ -673,7 +678,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId: contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipsender"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partySender}}},
@@ -808,25 +813,25 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Message: core.Canton2AnyMessage{
+		Message: clientapi.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
 			Payload:  types.TEXT(testPayloadHex),
-			TokenTransfer: &core.TokenTransfer{
+			TokenTransfer: &clientapi.TokenTransfer{
 				Token:  nativeInstrumentId,
 				Amount: types.NUMERIC(tokenTransferAmountDecimal),
 			},
 			FeeToken: nativeInstrumentId,
-			ExtraArgs: core.ExtraArgs{
-				V3: &core.GenericExtraArgsV3{
+			ExtraArgs: clientapi.ExtraArgs{
+				V3: &clientapi.GenericExtraArgsV3{
 					GasLimit: 0,
-					Ccvs: []core.CCVExtraArg{
+					Ccvs: []clientapi.CCVExtraArg{
 						{
 							CcvAddress: committeeVerifierAddress.Binding(),
 							CcvArgs:    types.TEXT(""),
 						},
 					},
-					Executor: core.ExecutorExtraArg{
-						ExecutorWithAddress: &core.ExecutorWithAddress{
+					Executor: clientapi.ExecutorExtraArg{
+						ExecutorWithAddress: &clientapi.ExecutorWithAddress{
 							ExecutorAddress: executorAddress.Binding(),
 							ExecutorArgs:    types.TEXT(""),
 						},
@@ -851,19 +856,19 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 		},
 		CcvSendInputs: []sender.CCVSendInput{
 			{
-				CcvAddress:      ccvSendDisclosure.Address.Binding(),
-				CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-				CcvExtraContext: ccvSendDisclosure.ChoiceContext,
+				CcvAddress: ccvSendDisclosure.Address.Binding(),
+				CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+				Context:    ccvSendDisclosure.ChoiceContext,
 			},
 		},
 		TokenTransferInput: &sender.TokenTransferInput{
-			SenderInputCids:  []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
-			TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
-			PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
+			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(tokenTransferHoldingCid)},
+			TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
+			Context:         tokenPoolSendDisclosure.ChoiceContext,
 		},
 		ExecutorInput: &sender.ExecutorInput{
-			ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
-			ExecutorExtraContext: executorSendDisclosure.ChoiceContext,
+			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
+			Context:     executorSendDisclosure.ChoiceContext,
 		},
 	}
 
@@ -898,11 +903,11 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
 	sendArgs.FeeTokenInput.FeeTokenConfigCid = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid)
 	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
-	sendArgs.CcvSendInputs[0].CcvExtraContext = ccvSendDisclosure.ChoiceContext
+	sendArgs.CcvSendInputs[0].Context = ccvSendDisclosure.ChoiceContext
 	sendArgs.TokenTransferInput.TokenPoolCid = types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId)
-	sendArgs.TokenTransferInput.PoolExtraContext = tokenPoolSendDisclosure.ChoiceContext
+	sendArgs.TokenTransferInput.Context = tokenPoolSendDisclosure.ChoiceContext
 	sendArgs.ExecutorInput.ExecutorCid = types.CONTRACT_ID(executorSendDisclosure.ContractId)
-	sendArgs.ExecutorInput.ExecutorExtraContext = executorSendDisclosure.ChoiceContext
+	sendArgs.ExecutorInput.Context = executorSendDisclosure.ChoiceContext
 	sendDisclosures = testhelpers.DeduplicateDisclosedContracts(slices.Concat(
 		transferFactoryDisclosures,
 		ccipSendDisclosure.DisclosedContracts,
@@ -923,7 +928,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#ccip-sender", ModuleName: "CCIP.CCIPSender", EntityName: "CCIPSender"},
+					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
 					ContractId:     ccipSenderCid,
 					Choice:         "Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),
@@ -935,36 +940,37 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	// Extract messageId from CCIPMessageSent to verify success
-	var returnedMessageId string
-	var returnedEncodedMessage string
+	// Extract CIPMessageSent event to verify success
+	eventTemplateId := events.CCIPMessageSent{}.GetTemplateID()
+	var ccipMessageSent *events.CCIPMessageSent
 	for _, event := range res.GetTransaction().GetEvents() {
-		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
-			if e.Created.GetTemplateId().GetEntityName() == "CCIPMessageSent" {
-				fields := e.Created.GetCreateArguments().GetFields()
-				if len(fields) >= 5 {
-					eventField := fields[4].GetValue().GetRecord()
-					if eventField != nil {
-						for _, field := range eventField.Fields {
-							if field.GetLabel() == "messageId" {
-								returnedMessageId = field.GetValue().GetText()
-							}
-							if field.GetLabel() == "encodedMessage" {
-								returnedEncodedMessage = field.GetValue().GetText()
-							}
-						}
-					}
+		if createdEvent := event.GetCreated(); createdEvent != nil {
+			if templateId := createdEvent.GetTemplateId(); templateId != nil {
+				gotTemplateId := fmt.Sprintf("#%s:%s:%s", createdEvent.GetPackageName(), templateId.GetModuleName(), templateId.GetEntityName())
+				if gotTemplateId == eventTemplateId {
+					// Found CCIPMessageSent event
+					ccipMessageSent, err = bindings.UnmarshalCreatedEvent[events.CCIPMessageSent](createdEvent)
+					require.NoError(t, err)
+					break
 				}
-
-				break
 			}
 		}
 	}
-	require.NotEmpty(t, returnedMessageId, "CCIPMessageSent should be created")
-	require.NotEmpty(t, returnedEncodedMessage, "CCIPMessageSent should contain encoded message")
+	require.NotNil(t, ccipMessageSent, "CCIPMessageSent event not found")
+	require.NotEmpty(t, ccipMessageSent.Event.MessageId, "CCIPMessageSent should be created")
+	require.NotEmpty(t, ccipMessageSent.Event.EncodedMessage, "CCIPMessageSent should contain encoded message")
+
+	// Verify that the event contains the feeToken InstrumentId
+	require.Equal(t, nativeInstrumentId, ccipMessageSent.Event.FeeToken, "CCIPMessageSent should contain feeToken InstrumentId")
 
 	// Verify pool feeBps haircut: 10,000 smallest units with 5% feeBps => 9,500 bridged.
-	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage), "encoded token amount should be net after 5% feeBps")
+	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, ccipMessageSent.Event.EncodedMessage), "encoded token amount should be net after 5% feeBps")
+	// Verify that the event itself contains the original amount without fees
+	wantAmount, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
+	require.True(t, ok, "token transfer amount should parse as a decimal value")
+	gotAmount, ok := new(big.Rat).SetString(string(ccipMessageSent.Event.TokenAmountBeforeTokenPoolFees))
+	require.True(t, ok, "token amount before token pool fees should parse as a decimal value")
+	require.Equal(t, 0, wantAmount.Cmp(gotAmount), "token amount before token pool fees should match original transfer amount")
 
 	// LnR LockOrBurn transfers gross to poolOwner; when poolOwner==sender, party Amulet total only drops by CCIP fee.
 	require.Eventually(t, func() bool {
@@ -978,7 +984,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	}, 15*time.Second, 200*time.Millisecond, "sender Amulet deduction should equal GetFee feeTokenAmount only")
 
 	t.Logf("Send completed")
-	t.Logf("  Message ID: %s", returnedMessageId)
+	t.Logf("  Message ID: %s", ccipMessageSent.Event.MessageId)
 	t.Logf("  Original payload: %s", string(testPayload))
 
 	t.Logf("✅ Success")
@@ -988,10 +994,10 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 // tokenTransfer.amount (uint256 big-endian) from the token-transfer payload.
 // It skips the fixed CCIP message prefix, short variable fields, and destination blob,
 // then reads the amount from bytes [1:33] of tokenTransfer (byte 0 is version/tag).
-func extractTokenTransferAmountFromEncodedMessageHex(t *testing.T, encodedMessageHex string) int64 {
+func extractTokenTransferAmountFromEncodedMessageHex(t *testing.T, encodedMessageHex types.TEXT) int64 {
 	t.Helper()
 
-	b, err := hex.DecodeString(encodedMessageHex)
+	b, err := hex.DecodeString(string(encodedMessageHex))
 	require.NoError(t, err, "decode encodedMessage")
 
 	i := 1 + 8 + 8 + 8 + 4 + 4 + 4 + 32
