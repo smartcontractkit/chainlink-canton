@@ -54,8 +54,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 	// TODO: currently minting 2 holdings of 2k for all the e2e tests. Otherwise one holding might conflict with the other.
 	// the tests need to be hardened to not rely on this and instead correctly pick the holding that suffices.
-	require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(uint64(cantondevenv.CantonToEVMFeeAmount)*100)))
-	require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(uint64(cantondevenv.CantonToEVMFeeAmount)*100)))
+	require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(uint64(cantondevenv.CantonToEVMFeeAmount)*1000)))
+	require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(uint64(cantondevenv.CantonToEVMFeeAmount)*1000)))
 
 	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
@@ -150,17 +150,13 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
 		sends := cantondevenv.CantonToEVMTokenSequentialSends
-		feeTotal := new(big.Rat).SetUint64(uint64(sends) * fee)
-		transferTotalFP := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(sends)))
-		transferTotal := new(big.Rat).SetFrac(transferTotalFP, big.NewInt(cantondevenv.CantonFixedPointScale))
 		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
-		require.NoError(t, cantonImpl.MintTokens(ctx, feeTotal))
-		require.NoError(t, cantonImpl.MintTokens(ctx, transferTotal))
 		if lane.TransferInstrument.Admin != "" {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
 		} else {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
 		}
+		cantonImpl.SetSequentialSends(sends)
 
 		ds, err := lib.DataStore()
 		require.NoError(t, err)
@@ -245,16 +241,13 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
 
 		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
-		feeTotal := new(big.Rat).SetUint64(fee)
-		transferTotal := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
 		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
-		require.NoError(t, cantonImpl.MintTokens(ctx, feeTotal))
-		require.NoError(t, cantonImpl.MintTokens(ctx, transferTotal))
 		if lane.TransferInstrument.Admin != "" {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
 		} else {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
 		}
+		cantonImpl.SetSequentialSends(1)
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
@@ -296,16 +289,13 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
 
 		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
-		feeTotal := new(big.Rat).SetUint64(fee)
-		transferTotal := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
 		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
-		require.NoError(t, cantonImpl.MintTokens(ctx, feeTotal))
-		require.NoError(t, cantonImpl.MintTokens(ctx, transferTotal))
 		if lane.TransferInstrument.Admin != "" {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
 		} else {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
 		}
+		cantonImpl.SetSequentialSends(1)
 
 		ds, err := lib.DataStore()
 		require.NoError(t, err)

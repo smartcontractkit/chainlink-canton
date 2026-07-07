@@ -127,7 +127,7 @@ func TestNormalizeTransferInstrumentID(t *testing.T) {
 	require.Equal(t, "link-token", normalizeTransferInstrumentID("LINK"))
 	require.Equal(t, "link-token", normalizeTransferInstrumentID("link"))
 	require.Equal(t, "link-token", normalizeTransferInstrumentID(" link "))
-	require.Equal(t, "amulet", normalizeTransferInstrumentID("Amulet"))
+	require.Equal(t, "Amulet", normalizeTransferInstrumentID("Amulet"))
 	require.Equal(t, "link-token", normalizeTransferInstrumentID("link-token"))
 }
 

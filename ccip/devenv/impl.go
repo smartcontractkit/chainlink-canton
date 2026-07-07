@@ -223,9 +223,11 @@ type Chain struct {
 	validatorAPIClients validatorAPIClients
 
 	feeTokenInstrument      splice_api_token_holding_v1.InstrumentId
+	feeAmountPerMessage     uint64 // per-message fee budget; used when rotating fee holdings after send
 	nextFeeCID              string // holding CID to be used as fee on next message send
 	transferTokenInstrument *splice_api_token_holding_v1.InstrumentId
 	nextTransferCID         string // holding CID to be used as transfer on next message send
+	sendsLeft               uint64 // remaining sends in current setup batch; 0 = always rotate
 
 	// verifierObs is injected post-construction by test runners (see SetVerifierObservation).
 	// Required by ConfirmExecOnDest to fetch verifier results from aggregator/indexer.
@@ -1072,9 +1074,12 @@ func (c *Chain) SetupSend(
 	}
 
 	c.feeTokenInstrument = feeTokenInstrument
+	c.feeAmountPerMessage = feeAmountPerMessage
 	c.nextFeeCID = selectedFee[0].ContractID
 
 	if transferAmountPerMessage == nil || transferAmountPerMessage.Sign() <= 0 {
+		c.transferTokenInstrument = nil
+		c.nextTransferCID = ""
 		return nil
 	}
 
@@ -1101,6 +1106,17 @@ func (c *Chain) SetupSend(
 	c.nextTransferCID = selectedTransfer[0].ContractID
 
 	return nil
+}
+
+// SetSequentialSends limits holding rotation to the next sends messages in this setup batch.
+// After the send whose on-chain seq equals nextSeq+sends, setNextHoldings is skipped.
+// Pass 0 to always rotate (open-ended load).
+func (c *Chain) SetSequentialSends(sends int) {
+	if sends <= 0 {
+		c.sendsLeft = 0
+		return
+	}
+	c.sendsLeft = uint64(sends)
 }
 
 // MintTokens mint tokens for transfer and fees. To be used on devenv tests only.
@@ -1440,16 +1456,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		Uint64("seqNo", parsedSend.seqNo).
 		Msg("CCIP Send executed")
 
-	// Set next holdings
-	var tokenAmount *big.Rat
-	if hasTokenTransfer {
-		tokenAmount = new(big.Rat).SetFrac(fields.TokenAmount.Amount, big.NewInt(CantonFixedPointScale))
-	}
-	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, tokenAmount)
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
-	}
-
 	event := cciptestinterfaces.MessageSentEvent{
 		MessageID:      parsedSend.messageID,
 		ReceiptIssuers: nil, // TODO: add them later, not currently needed
@@ -1461,6 +1467,24 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	c.lastSentDest = dest
 	c.lastSentSeq = parsedSend.seqNo
 	c.lastSentEvent = event
+
+	c.sendsLeft--
+	if c.sendsLeft == 0 {
+		c.logger.Info().
+			Uint64("sendsLeft", c.sendsLeft).
+			Msg("Skipping holding rotation after last planned send in batch")
+
+		return event, nil
+	}
+
+	var tokenAmount *big.Rat
+	if hasTokenTransfer {
+		tokenAmount = new(big.Rat).SetFrac(fields.TokenAmount.Amount, big.NewInt(CantonFixedPointScale))
+	}
+	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, tokenAmount)
+	if err != nil {
+		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("set next holdings: %w", err)
+	}
 
 	return event, nil
 }
@@ -1590,10 +1614,11 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 		testhelpers.ExcludeCIDs(spentCIDs),
 	}
 
+	feeMin := new(big.Rat).SetUint64(c.feeAmountPerMessage)
 	nextFeeCID, exhaustion, err := pickNextHolding(
 		events,
 		c.feeTokenInstrument,
-		big.NewRat(0, 1), // TODO: we'll have to consider real fee here once we go load tests
+		feeMin,
 		refreshFilters...,
 	)
 	if err != nil && !exhaustion {

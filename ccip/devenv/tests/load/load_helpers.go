@@ -267,7 +267,7 @@ func setupCantonTokenLoadHoldings(
 	estimated := estimateMessages(sched)
 	fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
 	feeTotal := new(big.Rat).SetUint64(estimated * fee)
-	transferTotalFP := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(estimated)))
+	transferTotalFP := new(big.Int).Mul(lane.TransferAmount, new(big.Int).SetUint64(estimated))
 	transferTotal := new(big.Rat).SetFrac(transferTotalFP, big.NewInt(cantondevenv.CantonFixedPointScale))
 	transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
 	t.Logf("Pre-mint: estimatedMessages=%d feeTotal=%s transferTotal=%s",
@@ -279,6 +279,7 @@ func setupCantonTokenLoadHoldings(
 	} else {
 		require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
 	}
+	cantonImpl.SetSequentialSends(int(estimated))
 }
 
 func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress) Destination {

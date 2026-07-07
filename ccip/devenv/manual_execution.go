@@ -40,6 +40,7 @@ func instanceIDFromEnv(key, defaultID string) contracts.InstanceID {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return contracts.InstanceID(v)
 	}
+
 	return contracts.InstanceID(defaultID)
 }
 
@@ -149,8 +150,8 @@ func (c *Chain) DeployCCIPSender(ctx context.Context, participant canton.Partici
 		}
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to deploy ccip sender contract: %w", err)
 	}
-
 	c.senderAddress = senderAddress
+
 	return senderAddress, nil
 }
 
