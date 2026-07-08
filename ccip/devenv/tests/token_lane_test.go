@@ -55,7 +55,7 @@ func TestLoadTokenDirection_transferAmountParsing(t *testing.T) {
 	require.Equal(t, "100000000001", evmDir.TransferAmount.String())
 
 	cantonDir := loadTokenDirection(t, EnvDevenv, directionCantonToEVM)
-	require.Equal(t, big.NewInt(1000), cantonDir.TransferAmount)
+	require.Equal(t, big.NewInt(10000000001), cantonDir.TransferAmount)
 
 	prodCantonDir := loadTokenDirection(t, EnvProdTestnet, directionCantonToEVM)
 	require.Equal(t, big.NewInt(100), prodCantonDir.TransferAmount)

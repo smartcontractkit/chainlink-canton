@@ -239,11 +239,13 @@ func tokenDirectionsForEnv(cfg tokenConfigTOML, env CCIPEnv) (tokenDirectionsTOM
 		if cfg.Devenv.EVMToCanton.PoolType == "" && cfg.Devenv.CantonToEVM.PoolType == "" {
 			return tokenDirectionsTOML{}, fmt.Errorf("missing [devenv.*] sections")
 		}
+
 		return cfg.Devenv, nil
 	case EnvProdTestnet:
 		if cfg.ProdTestnet.EVMToCanton.PoolType == "" && cfg.ProdTestnet.CantonToEVM.PoolType == "" {
 			return tokenDirectionsTOML{}, fmt.Errorf("missing [prod-testnet.*] sections")
 		}
+
 		return cfg.ProdTestnet, nil
 	default:
 		return tokenDirectionsTOML{}, fmt.Errorf("unsupported ccip env %q", env)

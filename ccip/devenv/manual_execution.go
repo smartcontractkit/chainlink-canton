@@ -148,6 +148,7 @@ func (c *Chain) DeployCCIPSender(ctx context.Context, participant canton.Partici
 			c.senderAddress = senderAddress
 			return senderAddress, nil
 		}
+
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to deploy ccip sender contract: %w", err)
 	}
 	c.senderAddress = senderAddress

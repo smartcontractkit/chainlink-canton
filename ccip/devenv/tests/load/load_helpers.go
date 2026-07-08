@@ -3,6 +3,7 @@ package load
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"strings"
@@ -274,7 +275,8 @@ func setupCantonTokenLoadHoldings(
 		estimated, feeTotal.FloatString(10), transferTotal.FloatString(10))
 	require.NoError(t, cantonImpl.MintTokens(ctx, feeTotal))
 	require.NoError(t, cantonImpl.MintTokens(ctx, transferTotal))
-	cantonImpl.SetSequentialSends(int(estimated))
+	require.LessOrEqual(t, estimated, uint64(math.MaxInt))
+	cantonImpl.SetSequentialSends(int(estimated)) //nolint:gosec // bounded by require above
 	if lane.TransferInstrument.Admin != "" {
 		require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
 	} else {

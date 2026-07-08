@@ -1705,15 +1705,15 @@ func (c *Chain) selectHolding(
 	source string,
 	instrument splice_api_token_holding_v1.InstrumentId,
 	rows []testhelpers.ListedHolding,
-	min *big.Rat,
+	minAmount *big.Rat,
 ) (testhelpers.ListedHolding, error) {
-	if min == nil {
-		min = big.NewRat(0, 1)
+	if minAmount == nil {
+		minAmount = big.NewRat(0, 1)
 	}
 
-	picked, err := testhelpers.SelectHoldingsForInstrument(rows, []*big.Rat{min})
+	picked, err := testhelpers.SelectHoldingsForInstrument(rows, []*big.Rat{minAmount})
 	if err != nil || len(picked) == 0 {
-		c.logHoldingSelectionFailure(source, instrument, min, rows, err)
+		c.logHoldingSelectionFailure(source, instrument, minAmount, rows, err)
 		if err != nil {
 			return testhelpers.ListedHolding{}, err
 		}
@@ -1727,7 +1727,7 @@ func (c *Chain) selectHolding(
 		Str("Amount", picked[0].Amount.FloatString(10)).
 		Str("InstrumentAdmin", string(instrument.Admin)).
 		Str("InstrumentId", string(instrument.Id)).
-		Str("MinRequired", min.FloatString(10)).
+		Str("MinRequired", minAmount.FloatString(10)).
 		Int("Candidates", len(rows)).
 		Msg("Selected holding")
 
@@ -1737,7 +1737,7 @@ func (c *Chain) selectHolding(
 func (c *Chain) logHoldingSelectionFailure(
 	source string,
 	instrument splice_api_token_holding_v1.InstrumentId,
-	min *big.Rat,
+	minAmount *big.Rat,
 	rows []testhelpers.ListedHolding,
 	selectErr error,
 ) {
@@ -1745,7 +1745,7 @@ func (c *Chain) logHoldingSelectionFailure(
 		Str("Source", source).
 		Str("InstrumentAdmin", string(instrument.Admin)).
 		Str("InstrumentId", string(instrument.Id)).
-		Str("MinRequired", min.FloatString(10)).
+		Str("MinRequired", minAmount.FloatString(10)).
 		Int("Candidates", len(rows))
 	if selectErr != nil {
 		logEvent = logEvent.Err(selectErr)
