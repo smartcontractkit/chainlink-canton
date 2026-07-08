@@ -104,23 +104,60 @@ jobs:
             echo "test_timeout=${{ inputs.test_timeout }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run CCIP load test
-        uses: ./.github/actions/ccip-load-test
+      - name: Setup CCIP devenv
+        if: inputs.ccip_env == 'devenv'
+        uses: ./.github/actions/setup-ccip-devenv
         with:
-          ccip_env: ${{ inputs.ccip_env }}
-          direction: ${{ inputs.direction }}
-          message_rate: ${{ steps.prod_defaults.outputs.message_rate }}
-          load_duration: ${{ steps.prod_defaults.outputs.load_duration }}
-          test_timeout: ${{ steps.prod_defaults.outputs.test_timeout }}
-          config_file: ${{ inputs.config_file }}
-          canton_path: ${{ steps.prod_defaults.outputs.canton_path }}
-          canton_ref: ${{ inputs.canton_ref }}
-          skip_exec_confirm: ${{ inputs.skip_exec_confirm }}
-          confirm_exec_timeout: ${{ inputs.confirm_exec_timeout }}
-          CANTON_OKTA_AUTHORIZER_TESTNET: ${{ secrets.CANTON_OKTA_AUTHORIZER_TESTNET }}
-          CANTON_OKTA_CLIENT_ID_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_ID_TESTNET }}
-          CANTON_OKTA_CLIENT_SECRET_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_SECRET_TESTNET }}
-          CCIP_PROD_TESTNET_PRIVATE_KEY: ${{ secrets.CCIP_PROD_TESTNET_PRIVATE_KEY }}
+          canton-ref: ${{ inputs.canton_ref }}
+          canton-path: ${{ steps.prod_defaults.outputs.canton_path }}
           ccv-iam-role: ${{ secrets.CCV_IAM_ROLE }}
           jd-registry: ${{ secrets.JD_REGISTRY }}
           jd-image: ${{ secrets.JD_IMAGE }}
+
+      - name: Install Go (prod-testnet)
+        if: inputs.ccip_env == 'prod-testnet'
+        uses: actions/setup-go@v6
+        with:
+          cache: true
+          go-version-file: ${{ steps.prod_defaults.outputs.canton_path }}/go.mod
+          cache-dependency-path: ${{ steps.prod_defaults.outputs.canton_path }}/go.sum
+
+      - name: Download Go dependencies (prod-testnet)
+        if: inputs.ccip_env == 'prod-testnet'
+        working-directory: ${{ steps.prod_defaults.outputs.canton_path }}
+        run: go mod download
+
+      - name: Run CCIP load test (${{ inputs.direction }})
+        working-directory: ${{ steps.prod_defaults.outputs.canton_path }}/ccip/devenv/tests/load
+        env:
+          CANTON_LOAD_MESSAGE_RATE: ${{ steps.prod_defaults.outputs.message_rate }}
+          CANTON_LOAD_DURATION: ${{ steps.prod_defaults.outputs.load_duration }}
+          CCIP_ENV: ${{ inputs.ccip_env == 'prod-testnet' && 'prod-testnet' || '' }}
+          CCIP_CONFIG_FILE: ${{ inputs.config_file }}
+          CANTON_AUTH_TYPE: ${{ inputs.ccip_env == 'prod-testnet' && 'clientCredentials' || '' }}
+          CANTON_AUTH_URL: ${{ inputs.ccip_env == 'prod-testnet' && secrets.CANTON_OKTA_AUTHORIZER_TESTNET || '' }}
+          CANTON_CLIENT_ID: ${{ inputs.ccip_env == 'prod-testnet' && secrets.CANTON_OKTA_CLIENT_ID_TESTNET || '' }}
+          CANTON_CLIENT_SECRET: ${{ inputs.ccip_env == 'prod-testnet' && secrets.CANTON_OKTA_CLIENT_SECRET_TESTNET || '' }}
+          CANTON_PARTY_ID: ${{ inputs.ccip_env == 'prod-testnet' && 'u_d53a15c42af6::1220c250c23c55120f7c758bccc5cbc739629015ab921594e1c29656981f985bffa7' || '' }}
+          CANTON_GRPC_URL: ${{ inputs.ccip_env == 'prod-testnet' && 'testnet.cv1.bcy-v.metalhosts.com:443' || '' }}
+          CANTON_CONFIRM_EXEC_TIMEOUT: ${{ inputs.confirm_exec_timeout }}
+          CANTON_LOAD_SKIP_EXEC_CONFIRM: ${{ inputs.skip_exec_confirm }}
+          PRIVATE_KEY: ${{ inputs.ccip_env == 'prod-testnet' && secrets.CCIP_PROD_TESTNET_PRIVATE_KEY || '' }}
+        run: |
+          case "${{ inputs.direction }}" in
+            canton2evm) TEST_RUN='^TestCanton2EVM_Load$' ;;
+            evm2canton) TEST_RUN='^TestEVM2Canton_Load$' ;;
+            canton2evm-token) TEST_RUN='^TestCanton2EVM_TokenLoad$' ;;
+            evm2canton-token) TEST_RUN='^TestEVM2Canton_TokenLoad$' ;;
+            *) echo "unknown direction: ${{ inputs.direction }}" >&2; exit 1 ;;
+          esac
+          go test -timeout "${{ steps.prod_defaults.outputs.test_timeout }}" -v -count 1 -run "$TEST_RUN"
+
+      - name: Upload devenv logs
+        if: always() && inputs.ccip_env == 'devenv'
+        uses: ./.github/actions/upload-ccip-devenv-logs
+        with:
+          canton-path: ${{ steps.prod_defaults.outputs.canton_path }}
+          test-package-dir: load
+          log-dump-suffix: ccip-load-tests
+          artifact-name: container-logs-ccip-load-tests

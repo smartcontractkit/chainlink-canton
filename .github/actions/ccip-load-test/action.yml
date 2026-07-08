@@ -1,7 +1,8 @@
 name: Run CCIP load test
 description: >-
-  Shared setup and execution for CCIP WASP load tests against local devenv or
-  prod-testnet infrastructure.
+  Shared execution for CCIP WASP load tests against local devenv or prod-testnet
+  infrastructure. Call setup-ccip-devenv and upload-ccip-devenv-logs separately
+  when you want distinct workflow steps (see ccip-load-tests.yml).
 
 inputs:
   ccip_env:
@@ -77,16 +78,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Setup CCIP devenv
-      if: inputs.ccip_env == 'devenv'
-      uses: ./.github/actions/setup-ccip-devenv
-      with:
-        canton-ref: ${{ inputs.canton_ref }}
-        canton-path: ${{ inputs.canton_path }}
-        ccv-iam-role: ${{ inputs.ccv-iam-role }}
-        jd-registry: ${{ inputs.jd-registry }}
-        jd-image: ${{ inputs.jd-image }}
-
     - name: Install Go (prod-testnet)
       if: inputs.ccip_env == 'prod-testnet'
       uses: actions/setup-go@v6
@@ -116,7 +107,7 @@ runs:
           evm2canton-token) TEST_RUN='^TestEVM2Canton_TokenLoad$' ;;
           *) echo "unknown direction: ${{ inputs.direction }}" >&2; exit 1 ;;
         esac
-        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -ccip-env=devenv -run "$TEST_RUN"
+        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -run "$TEST_RUN"
 
     - name: Run load tests (prod-testnet)
       if: inputs.ccip_env == 'prod-testnet'
@@ -144,13 +135,4 @@ runs:
           evm2canton-token) TEST_RUN='^TestEVM2Canton_TokenLoad$' ;;
           *) echo "unknown direction: ${{ inputs.direction }}" >&2; exit 1 ;;
         esac
-        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -ccip-env=prod-testnet -run "$TEST_RUN"
-
-    - name: Upload devenv logs
-      if: always() && inputs.ccip_env == 'devenv'
-      uses: ./.github/actions/upload-ccip-devenv-logs
-      with:
-        canton-path: ${{ inputs.canton_path }}
-        test-package-dir: load
-        log-dump-suffix: ccip-load-tests
-        artifact-name: container-logs-ccip-load-tests
+        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -run "$TEST_RUN"

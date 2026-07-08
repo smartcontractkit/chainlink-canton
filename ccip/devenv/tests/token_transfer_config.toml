@@ -1,6 +1,6 @@
 # Token lane inputs for CCIP e2e/load tests.
 #
-# Env selection follows -ccip-env / CCIP_ENV (same as CCIP harness).
+# Env selection uses CCIP_ENV (prod-testnet) or defaults to devenv in tests.
 # Token identity (pool_type / pool_version / pool_qualifier) is REQUIRED and is
 # matched against the source chain's GetTokenTransferConfigs to discover the lane.
 # Numeric send params (transfer_amount / execution_gas_limit / finality_config)
