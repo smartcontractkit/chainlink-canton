@@ -27,8 +27,8 @@ require (
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260702144426-865f1e5fe90d
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260702144426-865f1e5fe90d
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260708123712-fa9ab58755ca
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260708123712-fa9ab58755ca
+	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260708170746-8c3b42e257ba
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260708170746-8c3b42e257ba
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
 	github.com/smartcontractkit/chainlink-deployments-framework v0.114.2
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
