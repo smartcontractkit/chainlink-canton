@@ -10,7 +10,6 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 )
@@ -56,15 +55,6 @@ func (a *CantonVerifierJobConfigAdapter) ResolveVerifierContractAddresses(
 		return nil, fmt.Errorf("failed to get on ramp address for chain %d: %w", chainSelector, err)
 	}
 
-	executorAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:      datastore.ContractType(executor.ContractType),
-		Qualifier: executorQualifier,
-		Version:   executor.Version,
-	}, chainSelector, toAddress)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get executor address for chain %d: %w", chainSelector, err)
-	}
-
 	rmnRemoteAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
 		Type:    datastore.ContractType(rmn_remote.ContractType),
 		Version: rmn_remote.Version,
@@ -76,7 +66,6 @@ func (a *CantonVerifierJobConfigAdapter) ResolveVerifierContractAddresses(
 	return &ccvadapters.VerifierContractAddresses{
 		CommitteeVerifierAddress: committeeVerifierAddr,
 		OnRampAddress:            onRampAddr,
-		ExecutorProxyAddress:     executorAddr,
 		RMNRemoteAddress:         rmnRemoteAddr,
 	}, nil
 }
