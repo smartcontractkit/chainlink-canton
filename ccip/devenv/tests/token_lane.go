@@ -119,8 +119,11 @@ func ResolveTokenLane(
 
 	cfg, matched := trySelectTokenConfig(cfgs, dir.PoolRef)
 	if !matched {
-		t.Fatalf("no token transfer config on chain %d matches pool %s (have %s)",
-			srcSelector, poolRefString(dir.PoolRef), poolRefsString(cfgs))
+		if !env.IsRemote() {
+			t.Fatalf("no token transfer config on chain %d matches pool %s (have %s)",
+				srcSelector, poolRefString(dir.PoolRef), poolRefsString(cfgs))
+		}
+		return resolveTokenLaneFromDatastore(t, cldfEnv, dir, srcSelector, destSelectors)
 	}
 
 	for _, sel := range destSelectors {
@@ -250,6 +253,124 @@ func tokenDirectionsForEnv(cfg tokenConfigTOML, env CCIPEnv) (tokenDirectionsTOM
 	default:
 		return tokenDirectionsTOML{}, fmt.Errorf("unsupported ccip env %q", env)
 	}
+}
+
+func resolveTokenLaneFromDatastore(
+	t *testing.T,
+	env *deployment.Environment,
+	dir tokenDirectionParsed,
+	srcSelector uint64,
+	destSelectors []uint64,
+) TokenLane {
+	t.Helper()
+
+	requireAddressRefInDatastore(t, env.DataStore, srcSelector, dir.PoolRef, "source pool")
+
+	require.NotNil(t, dir.RemotePoolRef, "remote_pool_* required for prod datastore fallback")
+
+	for _, sel := range destSelectors {
+		if isCantonSelector(sel) {
+			requireAddressRefInDatastore(t, env.DataStore, sel, *dir.RemotePoolRef, "remote pool")
+		}
+	}
+
+	lane := TokenLane{
+		PoolRef:              dir.PoolRef,
+		TransferAmount:       dir.TransferAmount,
+		TransferInstrumentID: dir.TransferInstrumentID,
+		ExecutionGasLimit:    dir.ExecutionGasLimit,
+		FinalityConfig:       dir.FinalityConfig,
+		DestTokenBySelector:  make(map[uint64]protocol.UnknownAddress, len(destSelectors)),
+	}
+
+	if !isCantonSelector(srcSelector) {
+		srcToken, err := resolveSrcTokenFromDatastore(env.DataStore, srcSelector)
+		require.NoError(t, err, "resolve source token on chain %d from datastore", srcSelector)
+		lane.SrcToken = srcToken
+	} else {
+		tokenRef := datastore.AddressRef{
+			Type:      datastore.ContractType("Token"),
+			Version:   semver.MustParse("2.0.0"),
+			Qualifier: dir.PoolRef.Qualifier,
+		}
+		lane.TransferInstrument = resolveCantonTransferInstrument(t, env.DataStore, srcSelector, tokenRef, dir.PoolRef, dir.TransferInstrumentID)
+	}
+
+	for _, sel := range destSelectors {
+		if isCantonSelector(sel) {
+			continue
+		}
+		destToken, err := resolveDestTokenFromDatastore(env.DataStore, sel, *dir.RemotePoolRef)
+		require.NoError(t, err, "resolve destination token on chain %d from datastore", sel)
+		lane.DestTokenBySelector[sel] = destToken
+	}
+
+	return lane
+}
+
+func resolveSrcTokenFromDatastore(ds datastore.DataStore, chainSelector uint64) (protocol.UnknownAddress, error) {
+	candidates := []datastore.AddressRef{
+		{
+			Type:      datastore.ContractType("BurnMintERC20WithDrip"),
+			Version:   semver.MustParse("1.5.0"),
+			Qualifier: "TEST",
+		},
+		{
+			Type:      datastore.ContractType("BurnMintERC20WithDripToken"),
+			Version:   semver.MustParse("1.0.0"),
+			Qualifier: "",
+		},
+	}
+
+	var lastErr error
+	for _, ref := range candidates {
+		token, err := resolveTokenRef(ds, chainSelector, ref)
+		if err == nil {
+			return token, nil
+		}
+		lastErr = err
+	}
+
+	return protocol.UnknownAddress{}, fmt.Errorf("no source token candidate in datastore on chain %d: %w", chainSelector, lastErr)
+}
+
+func resolveDestTokenFromDatastore(ds datastore.DataStore, chainSelector uint64, remotePoolRef datastore.AddressRef) (protocol.UnknownAddress, error) {
+	candidates := []datastore.AddressRef{
+		{
+			Type:      datastore.ContractType("BurnMintERC20WithDrip"),
+			Version:   semver.MustParse("1.5.0"),
+			Qualifier: remotePoolRef.Qualifier,
+		},
+		{
+			Type:      datastore.ContractType("BurnMintERC20WithDripToken"),
+			Version:   semver.MustParse("1.0.0"),
+			Qualifier: remotePoolRef.Qualifier,
+		},
+	}
+
+	var lastErr error
+	for _, ref := range candidates {
+		token, err := resolveTokenRef(ds, chainSelector, ref)
+		if err == nil {
+			return token, nil
+		}
+		lastErr = err
+	}
+
+	return protocol.UnknownAddress{}, fmt.Errorf("no destination token candidate in datastore on chain %d: %w", chainSelector, lastErr)
+}
+
+func requireAddressRefInDatastore(
+	t *testing.T,
+	ds datastore.DataStore,
+	chainSelector uint64,
+	ref datastore.AddressRef,
+	label string,
+) {
+	t.Helper()
+
+	_, err := ds.Addresses().Get(datastore.NewAddressRefKey(chainSelector, ref.Type, ref.Version, ref.Qualifier))
+	require.NoError(t, err, "%s %s not found on chain %d", label, poolRefString(ref), chainSelector)
 }
 
 func trySelectTokenConfig(cfgs []tokenscore.TokenTransferConfig, poolRef datastore.AddressRef) (tokenscore.TokenTransferConfig, bool) {

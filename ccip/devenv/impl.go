@@ -23,7 +23,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -44,7 +43,6 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	ccipevents "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
@@ -219,6 +217,7 @@ type Chain struct {
 	// Send setup prerequisites
 	routerAddress       contracts.InstanceAddress
 	senderAddress       contracts.InstanceAddress
+	receiverAddress     contracts.InstanceAddress
 	registryAdmin       string
 	validatorAPIClients validatorAPIClients
 
@@ -230,7 +229,7 @@ type Chain struct {
 	sendsLeft               uint64 // remaining sends in current setup batch; 0 = always rotate
 
 	// verifierObs is injected post-construction by test runners (see SetVerifierObservation).
-	// Required by ConfirmExecOnDest to fetch verifier results from aggregator/indexer.
+	// Required by ConfirmExecOnDest to fetch verifier results from indexer (aggregator optional).
 	verifierObs VerifierObservation
 
 	// partyMutexes serializes manual execution per receiver party so that
@@ -943,9 +942,9 @@ func (c *Chain) ConfirmSendOnSource(ctx context.Context, to uint64, key cciptest
 //  1. Lock per receiver party (PerPartyRouter CID is consumed on every Execute).
 //  2. Idempotency: if an ExecutionStateChanged for (from, seqNo, messageID) already
 //     exists on the ledger, parse and return it without re-executing.
-//  3. Otherwise fetch the verifier result via verifier observation (aggregator +
-//     indexer), translate the verifier dest address to its hashed instance address,
-//     and call ManuallyExecuteMessage.
+//  3. Otherwise fetch the verifier result via verifier observation (indexer;
+//     aggregator optional), translate the verifier dest address to its hashed
+//     instance address, and call ManuallyExecuteMessage.
 //
 // Both SeqNum AND MessageID must be set on key: they key the idempotency lookup and
 // the verifier-result fetch respectively. EVM-side ConfirmExecOnDest is permissive
@@ -1277,7 +1276,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 	}
 	// TODO come up with a better way of doing this
-	routerCid, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{party}, ccipruntime.PerPartyRouter{}.GetTemplateID(), c.routerAddress)
+	routerCid, err := c.findPerPartyRouterCidByParty(ctx, participant, party)
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", c.routerAddress, err)
 	}
