@@ -16,7 +16,8 @@ func TestResolveConfigPath(t *testing.T) {
 	require.Equal(t, "env-prod-testnet.ci.toml", ResolveConfigPath(EnvProdTestnet))
 
 	t.Setenv(envConfigFile, "ccip/devenv/custom.toml")
-	require.Equal(t, "custom.toml", ResolveConfigPath(EnvDevenv))
+	require.Equal(t, "env-canton-evm-out.toml", ResolveConfigPath(EnvDevenv))
+	require.Equal(t, "custom.toml", ResolveConfigPath(EnvProdTestnet))
 }
 
 func TestParseCCIPEnv(t *testing.T) {

@@ -133,7 +133,7 @@ jobs:
           CANTON_LOAD_MESSAGE_RATE: ${{ steps.prod_defaults.outputs.message_rate }}
           CANTON_LOAD_DURATION: ${{ steps.prod_defaults.outputs.load_duration }}
           CCIP_ENV: ${{ inputs.ccip_env == 'prod-testnet' && 'prod-testnet' || '' }}
-          CCIP_CONFIG_FILE: ${{ inputs.config_file }}
+          CCIP_CONFIG_FILE: ${{ inputs.ccip_env == 'prod-testnet' && inputs.config_file || '' }}
           CANTON_AUTH_TYPE: ${{ inputs.ccip_env == 'prod-testnet' && 'clientCredentials' || '' }}
           CANTON_AUTH_URL: ${{ inputs.ccip_env == 'prod-testnet' && secrets.CANTON_OKTA_AUTHORIZER_TESTNET || '' }}
           CANTON_CLIENT_ID: ${{ inputs.ccip_env == 'prod-testnet' && secrets.CANTON_OKTA_CLIENT_ID_TESTNET || '' }}

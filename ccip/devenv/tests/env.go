@@ -62,8 +62,11 @@ func (e CCIPEnv) ConfigPath() string {
 }
 
 // ResolveConfigPath returns the CCV env output TOML filename under ccip/devenv.
-// When CCIP_CONFIG_FILE is set, its basename is used instead of the default for env.
+// On prod-testnet, CCIP_CONFIG_FILE overrides the default when set.
 func ResolveConfigPath(env CCIPEnv) string {
+	if !env.IsRemote() {
+		return env.ConfigPath()
+	}
 	if override := strings.TrimSpace(os.Getenv(envConfigFile)); override != "" {
 		return filepath.Base(override)
 	}
