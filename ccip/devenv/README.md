@@ -69,6 +69,19 @@ CCIP_ENV=prod-testnet \
 
 Token e2e: **EVM→Canton token** and **Canton→EVM token** are supported on prod-testnet (see [EVM→Canton token e2e (prod-testnet)](#evm→canton-token-e2e-prod-testnet) and [Canton→EVM token e2e (prod-testnet)](#canton→evm-token-e2e-prod-testnet)). A second prod run reuses existing router/sender/receiver contracts on ledger when instance IDs match.
 
+### Ledger bindings (`-tags=prodledger`)
+
+Devenv tests compile against `bindings/generated/latest` (current dev DAML module layout). Prod-testnet/mainnet contracts on ledger still use the older layout in `bindings/generated/v1_0_0`.
+
+Build prod-targeting tests with `-tags=prodledger` so devenv code resolves the correct template IDs (e.g. `CCIP.PerPartyRouter` vs `CCIP.RuntimeV1.PerPartyRouter`). Devenv runs omit the tag.
+
+| Target | Build tag | Bindings |
+|---|---|---|
+| devenv (default) | _(none)_ | `bindings/generated/latest` |
+| prod-testnet / mainnet | `-tags=prodledger` | `bindings/generated/v1_0_0` |
+
+Implementation lives in [`ccip/devenv/ledgerbind/`](./ledgerbind/).
+
 ## Load tests
 
 Load tests live in `ccip/devenv/tests/load`. They use [WASP](https://pkg.go.dev/github.com/smartcontractkit/chainlink-testing-framework/wasp) and run sequentially (RPS=1) because Canton holdings are single-flight.

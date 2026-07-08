@@ -11,7 +11,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/ccip/devenv/ledgerbind"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -49,12 +49,12 @@ func (c *Chain) GetMaxPerMsgGasLimit(ctx context.Context, remoteChainSelector ui
 	return uint32(cfg.MaxPerMsgGasLimit), nil
 }
 
-func (c *Chain) feeQuoterDestConfig(ctx context.Context, remoteChainSelector uint64) (core.FeeQuoterDestChainConfig, error) {
+func (c *Chain) feeQuoterDestConfig(ctx context.Context, remoteChainSelector uint64) (ledgerbind.FeeQuoterDestChainConfig, error) {
 	if c.e == nil {
-		return core.FeeQuoterDestChainConfig{}, fmt.Errorf("canton chain environment is nil")
+		return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("canton chain environment is nil")
 	}
 	if len(c.chain.Participants) == 0 {
-		return core.FeeQuoterDestChainConfig{}, fmt.Errorf("no canton participants configured")
+		return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("no canton participants configured")
 	}
 
 	feeQuoterRef, err := c.e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
@@ -64,7 +64,7 @@ func (c *Chain) feeQuoterDestConfig(ctx context.Context, remoteChainSelector uin
 		"",
 	))
 	if err != nil {
-		return core.FeeQuoterDestChainConfig{}, fmt.Errorf("resolve FeeQuoter address: %w", err)
+		return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("resolve FeeQuoter address: %w", err)
 	}
 
 	participant := c.chain.Participants[0]
@@ -75,22 +75,22 @@ func (c *Chain) feeQuoterDestConfig(ctx context.Context, remoteChainSelector uin
 		ctx,
 		participant.LedgerServices.State,
 		[]string{party},
-		core.FeeQuoter{}.GetTemplateID(),
+		ledgerbind.FeeQuoter{}.GetTemplateID(),
 		feeQuoterAddress,
 	)
 	if err != nil {
-		return core.FeeQuoterDestChainConfig{}, fmt.Errorf("find active FeeQuoter contract: %w", err)
+		return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("find active FeeQuoter contract: %w", err)
 	}
 
 	createArgs := activeContract.GetCreatedEvent().GetCreateArguments()
 	if createArgs == nil {
-		return core.FeeQuoterDestChainConfig{}, fmt.Errorf("FeeQuoter create arguments missing")
+		return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("FeeQuoter create arguments missing")
 	}
 
 	return destChainConfigFromFeeQuoterCreateArgs(createArgs, remoteChainSelector)
 }
 
-func destChainConfigFromFeeQuoterCreateArgs(createArgs *apiv2.Record, remoteChainSelector uint64) (core.FeeQuoterDestChainConfig, error) {
+func destChainConfigFromFeeQuoterCreateArgs(createArgs *apiv2.Record, remoteChainSelector uint64) (ledgerbind.FeeQuoterDestChainConfig, error) {
 	selectorKey := strconv.FormatUint(remoteChainSelector, 10)
 	for _, field := range createArgs.GetFields() {
 		if field.GetLabel() != "destChainConfigs" {
@@ -98,7 +98,7 @@ func destChainConfigFromFeeQuoterCreateArgs(createArgs *apiv2.Record, remoteChai
 		}
 		genMap := field.GetValue().GetGenMap()
 		if genMap == nil {
-			return core.FeeQuoterDestChainConfig{}, fmt.Errorf("destChainConfigs is not a GenMap")
+			return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("destChainConfigs is not a GenMap")
 		}
 		for _, entry := range genMap.GetEntries() {
 			key := strings.TrimSuffix(entry.GetKey().GetNumeric(), ".")
@@ -107,18 +107,18 @@ func destChainConfigFromFeeQuoterCreateArgs(createArgs *apiv2.Record, remoteChai
 			}
 			record := entry.GetValue().GetRecord()
 			if record == nil {
-				return core.FeeQuoterDestChainConfig{}, fmt.Errorf("dest chain config value is not a record")
+				return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("dest chain config value is not a record")
 			}
-			var cfg core.FeeQuoterDestChainConfig
+			var cfg ledgerbind.FeeQuoterDestChainConfig
 			if err := ledger.RecordToStruct(record, &cfg); err != nil {
-				return core.FeeQuoterDestChainConfig{}, fmt.Errorf("parse dest chain config record: %w", err)
+				return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("parse dest chain config record: %w", err)
 			}
 
 			return cfg, nil
 		}
 
-		return core.FeeQuoterDestChainConfig{}, fmt.Errorf("no FeeQuoter dest config for chain selector %d", remoteChainSelector)
+		return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("no FeeQuoter dest config for chain selector %d", remoteChainSelector)
 	}
 
-	return core.FeeQuoterDestChainConfig{}, fmt.Errorf("destChainConfigs field not found on FeeQuoter")
+	return ledgerbind.FeeQuoterDestChainConfig{}, fmt.Errorf("destChainConfigs field not found on FeeQuoter")
 }

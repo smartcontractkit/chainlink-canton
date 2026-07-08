@@ -43,20 +43,17 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
-	ccipevents "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
-	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
+	"github.com/smartcontractkit/chainlink-canton/ccip/devenv/ledgerbind"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	cantonchangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executor2 "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
@@ -1209,17 +1206,19 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		}
 	}
 
-	maxDataBytes, err := c.GetMaxDataBytes(ctx, dest)
-	if err != nil {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
-			"canton SendMessage: resolve max data bytes for destination %d: %w", dest, err,
-		)
-	}
-	if len(fields.Data) > int(maxDataBytes) {
-		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
-			"canton SendMessage: payload exceeds destination maxDataBytes (%d > %d)",
-			len(fields.Data), maxDataBytes,
-		)
+	if !c.isRemote() {
+		maxDataBytes, err := c.GetMaxDataBytes(ctx, dest)
+		if err != nil {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+				"canton SendMessage: resolve max data bytes for destination %d: %w", dest, err,
+			)
+		}
+		if len(fields.Data) > int(maxDataBytes) {
+			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf(
+				"canton SendMessage: payload exceeds destination maxDataBytes (%d > %d)",
+				len(fields.Data), maxDataBytes,
+			)
+		}
 	}
 
 	sendLog := c.logger.Info().Str("NextFeeCID", c.nextFeeCID)
@@ -1281,29 +1280,29 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("find active contract ID for router at address %s: %w", c.routerAddress, err)
 	}
 	var disclosedContracts []*apiv2.DisclosedContract
-	sendArgs := ccipsender.Send{
+	sendArgs := ledgerbind.Send{
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(dest, 10)),
-		Message: clientapi.Canton2AnyMessage{
+		Message: ledgerbind.Canton2AnyMessage{
 			Receiver: types.TEXT(hex.EncodeToString(fields.Receiver)),
 			Payload:  types.TEXT(hex.EncodeToString(fields.Data)),
-			FeeToken: c.feeTokenInstrument,
-			ExtraArgs: clientapi.ExtraArgs{
-				V3: &clientapi.GenericExtraArgsV3{
+			FeeToken: ledgerbind.AdaptInstrumentId(c.feeTokenInstrument),
+			ExtraArgs: ledgerbind.ExtraArgs{
+				V3: &ledgerbind.GenericExtraArgsV3{
 					GasLimit: types.INT64(opts.ExecutionGasLimit),
-					Executor: clientapi.ExecutorExtraArg{
-						ExecutorUseDefault: &clientapi.ExecutorUseDefault{},
+					Executor: ledgerbind.ExecutorExtraArg{
+						ExecutorUseDefault: &ledgerbind.ExecutorUseDefault{},
 					},
 				},
 			},
 		},
-		FeeTokenInput: ccipsender.FeeTokenInput{
+		FeeTokenInput: ledgerbind.FeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(c.nextFeeCID)},
 			FeeTokenTransferFactory: types.CONTRACT_ID(feeTransferFactorycid),
-			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+			FeeTokenExtraArgs: ledgerbind.AdaptExtraArgs(splice_api_token_metadata_v1.ExtraArgs{
 				Context: splice_api_token_metadata_v1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(feeTransferFactoryChoiceContextValue)},
 				Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
-			},
+			}),
 		},
 	}
 
@@ -1327,18 +1326,19 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Token Pool Send disclosure for token pool at address %s: %w", tokenPoolAddress.String(), err)
 		}
-		sendArgs.Message.TokenTransfer = &clientapi.TokenTransfer{
-			Token: splice_api_token_holding_v1.InstrumentId{
+		sendArgs.Message.TokenTransfer = &ledgerbind.TokenTransfer{
+			Token: ledgerbind.AdaptInstrumentId(splice_api_token_holding_v1.InstrumentId{
 				Admin: types.PARTY(outgoingMessage.TokenTransfer.Token.Admin),
 				Id:    types.TEXT(outgoingMessage.TokenTransfer.Token.Id),
-			},
+			}),
 			Amount: types.NUMERIC(outgoingMessage.TokenTransfer.Amount),
 		}
-		sendArgs.TokenTransferInput = &ccipsender.TokenTransferInput{
-			SenderInputCids: []types.CONTRACT_ID{types.CONTRACT_ID(c.nextTransferCID)},
-			TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
-			Context:         tokenPoolSendDisclosure.ChoiceContext,
-		}
+		tokenTransferInput := ledgerbind.NewTokenTransferInput(
+			[]types.CONTRACT_ID{types.CONTRACT_ID(c.nextTransferCID)},
+			types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
+			tokenPoolSendDisclosure.ChoiceContext,
+		)
+		sendArgs.TokenTransferInput = &tokenTransferInput
 		tokenPoolRequiredCCVs = tokenPoolSendDisclosure.RequiredCCVs
 		disclosedContracts = append(disclosedContracts, tokenPoolSendDisclosure.DisclosedContracts...)
 	}
@@ -1348,7 +1348,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get CCIP Send disclosure: %w", err)
 	}
-	sendArgs.Context = ccipSendDisclosure.ChoiceContext
+	sendArgs.Context = ledgerbind.AdaptChoiceContext(ccipSendDisclosure.ChoiceContext)
 	sendArgs.FeeTokenInput.FeeTokenConfigCid = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid)
 	disclosedContracts = append(disclosedContracts, ccipSendDisclosure.DisclosedContracts...)
 
@@ -1367,15 +1367,15 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get CCV Send disclosure for CCV %q: %w", v, err)
 		}
-		sendArgs.CcvSendInputs = append(sendArgs.CcvSendInputs, ccipsender.CCVSendInput{
-			CcvAddress: ccvSendDisclosure.Address.Binding(),
-			CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-			Context:    ccvSendDisclosure.ChoiceContext,
-		})
-		sendArgs.Message.ExtraArgs.V3.Ccvs = append(sendArgs.Message.ExtraArgs.V3.Ccvs, clientapi.CCVExtraArg{
-			CcvAddress: ccvSendDisclosure.Address.Binding(),
-			CcvArgs:    "",
-		})
+		sendArgs.CcvSendInputs = append(sendArgs.CcvSendInputs, ledgerbind.NewCCVSendInput(
+			ccvSendDisclosure.Address,
+			types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+			ccvSendDisclosure.ChoiceContext,
+		))
+		sendArgs.Message.ExtraArgs.V3.Ccvs = append(sendArgs.Message.ExtraArgs.V3.Ccvs, ledgerbind.NewCCVExtraArg(
+			ccvSendDisclosure.Address,
+			"",
+		))
 		allCCVs = append(allCCVs, ccvSendDisclosure.Address.InstanceAddress().Hex())
 		disclosedContracts = append(disclosedContracts, ccvSendDisclosure.DisclosedContracts...)
 	}
@@ -1393,10 +1393,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 		if err != nil {
 			return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("failed to get Executor Send disclosure for Executor %q: %w", *ccipSendDisclosure.Executor, err)
 		}
-		sendArgs.ExecutorInput = &ccipsender.ExecutorInput{
-			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
-			Context:     executorSendDisclosure.ChoiceContext,
-		}
+		executorInput := ledgerbind.NewExecutorInput(
+			types.CONTRACT_ID(executorSendDisclosure.ContractId),
+			executorSendDisclosure.ChoiceContext,
+		)
+		sendArgs.ExecutorInput = &executorInput
 		disclosedContracts = append(disclosedContracts, executorSendDisclosure.DisclosedContracts...)
 	}
 
@@ -1407,7 +1408,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	disclosedContracts = testhelpers.DeduplicateDisclosedContracts(disclosedContracts...)
 
 	// Call CCIPSend
-	ccipSendReport, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Send, c.chain, contract.ChoiceInput[ccipsender.Send]{
+	ccipSendReport, err := operations.ExecuteOperation(c.e.OperationsBundle, ccipSenderSendOperation, c.chain, contract.ChoiceInput[ledgerbind.Send]{
 		InstanceAddress:    c.senderAddress,
 		ParticipantIndex:   clientIdx,
 		Args:               sendArgs,
@@ -1429,7 +1430,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 								{
 									IdentifierFilter: &apiv2.CumulativeFilter_TemplateFilter{
 										TemplateFilter: &apiv2.TemplateFilter{
-											TemplateId:              contracts.TemplateIDFromBinding(ccipevents.CCIPMessageSent{}).ToLedgerIdentifier(),
+											TemplateId:              contracts.TemplateIDFromBinding(ledgerbind.CCIPMessageSent{}).ToLedgerIdentifier(),
 											IncludeCreatedEventBlob: true,
 										},
 									},
@@ -1512,7 +1513,7 @@ type ccipMessageSentFromSendUpdate struct {
 // before this send; returned seqNo is either previousSeq+1 or the sequence from the encoded payload
 // when that path is present.
 func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSeq uint64) (ccipMessageSentFromSendUpdate, error) {
-	messageSentTemplateID := contracts.TemplateIDFromBinding(ccipevents.CCIPMessageSent{})
+	messageSentTemplateID := contracts.TemplateIDFromBinding(ledgerbind.CCIPMessageSent{})
 
 	// Find CCIPMessageSent event in the events
 	var created *apiv2.CreatedEvent
@@ -1533,7 +1534,7 @@ func parseFirstCCIPMessageSentFromLedgerEvents(events []*apiv2.Event, previousSe
 		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("no CCIPMessageSent event found in sender transaction")
 	}
 
-	parsed, err := bindings.UnmarshalCreatedEvent[ccipevents.CCIPMessageSent](created)
+	parsed, err := bindings.UnmarshalCreatedEvent[ledgerbind.CCIPMessageSent](created)
 	if err != nil {
 		return ccipMessageSentFromSendUpdate{}, fmt.Errorf("unmarshal CCIPMessageSent created event: %w", err)
 	}

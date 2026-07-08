@@ -20,12 +20,11 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	ccipreceiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/ccip/devenv/ledgerbind"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
@@ -112,7 +111,7 @@ func (c *Chain) findPerPartyRouterByParty(
 	partyId string,
 	preferredInstanceID contracts.InstanceID,
 ) (contracts.InstanceAddress, string, bool, error) {
-	templateID := contracts.TemplateIDFromBinding(ccipruntime.PerPartyRouter{}).ToLedgerIdentifier()
+	templateID := contracts.TemplateIDFromBinding(ledgerbind.PerPartyRouter{}).ToLedgerIdentifier()
 	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, templateID)
 	if err != nil {
 		return contracts.InstanceAddress{}, "", false, err
@@ -192,7 +191,7 @@ func (c *Chain) DeployCCIPSender(ctx context.Context, participant canton.Partici
 		ctx,
 		participant.LedgerServices.State,
 		contract.LedgerQueryParties(participant),
-		ccipsender.CCIPSender{}.GetTemplateID(),
+		ledgerbind.CCIPSender{}.GetTemplateID(),
 		senderAddress,
 	); err == nil {
 		c.senderAddress = senderAddress
@@ -213,7 +212,7 @@ func (c *Chain) DeployCCIPSender(ctx context.Context, participant canton.Partici
 			ctx,
 			participant.LedgerServices.State,
 			contract.LedgerQueryParties(participant),
-			ccipsender.CCIPSender{}.GetTemplateID(),
+			ledgerbind.CCIPSender{}.GetTemplateID(),
 			senderAddress,
 		); findErr == nil {
 			c.senderAddress = senderAddress
@@ -239,7 +238,7 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Parti
 		ctx,
 		participant.LedgerServices.State,
 		contract.LedgerQueryParties(participant),
-		ccipreceiver.CCIPReceiver{}.GetTemplateID(),
+		ledgerbind.CCIPReceiver{}.GetTemplateID(),
 		receiverAddress,
 	); err == nil {
 		c.receiverAddress = receiverAddress
@@ -269,7 +268,7 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Parti
 			ctx,
 			participant.LedgerServices.State,
 			contract.LedgerQueryParties(participant),
-			ccipreceiver.CCIPReceiver{}.GetTemplateID(),
+			ledgerbind.CCIPReceiver{}.GetTemplateID(),
 			receiverAddress,
 		); findErr == nil {
 			c.receiverAddress = receiverAddress
@@ -331,12 +330,12 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCIP execute disclosure: %w", err)
 	}
-	executeArgs := ccipreceiver.Execute{
-		Context:        ccipExecuteDisclosure.ChoiceContext,
+	executeArgs := ledgerbind.ReceiverExecute{
+		Context:        ledgerbind.AdaptChoiceContext(ccipExecuteDisclosure.ChoiceContext),
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
 		TokenTransfer:  nil,
-		CcvInputs:      make([]ccipreceiver.CCVInput, len(verifiers)),
+		CcvInputs:      make([]ledgerbind.ReceiverCCVInput, len(verifiers)),
 	}
 	disclosedContracts := ccipExecuteDisclosure.DisclosedContracts
 
@@ -351,11 +350,11 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get CCV execute disclosure for verifier %s: %w", verifier.String(), err)
 		}
 
-		executeArgs.CcvInputs[i] = ccipreceiver.CCVInput{
-			CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
-			VerifierResults: types.TEXT(hex.EncodeToString(vr)),
-			Context: ccvExecuteDisclosure.ChoiceContext,
-		}
+		executeArgs.CcvInputs[i] = ledgerbind.NewReceiverCCVInput(
+			types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
+			types.TEXT(hex.EncodeToString(vr)),
+			ccvExecuteDisclosure.ChoiceContext,
+		)
 		disclosedContracts = append(disclosedContracts, ccvExecuteDisclosure.DisclosedContracts...)
 	}
 
@@ -372,11 +371,12 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 			return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to get token pool execute disclosure: %w", err)
 		}
 
-		executeArgs.TokenTransfer = &ccipreceiver.TokenTransferInput{
-			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
-			TokenReceiverParty: types.PARTY(executingParty),
-			Context:   tokenPoolDisclosure.ChoiceContext,
-		}
+		tokenTransfer := ledgerbind.NewReceiverTokenTransferInput(
+			types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
+			types.PARTY(executingParty),
+			tokenPoolDisclosure.ChoiceContext,
+		)
+		executeArgs.TokenTransfer = &tokenTransfer
 		disclosedContracts = append(disclosedContracts, tokenPoolDisclosure.DisclosedContracts...)
 	}
 
@@ -387,7 +387,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 		Str("Receiver", hex.EncodeToString(message.Receiver)).
 		Msg("Executing message...")
 
-	executeReport, err := operations.ExecuteOperation(c.e.OperationsBundle, receiver.Execute, c.chain, contract.ChoiceInput[ccipreceiver.Execute]{
+	executeReport, err := operations.ExecuteOperation(c.e.OperationsBundle, ccipReceiverExecuteOperation, c.chain, contract.ChoiceInput[ledgerbind.ReceiverExecute]{
 		InstanceAddress:    receiverAddress,
 		ParticipantIndex:   clientIdx,
 		Args:               executeArgs,
@@ -449,7 +449,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 	}
 
 	// Get ExecutionStateChangedEvent from events
-	expectedTemplateID := events.ExecutionStateChanged{}.GetTemplateID()
+	expectedTemplateID := ledgerbind.ExecutionStateChanged{}.GetTemplateID()
 	for _, event := range update.GetTransaction().GetEvents() {
 		//nolint:nestif // need to check if all of these are nil
 		if createdEvent := event.GetCreated(); createdEvent != nil {
@@ -475,7 +475,7 @@ func (c *Chain) ManuallyExecuteMessage(ctx context.Context, message protocol.Mes
 
 // parseExecutionStateChangedEvent parses a common.ExecutionStateChanged event from a Daml CreatedEvent and converts it to cciptestinterfaces.ExecutionStateChangedEvent.
 func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
-	executionStateChanged, err := bindings.UnmarshalCreatedEvent[events.ExecutionStateChanged](event)
+	executionStateChanged, err := bindings.UnmarshalCreatedEvent[ledgerbind.ExecutionStateChanged](event)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("failed to unmarshal ExecutionStateChanged event: %w", err)
 	}
@@ -500,13 +500,13 @@ func parseExecutionStateChangedEvent(event *apiv2.CreatedEvent) (cciptestinterfa
 	// Execution state
 	var executionState cciptestinterfaces.MessageExecutionState
 	switch executionStateChanged.Event.State {
-	case ccipapi.MessageExecutionStateUNTOUCHED:
+	case ledgerbind.MessageExecutionStateUNTOUCHED:
 		executionState = cciptestinterfaces.ExecutionStateUntouched
-	case ccipapi.MessageExecutionStateIN_PROGRESS:
+	case ledgerbind.MessageExecutionStateIN_PROGRESS:
 		executionState = cciptestinterfaces.ExecutionStateInProgress
-	case ccipapi.MessageExecutionStateSUCCESS:
+	case ledgerbind.MessageExecutionStateSUCCESS:
 		executionState = cciptestinterfaces.ExecutionStateSuccess
-	case ccipapi.MessageExecutionStateFAILURE:
+	case ledgerbind.MessageExecutionStateFAILURE:
 		executionState = cciptestinterfaces.ExecutionStateFailure
 	default:
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("unknown execution state %q", executionStateChanged.Event.State)
@@ -556,7 +556,7 @@ func (c *Chain) findExistingExecutionState(
 	}
 	participant := c.chain.Participants[0]
 
-	templateID := contracts.TemplateIDFromBinding(events.ExecutionStateChanged{}).ToLedgerIdentifier()
+	templateID := contracts.TemplateIDFromBinding(ledgerbind.ExecutionStateChanged{}).ToLedgerIdentifier()
 	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, templateID)
 	if err != nil {
 		return cciptestinterfaces.ExecutionStateChangedEvent{}, false, fmt.Errorf("findExistingExecutionState: list active ExecutionStateChanged contracts: %w", err)

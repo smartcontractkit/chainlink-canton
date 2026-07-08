@@ -144,7 +144,7 @@ runs:
           evm2canton-token) TEST_RUN='^TestEVM2Canton_TokenLoad$' ;;
           *) echo "unknown direction: ${{ inputs.direction }}" >&2; exit 1 ;;
         esac
-        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -ccip-env=prod-testnet -run "$TEST_RUN"
+        go test -tags=prodledger -timeout "${{ inputs.test_timeout }}" -v -count 1 -ccip-env=prod-testnet -run "$TEST_RUN"
 
     - name: Upload devenv logs
       if: always() && inputs.ccip_env == 'devenv'

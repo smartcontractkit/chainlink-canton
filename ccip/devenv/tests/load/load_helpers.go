@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 )
@@ -384,11 +385,11 @@ func cantonLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.Un
 	return Destination{
 		Chain:    chain,
 		Receiver: receiver,
-		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, executorAddr protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
+		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, _ protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
 			return cciptestinterfaces.MessageFields{
 				Receiver: receiver,
 				Data:     fmt.Appendf(nil, "evm2canton load n=%d dest=%d", callNum, destSelector),
-			}, devenvtests.EVMToCantonMessageOptions(200_000, executorAddr, ccvAddr), nil
+			}, devenvtests.EVMToCantonMessageOptions(200_000, cantondevenv.EVMToCantonFinalityConfig, ccvAddr), nil
 		},
 	}
 }
@@ -400,7 +401,7 @@ func cantonTokenLoadDestination(chain cciptestinterfaces.CCIP17, receiver protoc
 		Chain:     chain,
 		Receiver:  receiver,
 		TokenLane: &laneCopy,
-		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, executorAddr protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
+		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, _ protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
 			return cciptestinterfaces.MessageFields{
 					Receiver: receiver,
 					Data:     fmt.Appendf(nil, "evm2canton token load n=%d dest=%d", callNum, destSelector),
@@ -408,14 +409,7 @@ func cantonTokenLoadDestination(chain cciptestinterfaces.CCIP17, receiver protoc
 						Amount:       lane.TransferAmount,
 						TokenAddress: lane.SrcToken,
 					},
-				}, cciptestinterfaces.MessageOptions{
-					ExecutionGasLimit: lane.ExecutionGasLimit,
-					FinalityConfig:    lane.FinalityConfig,
-					Executor:          executorAddr,
-					CCVs: []protocol.CCV{
-						{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
-					},
-				}, nil
+				}, devenvtests.EVMToCantonMessageOptions(lane.ExecutionGasLimit, lane.FinalityConfig, ccvAddr), nil
 		},
 	}
 }

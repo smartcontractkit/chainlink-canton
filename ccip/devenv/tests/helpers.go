@@ -72,12 +72,17 @@ func ConfirmSendTimeout(t *testing.T, env CCIPEnv) time.Duration {
 	return timeout
 }
 
-// EVMToCantonMessageOptions returns standard message options for EVM→Canton sends with FTF.
-func EVMToCantonMessageOptions(gasLimit uint32, executor, ccvAddr protocol.UnknownAddress) cciptestinterfaces.MessageOptions {
+// EVMToCantonMessageOptions returns message options for EVM→Canton sends.
+// Execution on Canton is manual; the EVM Executor is skipped via NO_EXECUTION_ADDRESS.
+func EVMToCantonMessageOptions(
+	gasLimit uint32,
+	finality protocol.Finality,
+	ccvAddr protocol.UnknownAddress,
+) cciptestinterfaces.MessageOptions {
 	return cciptestinterfaces.MessageOptions{
 		ExecutionGasLimit: gasLimit,
-		FinalityConfig:    cantondevenv.EVMToCantonFinalityConfig,
-		Executor:          executor,
+		FinalityConfig:    finality,
+		Executor:          cantondevenv.EVMToCantonNoExecutionExecutor,
 		CCVs: []protocol.CCV{
 			{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
 		},
