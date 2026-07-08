@@ -46,7 +46,7 @@ MERGE_BASE="$(git merge-base HEAD "$BASE_REF" 2>/dev/null || echo "$BASE_REF")"
 is_frozen_path() {
   local path="$1"
   case "$path" in
-    contracts/dars/v[0-9]_*/*) return 0 ;;
+    contracts/dars/released/*) return 0 ;;
     bindings/generated/v[0-9]_*/*) return 0 ;;
     bindings/generated/mcms/*) return 0 ;;
     *) return 1 ;;
@@ -111,7 +111,7 @@ for f in "${violations[@]}"; do
 done
 echo "" >&2
 echo "Day-to-day contract work should only update:" >&2
-echo "  - contracts/dars/current/     (make compile-contracts)" >&2
+echo "  - contracts/dars/dev/     (make compile-contracts)" >&2
 echo "  - bindings/generated/latest/  (make generate-bindings)" >&2
 echo "" >&2
 echo "To refresh an existing frozen snapshot (e.g. rewrite ccip-core-1.0.0.dar in v1_0_0/):" >&2

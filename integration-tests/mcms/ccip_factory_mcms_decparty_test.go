@@ -359,7 +359,7 @@ func deployMCMSWithDecentralizedParty(
 		SynchronizerID:       synchronizerID,
 		Packages: []contractdeploy.PackageRef{{
 			Name:    string(contracts.MCMSCore),
-			Version: contracts.CurrentVersion,
+			Version: contracts.DevVersion,
 		}},
 		TemplateModule: "MCMS.Main",
 		TemplateEntity: "MCMS",

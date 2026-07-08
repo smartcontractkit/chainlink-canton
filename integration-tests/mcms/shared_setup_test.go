@@ -79,14 +79,14 @@ func GetSharedEnvironment(t *testing.T) *SharedCantonEnvironment {
 		participant := env.Chain.Participants[0]
 
 		// Upload MCMS DAR
-		mcmsDar, err := contracts.GetDar(contracts.MCMSCore, contracts.CurrentVersion)
+		mcmsDar, err := contracts.GetDar(contracts.MCMSCore, contracts.DevVersion)
 		if err != nil {
 			errSharedEnv = err
 			return
 		}
 
 		// Upload MCMS Test DAR (contains Counter)
-		mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)
+		mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.DevVersion)
 		if err != nil {
 			errSharedEnv = err
 			return
