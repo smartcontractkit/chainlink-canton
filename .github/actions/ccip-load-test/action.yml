@@ -56,6 +56,18 @@ inputs:
     description: "CANTON_GRPC_URL"
     required: false
     default: "testnet.cv1.bcy-v.metalhosts.com:443"
+  router_instance_id:
+    description: "CANTON_ROUTER_INSTANCE_ID (prod-testnet)"
+    required: false
+    default: "gha-load-router"
+  sender_instance_id:
+    description: "CANTON_SENDER_INSTANCE_ID (prod-testnet)"
+    required: false
+    default: "gha-load-sender"
+  receiver_instance_id:
+    description: "CANTON_RECEIVER_INSTANCE_ID (prod-testnet)"
+    required: false
+    default: "gha-load-receiver"
   CANTON_OKTA_AUTHORIZER_TESTNET:
     description: "GitHub secret CANTON_OKTA_AUTHORIZER_TESTNET"
     required: false
@@ -150,6 +162,9 @@ runs:
         CANTON_PARTY_ID: ${{ inputs.party_id }}
         CANTON_USER_ID: ${{ inputs.user_id }}
         CANTON_GRPC_URL: ${{ inputs.grpc_url }}
+        CANTON_ROUTER_INSTANCE_ID: ${{ inputs.router_instance_id }}
+        CANTON_SENDER_INSTANCE_ID: ${{ inputs.sender_instance_id }}
+        CANTON_RECEIVER_INSTANCE_ID: ${{ inputs.receiver_instance_id }}
         CANTON_LOAD_MESSAGE_RATE: ${{ inputs.message_rate }}
         CANTON_LOAD_DURATION: ${{ inputs.load_duration }}
         CANTON_CONFIRM_EXEC_TIMEOUT: ${{ inputs.confirm_exec_timeout }}
