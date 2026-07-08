@@ -27,8 +27,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-events"
-	PackageID   = "8cf1b15f40b7021beca31fca9deefe2944d5c18d7e1f9c00d0a7b38a513e1f5d"
+	PackageName = "ccip-events-v2"
+	PackageID   = "94a8452d8b1ca405985eb609eeb82a6916097d4685904ea6d5725d4028acdaed"
 	SDKVersion  = "3.4.11"
 )
 
