@@ -9,8 +9,6 @@ import (
 	"time"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
@@ -23,8 +21,8 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/wasp"
 	"github.com/stretchr/testify/require"
 
-	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	canton_committee_verifier "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 )
@@ -403,13 +401,13 @@ func cantonTokenLoadDestination(chain cciptestinterfaces.CCIP17, receiver protoc
 		TokenLane: &laneCopy,
 		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, _ protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
 			return cciptestinterfaces.MessageFields{
-					Receiver: receiver,
-					Data:     fmt.Appendf(nil, "evm2canton token load n=%d dest=%d", callNum, destSelector),
-					TokenAmount: cciptestinterfaces.TokenAmount{
-						Amount:       lane.TransferAmount,
-						TokenAddress: lane.SrcToken,
-					},
-				}, devenvtests.EVMToCantonMessageOptions(lane.ExecutionGasLimit, lane.FinalityConfig, ccvAddr), nil
+				Receiver: receiver,
+				Data:     fmt.Appendf(nil, "evm2canton token load n=%d dest=%d", callNum, destSelector),
+				TokenAmount: cciptestinterfaces.TokenAmount{
+					Amount:       lane.TransferAmount,
+					TokenAddress: lane.SrcToken,
+				},
+			}, devenvtests.EVMToCantonMessageOptions(lane.ExecutionGasLimit, lane.FinalityConfig, ccvAddr), nil
 		},
 	}
 }
@@ -438,26 +436,17 @@ func resolveCantonSourceAddrs(t *testing.T, lib ccv.Lib, cantonSelector uint64) 
 	return ccvAddr, executorAddr
 }
 
-func resolveEVMSourceAddrs(t *testing.T, lib ccv.Lib, evmSelector uint64) (protocol.UnknownAddress, protocol.UnknownAddress) {
+func resolveEVMSourceAddrs(t *testing.T, lib ccv.Lib, evmSelector uint64) protocol.UnknownAddress {
 	t.Helper()
 
 	ds, err := lib.DataStore()
 	require.NoError(t, err)
 
-	ccvAddr := devenvtests.GetContractAddress(
+	return devenvtests.GetContractAddress(
 		t, ds, evmSelector,
 		datastore.ContractType(versioned_verifier_resolver.CommitteeVerifierResolverType),
 		versioned_verifier_resolver.Version.String(),
 		common.DefaultCommitteeVerifierQualifier,
 		"source committee verifier",
 	)
-	executorAddr := devenvtests.GetContractAddress(
-		t, ds, evmSelector,
-		datastore.ContractType(sequences.ExecutorProxyType),
-		proxy.Deploy.Version(),
-		common.DefaultExecutorQualifier,
-		"source executor",
-	)
-
-	return ccvAddr, executorAddr
 }

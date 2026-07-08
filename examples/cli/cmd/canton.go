@@ -428,6 +428,7 @@ func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 			}
 
 			_, err = cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, raw)
+
 			return err
 		},
 	}

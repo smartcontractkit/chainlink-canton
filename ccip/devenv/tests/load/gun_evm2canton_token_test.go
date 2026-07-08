@@ -63,7 +63,7 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 		t.Logf("warning: EVM sender balance may be insufficient for full run")
 	}
 
-	ccvAddr, _ := resolveEVMSourceAddrs(t, boot.Lib, boot.EVM.ChainSelector())
+	ccvAddr := resolveEVMSourceAddrs(t, boot.Lib, boot.EVM.ChainSelector())
 
 	gun, err := NewCCIPLoadGun(
 		boot.EVM,

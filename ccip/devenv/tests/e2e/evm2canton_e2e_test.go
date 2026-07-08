@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
-	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register Canton ImplFactory
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )

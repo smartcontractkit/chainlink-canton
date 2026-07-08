@@ -123,6 +123,7 @@ func ResolveTokenLane(
 			t.Fatalf("no token transfer config on chain %d matches pool %s (have %s)",
 				srcSelector, poolRefString(dir.PoolRef), poolRefsString(cfgs))
 		}
+
 		return resolveTokenLaneFromDatastore(t, cldfEnv, dir, srcSelector, destSelectors)
 	}
 

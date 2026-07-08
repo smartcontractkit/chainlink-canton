@@ -41,13 +41,12 @@ func VerifierObservationFromLib(lib ccv.Lib) (VerifierObservation, error) {
 		IndexerMonitor: indexerMonitor,
 	}
 
-	aggregatorClients, err := lib.AllAggregators()
-	if err != nil {
-		return obs, nil
-	}
-	aggregatorClient, ok := aggregatorClients[devenvcommon.DefaultCommitteeVerifierQualifier]
-	if ok && aggregatorClient != nil {
-		obs.AggregatorClient = aggregatorClient
+	aggregatorClients, aggErr := lib.AllAggregators()
+	if aggErr == nil {
+		aggregatorClient, ok := aggregatorClients[devenvcommon.DefaultCommitteeVerifierQualifier]
+		if ok && aggregatorClient != nil {
+			obs.AggregatorClient = aggregatorClient
+		}
 	}
 
 	return obs, nil

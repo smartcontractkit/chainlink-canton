@@ -32,7 +32,7 @@ func TestEVM2Canton_Load(t *testing.T) {
 	t.Logf("EVM→Canton load: source=%d dest=%d receiver=%x",
 		boot.EVM.ChainSelector(), cantonDest.Chain.ChainSelector(), cantonDest.Receiver)
 
-	ccvAddr, _ := resolveEVMSourceAddrs(t, boot.Lib, boot.EVM.ChainSelector())
+	ccvAddr := resolveEVMSourceAddrs(t, boot.Lib, boot.EVM.ChainSelector())
 
 	gun, err := NewCCIPLoadGun(
 		boot.EVM,

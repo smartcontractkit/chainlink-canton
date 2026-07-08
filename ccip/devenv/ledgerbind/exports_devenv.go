@@ -3,9 +3,9 @@
 package ledgerbind
 
 import (
-	rt "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
+	rt "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
@@ -14,7 +14,7 @@ import (
 )
 
 type (
-	CreateRouter = rt.CreateRouter
+	CreateRouter   = rt.CreateRouter
 	PerPartyRouter = rt.PerPartyRouter
 
 	FinalityConfig = ccipcodec.FinalityConfig
