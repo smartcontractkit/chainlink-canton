@@ -20,16 +20,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
-	ccipreceiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
-	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
-	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/ccip/devenv/ledgerbind"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
-	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -71,19 +63,19 @@ func (c *Chain) DeployPerPartyRouter(ctx context.Context, participant canton.Par
 
 	_, err = operations.ExecuteOperation(
 		c.e.OperationsBundle,
-		per_party_router_factory.CreateRouter,
+		createRouterOperation,
 		c.chain,
-		contract.ChoiceInput[ccipruntime.CreateRouter]{
+		contract.ChoiceInput[ledgerbind.CreateRouter]{
 			InstanceAddress:    perPartyRouterFactoryDisclosure.Address.InstanceAddress(),
 			ContractID:         perPartyRouterFactoryDisclosure.ContractId,
 			ParticipantIndex:   c.clientParticipantIndex(),
 			DisclosedContracts: contract.DisclosedContractsFromProto(perPartyRouterFactoryDisclosure.DisclosedContracts),
-			Args: ccipruntime.CreateRouter{
+			Args: ledgerbind.CreateRouter{
 				PartyOwner: types.PARTY(partyId),
 				InstanceId: types.TEXT(routerInstanceID.String()),
 			},
 		},
-		operations.WithForceExecute[contract.ChoiceInput[ccipruntime.CreateRouter], canton.Chain](),
+		operations.WithForceExecute[contract.ChoiceInput[ledgerbind.CreateRouter], canton.Chain](),
 	)
 	if err != nil {
 		if found, _, ok, findErr := c.findPerPartyRouterByParty(ctx, participant, partyId, routerInstanceID); findErr != nil {
@@ -203,10 +195,10 @@ func (c *Chain) DeployCCIPSender(ctx context.Context, participant canton.Partici
 		return senderAddress, nil
 	}
 
-	_, err := operations.ExecuteOperation(c.e.OperationsBundle, sender.Deploy, c.chain, contract.DeployInput[ccipsender.CCIPSender]{
+	_, err := operations.ExecuteOperation(c.e.OperationsBundle, ccipSenderDeployOperation, c.chain, contract.DeployInput[ledgerbind.CCIPSender]{
 		Qualifier:        nil,
 		ParticipantIndex: c.clientParticipantIndex(),
-		Template: ccipsender.CCIPSender{
+		Template: ledgerbind.CCIPSender{
 			InstanceId: types.TEXT(instanceID),
 			Owner:      types.PARTY(partyId),
 		},
@@ -261,10 +253,10 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Parti
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to encode receiver finality config: %w", err)
 	}
 
-	_, err = operations.ExecuteOperation(c.e.OperationsBundle, receiver.Deploy, c.chain, contract.DeployInput[ccipreceiver.CCIPReceiver]{
+	_, err = operations.ExecuteOperation(c.e.OperationsBundle, ccipReceiverDeployOperation, c.chain, contract.DeployInput[ledgerbind.CCIPReceiver]{
 		Qualifier:        nil,
 		ParticipantIndex: c.clientParticipantIndex(),
-		Template: ccipreceiver.CCIPReceiver{
+		Template: ledgerbind.CCIPReceiver{
 			InstanceId:             types.TEXT(instanceID),
 			Owner:                  types.PARTY(partyId),
 			RequiredCCVs:           requiredCCVs,
@@ -293,7 +285,7 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Parti
 	return receiverAddress, nil
 }
 
-func receiverRequiredCCVsFromEnv() ([]chainlinkapi.RawInstanceAddress, error) {
+func receiverRequiredCCVsFromEnv() ([]ledgerbind.RawInstanceAddress, error) {
 	raw := strings.TrimSpace(os.Getenv("CANTON_RECEIVER_REQUIRED_CCV"))
 	if raw == "" {
 		return nil, nil
@@ -304,7 +296,7 @@ func receiverRequiredCCVsFromEnv() ([]chainlinkapi.RawInstanceAddress, error) {
 		return nil, fmt.Errorf("parse CANTON_RECEIVER_REQUIRED_CCV: %w", err)
 	}
 
-	return []chainlinkapi.RawInstanceAddress{
+	return []ledgerbind.RawInstanceAddress{
 		{Unpack: types.TEXT(parsed.String())},
 	}, nil
 }
@@ -660,18 +652,18 @@ func (c *Chain) fetchVerifierResult(ctx context.Context, messageID protocol.Byte
 	}, nil
 }
 
-func encodeReceiverFinalityConfig(finality int64) (ccipcodec.FinalityConfig, error) {
+func encodeReceiverFinalityConfig(finality int64) (ledgerbind.FinalityConfig, error) {
 	switch {
 	case finality < 0:
-		return ccipcodec.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
+		return ledgerbind.FinalityConfig{}, fmt.Errorf("invalid finality %d: must be non-negative", finality)
 	case finality == 0:
-		return ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
+		return ledgerbind.FinalityConfig{WaitForFinality: &types.UNIT{}}, nil
 	case finality == 0x00010000:
-		return ccipcodec.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
+		return ledgerbind.FinalityConfig{WaitForSafe: &types.UNIT{}}, nil
 	case finality > 0xFFFF:
-		return ccipcodec.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
+		return ledgerbind.FinalityConfig{}, fmt.Errorf("invalid finality %d: max supported block depth is 65535", finality)
 	default:
-		return ccipcodec.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
+		return ledgerbind.FinalityConfig{BlockDepth: new(types.INT64(finality))}, nil
 	}
 }
 

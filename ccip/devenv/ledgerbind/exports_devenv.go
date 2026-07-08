@@ -11,11 +11,14 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	ccipreceiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 )
 
 type (
 	CreateRouter   = rt.CreateRouter
 	PerPartyRouter = rt.PerPartyRouter
+
+	RawInstanceAddress = chainlinkapi.RawInstanceAddress
 
 	FinalityConfig = ccipcodec.FinalityConfig
 
