@@ -274,12 +274,12 @@ func setupCantonTokenLoadHoldings(
 		estimated, feeTotal.FloatString(10), transferTotal.FloatString(10))
 	require.NoError(t, cantonImpl.MintTokens(ctx, feeTotal))
 	require.NoError(t, cantonImpl.MintTokens(ctx, transferTotal))
+	cantonImpl.SetSequentialSends(int(estimated))
 	if lane.TransferInstrument.Admin != "" {
 		require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
 	} else {
 		require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
 	}
-	cantonImpl.SetSequentialSends(int(estimated))
 }
 
 func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.UnknownAddress) Destination {

@@ -61,6 +61,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		// Setup message send
+		cantonImpl.SetSequentialSends(1)
 		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantondevenv.CantonToEVMFeeAmount), nil))
 
 		ds, err := lib.DataStore()
@@ -151,12 +152,12 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
 		sends := cantondevenv.CantonToEVMTokenSequentialSends
 		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
+		cantonImpl.SetSequentialSends(sends)
 		if lane.TransferInstrument.Admin != "" {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
 		} else {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
 		}
-		cantonImpl.SetSequentialSends(sends)
 
 		ds, err := lib.DataStore()
 		require.NoError(t, err)
@@ -242,12 +243,12 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
 		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
+		cantonImpl.SetSequentialSends(1)
 		if lane.TransferInstrument.Admin != "" {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
 		} else {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
 		}
-		cantonImpl.SetSequentialSends(1)
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
@@ -290,12 +291,12 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
 		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
+		cantonImpl.SetSequentialSends(1)
 		if lane.TransferInstrument.Admin != "" {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
 		} else {
 			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
 		}
-		cantonImpl.SetSequentialSends(1)
 
 		ds, err := lib.DataStore()
 		require.NoError(t, err)

@@ -1018,11 +1018,16 @@ func (c *Chain) SetupReceive(ctx context.Context) error {
 
 // SetupSend sets up Canton sender specific prerequisites for sending a message.
 // eg: deploy per-party router, deploy ccipsender contract...
+//
+// feePerMessage is stored and used as the per-send fee budget in SendMessage and holding rotation.
+// transferPerMessage is the per-send transfer amount (nil or ≤0 → message-only). Initial holding
+// selection uses perMessage × sendsLeft when SetSequentialSends was called with sends > 0.
+//
 // transferInstrument defaults to Amulet under registryAdmin when omitted or Admin is empty.
 func (c *Chain) SetupSend(
 	ctx context.Context,
-	feeAmountPerMessage uint64,
-	transferAmountPerMessage *big.Rat,
+	feePerMessage uint64,
+	transferPerMessage *big.Rat,
 	transferInstrument ...splice_api_token_holding_v1.InstrumentId,
 ) error {
 	participant, _, err := c.ClientParticipant()
@@ -1067,17 +1072,20 @@ func (c *Chain) SetupSend(
 	if err != nil {
 		return fmt.Errorf("list fee holdings for setup: %w", err)
 	}
-	feeMin := new(big.Rat).SetUint64(feeAmountPerMessage)
+	feeMin := new(big.Rat).SetUint64(feePerMessage)
+	if c.sendsLeft > 0 {
+		feeMin.Mul(feeMin, new(big.Rat).SetUint64(c.sendsLeft))
+	}
 	selectedFee, err := c.selectHolding("setup-fee", feeTokenInstrument, feeRows, feeMin)
 	if err != nil {
 		return fmt.Errorf("select fee holding for setup: %w", err)
 	}
 
 	c.feeTokenInstrument = feeTokenInstrument
-	c.feeAmountPerMessage = feeAmountPerMessage
+	c.feeAmountPerMessage = feePerMessage
 	c.nextFeeCID = selectedFee.ContractID
 
-	if transferAmountPerMessage == nil || transferAmountPerMessage.Sign() <= 0 {
+	if transferPerMessage == nil || transferPerMessage.Sign() <= 0 {
 		c.transferTokenInstrument = nil
 		c.nextTransferCID = ""
 		return nil
@@ -1096,7 +1104,10 @@ func (c *Chain) SetupSend(
 	if err != nil {
 		return fmt.Errorf("list transfer holdings for setup: %w", err)
 	}
-	transferMin := new(big.Rat).Set(transferAmountPerMessage)
+	transferMin := new(big.Rat).Set(transferPerMessage)
+	if c.sendsLeft > 0 {
+		transferMin.Mul(transferMin, new(big.Rat).SetUint64(c.sendsLeft))
+	}
 	selectedTransfer, err := c.selectHolding("setup-transfer", *transferTokenInstrument, transferRows, transferMin)
 	if err != nil {
 		return fmt.Errorf("select transfer holding for setup: %w", err)
@@ -1110,7 +1121,6 @@ func (c *Chain) SetupSend(
 
 // SetSequentialSends limits holding rotation to the next sends messages in this setup batch.
 // After the send whose on-chain seq equals nextSeq+sends, setNextHoldings is skipped.
-// Pass 0 to always rotate (open-ended load).
 func (c *Chain) SetSequentialSends(sends int) {
 	if sends <= 0 {
 		c.sendsLeft = 0
