@@ -34,6 +34,7 @@ runs:
         if [ ! -d "logs" ] || [ -z "$(ls -A logs 2>/dev/null)" ]; then
           echo "Logs not found or empty. Dumping logs manually..."
           cd ../.. && go run cmd/ccv/main.go dl --dir-suffix "${{ inputs.log-dump-suffix }}"
+          mv logs ./tests/${{ inputs.test-package-dir }}/
         else
           echo "Logs already exist. Skipping manual dump."
         fi
