@@ -37,6 +37,11 @@ const (
 	defaultLoadDuration       = 90 * time.Second
 	defaultLoadCallPadding    = 2 * time.Minute
 	defaultSendOnlyCallBudget = 5 * time.Minute
+
+	// waspSequentialSendBuffer is added to estimateMessages when calling SetSequentialSends
+	// for token load. WASP always fires more Call() invocations than estimateMessages predicts
+	// (schedule boundaries, generator resume, post-window drain).
+	waspSequentialSendBuffer = 3
 )
 
 type scheduleConfig struct {
@@ -270,6 +275,13 @@ func discoverEVMTokenDestinationsFromBoot(t *testing.T, boot devenvtests.E2EBoot
 	}
 
 	return dests
+}
+
+// sequentialSendsForLoad returns SetSequentialSends budget for token load setup.
+func sequentialSendsForLoad(sched scheduleConfig) int {
+	estimated := estimateMessages(sched)
+	//nolint:gosec // estimateMessages is positive; buffer is a small fixed constant
+	return int(estimated + waspSequentialSendBuffer)
 }
 
 func estimateMessages(sched scheduleConfig) uint64 {

@@ -52,8 +52,7 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 	require.NotNil(t, receiverBalanceBefore)
 
 	sched := loadSchedule(t)
-	estimatedMessages := estimateMessages(sched)
-	boot.SetupCantonTokenSend(t, ctx, lane, int(estimatedMessages))
+	boot.SetupCantonTokenSend(t, ctx, lane, sequentialSendsForLoad(sched))
 
 	ccvAddr, executorAddr := resolveCantonSourceAddrs(t, boot.Lib, boot.Canton.ChainSelector())
 
