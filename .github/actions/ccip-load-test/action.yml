@@ -48,6 +48,10 @@ inputs:
     description: "CANTON_PARTY_ID"
     required: false
     default: "u_d53a15c42af6::1220c250c23c55120f7c758bccc5cbc739629015ab921594e1c29656981f985bffa7"
+  user_id:
+    description: "CANTON_USER_ID"
+    required: false
+    default: "0oau1l03xrG9NQw9z5d7"
   grpc_url:
     description: "CANTON_GRPC_URL"
     required: false
@@ -63,6 +67,12 @@ inputs:
     required: false
   CCIP_PROD_TESTNET_PRIVATE_KEY:
     description: "GitHub secret CCIP_PROD_TESTNET_PRIVATE_KEY"
+    required: false
+  TS_OAUTH_CLIENT_ID_CANTON:
+    description: "GitHub secret TS_OAUTH_CLIENT_ID_CANTON (prod-testnet Tailscale)"
+    required: false
+  TS_AUDIENCE_CANTON:
+    description: "GitHub secret TS_AUDIENCE_CANTON (prod-testnet Tailscale)"
     required: false
   ccv-iam-role:
     description: "AWS IAM role for CCV ECR authentication (devenv only)"
@@ -86,6 +96,14 @@ runs:
         ccv-iam-role: ${{ inputs.ccv-iam-role }}
         jd-registry: ${{ inputs.jd-registry }}
         jd-image: ${{ inputs.jd-image }}
+
+    - name: Connect to Tailscale (prod-testnet)
+      if: inputs.ccip_env == 'prod-testnet'
+      uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
+      with:
+        oauth-client-id: ${{ inputs.TS_OAUTH_CLIENT_ID_CANTON }}
+        audience: ${{ inputs.TS_AUDIENCE_CANTON }}
+        tags: tag:bcy-validators-gha
 
     - name: Install Go (prod-testnet)
       if: inputs.ccip_env == 'prod-testnet'
@@ -130,6 +148,7 @@ runs:
         CANTON_CLIENT_ID: ${{ inputs.CANTON_OKTA_CLIENT_ID_TESTNET }}
         CANTON_CLIENT_SECRET: ${{ inputs.CANTON_OKTA_CLIENT_SECRET_TESTNET }}
         CANTON_PARTY_ID: ${{ inputs.party_id }}
+        CANTON_USER_ID: ${{ inputs.user_id }}
         CANTON_GRPC_URL: ${{ inputs.grpc_url }}
         CANTON_LOAD_MESSAGE_RATE: ${{ inputs.message_rate }}
         CANTON_LOAD_DURATION: ${{ inputs.load_duration }}

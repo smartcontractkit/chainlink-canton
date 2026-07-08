@@ -21,7 +21,7 @@ out.chain_id = "11155111"
 out.family = "evm"
 out.container_name = "ethereum-testnet-sepolia"
 out.nodes = [
-  { http_url = "https://rpcs.cldev.sh/16015286601757825753", internal_http_url = "https://rpcs.cldev.sh/16015286601757825753", internal_ws_url = "wss://rpcs.cldev.sh/16015286601757825753", ws_url = "wss://rpcs.cldev.sh/16015286601757825753" },
+  { http_url = "https://rpc-proxy-main-prod.tailec47a7.ts.net/gha-canton/16015286601757825753", internal_http_url = "https://rpc-proxy-main-prod.tailec47a7.ts.net/gha-canton/16015286601757825753", internal_ws_url = "wss://rpc-proxy-main-prod.tailec47a7.ts.net/gha-canton/16015286601757825753", ws_url = "wss://rpc-proxy-main-prod.tailec47a7.ts.net/gha-canton/16015286601757825753" },
 ]
 
 [[blockchains]]

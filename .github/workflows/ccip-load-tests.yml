@@ -127,6 +127,8 @@ jobs:
           CANTON_OKTA_CLIENT_ID_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_ID_TESTNET }}
           CANTON_OKTA_CLIENT_SECRET_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_SECRET_TESTNET }}
           CCIP_PROD_TESTNET_PRIVATE_KEY: ${{ secrets.CCIP_PROD_TESTNET_PRIVATE_KEY }}
+          TS_OAUTH_CLIENT_ID_CANTON: ${{ secrets.TS_OAUTH_CLIENT_ID_CANTON }}
+          TS_AUDIENCE_CANTON: ${{ secrets.TS_AUDIENCE_CANTON }}
           ccv-iam-role: ${{ secrets.CCV_IAM_ROLE }}
           jd-registry: ${{ secrets.JD_REGISTRY }}
           jd-image: ${{ secrets.JD_IMAGE }}
