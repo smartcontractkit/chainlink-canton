@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	ccipreceiver "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	ccipsender "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/ccip/devenv/ledgerbind"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -245,6 +246,11 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Parti
 		return receiverAddress, nil
 	}
 
+	requiredCCVs, err := receiverRequiredCCVsFromEnv()
+	if err != nil {
+		return contracts.InstanceAddress{}, err
+	}
+
 	finalityConfig, err := encodeReceiverFinalityConfig(receiverFinality)
 	if err != nil {
 		return contracts.InstanceAddress{}, fmt.Errorf("failed to encode receiver finality config: %w", err)
@@ -256,7 +262,7 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Parti
 		Template: ccipreceiver.CCIPReceiver{
 			InstanceId:             types.TEXT(instanceID),
 			Owner:                  types.PARTY(partyId),
-			RequiredCCVs:           nil,
+			RequiredCCVs:           requiredCCVs,
 			OptionalCCVs:           nil,
 			OptionalThreshold:      0,
 			ReceiverFinalityConfig: finalityConfig,
@@ -279,6 +285,22 @@ func (c *Chain) DeployCCIPReceiver(ctx context.Context, participant canton.Parti
 
 	c.receiverAddress = receiverAddress
 	return receiverAddress, nil
+}
+
+func receiverRequiredCCVsFromEnv() ([]chainlinkapi.RawInstanceAddress, error) {
+	raw := strings.TrimSpace(os.Getenv("CANTON_RECEIVER_REQUIRED_CCV"))
+	if raw == "" {
+		return nil, nil
+	}
+
+	parsed, err := contracts.RawInstanceAddressFromString(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parse CANTON_RECEIVER_REQUIRED_CCV: %w", err)
+	}
+
+	return []chainlinkapi.RawInstanceAddress{
+		{Unpack: types.TEXT(parsed.String())},
+	}, nil
 }
 
 // ManuallyExecuteMessage implements cciptestinterfaces.CCIP17.

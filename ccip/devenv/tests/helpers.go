@@ -15,6 +15,7 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
+	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -23,6 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -204,10 +206,30 @@ func (b E2EBootstrap) SetupCantonTokenSend(t *testing.T, ctx context.Context, la
 	}
 }
 
-// SetupCantonReceive deploys the client party's PerPartyRouter before inbound messages
-// are executed on Canton (e.g. EVM→Canton).
+// SetupCantonReceive sets CANTON_RECEIVER_REQUIRED_CCV when unset, then deploys the client
+// party's PerPartyRouter before inbound messages are executed on Canton (e.g. EVM→Canton).
 func (b E2EBootstrap) SetupCantonReceive(t *testing.T, ctx context.Context) {
 	t.Helper()
+
+	if strings.TrimSpace(os.Getenv("CANTON_RECEIVER_REQUIRED_CCV")) == "" {
+		ds, err := b.Lib.DataStore()
+		require.NoError(t, err)
+
+		cantonChain := GetChainFromMap(t, blockchain.TypeCanton, b.Cfg, b.ChainMap)
+		_, raw, err := testhelpers.ResolveAddressFromDatastore(
+			ds,
+			cantonChain.ChainSelector(),
+			committee_verifier.ContractType,
+			committee_verifier.Version,
+			devenvcommon.DefaultCommitteeVerifierQualifier,
+		)
+		if err != nil && b.Env.IsRemote() {
+			require.FailNow(t, err.Error()+"; set CANTON_RECEIVER_REQUIRED_CCV to the Canton committee verifier raw address (instanceId@owner)")
+		}
+		require.NoError(t, err)
+		require.NoError(t, os.Setenv("CANTON_RECEIVER_REQUIRED_CCV", raw.String()))
+	}
+
 	require.NoError(t, b.Canton.SetupReceive(ctx))
 }
 

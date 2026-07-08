@@ -67,6 +67,7 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 	c.AddCommand(newCantonSendMessageCmd(g))
 	c.AddCommand(newCantonSendTokenCmd(g))
 	c.AddCommand(newCantonExecuteCmd(g))
+	c.AddCommand(newCantonSyncReceiverCCVCmd(g))
 	c.AddCommand(newCantonListEventsCmd(g))
 	c.AddCommand(newCantonListHoldingsCmd(g))
 	c.AddCommand(newCantonCreateTransferCmd(g))
@@ -399,6 +400,40 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 	c.Flags().DurationVar(&wait, "wait", 15*time.Minute, "max time to wait for verifier results")
 	c.Flags().StringVar(&finalityName, "finality", "finality", "must match the send: finality (full), safe, or block depth 1-65535")
 	_ = c.MarkFlagRequired("message-id")
+
+	return c
+}
+
+func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
+	var (
+		requiredCCV  string
+		finalityName string
+	)
+	c := &cobra.Command{
+		Use:   "sync-receiver-ccv",
+		Short: "Deploy or update CCIPReceiver required CCVs (run once before inbound load/e2e on prod)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			b, err := g.Resolve(ctx)
+			if err != nil {
+				return err
+			}
+			fin, err := finality.Parse(finalityName)
+			if err != nil {
+				return err
+			}
+			raw, err := contracts.RawInstanceAddressFromString(requiredCCV)
+			if err != nil {
+				return fmt.Errorf("parse --required-ccv: %w", err)
+			}
+
+			_, err = cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, raw)
+			return err
+		},
+	}
+	c.Flags().StringVar(&requiredCCV, "required-ccv", "", "Canton committee verifier raw address (instanceId@owner)")
+	c.Flags().StringVar(&finalityName, "finality", "1", "receiver finality profile: finality|safe|1-65535")
+	_ = c.MarkFlagRequired("required-ccv")
 
 	return c
 }
