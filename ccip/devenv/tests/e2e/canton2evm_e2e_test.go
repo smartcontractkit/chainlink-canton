@@ -52,11 +52,15 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	// TODO: currently minting 2 holdings of 2k for all the e2e tests. Otherwise one holding might conflict with the other.
+	// the tests need to be hardened to not rely on this and instead correctly pick the holding that suffices.
+	require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)*100))
+	require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)*100))
+
 	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		// Setup message send
-		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)))
 		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), 0))
 
 		ds, err := lib.DataStore()
@@ -146,12 +150,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		tokenTransferAmount := lane.TransferAmount.Uint64()
 
 		// Setup message send
-		require.NoError(t, cantonImpl.MintTokens(ctx,
-			devenvtests.CantonToEVMTokenSequentialSends*uint64(devenvtests.CantonToEVMFeeAmount),
-		)) // Holdings for fee
-		require.NoError(t, cantonImpl.MintTokens(ctx,
-			devenvtests.CantonToEVMTokenSequentialSends*tokenTransferAmount,
-		)) // Holdings for token transfer
 		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
 
 		ds, err := lib.DataStore()
@@ -237,8 +235,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
 		tokenTransferAmount := lane.TransferAmount.Uint64()
 
-		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)))
-		require.NoError(t, cantonImpl.MintTokens(ctx, tokenTransferAmount))
 		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
@@ -281,8 +277,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
 		tokenTransferAmount := lane.TransferAmount.Uint64()
 
-		require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)))
-		require.NoError(t, cantonImpl.MintTokens(ctx, tokenTransferAmount))
 		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
 
 		ds, err := lib.DataStore()

@@ -78,7 +78,10 @@ func TestCanton2EVM_TokenLoad(t *testing.T) {
 		destinations,
 		ccvAddr,
 		executorAddr,
-		utilstests.WaitTimeout(t),
+		LoadGunOptions{
+			ConfirmSend:        cantonSourceConfirmSend(cantonChain),
+			ConfirmExecTimeout: utilstests.WaitTimeout(t),
+		},
 	)
 	require.NoError(t, err)
 

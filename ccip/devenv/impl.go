@@ -1396,7 +1396,6 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, fmt.Errorf("execute CCIP Send: %w", err)
 	}
-	c.logger.Info().Str("UpdateID", ccipSendReport.Output.ExecInfo.UpdateID).Msg("CCIP Send executed")
 	update, err := participant.LedgerServices.Update.GetUpdateById(ctx, &apiv2.GetUpdateByIdRequest{
 		UpdateId: ccipSendReport.Output.ExecInfo.UpdateID,
 		UpdateFormat: &apiv2.UpdateFormat{
@@ -1439,6 +1438,11 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 	if err != nil {
 		return cciptestinterfaces.MessageSentEvent{}, err
 	}
+	c.logger.Info().
+		Str("UpdateID", ccipSendReport.Output.ExecInfo.UpdateID).
+		Str("messageID", protocol.Bytes32(parsedSend.messageID).String()).
+		Uint64("seqNo", parsedSend.seqNo).
+		Msg("CCIP Send executed")
 
 	// Set next holdings
 	err = c.setNextHoldings(update.GetTransaction().GetEvents(), hasTokenTransfer, fields.TokenAmount.Amount)

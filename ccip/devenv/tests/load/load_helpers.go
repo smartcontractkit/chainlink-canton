@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	ccvload "github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/load"
+	ccvmetrics "github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/metrics"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
@@ -29,10 +31,13 @@ import (
 )
 
 const (
-	envMessageRate      = "CANTON_LOAD_MESSAGE_RATE"
-	envLoadDuration     = "CANTON_LOAD_DURATION"
-	defaultMessageRate  = "1/1s"
-	defaultLoadDuration = 90 * time.Second
+	envMessageRate         = "CANTON_LOAD_MESSAGE_RATE"
+	envLoadDuration        = "CANTON_LOAD_DURATION"
+	envLoadCallTimeout     = "CANTON_LOAD_CALL_TIMEOUT"
+	defaultMessageRate     = "1/1s"
+	defaultLoadDuration    = 90 * time.Second
+	defaultLoadCallPadding = 2 * time.Minute
+	confirmSendTimeout     = 30 * time.Second
 )
 
 type scheduleConfig struct {
@@ -70,8 +75,60 @@ func loadSchedule(t *testing.T) scheduleConfig {
 	}
 }
 
+func waspCallTimeout(t *testing.T, gun *CCIPLoadGun, sched scheduleConfig) time.Duration {
+	t.Helper()
+
+	if v := strings.TrimSpace(os.Getenv(envLoadCallTimeout)); v != "" {
+		parsed, err := time.ParseDuration(v)
+		require.NoError(t, err, "%s=%q invalid", envLoadCallTimeout, v)
+		return parsed
+	}
+
+	return gun.ConfirmExecTimeout() + sched.rateUnit + defaultLoadCallPadding
+}
+
+func printLoadMetrics(t *testing.T, gun *CCIPLoadGun) {
+	t.Helper()
+
+	records := gun.Metrics()
+	failures := gun.FailureCounts()
+	PrintPhaseMetricsSummary(t, records, failures, false)
+
+	ccvMetrics := ToCCVMessageMetrics(records)
+	if len(ccvMetrics) > 0 {
+		totals := ccvmetrics.MessageTotals{
+			Sent:     len(ccvMetrics),
+			Received: len(ccvMetrics),
+		}
+		summary := ccvmetrics.CalculateMetricsSummary(ccvMetrics, totals)
+		ccvmetrics.PrintMetricsSummary(t, summary)
+	}
+}
+
+func logLoadMessageSummary(t *testing.T, gun *CCIPLoadGun) {
+	t.Helper()
+
+	ids := gun.MessageIDs()
+	lggr := ccv.Plog
+	lggr.Info().Int("count", len(ids)).Msg("Load message summary")
+
+	for i, id := range ids {
+		lggr.Info().Int("index", i+1).Str("messageID", id.String()).Msg("Load message sent")
+	}
+}
+
 func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfig, scenario string) {
 	t.Helper()
+	defer logLoadMessageSummary(t, gun)
+
+	callTimeout := waspCallTimeout(t, gun, sched)
+	ccv.Plog.Info().
+		Str("messageRate", sched.messageRate).
+		Dur("rateUnit", sched.rateUnit).
+		Dur("loadDuration", sched.duration).
+		Dur("callTimeout", callTimeout).
+		Dur("confirmExecTimeout", gun.ConfirmExecTimeout()).
+		Msg("WASP load schedule")
 
 	labels := map[string]string{
 		"go_test_name":  genName,
@@ -92,6 +149,7 @@ func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfi
 			wasp.Plain(sched.rate, sched.duration),
 		),
 		RateLimitUnitDuration: sched.rateUnit,
+		CallTimeout:           callTimeout,
 		Gun:                   gun,
 		Labels:                labels,
 		LokiConfig:            nil,
@@ -104,6 +162,8 @@ func runWASP(t *testing.T, gun *CCIPLoadGun, genName string, sched scheduleConfi
 	require.Positive(t, gun.CallCount(), "gun should have completed at least one message")
 	require.LessOrEqual(t, gun.MaxConcurrentObserved(), int32(1),
 		"Gun.Call must not overlap (single-flight)")
+
+	printLoadMetrics(t, gun)
 }
 
 func discoverEVMDestinations(t *testing.T, in *ccv.Cfg, chainMap map[uint64]cciptestinterfaces.CCIP17) []Destination {
@@ -369,4 +429,40 @@ func resolveEVMSourceAddrs(t *testing.T, lib ccv.Lib, evmSelector uint64) (proto
 	)
 
 	return ccvAddr, executorAddr
+}
+
+func cantonSourceConfirmSend(source cciptestinterfaces.CCIP17) ConfirmSendFunc {
+	return func(
+		t *testing.T,
+		ctx context.Context,
+		destSelector uint64,
+		seqNo uint64,
+		_ cciptestinterfaces.MessageSentEvent,
+	) (cciptestinterfaces.MessageSentEvent, error) {
+		return source.ConfirmSendOnSource(
+			ctx,
+			destSelector,
+			cciptestinterfaces.MessageEventKey{SeqNum: seqNo},
+			confirmSendTimeout,
+		)
+	}
+}
+
+// TODO: this is needed because EVM impls method has a bug on prod-testnet checks.
+// currently just a simple wrapper around the method.
+func evmSourceConfirmSend(source cciptestinterfaces.CCIP17) ConfirmSendFunc {
+	return func(
+		t *testing.T,
+		ctx context.Context,
+		destSelector uint64,
+		seqNo uint64,
+		_ cciptestinterfaces.MessageSentEvent,
+	) (cciptestinterfaces.MessageSentEvent, error) {
+		return source.ConfirmSendOnSource(
+			ctx,
+			destSelector,
+			cciptestinterfaces.MessageEventKey{SeqNum: seqNo},
+			confirmSendTimeout,
+		)
+	}
 }
