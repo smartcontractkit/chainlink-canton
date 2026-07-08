@@ -39,7 +39,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[lockreleasetokenpool.LockR
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPLockReleaseTokenPool),
+	PackageName: string(contracts.CCIPLockReleaseTokenPoolV2),
 	Prefix:      "lockreleasetokenpool",
 })
 

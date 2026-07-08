@@ -32,7 +32,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[executor.Executor]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPExecutor),
+	PackageName: string(contracts.CCIPExecutorV2),
 	Prefix:      "executor",
 })
 

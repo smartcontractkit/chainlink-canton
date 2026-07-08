@@ -34,7 +34,7 @@ func TestMCMSOps(t *testing.T) {
 	primaryParty := participant.PartyID
 
 	// Upload Dar
-	mcmdDar, err := contracts.GetDar(contracts.MCMSCore, contracts.CurrentVersion)
+	mcmdDar, err := contracts.GetDar(contracts.MCMSCore, contracts.DevVersion)
 	require.NoError(t, err, "failed to get MCMS dar file")
 	_, err = participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
 		Dars: []*participantv30.UploadDarRequest_UploadDarData{

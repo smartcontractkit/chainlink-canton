@@ -441,18 +441,18 @@ func uploadCCIPMCMSFactoryDARs(t *testing.T, participants []canton.Participant) 
 	darPackages := []contracts.Package{
 		contracts.MCMSCore,
 		contracts.MCMSTest,
-		contracts.CCIPRuntime,
-		contracts.CCIPCore,
-		contracts.CCIPCommitteeVerifier,
-		contracts.CCIPExtensionAPI,
-		contracts.CCIPLockReleaseTokenPool,
-		contracts.CCIPExecutor,
-		contracts.CCIPFactory,
+		contracts.CCIPRuntimeV2,
+		contracts.CCIPCoreV2,
+		contracts.CCIPCommitteeVerifierV2,
+		contracts.CCIPExtensionAPIV2,
+		contracts.CCIPLockReleaseTokenPoolV2,
+		contracts.CCIPExecutorV2,
+		contracts.CCIPFactoryV2,
 	}
 
 	darBytes := make([][]byte, 0, len(darPackages))
 	for _, pkg := range darPackages {
-		dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
+		dar, err := contracts.GetDar(pkg, contracts.DevVersion)
 		require.NoError(t, err)
 		darBytes = append(darBytes, dar)
 	}

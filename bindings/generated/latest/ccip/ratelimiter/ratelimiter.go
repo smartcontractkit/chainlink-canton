@@ -23,8 +23,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-rate-limiter"
-	PackageID   = "cf163092a8c62f4692e9026cb1d4769e158ba507787783938d85b74e16cfe28a"
+	PackageName = "ccip-rate-limiter-v2"
+	PackageID   = "973f5a6e681710e7ea5b8f19c01ef608e91c8b4f04d9779fa0337763fb1cf328"
 	SDKVersion  = "3.4.11"
 )
 

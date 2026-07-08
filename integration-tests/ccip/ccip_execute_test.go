@@ -136,15 +136,15 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	})
 
 	// Upload DARs
-	runtimeDar, err := contracts.GetDar(contracts.CCIPRuntime, contracts.CurrentVersion)
+	runtimeDar, err := contracts.GetDar(contracts.CCIPRuntimeV2, contracts.DevVersion)
 	require.NoError(t, err)
-	coreDar, err := contracts.GetDar(contracts.CCIPCore, contracts.CurrentVersion)
+	coreDar, err := contracts.GetDar(contracts.CCIPCoreV2, contracts.DevVersion)
 	require.NoError(t, err)
-	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
+	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifierV2, contracts.DevVersion)
 	require.NoError(t, err)
-	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
+	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiverV2, contracts.DevVersion)
 	require.NoError(t, err)
-	executorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
+	executorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
 
 	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipReceiverDar, executorDar}

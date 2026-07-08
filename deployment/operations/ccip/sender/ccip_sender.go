@@ -29,7 +29,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[sender.CCIPSender]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPSender),
+	PackageName: string(contracts.CCIPSenderV2),
 	Prefix:      "ccipsender",
 })
 

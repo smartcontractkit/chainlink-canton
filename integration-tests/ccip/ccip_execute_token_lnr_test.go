@@ -143,17 +143,17 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 
 	// DAR Uploading
 	// Read DARs
-	runtimeDar, err := contracts.GetDar(contracts.CCIPRuntime, contracts.CurrentVersion)
+	runtimeDar, err := contracts.GetDar(contracts.CCIPRuntimeV2, contracts.DevVersion)
 	require.NoError(t, err)
-	coreDar, err := contracts.GetDar(contracts.CCIPCore, contracts.CurrentVersion)
+	coreDar, err := contracts.GetDar(contracts.CCIPCoreV2, contracts.DevVersion)
 	require.NoError(t, err)
-	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
+	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifierV2, contracts.DevVersion)
 	require.NoError(t, err)
-	tokenPoolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPool, contracts.CurrentVersion)
+	tokenPoolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPoolV2, contracts.DevVersion)
 	require.NoError(t, err)
-	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
+	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiverV2, contracts.DevVersion)
 	require.NoError(t, err)
-	executorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
+	executorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
 
 	// Upload DARs to all participants

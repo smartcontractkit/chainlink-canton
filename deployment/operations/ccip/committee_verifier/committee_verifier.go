@@ -52,7 +52,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[committeeverifier.Committe
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPCommitteeVerifier),
+	PackageName: string(contracts.CCIPCommitteeVerifierV2),
 	Prefix:      "committeeverifier",
 })
 

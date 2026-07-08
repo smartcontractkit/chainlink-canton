@@ -90,20 +90,18 @@ func TestCCIPSend(t *testing.T) {
 	})
 
 	// Upload DARs
-	runtimeDar, err := contracts.GetDar(contracts.CCIPRuntime, contracts.CurrentVersion)
+	runtimeDar, err := contracts.GetDar(contracts.CCIPRuntimeV2, contracts.DevVersion)
 	require.NoError(t, err)
-	coreDar, err := contracts.GetDar(contracts.CCIPCore, contracts.CurrentVersion)
+	coreDar, err := contracts.GetDar(contracts.CCIPCoreV2, contracts.DevVersion)
 	require.NoError(t, err)
-	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
+	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifierV2, contracts.DevVersion)
 	require.NoError(t, err)
-	ccipSenderDar, err := contracts.GetDar(contracts.CCIPSender, contracts.CurrentVersion)
+	ccipSenderDar, err := contracts.GetDar(contracts.CCIPSenderV2, contracts.DevVersion)
 	require.NoError(t, err)
-	ccipExecutorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
-	require.NoError(t, err)
-	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.CurrentVersion)
+	ccipExecutorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
 
-	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, ccipTestDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, senderParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)

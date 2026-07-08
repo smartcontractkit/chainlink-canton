@@ -28,7 +28,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[core.RMNRemote]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPCore),
+	PackageName: string(contracts.CCIPCoreV2),
 	Prefix:      "rmn_remote",
 })
 

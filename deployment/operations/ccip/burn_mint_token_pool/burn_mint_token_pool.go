@@ -40,7 +40,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[burnminttokenpool.BurnMint
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPBurnMintTokenPool),
+	PackageName: string(contracts.CCIPBurnMintTokenPoolV2),
 	Prefix:      "burnminttokenpool",
 })
 

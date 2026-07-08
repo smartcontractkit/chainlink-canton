@@ -15,23 +15,41 @@ var SpliceDependencies embed.FS
 type Package string
 
 const (
-	Coin = Package("coin")
-	Link = Package("link")
+	// Shared
 
 	ChainlinkAPI = Package("chainlink-api")
 
-	MCMSAPI      = Package("mcms-api")
-	MCMSCore     = Package("mcms-core")
-	MCMSTest     = Package("mcms-test")
-	GlobalConfig = Package("globalconfig")
+	// LINK Token
 
-	CCIPAPI                  = Package("ccip-api")
-	CCIPCodec                = Package("ccip-codec")
-	CCIPTickets              = Package("ccip-tickets")
-	CCIPEvents               = Package("ccip-events")
-	CCIPRateLimiter          = Package("ccip-rate-limiter")
-	CCIPClientAPI            = Package("ccip-client-api")
-	CCIPUtils                = Package("ccip-utils")
+	Link = Package("link")
+
+	// MCMS
+
+	MCMSAPI  = Package("mcms-api")
+	MCMSCore = Package("mcms-core")
+
+	// CCIP - V2
+
+	CCIPAPIV2                  = Package("ccip-api-v2")
+	CCIPCodecV2                = Package("ccip-codec-v2")
+	CCIPTicketsV2              = Package("ccip-tickets-v2")
+	CCIPEventsV2               = Package("ccip-events-v2")
+	CCIPRateLimiterV2          = Package("ccip-rate-limiter-v2")
+	CCIPClientAPIV2            = Package("ccip-client-api-v2")
+	CCIPUtilsV2                = Package("ccip-utils-v2")
+	CCIPCoreV2                 = Package("ccip-core-v2")
+	CCIPExtensionAPIV2         = Package("ccip-extension-api-v2")
+	CCIPRuntimeV2              = Package("ccip-runtime-v2")
+	CCIPSenderV2               = Package("ccip-sender-v2")
+	CCIPReceiverV2             = Package("ccip-receiver-v2")
+	CCIPCommitteeVerifierV2    = Package("ccip-committee-verifier-v2")
+	CCIPExecutorV2             = Package("ccip-executor-v2")
+	CCIPLockReleaseTokenPoolV2 = Package("ccip-lock-release-token-pool-v2")
+	CCIPBurnMintTokenPoolV2    = Package("ccip-burn-mint-token-pool-v2")
+	CCIPFactoryV2              = Package("ccip-factory-v2")
+
+	// CCIP - Legacy
+
 	CCIPCore                 = Package("ccip-core")
 	CCIPExtensionAPI         = Package("ccip-extension-api")
 	CCIPRuntime              = Package("ccip-runtime")
@@ -42,67 +60,100 @@ const (
 	CCIPLockReleaseTokenPool = Package("ccip-lock-release-token-pool")
 	CCIPBurnMintTokenPool    = Package("ccip-burn-mint-token-pool")
 	CCIPFactory              = Package("ccip-factory")
-	CCIPTest                 = Package("ccip-test")
+
+	// Token Standard
 
 	SpliceApiTokenBurnMintV1            = Package("splice-api-token-burn-mint-v1")
 	SpliceApiTokenHoldingV1             = Package("splice-api-token-holding-v1")
 	SpliceApiTokenMetadataV1            = Package("splice-api-token-metadata-v1")
 	SpliceApiTokenTransferInstructionV1 = Package("splice-api-token-transfer-instruction-v1")
+
+	// Tests
+
+	Coin         = Package("coin")
+	GlobalConfig = Package("globalconfig")
+	MCMSTest     = Package("mcms-test")
+	CCIPTest     = Package("ccip-test")
 )
 
-const CurrentVersion = "current"
+const DevVersion = "dev"
 
-// ReleaseDir is the frozen production DAR snapshot (e.g. v2_0_0).
-// Individual packages keep their own semver in the filename; multiple package
-// versions (e.g. globalconfig-1.0.0 and globalconfig-2.0.0) live in the same
-// release directory.
-const ReleaseDir = "v2_0_0"
+var ReleasedVersions map[Package][]string = map[Package][]string{
+	CCIPAPIV2:                  []string{"2.0.0"},
+	CCIPBurnMintTokenPoolV2:    []string{"2.0.0"},
+	CCIPClientAPIV2:            []string{"2.0.0"},
+	CCIPCodecV2:                []string{"2.0.0"},
+	CCIPCommitteeVerifierV2:    []string{"2.0.0"},
+	CCIPCoreV2:                 []string{"2.0.0"},
+	CCIPEventsV2:               []string{"2.0.0"},
+	CCIPExecutorV2:             []string{"2.0.0"},
+	CCIPExtensionAPIV2:         []string{"2.0.0"},
+	CCIPFactoryV2:              []string{"2.0.0"},
+	CCIPLockReleaseTokenPoolV2: []string{"2.0.0"},
+	CCIPRateLimiterV2:          []string{"2.0.0"},
+	CCIPReceiverV2:             []string{"2.0.0"},
+	CCIPRuntimeV2:              []string{"2.0.0"},
+	CCIPSenderV2:               []string{"2.0.0"},
+	CCIPTicketsV2:              []string{"2.0.0"},
+	CCIPUtilsV2:                []string{"2.0.0"},
+	ChainlinkAPI:               []string{"2.0.0"},
+	Link:                       []string{"2.0.0"},
+	MCMSAPI:                    []string{"1.0.0"},
+	MCMSCore:                   []string{"2.0.0"},
+}
+
+const (
+	ReleaseDir = "released"
+	DevDir     = "dev"
+)
 
 var Versions map[Package][]string = map[Package][]string{
-	Coin:         []string{CurrentVersion},
-	Link:         []string{"2.0.0", CurrentVersion},
-	ChainlinkAPI: []string{"2.0.0", CurrentVersion},
-	MCMSAPI:      []string{"2.0.0", CurrentVersion},
-	MCMSCore:     []string{"2.0.0", CurrentVersion},
-	MCMSTest:     []string{CurrentVersion},
-	GlobalConfig: []string{"1.0.0", "2.0.0", CurrentVersion},
+	ChainlinkAPI: []string{"2.0.0", DevVersion},
 
-	CCIPAPI:                  []string{CurrentVersion},
-	CCIPCodec:                []string{CurrentVersion},
-	CCIPTickets:              []string{CurrentVersion},
-	CCIPEvents:               []string{CurrentVersion},
-	CCIPRateLimiter:          []string{CurrentVersion},
-	CCIPClientAPI:            []string{CurrentVersion},
-	CCIPUtils:                []string{CurrentVersion},
-	CCIPCore:                 []string{"2.0.0", CurrentVersion},
-	CCIPExtensionAPI:         []string{"2.0.0", CurrentVersion},
-	CCIPRuntime:              []string{"2.0.0", CurrentVersion},
-	CCIPSender:               []string{"2.0.0", CurrentVersion},
-	CCIPReceiver:             []string{"2.0.0", CurrentVersion},
-	CCIPCommitteeVerifier:    []string{"2.0.0", CurrentVersion},
-	CCIPExecutor:             []string{"2.0.0", CurrentVersion},
-	CCIPLockReleaseTokenPool: []string{"2.0.0", CurrentVersion},
-	CCIPBurnMintTokenPool:    []string{"2.0.0", CurrentVersion},
-	CCIPFactory:              []string{"2.0.0", CurrentVersion},
-	CCIPTest:                 []string{CurrentVersion},
+	Link: []string{"2.0.0", DevVersion},
+
+	MCMSAPI:  []string{"1.0.0", DevVersion},
+	MCMSCore: []string{"2.0.0", DevVersion},
+
+	CCIPAPIV2:                  []string{"2.0.0", DevVersion},
+	CCIPCodecV2:                []string{"2.0.0", DevVersion},
+	CCIPTicketsV2:              []string{"2.0.0", DevVersion},
+	CCIPEventsV2:               []string{"2.0.0", DevVersion},
+	CCIPRateLimiterV2:          []string{"2.0.0", DevVersion},
+	CCIPClientAPIV2:            []string{"2.0.0", DevVersion},
+	CCIPUtilsV2:                []string{"2.0.0", DevVersion},
+	CCIPCoreV2:                 []string{"2.0.0", DevVersion},
+	CCIPExtensionAPIV2:         []string{"2.0.0", DevVersion},
+	CCIPRuntimeV2:              []string{"2.0.0", DevVersion},
+	CCIPSenderV2:               []string{"2.0.0", DevVersion},
+	CCIPReceiverV2:             []string{"2.0.0", DevVersion},
+	CCIPCommitteeVerifierV2:    []string{"2.0.0", DevVersion},
+	CCIPExecutorV2:             []string{"2.0.0", DevVersion},
+	CCIPLockReleaseTokenPoolV2: []string{"2.0.0", DevVersion},
+	CCIPBurnMintTokenPoolV2:    []string{"2.0.0", DevVersion},
+	CCIPFactoryV2:              []string{"2.0.0", DevVersion},
 
 	SpliceApiTokenBurnMintV1:            []string{"1.0.0"},
 	SpliceApiTokenHoldingV1:             []string{"1.0.0"},
 	SpliceApiTokenMetadataV1:            []string{"1.0.0"},
 	SpliceApiTokenTransferInstructionV1: []string{"1.0.0"},
+
+	Coin:         []string{DevVersion},
+	GlobalConfig: []string{DevVersion},
+	MCMSTest:     []string{DevVersion},
 }
 
-// VersionDir maps a DAR version string to its artifact subdirectory.
-func VersionDir(version string) string {
-	if version == CurrentVersion {
-		return CurrentVersion
+// versionDir maps a DAR version string to its artifact subdirectory.
+func versionDir(version string) string {
+	if version == DevVersion {
+		return DevDir
 	}
 
 	return ReleaseDir
 }
 
 func darPath(packageName Package, version string) string {
-	return fmt.Sprintf("dars/%s/%s-%s.dar", VersionDir(version), packageName, version)
+	return fmt.Sprintf("dars/%s/%s-%s.dar", versionDir(version), packageName, version)
 }
 
 func GetDar(packageName Package, version string) ([]byte, error) {
@@ -128,7 +179,50 @@ func GetDar(packageName Package, version string) ([]byte, error) {
 	return data, nil
 }
 
-var OutputDirs = map[Package][]string{
+var LegacyVersions map[Package][]string = map[Package][]string{
+	CCIPBurnMintTokenPool:    []string{"1.0.0", "2.0.0"},
+	CCIPCommitteeVerifier:    []string{"1.0.0", "2.0.0"},
+	CCIPCore:                 []string{"1.0.0", "2.0.0"},
+	CCIPExecutor:             []string{"1.0.0", "2.0.0"},
+	CCIPExtensionAPI:         []string{"1.0.0", "2.0.0"},
+	CCIPFactory:              []string{"1.0.0", "2.0.0"},
+	CCIPLockReleaseTokenPool: []string{"1.0.0", "2.0.0"},
+	CCIPReceiver:             []string{"1.0.0", "2.0.0"},
+	CCIPRuntime:              []string{"1.0.0", "2.0.0"},
+	CCIPSender:               []string{"1.0.0", "2.0.0"},
+	ChainlinkAPI:             []string{"1.0.0", "2.0.0"},
+	Coin:                     []string{"0.0.1"},
+	GlobalConfig:             []string{"1.0.0", "2.0.0"},
+	Link:                     []string{"0.0.1", "2.0.0"},
+	MCMSAPI:                  []string{"1.0.0"},
+	MCMSCore:                 []string{"1.0.0", "2.0.0"},
+	MCMSTest:                 []string{"1.0.0"},
+}
+
+func GetLegacyDar(packageName Package, version string) ([]byte, error) {
+	availableVersions, ok := LegacyVersions[packageName]
+	if !ok {
+		return nil, fmt.Errorf("no available versions for package %s", packageName)
+	}
+
+	if !slices.Contains(availableVersions, version) {
+		return nil, fmt.Errorf("version %s not found for package %s", version, packageName)
+	}
+
+	path := fmt.Sprintf("dars/legacy/%s-%s.dar", packageName, version)
+	data, err := Dars.ReadFile(path)
+	if err != nil {
+		// Try to read from Splice dependencies if not found in dars
+		data, err = SpliceDependencies.ReadFile(fmt.Sprintf("dependencies/splice/%s-%s.dar", packageName, version))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read embedded DAR file %s: %w", path, err)
+		}
+	}
+
+	return data, nil
+}
+
+var BindingsOutputDirs = map[Package][]string{
 	Coin: []string{"coin"},
 	Link: []string{"link"},
 
@@ -137,22 +231,22 @@ var OutputDirs = map[Package][]string{
 	MCMSCore:     []string{"mcms", "core"},
 	MCMSTest:     []string{"mcms", "mcmstest"},
 
-	CCIPAPI:                  []string{"ccip", "ccipapi"},
-	CCIPCodec:                []string{"ccip", "ccipcodec"},
-	CCIPTickets:              []string{"ccip", "tickets"},
-	CCIPEvents:               []string{"ccip", "events"},
-	CCIPRateLimiter:          []string{"ccip", "ratelimiter"},
-	CCIPClientAPI:            []string{"ccip", "clientapi"},
-	CCIPCore:                 []string{"ccip", "core"},
-	CCIPExtensionAPI:         []string{"ccip", "extensionapi"},
-	CCIPRuntime:              []string{"ccip", "ccipruntime"},
-	CCIPReceiver:             []string{"ccip", "receiver"},
-	CCIPSender:               []string{"ccip", "sender"},
-	CCIPCommitteeVerifier:    []string{"ccip", "committeeverifier"},
-	CCIPExecutor:             []string{"ccip", "executor"},
-	CCIPLockReleaseTokenPool: []string{"ccip", "lockreleasetokenpool"},
-	CCIPBurnMintTokenPool:    []string{"ccip", "burnminttokenpool"},
-	CCIPFactory:              []string{"ccip", "factory"},
+	CCIPAPIV2:                  []string{"ccip", "ccipapi"},
+	CCIPCodecV2:                []string{"ccip", "ccipcodec"},
+	CCIPTicketsV2:              []string{"ccip", "tickets"},
+	CCIPEventsV2:               []string{"ccip", "events"},
+	CCIPRateLimiterV2:          []string{"ccip", "ratelimiter"},
+	CCIPClientAPIV2:            []string{"ccip", "clientapi"},
+	CCIPCoreV2:                 []string{"ccip", "core"},
+	CCIPExtensionAPIV2:         []string{"ccip", "extensionapi"},
+	CCIPRuntimeV2:              []string{"ccip", "ccipruntime"},
+	CCIPReceiverV2:             []string{"ccip", "receiver"},
+	CCIPSenderV2:               []string{"ccip", "sender"},
+	CCIPCommitteeVerifierV2:    []string{"ccip", "committeeverifier"},
+	CCIPExecutorV2:             []string{"ccip", "executor"},
+	CCIPLockReleaseTokenPoolV2: []string{"ccip", "lockreleasetokenpool"},
+	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
+	CCIPFactoryV2:              []string{"ccip", "factory"},
 
 	SpliceApiTokenBurnMintV1:            []string{"splice", "splice_api_token_burn_mint_v1"},
 	SpliceApiTokenHoldingV1:             []string{"splice", "splice_api_token_holding_v1"},

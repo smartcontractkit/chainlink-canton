@@ -131,28 +131,28 @@ func GetSharedTAREnvironment(t *testing.T) *SharedTAREnvironment {
 		env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(1))
 		participant := env.Chain.Participants[0]
 
-		mcmsDar, err := contracts.GetDar(contracts.MCMSCore, contracts.CurrentVersion)
+		mcmsDar, err := contracts.GetDar(contracts.MCMSCore, contracts.DevVersion)
 		if err != nil {
 			errSharedTAREnv = err
 
 			return
 		}
 
-		mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.CurrentVersion)
+		mcmsTestDar, err := contracts.GetDar(contracts.MCMSTest, contracts.DevVersion)
 		if err != nil {
 			errSharedTAREnv = err
 
 			return
 		}
 
-		commonDar, err := contracts.GetDar(contracts.CCIPRuntime, contracts.CurrentVersion)
+		commonDar, err := contracts.GetDar(contracts.CCIPRuntimeV2, contracts.DevVersion)
 		if err != nil {
 			errSharedTAREnv = err
 
 			return
 		}
 
-		tarDar, err := contracts.GetDar(contracts.CCIPCore, contracts.CurrentVersion)
+		tarDar, err := contracts.GetDar(contracts.CCIPCoreV2, contracts.DevVersion)
 		if err != nil {
 			errSharedTAREnv = err
 
@@ -207,18 +207,18 @@ func GetSharedCCIPMCMSEnvironment(t *testing.T) *SharedCCIPMCMSEnvironment {
 		darPackages := []contracts.Package{
 			contracts.MCMSCore,
 			contracts.MCMSTest,
-			contracts.CCIPRuntime,
-			contracts.CCIPCore,
-			contracts.CCIPCommitteeVerifier,
-			contracts.CCIPExtensionAPI,
-			contracts.CCIPLockReleaseTokenPool,
-			contracts.CCIPExecutor,
-			contracts.CCIPFactory,
+			contracts.CCIPRuntimeV2,
+			contracts.CCIPCoreV2,
+			contracts.CCIPCommitteeVerifierV2,
+			contracts.CCIPExtensionAPIV2,
+			contracts.CCIPLockReleaseTokenPoolV2,
+			contracts.CCIPExecutorV2,
+			contracts.CCIPFactoryV2,
 		}
 
 		darBytes := make([][]byte, 0, len(darPackages))
 		for _, pkg := range darPackages {
-			dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
+			dar, err := contracts.GetDar(pkg, contracts.DevVersion)
 			if err != nil {
 				errSharedCCIPMCMSEnv = err
 				return
@@ -275,18 +275,18 @@ func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwo
 		darPackages := []contracts.Package{
 			contracts.MCMSCore,
 			contracts.MCMSTest,
-			contracts.CCIPRuntime,
-			contracts.CCIPCore,
-			contracts.CCIPCommitteeVerifier,
-			contracts.CCIPExtensionAPI,
-			contracts.CCIPLockReleaseTokenPool,
-			contracts.CCIPExecutor,
-			contracts.CCIPFactory,
+			contracts.CCIPRuntimeV2,
+			contracts.CCIPCoreV2,
+			contracts.CCIPCommitteeVerifierV2,
+			contracts.CCIPExtensionAPIV2,
+			contracts.CCIPLockReleaseTokenPoolV2,
+			contracts.CCIPExecutorV2,
+			contracts.CCIPFactoryV2,
 		}
 
 		darBytes := make([][]byte, 0, len(darPackages))
 		for _, pkg := range darPackages {
-			dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
+			dar, err := contracts.GetDar(pkg, contracts.DevVersion)
 			if err != nil {
 				errSharedCCIPMCMSTwoPartEnv = err
 				return

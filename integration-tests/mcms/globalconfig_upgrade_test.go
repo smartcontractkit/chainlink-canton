@@ -35,9 +35,9 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	//   - V1 has NO MigrateToV2 choice at this point
 	// ===================================================================
 
-	mcmsDar, err := contracts.GetDar(contracts.MCMSCore, contracts.CurrentVersion)
+	mcmsDar, err := contracts.GetDar(contracts.MCMSCore, contracts.DevVersion)
 	require.NoError(t, err)
-	gcV1Dar, err := contracts.GetDar(contracts.GlobalConfig, "1.0.0")
+	gcV1Dar, err := contracts.GetLegacyDar(contracts.GlobalConfig, "1.0.0")
 	require.NoError(t, err)
 
 	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(
@@ -76,7 +76,7 @@ func TestGlobalConfig_UpgradeV1ToV2(t *testing.T) {
 	//   - Existing V1 contract gains MigrateToV2 via upgraded code
 	// ===================================================================
 
-	gcV2Dar, err := contracts.GetDar(contracts.GlobalConfig, "2.0.0")
+	gcV2Dar, err := contracts.GetLegacyDar(contracts.GlobalConfig, "2.0.0")
 	require.NoError(t, err)
 
 	v2PkgIDs, err := testhelpers.UploadDARstoMultipleParticipants(

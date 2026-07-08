@@ -33,7 +33,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[factorybindings.CCIPFactor
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPFactory),
+	PackageName: string(contracts.CCIPFactoryV2),
 	Prefix:      "factory",
 })
 
