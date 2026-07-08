@@ -1068,14 +1068,14 @@ func (c *Chain) SetupSend(
 		return fmt.Errorf("list fee holdings for setup: %w", err)
 	}
 	feeMin := new(big.Rat).SetUint64(feeAmountPerMessage)
-	selectedFee, err := testhelpers.SelectHoldingsForInstrument(feeRows, []*big.Rat{feeMin})
-	if err != nil || len(selectedFee) == 0 {
+	selectedFee, err := c.selectHolding("setup-fee", feeTokenInstrument, feeRows, feeMin)
+	if err != nil {
 		return fmt.Errorf("select fee holding for setup: %w", err)
 	}
 
 	c.feeTokenInstrument = feeTokenInstrument
 	c.feeAmountPerMessage = feeAmountPerMessage
-	c.nextFeeCID = selectedFee[0].ContractID
+	c.nextFeeCID = selectedFee.ContractID
 
 	if transferAmountPerMessage == nil || transferAmountPerMessage.Sign() <= 0 {
 		c.transferTokenInstrument = nil
@@ -1097,13 +1097,13 @@ func (c *Chain) SetupSend(
 		return fmt.Errorf("list transfer holdings for setup: %w", err)
 	}
 	transferMin := new(big.Rat).Set(transferAmountPerMessage)
-	selectedTransfer, err := testhelpers.SelectHoldingsForInstrument(transferRows, []*big.Rat{transferMin})
-	if err != nil || len(selectedTransfer) == 0 {
+	selectedTransfer, err := c.selectHolding("setup-transfer", *transferTokenInstrument, transferRows, transferMin)
+	if err != nil {
 		return fmt.Errorf("select transfer holding for setup: %w", err)
 	}
 
 	c.transferTokenInstrument = transferTokenInstrument
-	c.nextTransferCID = selectedTransfer[0].ContractID
+	c.nextTransferCID = selectedTransfer.ContractID
 
 	return nil
 }
@@ -1615,18 +1615,17 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 	}
 
 	feeMin := new(big.Rat).SetUint64(c.feeAmountPerMessage)
-	nextFeeCID, exhaustion, err := pickNextHolding(
+	nextFeeCID, feeExhausted, err := c.pickNextHolding(
 		events,
 		c.feeTokenInstrument,
 		feeMin,
 		refreshFilters...,
 	)
-	if err != nil && !exhaustion {
+	if err != nil && !feeExhausted {
 		return fmt.Errorf("refresh next fee holding from update: %w", err)
 	}
-	if !exhaustion {
+	if !feeExhausted {
 		c.nextFeeCID = nextFeeCID
-		c.logger.Info().Str("NextFeeCID", c.nextFeeCID).Msg("Selected next fee holding")
 	} else {
 		c.nextFeeCID = ""
 		c.logger.Info().Msg("No next fee holding available after send; clearing for future sends")
@@ -1641,18 +1640,17 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 		testhelpers.ExcludeCIDs(append(spentCIDs, c.nextFeeCID)),
 	)
 	transferValue := new(big.Rat).Set(tokenAmount)
-	nextTransferCID, exhaustion, err := pickNextHolding(
+	nextTransferCID, transferExhausted, err := c.pickNextHolding(
 		events,
 		*c.transferTokenInstrument,
 		transferValue,
 		transferFilters...,
 	)
-	if err != nil && !exhaustion {
+	if err != nil && !transferExhausted {
 		return fmt.Errorf("refresh next transfer holding from update: %w", err)
 	}
-	if !exhaustion {
+	if !transferExhausted {
 		c.nextTransferCID = nextTransferCID
-		c.logger.Info().Str("NextTransferCID", c.nextTransferCID).Msg("Selected next transfer holding")
 	} else {
 		c.nextTransferCID = ""
 		c.logger.Info().Msg("No next transfer holding available after send; clearing for future sends")
@@ -1663,27 +1661,93 @@ func (c *Chain) setNextHoldings(events []*apiv2.Event, hasTokenTransfer bool, to
 
 // pickNextHolding chooses an unused holding for the next send from Created events in the
 // send transaction only. Returns an empty CID when nothing meets minAmount (not an error).
-func pickNextHolding(
+func (c *Chain) pickNextHolding(
 	events []*apiv2.Event,
 	instrument splice_api_token_holding_v1.InstrumentId,
 	minAmount *big.Rat,
 	filters ...testhelpers.Filter,
 ) (string, bool, error) {
-	minAmounts := []*big.Rat{minAmount}
-
 	fromEvents, err := testhelpers.ListedHoldingsFromTransactionEventsForInstrument(events, instrument, filters...)
 	if err != nil {
 		return "", false, err
 	}
 	if len(fromEvents) == 0 {
-		return "", true, nil // no qualifying Created events → exhaustion, next send will fail
-	}
-	picked, err := testhelpers.SelectHoldingsForInstrument(fromEvents, minAmounts)
-	if err != nil || len(picked) == 0 {
-		return "", true, fmt.Errorf("refresh next fee holding from update: %w", err)
+		c.logger.Info().
+			Str("Source", "rotate").
+			Str("InstrumentAdmin", string(instrument.Admin)).
+			Str("InstrumentId", string(instrument.Id)).
+			Str("MinRequired", minAmount.FloatString(10)).
+			Int("Candidates", 0).
+			Msg("No qualifying holding in send events")
+
+		return "", true, nil
 	}
 
-	return picked[0].ContractID, false, nil
+	picked, err := c.selectHolding("rotate", instrument, fromEvents, minAmount)
+	if err != nil {
+		return "", true, err
+	}
+
+	return picked.ContractID, false, nil
+}
+
+func (c *Chain) selectHolding(
+	source string,
+	instrument splice_api_token_holding_v1.InstrumentId,
+	rows []testhelpers.ListedHolding,
+	min *big.Rat,
+) (testhelpers.ListedHolding, error) {
+	if min == nil {
+		min = big.NewRat(0, 1)
+	}
+
+	picked, err := testhelpers.SelectHoldingsForInstrument(rows, []*big.Rat{min})
+	if err != nil || len(picked) == 0 {
+		c.logHoldingSelectionFailure(source, instrument, min, rows, err)
+		if err != nil {
+			return testhelpers.ListedHolding{}, err
+		}
+
+		return testhelpers.ListedHolding{}, fmt.Errorf("no qualifying holding for %s", source)
+	}
+
+	c.logger.Info().
+		Str("Source", source).
+		Str("ContractID", picked[0].ContractID).
+		Str("Amount", picked[0].Amount.FloatString(10)).
+		Str("InstrumentAdmin", string(instrument.Admin)).
+		Str("InstrumentId", string(instrument.Id)).
+		Str("MinRequired", min.FloatString(10)).
+		Int("Candidates", len(rows)).
+		Msg("Selected holding")
+
+	return picked[0], nil
+}
+
+func (c *Chain) logHoldingSelectionFailure(
+	source string,
+	instrument splice_api_token_holding_v1.InstrumentId,
+	min *big.Rat,
+	rows []testhelpers.ListedHolding,
+	selectErr error,
+) {
+	logEvent := c.logger.Info().
+		Str("Source", source).
+		Str("InstrumentAdmin", string(instrument.Admin)).
+		Str("InstrumentId", string(instrument.Id)).
+		Str("MinRequired", min.FloatString(10)).
+		Int("Candidates", len(rows))
+	if selectErr != nil {
+		logEvent = logEvent.Err(selectErr)
+	}
+	logEvent.Msg("No qualifying holding selected")
+	for _, row := range rows {
+		c.logger.Debug().
+			Str("Source", source).
+			Str("ContractID", row.ContractID).
+			Str("Amount", row.Amount.FloatString(10)).
+			Msg("Holding candidate")
+	}
 }
 
 func (c *Chain) waitOneSentEventBySeqNo(ctx context.Context, to, seq uint64, timeout time.Duration) (cciptestinterfaces.MessageSentEvent, error) {
