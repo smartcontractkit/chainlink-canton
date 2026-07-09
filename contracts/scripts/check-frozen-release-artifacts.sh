@@ -46,7 +46,7 @@ MERGE_BASE="$(git merge-base HEAD "$BASE_REF" 2>/dev/null || echo "$BASE_REF")"
 is_frozen_path() {
   local path="$1"
   case "$path" in
-    contracts/dars/released/*) return 0 ;;
+    contracts/dars/released/*.dar) return 0 ;;
     bindings/generated/v[0-9]_*/*) return 0 ;;
     bindings/generated/mcms/*) return 0 ;;
     *) return 1 ;;
