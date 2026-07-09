@@ -2386,6 +2386,22 @@ func (v TransferTimeout) GetVariantValue() any {
 
 var _ types.VARIANT = (*TransferTimeout)(nil)
 
+// GetVariantTagByte implements types.VariantWithTagByte interface for MCMS numeric tag encoding
+func (v TransferTimeout) GetVariantTagByte() byte {
+
+	if v.Indefinite != nil {
+		return 0
+	}
+
+	if v.RelativeHours != nil {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown variant
+}
+
+var _ types.VariantWithTagByte = (*TransferTimeout)(nil)
+
 // VerifyInboundMessage is a Record type
 type VerifyInboundMessage struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`

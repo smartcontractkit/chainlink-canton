@@ -103,16 +103,16 @@ func main() {
 			"usdPerToken":   true, // FeeQuoter token price updates
 		},
 		VariantTagByteMap: map[string]map[string]byte{
-			"CCIP.LockReleaseTokenPoolTypes.TransferTimeout": {
+			"CCIP.LockReleaseTokenPoolV2Types.TransferTimeout": {
 				"Indefinite":    0x00,
 				"RelativeHours": 0x01,
 			},
-			"CCIP.BurnMintTokenPoolTypes.TransferTimeout": {
+			"CCIP.BurnMintTokenPoolV2Types.TransferTimeout": {
 				"Indefinite":    0x00,
 				"RelativeHours": 0x01,
 			},
-			// Tags must match encodeRequestedFinality/decodeRequestedFinalityAt in CCIP/Codec.daml.
-			"CCIP.FinalityConfig.FinalityConfig": {
+			// Tags must match encode/decode in contracts/ccip/codec/daml/CCIP/CodecV2/FinalityConfig.daml.
+			"CCIP.CodecV2.FinalityConfig.FinalityConfig": {
 				"WaitForFinality": 0x00,
 				"WaitForSafe":     0x01,
 				"BlockDepth":      0x02,
@@ -121,13 +121,13 @@ func main() {
 		// EnumTagByteMap: enums decoded as a single uint8 ordinal byte by the Daml MCMS codec.
 		// Tags must match the decodeXxxAt case statement in the corresponding Daml contract.
 		EnumTagByteMap: map[string]map[string]byte{
-			// Tags match decodeRateLimitDirectionAt in contracts/ccip/factory/daml/CCIP/Factory.daml.
-			"CCIP.RateLimiter.RateLimitDirection": {
+			// Tags match decodeRateLimitDirectionAt in contracts/ccip/factory/daml/CCIP/FactoryV2.daml.
+			"CCIP.RateLimiterV2.RateLimitDirection": {
 				"RateLimitDirection_Outbound": 0x00,
 				"RateLimitDirection_Inbound":  0x01,
 			},
-			// Tags match decodeRateLimitModeAt in contracts/ccip/factory/daml/CCIP/Factory.daml.
-			"CCIP.RateLimiter.RateLimitMode": {
+			// Tags match decodeRateLimitModeAt in contracts/ccip/factory/daml/CCIP/FactoryV2.daml.
+			"CCIP.RateLimiterV2.RateLimitMode": {
 				"RateLimitMode_DefaultFinality": 0x00,
 				"RateLimitMode_CustomFinality":  0x01,
 			},

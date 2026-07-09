@@ -178,6 +178,36 @@ func (e *RateLimitDirection) UnmarshalHex(data string) error {
 
 var _ types.ENUM = RateLimitDirection("")
 
+// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
+func (e RateLimitDirection) GetEnumTagByte() byte {
+
+	if string(e) == "RateLimitDirection_Outbound" {
+		return 0
+	}
+
+	if string(e) == "RateLimitDirection_Inbound" {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown constructor
+}
+
+// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
+func (e RateLimitDirection) EnumConstructorForTagByte(tag byte) (string, bool) {
+
+	if tag == 0 {
+		return "RateLimitDirection_Outbound", true
+	}
+
+	if tag == 1 {
+		return "RateLimitDirection_Inbound", true
+	}
+
+	return "", false
+}
+
+var _ types.EnumWithTagByte = RateLimitDirection("")
+
 // RateLimitMode is an enum type
 type RateLimitMode string
 
@@ -221,6 +251,36 @@ func (e *RateLimitMode) UnmarshalHex(data string) error {
 }
 
 var _ types.ENUM = RateLimitMode("")
+
+// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
+func (e RateLimitMode) GetEnumTagByte() byte {
+
+	if string(e) == "RateLimitMode_DefaultFinality" {
+		return 0
+	}
+
+	if string(e) == "RateLimitMode_CustomFinality" {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown constructor
+}
+
+// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
+func (e RateLimitMode) EnumConstructorForTagByte(tag byte) (string, bool) {
+
+	if tag == 0 {
+		return "RateLimitMode_DefaultFinality", true
+	}
+
+	if tag == 1 {
+		return "RateLimitMode_CustomFinality", true
+	}
+
+	return "", false
+}
+
+var _ types.EnumWithTagByte = RateLimitMode("")
 
 // RateLimiter is a Template type
 type RateLimiter struct {
