@@ -17,8 +17,8 @@ import (
 //
 // Devenv: requires a running devenv and env-canton-evm-out.toml; EVM sender is pre-funded.
 //
-// Prod-testnet: requires PRIVATE_KEY wallet with TEST tokens and Sepolia ETH on Sepolia,
-// plus a pre-funded Canton party for execution fees.
+// Prod-testnet: requires PRIVATE_KEY wallet with TEST tokens and Sepolia ETH on Sepolia
+// (one upfront router approve plus send fees), plus a pre-funded Canton party for execution fees.
 //
 //nolint:paralleltest // single-flight exec on Canton dest; shares env with e2e.
 func TestEVM2Canton_TokenLoad(t *testing.T) {
@@ -47,21 +47,22 @@ func TestEVM2Canton_TokenLoad(t *testing.T) {
 	cantonDest := cantonTokenLoadDestination(boot.Canton, receiver, lane)
 
 	sched := loadSchedule(t)
-	estimatedMessages := estimateMessages(sched)
+	sendBudget := sequentialSendsForLoad(sched)
 	evmSender := boot.ResolveEVMReceiver(t)
 	senderBalance, err := boot.EVM.GetTokenBalance(ctx, evmSender, lane.SrcToken)
 	require.NoError(t, err)
-	requiredBalance := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(estimatedMessages)))
-	t.Logf("EVM sender token balance=%s requiredForRun=%s (estimatedMessages=%d; devenv pre-funds sender)",
-		senderBalance.String(), requiredBalance.String(), estimatedMessages)
+	requiredBalance := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(sendBudget)))
+	t.Logf("EVM sender token balance=%s requiredForRun=%s (sendBudget=%d; devenv pre-funds sender)",
+		senderBalance.String(), requiredBalance.String(), sendBudget)
 	if boot.Env.IsRemote() {
 		require.GreaterOrEqual(t, senderBalance.Cmp(requiredBalance), 0,
 			"EVM sender token balance %s is below required %s; fund PRIVATE_KEY wallet with TEST tokens on Sepolia",
 			senderBalance.String(), requiredBalance.String())
-		t.Log("prod-testnet: ensure PRIVATE_KEY wallet has Sepolia ETH for send and possible router approve tx")
 	} else if senderBalance.Cmp(requiredBalance) < 0 {
 		t.Logf("warning: EVM sender balance may be insufficient for full run")
 	}
+
+	boot.SetupEVMTokenSend(t, ctx, lane, sendBudget)
 
 	ccvAddr := resolveEVMSourceAddrs(t, boot.Lib, boot.EVM.ChainSelector())
 

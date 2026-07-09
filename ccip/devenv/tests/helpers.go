@@ -11,14 +11,18 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
 	chainsel "github.com/smartcontractkit/chain-selectors"
+	routeroperations "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v1_2_0/operations/router"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/tests/e2e/tcapi"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/chainlink-evm/gethwrappers/shared/generated/initial/erc20"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
@@ -204,6 +208,68 @@ func (b E2EBootstrap) SetupCantonTokenSend(t *testing.T, ctx context.Context, la
 	} else {
 		require.NoError(t, b.Canton.SetupSend(ctx, fee, transferPerSend))
 	}
+}
+
+// SetupEVMTokenSend pre-approves the CCIP router to spend transfer tokens for N sends.
+// The CCV EVM impl approves only the per-message amount on each send; without this
+// upfront approval, load tests would pay one extra approve tx per message.
+func (b E2EBootstrap) SetupEVMTokenSend(t *testing.T, ctx context.Context, lane TokenLane, sends int) {
+	t.Helper()
+
+	require.Positive(t, sends)
+	require.NotNil(t, lane.TransferAmount)
+	require.False(t, lane.SrcToken.IsEmpty(), "SetupEVMTokenSend requires an EVM source token")
+
+	requiredAllowance := new(big.Int).Mul(lane.TransferAmount, big.NewInt(int64(sends)))
+
+	opsEnv, err := b.Lib.CLDFEnvironment()
+	require.NoError(t, err)
+
+	selector := b.EVM.ChainSelector()
+	chain, ok := opsEnv.BlockChains.EVMChains()[selector]
+	require.True(t, ok, "EVM chain %d not in CLDF environment", selector)
+
+	ds, err := b.Lib.DataStore()
+	require.NoError(t, err)
+
+	routerVersion := semver.MustParse(routeroperations.Deploy.Version())
+	routerRefs := ds.Addresses().Filter(
+		datastore.AddressRefByChainSelector(selector),
+		datastore.AddressRefByType(datastore.ContractType(routeroperations.ContractType)),
+		datastore.AddressRefByVersion(routerVersion),
+	)
+	require.Len(t, routerRefs, 1, "expected exactly one CCIP router for chain %d", selector)
+
+	routerAddr := common.HexToAddress(routerRefs[0].Address)
+	tokenAddr := common.BytesToAddress(lane.SrcToken.Bytes())
+	owner := chain.DeployerKey.From
+
+	tkn, err := erc20.NewERC20(tokenAddr, chain.Client)
+	require.NoError(t, err)
+
+	allowance, err := tkn.Allowance(&bind.CallOpts{Context: ctx}, owner, routerAddr)
+	require.NoError(t, err)
+	if allowance.Cmp(requiredAllowance) >= 0 {
+		t.Logf("EVM router allowance sufficient: have=%s need=%s (token=%s router=%s)",
+			allowance.String(), requiredAllowance.String(), tokenAddr.Hex(), routerAddr.Hex())
+		return
+	}
+
+	t.Logf("approving CCIP router %s for %s transfer tokens (%d sends × %s)",
+		routerAddr.Hex(), requiredAllowance.String(), sends, lane.TransferAmount.String())
+
+	auth := *chain.DeployerKey
+	auth.Context = ctx
+	auth.Value = nil // approve is non-payable; clear stale msg.Value from shared opts
+
+	tx, err := tkn.Approve(&auth, routerAddr, requiredAllowance)
+	require.NoError(t, err)
+
+	_, err = chain.Confirm(tx)
+	require.NoError(t, err)
+
+	t.Logf("Approved router %s for transfer token %s amount=%s tx=%s",
+		routerAddr.Hex(), tokenAddr.Hex(), requiredAllowance.String(), tx.Hash().Hex())
 }
 
 // SetupCantonReceive sets CANTON_RECEIVER_REQUIRED_CCV when unset, then deploys the client
