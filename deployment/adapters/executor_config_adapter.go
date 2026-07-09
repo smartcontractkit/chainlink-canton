@@ -62,6 +62,7 @@ func (a *CantonExecutorConfigAdapter) ResolveExecutorAddress(ds datastore.DataSt
 	if err != nil {
 		return "", fmt.Errorf("failed to get executor address for chain %d: %w", chainSelector, err)
 	}
+
 	return executorAddr, nil
 }
 
