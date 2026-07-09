@@ -38,15 +38,15 @@ func init() {
 	ccipadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyCanton, &cantonChainFamilyWithDataStoreCache{})
 	ccipdeploy.GetTransferOwnershipRegistry().RegisterAdapter(chainsel.FamilyCanton, ccipdeploy.MCMSVersion, &CantonTransferOwnershipAdapter{})
 
-	// Register the offchain adapters
-	ccvadapters.GetRegistry().Register(chainsel.FamilyCanton, ccvadapters.ChainAdapters{
-		Aggregator:               &CantonAggregatorConfigAdapter{},
-		Executor:                 &CantonExecutorConfigAdapter{},
-		Verifier:                 &CantonVerifierJobConfigAdapter{},
-		Indexer:                  &CantonIndexerConfigAdapter{},
-		CommitteeVerifierOnchain: &CantonCommitteeVerifierOnchain{},
-		TokenVerifier:            nil, // not implemented yet
-	})
+	// Register the offchain adapters into the ccv per-type singleton registries.
+	// The legacy GetRegistry().Register(ChainAdapters{}) shim was removed in the
+	// ccv adapter-registration cleanup, so each adapter type registers on its own.
+	// TokenVerifier is not implemented for canton yet.
+	ccvadapters.GetAggregatorRegistry().Register(chainsel.FamilyCanton, &CantonAggregatorConfigAdapter{})
+	ccvadapters.GetExecutorRegistry().Register(chainsel.FamilyCanton, &CantonExecutorConfigAdapter{})
+	ccvadapters.GetVerifierRegistry().Register(chainsel.FamilyCanton, &CantonVerifierJobConfigAdapter{})
+	ccvadapters.GetIndexerRegistry().Register(chainsel.FamilyCanton, &CantonIndexerConfigAdapter{})
+	ccvadapters.GetCommitteeVerifierOnchainRegistry().Register(chainsel.FamilyCanton, &CantonCommitteeVerifierOnchain{})
 
 	lanes.GetLaneAdapterRegistry().RegisterLaneAdapter(chainsel.FamilyCanton, semver.MustParse("2.0.0"), CantonLaneAdapter{})
 	mcmsreaderapi.GetRegistry().RegisterMCMSReader(chainsel.FamilyCanton, &CantonMCMSReader{})
