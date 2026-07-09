@@ -36,7 +36,7 @@ inputs:
   free-disk-space:
     description: Run the free-disk-space action before builds
     required: false
-    default: 'true'
+    default: "true"
 
 runs:
   using: composite
@@ -53,7 +53,7 @@ runs:
       with:
         repository: smartcontractkit/chainlink-canton
         path: ${{ inputs.canton-path }}
-        ref: github.sha
+        ref: ${{ github.sha }}
 
     - name: Check out chainlink-ccv
       uses: actions/checkout@v6
