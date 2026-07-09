@@ -16,7 +16,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -88,8 +87,6 @@ type DeployChainContractsParams struct {
 	RMNFactoryAddressRef datastore.AddressRef
 	// ProposalDriven enables MCMS proposal generation for factory-backed deploys.
 	ProposalDriven bool
-	// CcvRegistryBinding is required for OnRamp deps when CommitteeVerifiers is empty (CCV deployed separately).
-	CcvRegistryBinding chainlinkapi.RawInstanceAddress
 	// RmnRemoteRawInstanceAddress is required for production split deploy paths.
 	RmnRemoteRawInstanceAddress contracts.RawInstanceAddress
 	// DevenvBundledDeploy runs RMN+CV+core in one sequence (devenv adapter only). Mutually exclusive with RmnRemoteRawInstanceAddress.
