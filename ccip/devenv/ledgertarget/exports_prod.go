@@ -1,6 +1,6 @@
 //go:build prodledger
 
-package ledgerbind
+package ledgertarget
 
 import (
 	rt "github.com/smartcontractkit/chainlink-canton/bindings/generated/v1_0_0/ccip/ccipruntime"
@@ -11,7 +11,7 @@ import (
 )
 
 type (
-	CreateRouter = rt.CreateRouter
+	CreateRouter   = rt.CreateRouter
 	PerPartyRouter = rt.PerPartyRouter
 
 	RawInstanceAddress = chainlinkapi.RawInstanceAddress
@@ -44,9 +44,9 @@ type (
 	CCVSendInput       = ccipsender.CCVSendInput
 	ExecutorInput      = ccipsender.ExecutorInput
 
-	ReceiverExecute             = ccipreceiver.Execute
-	ReceiverCCVInput            = ccipreceiver.CCVInput
-	ReceiverTokenTransferInput  = ccipreceiver.TokenTransferInput
+	ReceiverExecute            = ccipreceiver.Execute
+	ReceiverCCVInput           = ccipreceiver.CCVInput
+	ReceiverTokenTransferInput = ccipreceiver.TokenTransferInput
 )
 
 const (

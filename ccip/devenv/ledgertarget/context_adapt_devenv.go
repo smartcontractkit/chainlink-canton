@@ -1,6 +1,6 @@
 //go:build !prodledger
 
-package ledgerbind
+package ledgertarget
 
 import (
 	latestholding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"

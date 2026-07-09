@@ -1,6 +1,6 @@
 //go:build !prodledger
 
-package ledgerbind
+package ledgertarget
 
 import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipapi"

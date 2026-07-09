@@ -1,6 +1,6 @@
 //go:build !prodledger
 
-package ledgerbind
+package ledgertarget
 
 import (
 	"github.com/smartcontractkit/go-daml/pkg/types"

@@ -80,7 +80,7 @@ Build prod-targeting tests with `-tags=prodledger` so devenv code resolves the c
 | devenv (default) | _(none)_ | `bindings/generated/latest` |
 | prod-testnet / mainnet | `-tags=prodledger` | `bindings/generated/v1_0_0` |
 
-Implementation lives in [`ccip/devenv/ledgerbind/`](./ledgerbind/).
+Implementation lives in [`ccip/devenv/ledgertarget/`](./ledgertarget/).
 
 ## Load tests
 

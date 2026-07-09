@@ -1,6 +1,6 @@
 //go:build prodledger
 
-package ledgerbind
+package ledgertarget
 
 import (
 	"encoding/json"
