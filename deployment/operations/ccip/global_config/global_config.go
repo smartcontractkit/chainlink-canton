@@ -16,7 +16,7 @@ var ContractType = deployment.ContractType("CantonGlobalConfig")
 
 var Version = semver.MustParse("2.0.0")
 
-var globalConfigEncoder = core.NewContract("", "CCIP.GlobalConfig", "GlobalConfig").Encoder()
+var globalConfigEncoder = core.NewContract("", "CCIP.CoreV2.GlobalConfig", "GlobalConfig").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[core.GlobalConfig]{
 	Name:           "canton/ccip/global_config/deploy",

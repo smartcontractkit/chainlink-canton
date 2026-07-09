@@ -61,7 +61,7 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	// --- Step 2: Upload DARs and prepare encoders ---
 	uploadCCIPMCMSFactoryDARs(t, participants)
 	mcmsEncoder := NewMCMSEncoder()
-	factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.Factory", "CCIPFactory").Encoder()
+	factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.FactoryV2", "CCIPFactory").Encoder()
 
 	signers := createSigners(t)
 	sortedSigners := SortSignersByAddress(signers)
@@ -245,7 +245,7 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	require.NotEmpty(t, gcCid)
 
 	remoteChainSelector := types.NUMERIC("456")
-	gcEncoder := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.GlobalConfig", "GlobalConfig").Encoder()
+	gcEncoder := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.CoreV2.GlobalConfig", "GlobalConfig").Encoder()
 
 	sourceConfigArgs := core.ApplySourceChainConfigUpdates{
 		SourceChainConfigUpdates: []core.SourceChainConfigArgs{{

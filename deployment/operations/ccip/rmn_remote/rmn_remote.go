@@ -15,7 +15,7 @@ var ContractType = deployment.ContractType("RMNRemote")
 
 var Version = semver.MustParse("2.0.0")
 
-var rmnEncoder = core.NewContract("", "CCIP.RMNRemote", "RMNRemote").Encoder()
+var rmnEncoder = core.NewContract("", "CCIP.CoreV2.RMNRemote", "RMNRemote").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[core.RMNRemote]{
 	Name:           "canton/ccip/rmn_remote/deploy",

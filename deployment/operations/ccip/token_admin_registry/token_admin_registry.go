@@ -16,7 +16,7 @@ var ContractType = deployment.ContractType("TokenAdminRegistry")
 
 var Version = semver.MustParse("2.0.0")
 
-var tarEncoder = core.NewContract("", "CCIP.TokenAdminRegistry", "TokenAdminRegistry").Encoder()
+var tarEncoder = core.NewContract("", "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[core.TokenAdminRegistry]{
 	Name:           "canton/ccip/token_admin_registry/deploy",

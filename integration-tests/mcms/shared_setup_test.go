@@ -235,7 +235,7 @@ func GetSharedCCIPMCMSEnvironment(t *testing.T) *SharedCCIPMCMSEnvironment {
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
-		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.Factory", "CCIPFactory").Encoder()
+		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.FactoryV2", "CCIPFactory").Encoder()
 
 		sharedCCIPMCMSEnv = &SharedCCIPMCMSEnvironment{
 			SharedCantonEnvironment: SharedCantonEnvironment{
@@ -304,7 +304,7 @@ func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwo
 		signers := createSigners(t)
 		sortedSigners := SortSignersByAddress(signers)
 
-		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.Factory", "CCIPFactory").Encoder()
+		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.FactoryV2", "CCIPFactory").Encoder()
 
 		sharedCCIPMCMSTwoPartEnv = &SharedCCIPMCMSTwoParticipantEnvironment{
 			SharedCCIPMCMSEnvironment: SharedCCIPMCMSEnvironment{
