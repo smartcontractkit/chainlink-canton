@@ -5,7 +5,11 @@ on Canton.
 
 ## Contract artifacts & releases
 
-DARs live under `contracts/dars/` (`current/` for dev, `v2_0_0/` etc. for frozen releases). Go bindings live under `bindings/generated/latest/` for all in-repo code; frozen releases snapshot DARs only (not versioned binding trees).
+DARs live under:
+- `contracts/dars/dev` for development artifacts, rebuilt on every contract change
+- `contracts/dars/released` for stable, frozen, release versions
+
+Go bindings live under `bindings/generated/latest/` for all in-repo code; frozen releases snapshot DARs only (not versioned binding trees).
 
 For day-to-day builds (`make contracts`) and **how to cut and migrate to a new release** (e.g. 2.1.0 — freeze, update `ReleaseDir`, import paths, and git tag), see **[bindings/README.md](../bindings/README.md)**.
 
@@ -1126,5 +1130,5 @@ cd contracts && dpm clean --all
 ```
 
 Built DARs are output to `.daml/dist/` in each package directory. After building, run `make contracts` from the repo root to:
-1. Copy DARs to `contracts/dars/current/`
+1. Copy DARs to `contracts/dars/dev/`
 2. Generate Go bindings to `bindings/generated/latest/`

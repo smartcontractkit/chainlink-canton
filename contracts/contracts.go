@@ -78,6 +78,15 @@ const (
 
 const DevVersion = "dev"
 
+// ReleasedVersions contains all Dars that should be placed in the `dars/released` directory.
+// To release a new version of a package:
+//  1. Bump the version in the package's daml.yaml file.
+//  2. Update the package's daml.yaml `upgrades:` field to point at the previous version in `dars/released`
+//  3. Add the new version to the list of released versions for that package in this map.
+//  4. Run `make contracts` to regenerate
+//
+// CI will prevent any of the already committed release artifacts from being changed/altered. If a released package
+// is therefore updated without its version being bumped, CI is expected to fail.
 var ReleasedVersions map[Package][]string = map[Package][]string{
 	CCIPAPIV2:                  []string{"2.0.0"},
 	CCIPBurnMintTokenPoolV2:    []string{"2.0.0"},
@@ -108,30 +117,30 @@ const (
 )
 
 var Versions map[Package][]string = map[Package][]string{
-	ChainlinkAPI: []string{"2.0.0", DevVersion},
+	ChainlinkAPI: append(ReleasedVersions[ChainlinkAPI], DevVersion),
 
-	Link: []string{"2.0.0", DevVersion},
+	Link: append(ReleasedVersions[Link], DevVersion),
 
-	MCMSAPI:  []string{"1.0.0", DevVersion},
-	MCMSCore: []string{"2.0.0", DevVersion},
+	MCMSAPI:  append(ReleasedVersions[MCMSAPI], DevVersion),
+	MCMSCore: append(ReleasedVersions[MCMSCore], DevVersion),
 
-	CCIPAPIV2:                  []string{"2.0.0", DevVersion},
-	CCIPCodecV2:                []string{"2.0.0", DevVersion},
-	CCIPTicketsV2:              []string{"2.0.0", DevVersion},
-	CCIPEventsV2:               []string{"2.0.0", DevVersion},
-	CCIPRateLimiterV2:          []string{"2.0.0", DevVersion},
-	CCIPClientAPIV2:            []string{"2.0.0", DevVersion},
-	CCIPUtilsV2:                []string{"2.0.0", DevVersion},
-	CCIPCoreV2:                 []string{"2.0.0", DevVersion},
-	CCIPExtensionAPIV2:         []string{"2.0.0", DevVersion},
-	CCIPRuntimeV2:              []string{"2.0.0", DevVersion},
-	CCIPSenderV2:               []string{"2.0.0", DevVersion},
-	CCIPReceiverV2:             []string{"2.0.0", DevVersion},
-	CCIPCommitteeVerifierV2:    []string{"2.0.0", DevVersion},
-	CCIPExecutorV2:             []string{"2.0.0", DevVersion},
-	CCIPLockReleaseTokenPoolV2: []string{"2.0.0", DevVersion},
-	CCIPBurnMintTokenPoolV2:    []string{"2.0.0", DevVersion},
-	CCIPFactoryV2:              []string{"2.0.0", DevVersion},
+	CCIPAPIV2:                  append(ReleasedVersions[CCIPAPIV2], DevVersion),
+	CCIPCodecV2:                append(ReleasedVersions[CCIPCodecV2], DevVersion),
+	CCIPTicketsV2:              append(ReleasedVersions[CCIPTicketsV2], DevVersion),
+	CCIPEventsV2:               append(ReleasedVersions[CCIPEventsV2], DevVersion),
+	CCIPRateLimiterV2:          append(ReleasedVersions[CCIPRateLimiterV2], DevVersion),
+	CCIPClientAPIV2:            append(ReleasedVersions[CCIPClientAPIV2], DevVersion),
+	CCIPUtilsV2:                append(ReleasedVersions[CCIPUtilsV2], DevVersion),
+	CCIPCoreV2:                 append(ReleasedVersions[CCIPCoreV2], DevVersion),
+	CCIPExtensionAPIV2:         append(ReleasedVersions[CCIPExtensionAPIV2], DevVersion),
+	CCIPRuntimeV2:              append(ReleasedVersions[CCIPRuntimeV2], DevVersion),
+	CCIPSenderV2:               append(ReleasedVersions[CCIPSenderV2], DevVersion),
+	CCIPReceiverV2:             append(ReleasedVersions[CCIPReceiverV2], DevVersion),
+	CCIPCommitteeVerifierV2:    append(ReleasedVersions[CCIPCommitteeVerifierV2], DevVersion),
+	CCIPExecutorV2:             append(ReleasedVersions[CCIPExecutorV2], DevVersion),
+	CCIPLockReleaseTokenPoolV2: append(ReleasedVersions[CCIPLockReleaseTokenPoolV2], DevVersion),
+	CCIPBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
+	CCIPFactoryV2:              append(ReleasedVersions[CCIPFactoryV2], DevVersion),
 
 	SpliceApiTokenBurnMintV1:            []string{"1.0.0"},
 	SpliceApiTokenHoldingV1:             []string{"1.0.0"},
