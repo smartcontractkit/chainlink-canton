@@ -92,11 +92,11 @@ Sequential Canton→EVM messages round-robined across every EVM destination in t
 
 **Devenv** (requires `make start-devenv` so `ccip/devenv/env-canton-evm-out.toml` exists): pre-mints fee holdings and calls `SetupSend` once before WASP starts. Full send + EVM exec confirmation per message.
 
-Schedule is configured via env vars (defaults are `1/1s` for 90s):
+Schedule is configured via env vars (defaults are `1/10s` for 90s):
 
 | Env var | Form | Default | Meaning |
 |---|---|---|---|
-| `CANTON_LOAD_MESSAGE_RATE` | `<int>/<duration>` (e.g. `1/1s`, `1/20s`, `10/5m`) | `1/1s` | rate per rate-limit window |
+| `CANTON_LOAD_MESSAGE_RATE` | `<int>/<duration>` (e.g. `1/10s`, `1/20s`, `10/5m`) | `1/10s` | rate per rate-limit window |
 | `CANTON_LOAD_DURATION` | Go duration (e.g. `90s`, `10m`, `1h`) | `90s` | total runtime |
 
 Example — 1 message every 20 seconds for 10 minutes:
@@ -406,13 +406,12 @@ Load tests use the composite action (`.github/actions/ccip-load-test`) from **CC
 |---|---|---|---|
 | `ccip_env` | `devenv` | select `prod-testnet` | `-ccip-env` |
 | `direction` | `canton2evm` | same | test `-run` regex |
-| `message_rate` | `1/1s` | `1/45s` (when left at devenv default) | `CANTON_LOAD_MESSAGE_RATE` |
+| `message_rate` | `1/10s` | `1/10s` | `CANTON_LOAD_MESSAGE_RATE` |
 | `load_duration` | `90s` | `2m` (when left at devenv default) | `CANTON_LOAD_DURATION` |
 | `test_timeout` | `40m` | `30m` / `45m` for evm2canton or evm2canton-token | `go test -timeout` |
 | `config_file` | — | `env-prod-testnet.ci.toml` | `CCIP_CONFIG_FILE` |
-| `skip_exec_confirm` | — | `true` for canton2evm only; `false` for token + evm2canton | `CANTON_LOAD_SKIP_EXEC_CONFIRM` |
+| `skip_exec_confirm` | `false` | `true` for canton2evm only; `false` for token + evm2canton | `CANTON_LOAD_SKIP_EXEC_CONFIRM` |
 | `confirm_exec_timeout` | — | `10m` | `CANTON_CONFIRM_EXEC_TIMEOUT` |
-| `canton_ref` | workflow ref | devenv only | chainlink-canton checkout |
 
 **Devenv** spins up Docker via `setup-ccip-devenv` (same as CCIP E2E). **Prod-testnet** hits live Canton TestNet + Sepolia with no local devenv.
 

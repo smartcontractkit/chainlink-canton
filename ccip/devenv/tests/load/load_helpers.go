@@ -32,7 +32,7 @@ const (
 	envLoadDuration           = "CANTON_LOAD_DURATION"
 	envLoadSkipExecConfirm    = "CANTON_LOAD_SKIP_EXEC_CONFIRM"
 	envLoadCallTimeout        = "CANTON_LOAD_CALL_TIMEOUT"
-	defaultMessageRate        = "1/1s"
+	defaultMessageRate        = "1/10s"
 	defaultLoadDuration       = 90 * time.Second
 	defaultLoadCallPadding    = 2 * time.Minute
 	defaultSendOnlyCallBudget = 5 * time.Minute

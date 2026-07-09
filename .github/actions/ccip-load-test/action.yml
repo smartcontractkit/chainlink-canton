@@ -15,7 +15,7 @@ inputs:
   message_rate:
     description: "CANTON_LOAD_MESSAGE_RATE"
     required: false
-    default: "1/45s"
+    default: "1/10s"
   load_duration:
     description: "CANTON_LOAD_DURATION"
     required: false
@@ -32,10 +32,6 @@ inputs:
     description: "Checkout path for chainlink-canton (`.` for PR root, `chainlink-canton` for nested devenv checkout)"
     required: false
     default: .
-  canton_ref:
-    description: "chainlink-canton git ref for devenv setup (empty = workflow SHA)"
-    required: false
-    default: ""
   skip_exec_confirm:
     description: "CANTON_LOAD_SKIP_EXEC_CONFIRM"
     required: false
@@ -103,7 +99,6 @@ runs:
       if: inputs.ccip_env == 'devenv'
       uses: ./.github/actions/setup-ccip-devenv
       with:
-        canton-ref: ${{ inputs.canton_ref }}
         canton-path: ${{ inputs.canton_path }}
         ccv-iam-role: ${{ inputs.ccv-iam-role }}
         jd-registry: ${{ inputs.jd-registry }}
@@ -138,6 +133,7 @@ runs:
       env:
         CANTON_LOAD_MESSAGE_RATE: ${{ inputs.message_rate }}
         CANTON_LOAD_DURATION: ${{ inputs.load_duration }}
+        CANTON_LOAD_SKIP_EXEC_CONFIRM: ${{ inputs.skip_exec_confirm }}
       run: |
         case "${{ inputs.direction }}" in
           canton2evm) TEST_RUN='^TestCanton2EVM_Load$' ;;

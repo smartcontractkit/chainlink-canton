@@ -12,11 +12,6 @@ inputs:
     # that generates their configs. A mismatch across config-format changes (e.g. #1193
     # bootstrap monitoring.Config) makes the verifier container exit on startup.
     default: f56568515e8ad749f71e437342fa170f4ec12a0b
-  canton-ref:
-    description: >-
-      chainlink-canton git ref. Leave empty to use the ref that triggered the workflow.
-    required: false
-    default: ''
   ccv-iam-role:
     description: AWS IAM role ARN for CCV ECR authentication
     required: true
@@ -58,7 +53,7 @@ runs:
       with:
         repository: smartcontractkit/chainlink-canton
         path: ${{ inputs.canton-path }}
-        ref: ${{ inputs.canton-ref != '' && inputs.canton-ref || github.sha }}
+        ref: github.sha
 
     - name: Check out chainlink-ccv
       uses: actions/checkout@v6
