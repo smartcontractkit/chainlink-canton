@@ -6,7 +6,7 @@ import DA.Assert
 import DA.Crypto.Text (byteCount)
 import DA.Optional
 
-import CCIP.CodecV1.Uint256
+import CCIP.CodecV2.Uint256
 
 maxUint256Hex : Text
 maxUint256Hex = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
@@ -23,35 +23,35 @@ oneAboveMaxNumeric0Hex = "000000000000000000000000000000004b3b4ca85a86c47a098a22
 -- Unit tests for exact uint256 decimal text <-> 32-byte wire conversion.
 testUint256_DecimalTextToBytes_Vectors : Script ()
 testUint256_DecimalTextToBytes_Vectors = script do
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "0"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "0"
         === Some "0000000000000000000000000000000000000000000000000000000000000000"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "000000"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "000000"
         === Some "0000000000000000000000000000000000000000000000000000000000000000"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "1"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "1"
         === Some "0000000000000000000000000000000000000000000000000000000000000001"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "15"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "15"
         === Some "000000000000000000000000000000000000000000000000000000000000000f"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "16"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "16"
         === Some "0000000000000000000000000000000000000000000000000000000000000010"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "255"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "255"
         === Some "00000000000000000000000000000000000000000000000000000000000000ff"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "256"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "256"
         === Some "0000000000000000000000000000000000000000000000000000000000000100"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "1000000000000000000"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "1000000000000000000"
         === Some "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes CCIP.CodecV1.Uint256.maxNumeric0DecimalText
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes CCIP.CodecV2.Uint256.maxNumeric0DecimalText
         === Some maxNumeric0Hex
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes oneAboveMaxNumeric0Text
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes oneAboveMaxNumeric0Text
         === Some oneAboveMaxNumeric0Hex
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes CCIP.CodecV1.Uint256.maxUint256DecimalText
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes CCIP.CodecV2.Uint256.maxUint256DecimalText
         === Some maxUint256Hex
 
     assertMsg "all encoded uint256 vectors must be 32 bytes"
         (all (\hex -> byteCount hex == 32)
-            [ fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "0")
-            , fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "1")
-            , fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "1000000000000000000")
-            , fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes CCIP.CodecV1.Uint256.maxUint256DecimalText)
+            [ fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "0")
+            , fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "1")
+            , fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "1000000000000000000")
+            , fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes CCIP.CodecV2.Uint256.maxUint256DecimalText)
             ])
 
     debug "testUint256_DecimalTextToBytes_Vectors: PASSED"
@@ -59,100 +59,100 @@ testUint256_DecimalTextToBytes_Vectors = script do
 -- Unit tests for 32-byte wire uint256 -> exact decimal text conversion.
 testUint256_BytesToDecimalText_Vectors : Script ()
 testUint256_BytesToDecimalText_Vectors = script do
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000000"
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000000"
         === Some "0"
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000001"
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000001"
         === Some "1"
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText "000000000000000000000000000000000000000000000000000000000000000f"
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText "000000000000000000000000000000000000000000000000000000000000000f"
         === Some "15"
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000010"
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000010"
         === Some "16"
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText "00000000000000000000000000000000000000000000000000000000000000ff"
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText "00000000000000000000000000000000000000000000000000000000000000ff"
         === Some "255"
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000100"
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000000000000000100"
         === Some "256"
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
         === Some "1000000000000000000"
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText maxNumeric0Hex
-        === Some CCIP.CodecV1.Uint256.maxNumeric0DecimalText
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText oneAboveMaxNumeric0Hex
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText maxNumeric0Hex
+        === Some CCIP.CodecV2.Uint256.maxNumeric0DecimalText
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText oneAboveMaxNumeric0Hex
         === Some oneAboveMaxNumeric0Text
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText maxUint256Hex
-        === Some CCIP.CodecV1.Uint256.maxUint256DecimalText
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
-        === Some CCIP.CodecV1.Uint256.maxUint256DecimalText
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText maxUint256Hex
+        === Some CCIP.CodecV2.Uint256.maxUint256DecimalText
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+        === Some CCIP.CodecV2.Uint256.maxUint256DecimalText
 
-    CCIP.CodecV1.Uint256.isUint256Bytes maxUint256Hex === True
-    CCIP.CodecV1.Uint256.isUint256Bytes "00" === False
-    CCIP.CodecV1.Uint256.isUint256Bytes (maxUint256Hex <> "00") === False
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText "00" === None
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText (maxUint256Hex <> "00") === None
+    CCIP.CodecV2.Uint256.isUint256Bytes maxUint256Hex === True
+    CCIP.CodecV2.Uint256.isUint256Bytes "00" === False
+    CCIP.CodecV2.Uint256.isUint256Bytes (maxUint256Hex <> "00") === False
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText "00" === None
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText (maxUint256Hex <> "00") === None
 
     debug "testUint256_BytesToDecimalText_Vectors: PASSED"
 
 -- Input validation should reject non-integer decimal text and uint256 overflow.
 testUint256_DecimalTextValidation : Script ()
 testUint256_DecimalTextValidation = script do
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "" === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes " " === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "-1" === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "+1" === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "1.0" === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "1_000" === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "abc" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes " " === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "-1" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "+1" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "1.0" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "1_000" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "abc" === None
 
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes CCIP.CodecV1.Uint256.maxUint256DecimalText
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes CCIP.CodecV2.Uint256.maxUint256DecimalText
         === Some maxUint256Hex
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes (CCIP.CodecV1.Uint256.maxUint256DecimalText <> "0")
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes (CCIP.CodecV2.Uint256.maxUint256DecimalText <> "0")
         === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "115792089237316195423570985008687907853269984665640564039457584007913129639936"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "115792089237316195423570985008687907853269984665640564039457584007913129639936"
         === None
 
-    CCIP.CodecV1.Uint256.decimalTextFitsNumeric0 "0" === True
-    CCIP.CodecV1.Uint256.decimalTextFitsNumeric0 "000" === True
-    CCIP.CodecV1.Uint256.decimalTextFitsNumeric0 CCIP.CodecV1.Uint256.maxNumeric0DecimalText === True
-    CCIP.CodecV1.Uint256.decimalTextFitsNumeric0 oneAboveMaxNumeric0Text === False
-    CCIP.CodecV1.Uint256.decimalTextFitsNumeric0 CCIP.CodecV1.Uint256.maxUint256DecimalText === False
-    CCIP.CodecV1.Uint256.decimalTextFitsNumeric0 "-1" === False
-    CCIP.CodecV1.Uint256.decimalTextFitsNumeric0 "1.0" === False
+    CCIP.CodecV2.Uint256.decimalTextFitsNumeric0 "0" === True
+    CCIP.CodecV2.Uint256.decimalTextFitsNumeric0 "000" === True
+    CCIP.CodecV2.Uint256.decimalTextFitsNumeric0 CCIP.CodecV2.Uint256.maxNumeric0DecimalText === True
+    CCIP.CodecV2.Uint256.decimalTextFitsNumeric0 oneAboveMaxNumeric0Text === False
+    CCIP.CodecV2.Uint256.decimalTextFitsNumeric0 CCIP.CodecV2.Uint256.maxUint256DecimalText === False
+    CCIP.CodecV2.Uint256.decimalTextFitsNumeric0 "-1" === False
+    CCIP.CodecV2.Uint256.decimalTextFitsNumeric0 "1.0" === False
 
     debug "testUint256_DecimalTextValidation: PASSED"
 
 -- Numeric 0 helper covers the Canton-originating outbound path.
 testUint256_Numeric0ToBytes : Script ()
 testUint256_Numeric0ToBytes = script do
-    CCIP.CodecV1.Uint256.numeric0ToUint256Bytes 0.0
+    CCIP.CodecV2.Uint256.numeric0ToUint256Bytes 0.0
         === Some "0000000000000000000000000000000000000000000000000000000000000000"
-    CCIP.CodecV1.Uint256.numeric0ToUint256Bytes 1.0
+    CCIP.CodecV2.Uint256.numeric0ToUint256Bytes 1.0
         === Some "0000000000000000000000000000000000000000000000000000000000000001"
-    CCIP.CodecV1.Uint256.numeric0ToUint256Bytes 1000000000000000000.0
+    CCIP.CodecV2.Uint256.numeric0ToUint256Bytes 1000000000000000000.0
         === Some "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
-    CCIP.CodecV1.Uint256.numeric0ToUint256Bytes 99999999999999999999999999999999999999.0
+    CCIP.CodecV2.Uint256.numeric0ToUint256Bytes 99999999999999999999999999999999999999.0
         === Some maxNumeric0Hex
-    CCIP.CodecV1.Uint256.numeric0ToUint256Bytes (-1.0) === None
+    CCIP.CodecV2.Uint256.numeric0ToUint256Bytes (-1.0) === None
 
     debug "testUint256_Numeric0ToBytes: PASSED"
 
 -- Equal-decimal conversion preserves amount exactly and rejects values outside Numeric 0.
 testUint256_LocalConversion_EqualDecimals : Script ()
 testUint256_LocalConversion_EqualDecimals = script do
-    let zero = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "zero" "0" 18 18)
+    let zero = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "zero" "0" 18 18)
     zero.localAmount === 0.0
     zero.truncatedRemainder === "0"
     zero.wasTruncated === False
 
-    let normal = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "normal" "123456789" 6 6)
+    let normal = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "normal" "123456789" 6 6)
     normal.localAmount === 123456789.0
     normal.truncatedRemainder === "0"
     normal.wasTruncated === False
 
-    let maxNumeric = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "max" CCIP.CodecV1.Uint256.maxNumeric0DecimalText 18 18)
+    let maxNumeric = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "max" CCIP.CodecV2.Uint256.maxNumeric0DecimalText 18 18)
     maxNumeric.localAmount === 99999999999999999999999999999999999999.0
     maxNumeric.wasTruncated === False
 
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "one-above" oneAboveMaxNumeric0Text 18 18
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "one-above" oneAboveMaxNumeric0Text 18 18
         === None
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "above-uint256" (CCIP.CodecV1.Uint256.maxUint256DecimalText <> "0") 80 0
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "above-uint256" (CCIP.CodecV2.Uint256.maxUint256DecimalText <> "0") 80 0
         === None
 
     debug "testUint256_LocalConversion_EqualDecimals: PASSED"
@@ -160,49 +160,49 @@ testUint256_LocalConversion_EqualDecimals = script do
 -- Downscaling floors toward zero before parsing to Numeric 0, matching integer token units.
 testUint256_LocalConversion_Downscale : Script ()
 testUint256_LocalConversion_Downscale = script do
-    let exact = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "exact" "1000000000000000000" 18 6)
+    let exact = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "exact" "1000000000000000000" 18 6)
     exact.localAmount === 1000000.0
     exact.truncatedRemainder === "0"
     exact.wasTruncated === False
 
-    let fractional = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "fractional" "123456789123456789" 18 6)
+    let fractional = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "fractional" "123456789123456789" 18 6)
     fractional.localAmount === 123456.0
     fractional.truncatedRemainder === "789123456789"
     fractional.wasTruncated === True
 
-    let belowUnit = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "below-unit" "999999999999" 18 6)
+    let belowUnit = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "below-unit" "999999999999" 18 6)
     belowUnit.localAmount === 0.0
     belowUnit.truncatedRemainder === "999999999999"
     belowUnit.wasTruncated === True
 
-    let maxDecimalGapBelowUnit = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "max-gap-below-unit" "1" 255 0)
+    let maxDecimalGapBelowUnit = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "max-gap-below-unit" "1" 255 0)
     maxDecimalGapBelowUnit.localAmount === 0.0
     maxDecimalGapBelowUnit.truncatedRemainder === "1"
     maxDecimalGapBelowUnit.wasTruncated === True
 
-    let exactUnit = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "exact-unit" "1000000000000" 18 6)
+    let exactUnit = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "exact-unit" "1000000000000" 18 6)
     exactUnit.localAmount === 1.0
     exactUnit.truncatedRemainder === "0"
     exactUnit.wasTruncated === False
 
-    let leadingZeros = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "leading-zeros" "0001234500" 4 2)
+    let leadingZeros = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "leading-zeros" "0001234500" 4 2)
     leadingZeros.localAmount === 12345.0
     leadingZeros.truncatedRemainder === "0"
     leadingZeros.wasTruncated === False
 
-    let largeSourceFitsAfterDownscale = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "large-source" oneAboveMaxNumeric0Text 20 18)
+    let largeSourceFitsAfterDownscale = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "large-source" oneAboveMaxNumeric0Text 20 18)
     largeSourceFitsAfterDownscale.localAmount === 1000000000000000000000000000000000000.0
     largeSourceFitsAfterDownscale.truncatedRemainder === "0"
     largeSourceFitsAfterDownscale.wasTruncated === False
 
-    let maxUint256ToOne = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "max-uint256" CCIP.CodecV1.Uint256.maxUint256DecimalText 77 0)
+    let maxUint256ToOne = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "max-uint256" CCIP.CodecV2.Uint256.maxUint256DecimalText 77 0)
     maxUint256ToOne.localAmount === 1.0
     maxUint256ToOne.truncatedRemainder === "15792089237316195423570985008687907853269984665640564039457584007913129639935"
     maxUint256ToOne.wasTruncated === True
 
-    let maxUint256ToZero = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "max-uint256-zero" CCIP.CodecV1.Uint256.maxUint256DecimalText 78 0)
+    let maxUint256ToZero = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "max-uint256-zero" CCIP.CodecV2.Uint256.maxUint256DecimalText 78 0)
     maxUint256ToZero.localAmount === 0.0
-    maxUint256ToZero.truncatedRemainder === CCIP.CodecV1.Uint256.maxUint256DecimalText
+    maxUint256ToZero.truncatedRemainder === CCIP.CodecV2.Uint256.maxUint256DecimalText
     maxUint256ToZero.wasTruncated === True
 
     debug "testUint256_LocalConversion_Downscale: PASSED"
@@ -210,29 +210,29 @@ testUint256_LocalConversion_Downscale = script do
 -- Upscaling appends zeros and rejects results that overflow Canton's Numeric 0 range.
 testUint256_LocalConversion_Upscale : Script ()
 testUint256_LocalConversion_Upscale = script do
-    let sixToEighteen = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "six-to-eighteen" "123456" 6 18)
+    let sixToEighteen = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "six-to-eighteen" "123456" 6 18)
     sixToEighteen.localAmount === 123456000000000000.0
     sixToEighteen.truncatedRemainder === "0"
     sixToEighteen.wasTruncated === False
 
-    let zeroToEighteen = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "zero-to-eighteen" "1" 0 18)
+    let zeroToEighteen = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "zero-to-eighteen" "1" 0 18)
     zeroToEighteen.localAmount === 1000000000000000000.0
 
-    let zeroMaxGap = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "zero-max-gap" "0" 0 255)
+    let zeroMaxGap = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "zero-max-gap" "0" 0 255)
     zeroMaxGap.localAmount === 0.0
     zeroMaxGap.truncatedRemainder === "0"
     zeroMaxGap.wasTruncated === False
 
-    let boundary = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "boundary" "99999999999999999999999999" 6 18)
+    let boundary = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "boundary" "99999999999999999999999999" 6 18)
     boundary.localAmount === 99999999999999999999999999000000000000.0
 
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "overflow" "100000000000000000000000000" 6 18
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "overflow" "100000000000000000000000000" 6 18
         === None
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "invalid-negative-decimals" "1" (-1) 18
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "invalid-negative-decimals" "1" (-1) 18
         === None
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "invalid-local-decimals" "1" 18 256
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "invalid-local-decimals" "1" 18 256
         === None
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "invalid-remote-decimals" "1" 256 18
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "invalid-remote-decimals" "1" 256 18
         === None
 
     debug "testUint256_LocalConversion_Upscale: PASSED"
@@ -240,17 +240,17 @@ testUint256_LocalConversion_Upscale = script do
 -- The byte-based conversion path is the one used by inbound token pools.
 testUint256_LocalConversion_FromBytes : Script ()
 testUint256_LocalConversion_FromBytes = script do
-    let amount = fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "123456789123456789")
-    let converted = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromUint256Checked "from-bytes" amount 18 6)
+    let amount = fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "123456789123456789")
+    let converted = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromUint256Checked "from-bytes" amount 18 6)
     converted.localAmount === 123456.0
     converted.truncatedRemainder === "789123456789"
     converted.wasTruncated === True
 
-    let large = fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes oneAboveMaxNumeric0Text)
-    let downscaled = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromUint256Checked "large-downscale" large 20 18)
+    let large = fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes oneAboveMaxNumeric0Text)
+    let downscaled = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromUint256Checked "large-downscale" large 20 18)
     downscaled.localAmount === 1000000000000000000000000000000000000.0
 
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromUint256Checked "bad-length" "00" 18 6
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromUint256Checked "bad-length" "00" 18 6
         === None
 
     debug "testUint256_LocalConversion_FromBytes: PASSED"

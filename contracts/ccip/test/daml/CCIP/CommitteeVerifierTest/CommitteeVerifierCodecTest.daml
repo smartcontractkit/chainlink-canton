@@ -6,8 +6,8 @@ import DA.Optional (fromSome)
 
 import qualified Chainlink.InstanceAddress
 
-import CCIP.CommitteeVerifierV1.CommitteeVerifierCodecGen qualified as CommitteeVerifierCodec
-import CCIP.CommitteeVerifierV1.CommitteeVerifierTypes (
+import CCIP.CommitteeVerifierV2.CommitteeVerifierCodecGen qualified as CommitteeVerifierCodec
+import CCIP.CommitteeVerifierV2.CommitteeVerifierTypes (
     SignatureConfig(..),
     DynamicConfig(..),
     RemoteChainConfigArgs(..),

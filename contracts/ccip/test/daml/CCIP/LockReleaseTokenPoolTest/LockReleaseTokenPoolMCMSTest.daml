@@ -16,15 +16,15 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 
 import qualified Chainlink.InstanceAddress
 
-import CCIP.CodecV1.FinalityConfig
-import CCIP.LockReleaseTokenPoolV1
-import CCIP.LockReleaseTokenPoolV1CodecGen
-import CCIP.UtilsV1.Context
+import CCIP.CodecV2.FinalityConfig
+import CCIP.LockReleaseTokenPoolV2
+import CCIP.LockReleaseTokenPoolV2CodecGen
+import CCIP.UtilsV2.Context
 
 mkFinalityConfig n =
   if n == 0
-  then CCIP.CodecV1.FinalityConfig.WaitForFinality
-  else CCIP.CodecV1.FinalityConfig.BlockDepth n
+  then CCIP.CodecV2.FinalityConfig.WaitForFinality
+  else CCIP.CodecV2.FinalityConfig.BlockDepth n
 
 dummyPoolDeps : Party -> LockReleaseTokenPoolDeps
 dummyPoolDeps ccipOwner =
@@ -800,10 +800,10 @@ testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig = script do
             deps = dummyPoolDeps ccipOwner
 
     submitMustFail poolOwner do
-        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (CCIP.CodecV1.FinalityConfig.BlockDepth 0))]))
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (CCIP.CodecV2.FinalityConfig.BlockDepth 0))]))
 
     submitMustFail poolOwner do
-        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (CCIP.CodecV1.FinalityConfig.BlockDepth (-1)))]))
+        createCmd (mkPool (Map.fromList [(123.0, mkRemoteConfig (CCIP.CodecV2.FinalityConfig.BlockDepth (-1)))]))
 
     poolCid <- submit poolOwner do
         createCmd (mkPool Map.empty)
@@ -822,17 +822,17 @@ testLockReleaseTokenPool_RejectsInvalidBlockDepthConfig = script do
     submitMustFail poolOwner do
         exerciseCmd poolCid ApplyChainUpdates with
             remoteChainSelectorsToRemove = []
-            chainsToAdd = [mkUpdate (CCIP.CodecV1.FinalityConfig.BlockDepth 0)]
+            chainsToAdd = [mkUpdate (CCIP.CodecV2.FinalityConfig.BlockDepth 0)]
 
     submitMustFail poolOwner do
         exerciseCmd poolCid ApplyChainUpdates with
             remoteChainSelectorsToRemove = []
-            chainsToAdd = [mkUpdate (CCIP.CodecV1.FinalityConfig.BlockDepth (-1))]
+            chainsToAdd = [mkUpdate (CCIP.CodecV2.FinalityConfig.BlockDepth (-1))]
 
     _ <- submit poolOwner do
         exerciseCmd poolCid ApplyChainUpdates with
             remoteChainSelectorsToRemove = []
-            chainsToAdd = [mkUpdate (CCIP.CodecV1.FinalityConfig.BlockDepth 1)]
+            chainsToAdd = [mkUpdate (CCIP.CodecV2.FinalityConfig.BlockDepth 1)]
 
     pure ()
 

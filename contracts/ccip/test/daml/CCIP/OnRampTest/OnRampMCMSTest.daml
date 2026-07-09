@@ -10,8 +10,8 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.RuntimeV1.OnRamp
-import qualified CCIP.RuntimeV1.OnRampCodecGen
+import qualified CCIP.RuntimeV2.OnRamp
+import qualified CCIP.RuntimeV2.OnRampCodecGen
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - SET DEPS
@@ -23,14 +23,14 @@ testOnRampMCMSEntrypoint_SetDeps = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "onramp-test"
-      initialDeps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+      initialDeps = CCIP.RuntimeV2.OnRamp.OnRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc-old@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn-old@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar-old@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq-old@owner"
 
   onRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
+    createCmd CCIP.RuntimeV2.OnRamp.OnRamp with
       instanceId
       ccipOwner
       maxUSDCentsPerMsg = 1000000000.0
@@ -39,13 +39,13 @@ testOnRampMCMSEntrypoint_SetDeps = script do
   let instAddr = Chainlink.InstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid
 
-  let newDeps = CCIP.RuntimeV1.OnRamp.SetDepsParams with
+  let newDeps = CCIP.RuntimeV2.OnRamp.SetDepsParams with
         globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc-new@owner")
         rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn-new@owner")
         tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar-new@owner")
         feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq-new@owner")
 
-      encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams newDeps
+      encoded = CCIP.RuntimeV2.OnRampCodecGen.encodeSetDepsParams newDeps
 
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -53,7 +53,7 @@ testOnRampMCMSEntrypoint_SetDeps = script do
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId onRampCid)]
 
-  contracts <- query @CCIP.RuntimeV1.OnRamp.OnRamp ccipOwner
+  contracts <- query @CCIP.RuntimeV2.OnRamp.OnRamp ccipOwner
   case filter (\(_, onRamp) -> onRamp.instanceId == instanceId) contracts of
     [(_, onRamp)] -> do
       onRamp.deps.globalConfig === Chainlink.InstanceAddress.RawInstanceAddress "gc-new@owner"
@@ -70,14 +70,14 @@ testOnRampMCMSEntrypoint_SetDeps_Partial = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "onramp-partial-test"
-      initialDeps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+      initialDeps = CCIP.RuntimeV2.OnRamp.OnRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc-old@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn-old@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar-old@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq-old@owner"
 
   onRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
+    createCmd CCIP.RuntimeV2.OnRamp.OnRamp with
       instanceId
       ccipOwner
       maxUSDCentsPerMsg = 1000000000.0
@@ -86,13 +86,13 @@ testOnRampMCMSEntrypoint_SetDeps_Partial = script do
   let instAddr = Chainlink.InstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid
 
-  let partialDeps = CCIP.RuntimeV1.OnRamp.SetDepsParams with
+  let partialDeps = CCIP.RuntimeV2.OnRamp.SetDepsParams with
         globalConfig = None
         rmnRemote = None
         tokenAdminRegistry = None
         feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq-new@owner")
 
-      encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams partialDeps
+      encoded = CCIP.RuntimeV2.OnRampCodecGen.encodeSetDepsParams partialDeps
 
   submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -100,7 +100,7 @@ testOnRampMCMSEntrypoint_SetDeps_Partial = script do
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId onRampCid)]
 
-  contracts <- query @CCIP.RuntimeV1.OnRamp.OnRamp ccipOwner
+  contracts <- query @CCIP.RuntimeV2.OnRamp.OnRamp ccipOwner
   case filter (\(_, onRamp) -> onRamp.instanceId == instanceId) contracts of
     [(_, onRamp)] -> do
       onRamp.deps.globalConfig === Chainlink.InstanceAddress.RawInstanceAddress "gc-old@owner"
@@ -117,14 +117,14 @@ testOnRampMCMSEntrypoint_SetDeps_Replace = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "onramp-replace-test"
-      initialDeps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+      initialDeps = CCIP.RuntimeV2.OnRamp.OnRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc1@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn1@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar1@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq1@owner"
 
   onRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
+    createCmd CCIP.RuntimeV2.OnRamp.OnRamp with
       instanceId
       ccipOwner
       maxUSDCentsPerMsg = 1000000000.0
@@ -133,12 +133,12 @@ testOnRampMCMSEntrypoint_SetDeps_Replace = script do
   let instAddr = Chainlink.InstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid
 
-  let deps2 = CCIP.RuntimeV1.OnRamp.SetDepsParams with
+  let deps2 = CCIP.RuntimeV2.OnRamp.SetDepsParams with
         globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc2@owner")
         rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn2@owner")
         tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar2@owner")
         feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq2@owner")
-      encoded1 = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams deps2
+      encoded1 = CCIP.RuntimeV2.OnRampCodecGen.encodeSetDepsParams deps2
 
   newContractIds1 <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -146,18 +146,18 @@ testOnRampMCMSEntrypoint_SetDeps_Replace = script do
       operationData = encoded1
       contractIds = Map.fromList [(instAddr, toAnyContractId onRampCid)]
 
-  contracts1 <- query @CCIP.RuntimeV1.OnRamp.OnRamp ccipOwner
+  contracts1 <- query @CCIP.RuntimeV2.OnRamp.OnRamp ccipOwner
   case filter (\(_, onRamp) -> onRamp.instanceId == instanceId) contracts1 of
     [(newCid, onRamp1)] -> do
       onRamp1.deps.globalConfig === Chainlink.InstanceAddress.RawInstanceAddress "gc2@owner"
 
       let targetAsMcmsReceiver2 = toInterfaceContractId @MCMSReceiver newCid
-      let deps3 = CCIP.RuntimeV1.OnRamp.SetDepsParams with
+      let deps3 = CCIP.RuntimeV2.OnRamp.SetDepsParams with
             globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc3@owner")
             rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn3@owner")
             tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar3@owner")
             feeQuoter = Some (Chainlink.InstanceAddress.RawInstanceAddress "fq3@owner")
-          encoded2 = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams deps3
+          encoded2 = CCIP.RuntimeV2.OnRampCodecGen.encodeSetDepsParams deps3
 
       newContractIds2 <- submit ccipOwner do
         exerciseCmd targetAsMcmsReceiver2 MCMSReceiver_Entrypoint with
@@ -165,7 +165,7 @@ testOnRampMCMSEntrypoint_SetDeps_Replace = script do
           operationData = encoded2
           contractIds = Map.fromList [(instAddr, toAnyContractId newCid)]
 
-      contracts2 <- query @CCIP.RuntimeV1.OnRamp.OnRamp ccipOwner
+      contracts2 <- query @CCIP.RuntimeV2.OnRamp.OnRamp ccipOwner
       case filter (\(_, onRamp) -> onRamp.instanceId == instanceId) contracts2 of
         [(_, onRamp2)] -> do
           onRamp2.deps.globalConfig === Chainlink.InstanceAddress.RawInstanceAddress "gc3@owner"
@@ -185,14 +185,14 @@ testOnRampMCMSEntrypoint_UnknownFunction = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "onramp-error-test"
-      deps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+      deps = CCIP.RuntimeV2.OnRamp.OnRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
 
   onRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
+    createCmd CCIP.RuntimeV2.OnRamp.OnRamp with
       instanceId
       ccipOwner
       maxUSDCentsPerMsg = 1000000000.0
@@ -214,14 +214,14 @@ testOnRampMCMSEntrypoint_InvalidParams = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "onramp-invalid-test"
-      deps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+      deps = CCIP.RuntimeV2.OnRamp.OnRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
 
   onRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
+    createCmd CCIP.RuntimeV2.OnRamp.OnRamp with
       instanceId
       ccipOwner
       maxUSDCentsPerMsg = 1000000000.0
@@ -243,14 +243,14 @@ testOnRampMCMSEntrypoint_MissingSelfCid = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "onramp-missing-cid-test"
-      deps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+      deps = CCIP.RuntimeV2.OnRamp.OnRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
         feeQuoter = Chainlink.InstanceAddress.RawInstanceAddress "fq@owner"
 
   onRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
+    createCmd CCIP.RuntimeV2.OnRamp.OnRamp with
       instanceId
       ccipOwner
       maxUSDCentsPerMsg = 1000000000.0
@@ -258,7 +258,7 @@ testOnRampMCMSEntrypoint_MissingSelfCid = script do
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver onRampCid
 
-  let encoded = CCIP.RuntimeV1.OnRampCodecGen.encodeSetDepsParams (CCIP.RuntimeV1.OnRamp.SetDepsParams with
+  let encoded = CCIP.RuntimeV2.OnRampCodecGen.encodeSetDepsParams (CCIP.RuntimeV2.OnRamp.SetDepsParams with
         globalConfig = Some deps.globalConfig
         rmnRemote = Some deps.rmnRemote
         tokenAdminRegistry = Some deps.tokenAdminRegistry

@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-api-v2"
-	PackageID   = "0df0f713cc0ecec5b1cb3de701fd7488c68c54421074503c05af29859754b339"
+	PackageID   = "7fffaf108129d37413d8edfbd91ffe373051b2cb0621c26e245093c6138daf58"
 	SDKVersion  = "3.4.11"
 )
 
@@ -204,11 +204,11 @@ type IITokenReceiveTicket interface {
 }
 
 const (
+	FeeQuoterContextKey          = types.TEXT("fee-quoter")
 	RmnRemoteContextKey          = types.TEXT("rmn-remote")
+	GlobalConfigContextKey       = types.TEXT("global-config")
 	TokenConfigContextKey        = types.TEXT("token-config")
 	TokenAdminRegistryContextKey = types.TEXT("token-admin-registry")
-	FeeQuoterContextKey          = types.TEXT("fee-quoter")
-	GlobalConfigContextKey       = types.TEXT("global-config")
 )
 
 func argsToMap(args any) map[string]any {
@@ -972,12 +972,12 @@ const (
 func (e MessageExecutionState) GetEnumConstructor() string { return string(e) }
 
 func (e MessageExecutionState) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV1.ExecutingMessage", "MessageExecutionState")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV2.ExecutingMessage", "MessageExecutionState")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e MessageExecutionState) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.APIV1.ExecutingMessage", "MessageExecutionState")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.APIV2.ExecutingMessage", "MessageExecutionState")
 }
 
 func (e MessageExecutionState) MarshalJSON() ([]byte, error) {
@@ -2759,82 +2759,82 @@ func (t *TokenReceiveTicketView) UnmarshalHex(data string) error {
 
 // IIExecutingMessageInterfaceID returns the interface ID for the IIExecutingMessage interface using the package name
 func IIExecutingMessageInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV1.ExecutingMessage", "IExecutingMessage")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV2.ExecutingMessage", "IExecutingMessage")
 }
 
 // IIExecutingMessageInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IIExecutingMessageInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV1.ExecutingMessage", "IExecutingMessage")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV2.ExecutingMessage", "IExecutingMessage")
 }
 
 // IIFeeQuoterInterfaceID returns the interface ID for the IIFeeQuoter interface using the package name
 func IIFeeQuoterInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV1.FeeQuoter", "IFeeQuoter")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV2.FeeQuoter", "IFeeQuoter")
 }
 
 // IIFeeQuoterInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IIFeeQuoterInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV1.FeeQuoter", "IFeeQuoter")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV2.FeeQuoter", "IFeeQuoter")
 }
 
 // IIGlobalConfigInterfaceID returns the interface ID for the IIGlobalConfig interface using the package name
 func IIGlobalConfigInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV1.GlobalConfig", "IGlobalConfig")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV2.GlobalConfig", "IGlobalConfig")
 }
 
 // IIGlobalConfigInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IIGlobalConfigInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV1.GlobalConfig", "IGlobalConfig")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV2.GlobalConfig", "IGlobalConfig")
 }
 
 // IIRMNRemoteInterfaceID returns the interface ID for the IIRMNRemote interface using the package name
 func IIRMNRemoteInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV1.RMNRemote", "IRMNRemote")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV2.RMNRemote", "IRMNRemote")
 }
 
 // IIRMNRemoteInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IIRMNRemoteInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV1.RMNRemote", "IRMNRemote")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV2.RMNRemote", "IRMNRemote")
 }
 
 // IISendingMessageInterfaceID returns the interface ID for the IISendingMessage interface using the package name
 func IISendingMessageInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV1.SendingMessage", "ISendingMessage")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV2.SendingMessage", "ISendingMessage")
 }
 
 // IISendingMessageInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IISendingMessageInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV1.SendingMessage", "ISendingMessage")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV2.SendingMessage", "ISendingMessage")
 }
 
 // IITokenAdminRegistryInterfaceID returns the interface ID for the IITokenAdminRegistry interface using the package name
 func IITokenAdminRegistryInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV1.TokenAdminRegistry", "ITokenAdminRegistry")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV2.TokenAdminRegistry", "ITokenAdminRegistry")
 }
 
 // IITokenAdminRegistryInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IITokenAdminRegistryInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV1.TokenAdminRegistry", "ITokenAdminRegistry")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV2.TokenAdminRegistry", "ITokenAdminRegistry")
 }
 
 // IITokenConfigInterfaceID returns the interface ID for the IITokenConfig interface using the package name
 func IITokenConfigInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV1.TokenAdminRegistry", "ITokenConfig")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV2.TokenAdminRegistry", "ITokenConfig")
 }
 
 // IITokenConfigInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IITokenConfigInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV1.TokenAdminRegistry", "ITokenConfig")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV2.TokenAdminRegistry", "ITokenConfig")
 }
 
 // IITokenReceiveTicketInterfaceID returns the interface ID for the IITokenReceiveTicket interface using the package name
 func IITokenReceiveTicketInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV1.ExecutingMessage", "ITokenReceiveTicket")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.APIV2.ExecutingMessage", "ITokenReceiveTicket")
 }
 
 // IITokenReceiveTicketInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IITokenReceiveTicketInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV1.ExecutingMessage", "ITokenReceiveTicket")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.APIV2.ExecutingMessage", "ITokenReceiveTicket")
 }
 
 // MCMSEncoder interface for typed encoding methods.

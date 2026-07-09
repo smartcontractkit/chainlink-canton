@@ -23,7 +23,7 @@ var (
 
 const (
 	PackageName = "ccip-codec-v2"
-	PackageID   = "769c413687b6e770b7495d5601774ce71b8da9135913e59f30c7290299709e5e"
+	PackageID   = "6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb"
 	SDKVersion  = "3.4.11"
 )
 
@@ -34,13 +34,13 @@ type Template interface {
 
 const (
 	MaxCCVsPerMessage        = types.INT64(255)
+	MaxUint256DecimalText    = types.TEXT("115792089237316195423570985008687907853269984665640564039457584007913129639935")
+	MaxNumeric0DecimalText   = types.TEXT("99999999999999999999999999999999999999")
+	MaxNumeric0IntegerText   = types.TEXT("99999999999999999999999999999999999999")
 	WaitForFinalityFlag      = types.TEXT("00000000")
 	MinBlockDepth            = types.INT64(1)
 	MaxBlockDepth            = types.INT64(65535)
 	FinalityConfigByteLength = types.INT64(4)
-	MaxNumeric0IntegerText   = types.TEXT("99999999999999999999999999999999999999")
-	MaxUint256DecimalText    = types.TEXT("115792089237316195423570985008687907853269984665640564039457584007913129639935")
-	MaxNumeric0DecimalText   = types.TEXT("99999999999999999999999999999999999999")
 	UsdPerUsdCent            = types.NUMERIC("100000000.")
 	PremiumIdentity          = types.NUMERIC("10000000000.")
 	MinTokenDecimals         = types.INT64(0)

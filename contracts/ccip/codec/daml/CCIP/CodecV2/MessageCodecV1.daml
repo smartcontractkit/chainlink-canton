@@ -1,0 +1,690 @@
+module CCIP.CodecV2.MessageCodecV1
+  ( MessageV1(..)
+  , TokenTransferV1(..)
+  , encodeMessageV1
+  , encodeTokenTransferV1
+  , encodeUint8
+  , encodeUint16
+  , encodeUint32
+  , encodeUint64
+  , encodeUint256
+  , encodeInstrumentId
+  , encodePartyAddress
+  , encodeInstanceAddress
+  , computeCCVAndExecutorHash
+  , extractBytes
+  , decodeMessageV1
+  , decodeTokenTransfer
+  , decodeUint8
+  , decodeUint16
+  , decodeUint32
+  , decodeUint64
+  , decodeUint256
+  , messageId
+  ) where
+
+import DA.Crypto.Text (BytesHex, byteCount, toHex, packHexBytes, fromHex, keccak256)
+import qualified DA.Text as Text
+import DA.Optional (fromSome)
+
+import qualified Splice.Api.Token.HoldingV1
+
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CodecV2.NumericHex
+
+-- | MessageV1 struct matching EVM MessageV1Codec.sol exactly.
+-- The encoding order is critical for cross-chain messageId compatibility:
+--   messageId = keccak256(encodedMessage)
+--
+-- Static length section (69 bytes):
+--   version (1 byte) + sourceChainSelector (8) + destChainSelector (8) +
+--   sequenceNumber (8) + executionGasLimit (4) + ccipReceiveGasLimit (4) +
+--   finality (4) + ccvAndExecutorHash (32)
+--
+-- Variable length section:
+--   onRampAddress, offRampAddress, sender, receiver, destBlob, tokenTransfer, messageData
+data MessageV1 = MessageV1
+    with
+        -- Static length fields (must be in this exact order for encoding)
+        sourceChainSelector : Numeric 0   -- uint64
+        destChainSelector : Numeric 0     -- uint64
+        sequenceNumber : Numeric 0        -- uint64 (called messageNumber in EVM)
+        executionGasLimit : Int           -- uint32
+        ccipReceiveGasLimit : Int         -- uint32 (gas limit for user callback)
+        finality : CCIP.CodecV2.FinalityConfig.DecodedFinality -- bytes4 finality config
+        ccvAndExecutorHash : BytesHex     -- bytes32 (hash of CCVs and executor)
+        -- Variable length fields (must be in this exact order for encoding)
+        onRampAddress : BytesHex          -- bytes (length-prefixed)
+        offRampAddress : BytesHex         -- bytes (length-prefixed)
+        sender : BytesHex                 -- bytes (length-prefixed)
+        receiver : BytesHex               -- bytes (length-prefixed)
+        destBlob : BytesHex               -- bytes (length-prefixed)
+        tokenTransfer : Optional TokenTransferV1  -- 0 or 1 token transfer
+        messageData : BytesHex            -- bytes (length-prefixed)
+    deriving (Eq, Show)
+
+data TokenTransferV1 = TokenTransferV1
+    with
+        amount : BytesHex -- uint256
+        sourcePoolAddress : BytesHex -- bytes
+        sourceTokenAddress : BytesHex -- bytes
+        destTokenAddress : BytesHex -- bytes
+        tokenReceiver : BytesHex -- bytes
+        extraData : BytesHex -- bytes
+    deriving (Eq, Show)
+
+extractBytes : BytesHex -> Int -> Int -> Optional BytesHex
+extractBytes bs start len =
+    let totalLen = byteCount bs
+        endPos = start + len
+    in
+        if start >= 0 && len >= 0 && start <= totalLen && endPos <= totalLen
+        then Some(Text.take (len*2) (Text.drop (start*2) bs))
+        else None
+
+-- ===================================================
+-- |                     Encoding                    |
+-- ===================================================
+
+-- | Encode MessageV1 to bytes matching EVM MessageV1Codec._encodeMessageV1 exactly.
+-- The encoding order MUST match EVM for cross-chain messageId compatibility.
+encodeMessageV1 : MessageV1 -> BytesHex
+encodeMessageV1 message =
+    let
+        -- Encode token transfer if present
+        encodedTokenTransfer = optional "" encodeTokenTransferV1 message.tokenTransfer
+
+        -- Static length section (69 bytes total) - MUST match EVM order exactly
+        staticSection =
+            fromSome (encodeUint8 1)                                -- version (1 byte)
+            <> fromSome (encodeUint64 message.sourceChainSelector)  -- sourceChainSelector (8 bytes)
+            <> fromSome (encodeUint64 message.destChainSelector)    -- destChainSelector (8 bytes)
+            <> fromSome (encodeUint64 message.sequenceNumber)       -- messageNumber (8 bytes)
+            <> fromSome (encodeUint32 message.executionGasLimit)    -- executionGasLimit (4 bytes)
+            <> fromSome (encodeUint32 message.ccipReceiveGasLimit)  -- ccipReceiveGasLimit (4 bytes)
+            <> (if byteCount message.finality.raw == 4
+                then message.finality.raw
+                else error "MessageCodecV1.encodeMessageV1: finality must be 4 bytes")
+            <> CCIP.CodecV2.NumericHex.padLeft 64 "0" message.ccvAndExecutorHash -- ccvAndExecutorHash (32 bytes = 64 hex chars)
+
+        -- Variable length section - MUST match EVM order exactly
+        variableSection =
+            fromSome (encodeUint8 (byteCount message.onRampAddress))
+            <> message.onRampAddress
+            <> fromSome (encodeUint8 (byteCount message.offRampAddress))
+            <> message.offRampAddress
+            <> fromSome (encodeUint8 (byteCount message.sender))
+            <> message.sender
+            <> fromSome (encodeUint8 (byteCount message.receiver))
+            <> message.receiver
+            <> fromSome (encodeUint16 (byteCount message.destBlob))
+            <> message.destBlob
+            <> fromSome (encodeUint16 (byteCount encodedTokenTransfer))
+            <> encodedTokenTransfer
+            <> fromSome (encodeUint16 (byteCount message.messageData))
+            <> message.messageData
+    in
+        staticSection <> variableSection
+
+encodeTokenTransferV1 : TokenTransferV1 -> BytesHex
+encodeTokenTransferV1 tokenTransfer =
+    (fromSome (encodeUint8 1)) -- version 1
+    <> (if byteCount tokenTransfer.amount == 32 then tokenTransfer.amount else error "MessageCodecV1.encodeTokenTransferV1: amount must be 32 bytes")
+    <> fromSome (encodeUint8 (byteCount tokenTransfer.sourcePoolAddress))
+    <> tokenTransfer.sourcePoolAddress
+    <> fromSome (encodeUint8 (byteCount tokenTransfer.sourceTokenAddress))
+    <> tokenTransfer.sourceTokenAddress
+    <> fromSome (encodeUint8 (byteCount tokenTransfer.destTokenAddress))
+    <> tokenTransfer.destTokenAddress
+    <> fromSome (encodeUint8 (byteCount tokenTransfer.tokenReceiver))
+    <> tokenTransfer.tokenReceiver
+    <> fromSome (encodeUint16 (byteCount tokenTransfer.extraData))
+    <> tokenTransfer.extraData
+
+encodeInstrumentId : Splice.Api.Token.HoldingV1.InstrumentId -> BytesHex
+encodeInstrumentId instrumentId =
+    let combined = instrumentId.id <> "@" <> partyToText instrumentId.admin
+    in keccak256 (DA.Crypto.Text.toHex combined)
+
+encodeUint8 : Int -> Optional BytesHex
+encodeUint8 n =
+    let
+        -- Maximum value for uint8: 2^8 - 1 = 255
+        maxUint8 = 255
+    in
+        if n < 0 || n > maxUint8
+        then None
+        else
+            DA.Crypto.Text.packHexBytes (DA.Crypto.Text.toHex n) 1
+
+encodeUint16 : Int -> Optional BytesHex
+encodeUint16 n =
+    let
+        -- Maximum value for uint16: 2^16 - 1 = 65535
+        maxUint16 = 65535
+    in
+        if n < 0 || n > maxUint16
+        then None
+        else
+            DA.Crypto.Text.packHexBytes (DA.Crypto.Text.toHex n) 2
+
+encodeUint32 : Int -> Optional BytesHex
+encodeUint32 n =
+    let
+        -- Maximum value for uint32: 2^32 - 1 = 4294967295
+        maxUint32 = 4294967295
+    in
+        if n < 0 || n > maxUint32
+        then None
+        else
+            DA.Crypto.Text.packHexBytes (DA.Crypto.Text.toHex n) 4
+
+-- Convert a Numeric 0 to a hex-encoded uint64 (8 bytes)
+encodeUint64 : Numeric 0 -> Optional BytesHex
+encodeUint64 = CCIP.CodecV2.NumericHex.encodeUint64
+
+-- Convert a Numeric 0 to a hex-encoded uint256 (32 bytes)
+encodeUint256 : Numeric 0 -> Optional BytesHex
+encodeUint256 = CCIP.CodecV2.NumericHex.encodeUint256
+
+-- Compute 32-byte party address from Party.
+-- Returns keccak256(partyToText(party)) for privacy-preserving cross-chain addressing.
+encodePartyAddress : Party -> BytesHex
+encodePartyAddress party =
+    let partyHex = DA.Crypto.Text.toHex (partyToText party)
+    in keccak256 partyHex
+
+-- Compute 32-byte instance address from instanceId and owner.
+-- Returns keccak256(instanceId + "@" + partyId) for privacy-preserving contract addressing.
+-- The "@" separator ensures uniqueness and prevents ambiguity between different (instanceId, owner) pairs.
+encodeInstanceAddress : Text -> Party -> BytesHex
+encodeInstanceAddress instId owner =
+    let combined = instId <> "@" <> partyToText owner
+        combinedHex = DA.Crypto.Text.toHex combined
+    in keccak256 combinedHex
+
+-- Compute ccvAndExecutorHash using chain-agnostic format.
+-- Format: keccak256(addressLength || ccv1 || ccv2 || ... || executor)
+-- For Canton: addressLength = 32 (1 byte), each address is 32 bytes.
+-- This matches the offchain ComputeCCVAndExecutorHash which derives length from executor.
+computeCCVAndExecutorHash : [BytesHex] -> BytesHex -> BytesHex
+computeCCVAndExecutorHash ccvInstanceAddresses executorInstanceAddress =
+    let
+        -- Validate executor is 32 bytes
+        _ = if byteCount executorInstanceAddress /= 32
+            then error ("computeCCVAndExecutorHash: executor must be 32 bytes, got " <> show (byteCount executorInstanceAddress))
+            else ()
+
+        -- Validate all CCV addresses are 32 bytes
+        validateAddr addr =
+            if byteCount addr /= 32
+            then error ("computeCCVAndExecutorHash: CCV address must be 32 bytes, got " <> show (byteCount addr))
+            else addr
+        validCCVs = map validateAddr ccvInstanceAddresses
+
+        -- Encode: 1 byte length prefix (32) + all CCVs + executor
+        lengthPrefix = fromSome (encodeUint8 32)
+        encodedCCVs = foldl (<>) "" validCCVs
+        encoded = lengthPrefix <> encodedCCVs <> executorInstanceAddress
+    in
+        keccak256 encoded
+
+-- ===================================================
+-- |                     Decoding                    |
+-- ===================================================
+
+decodeUint8 : BytesHex -> Optional Int
+decodeUint8 hex =
+    if byteCount hex /= 1 then None
+    else DA.Crypto.Text.fromHex hex
+
+decodeUint16 : BytesHex -> Optional Int
+decodeUint16 hex =
+    if byteCount hex /= 2 then None
+    else DA.Crypto.Text.fromHex hex
+
+decodeUint32 : BytesHex -> Optional Int
+decodeUint32 hex =
+    if byteCount hex /= 4 then None
+    else DA.Crypto.Text.fromHex hex
+
+decodeUint64 : BytesHex -> Optional (Numeric 0)
+decodeUint64 hex =
+    if byteCount hex /= 8 then None
+    else
+        parseDecimal =<< hexToDecimalString hex
+
+decodeUint256 : BytesHex -> Optional (Numeric 0)
+decodeUint256 hex =
+    if byteCount hex /= 32 then None
+    else
+        parseDecimal =<< hexToDecimalString hex
+
+-- Helpers
+
+-- Convert hex string to decimal string
+hexToDecimalString : BytesHex -> Optional Text
+hexToDecimalString hex =
+    let
+        -- Convert hex to list of digits
+        hexDigits = hexStringToDigits hex []
+    in
+        case hexDigits of
+            Some digits -> Some (hexDigitsToDecimal digits)
+            None -> None
+
+-- Parse hex string into list of digit values
+hexStringToDigits : Text -> [Int] -> Optional [Int]
+hexStringToDigits str acc =
+    if Text.length str == 0 then Some acc
+    else
+        let
+            firstChar = Text.take 1 str
+            rest = Text.drop 1 str
+            digit = case firstChar of
+                "0" -> Some 0
+                "1" -> Some 1
+                "2" -> Some 2
+                "3" -> Some 3
+                "4" -> Some 4
+                "5" -> Some 5
+                "6" -> Some 6
+                "7" -> Some 7
+                "8" -> Some 8
+                "9" -> Some 9
+                "a" -> Some 10
+                "b" -> Some 11
+                "c" -> Some 12
+                "d" -> Some 13
+                "e" -> Some 14
+                "f" -> Some 15
+                "A" -> Some 10
+                "B" -> Some 11
+                "C" -> Some 12
+                "D" -> Some 13
+                "E" -> Some 14
+                "F" -> Some 15
+                _ -> None
+        in
+            case digit of
+                Some d -> hexStringToDigits rest (acc ++ [d])
+                None -> None
+
+-- Convert hex digits to decimal string
+hexDigitsToDecimal : [Int] -> Text
+hexDigitsToDecimal digits =
+    let
+        digitToDecimalString d = case d of
+            0 -> "0"
+            1 -> "1"
+            2 -> "2"
+            3 -> "3"
+            4 -> "4"
+            5 -> "5"
+            6 -> "6"
+            7 -> "7"
+            8 -> "8"
+            9 -> "9"
+            10 -> "10"
+            11 -> "11"
+            12 -> "12"
+            13 -> "13"
+            14 -> "14"
+            15 -> "15"
+            _ -> error "Invalid hex digit"
+    in
+        foldl
+            (\acc d -> addDecimalStrings (multiplyDecimalBy16 acc) (digitToDecimalString d))
+            "0"
+            digits
+
+-- Multiply list of digits by a base
+multiplyDigitsByBase : [Int] -> Int -> [Int]
+multiplyDigitsByBase digits base = multiplyDigitsByBaseHelper (reverse digits) base 0 []
+
+-- Decompose carry into base-10 digits prepended (most-significant first) onto acc.
+-- acc is in most-significant-first order at this point (already reversed by caller logic).
+prependCarryDigits : Int -> [Int] -> [Int]
+prependCarryDigits carry acc =
+    if carry < 10 then carry :: acc
+    else prependCarryDigits (carry / 10) ((carry % 10) :: acc)
+
+-- Helper for multiplyDigitsByBase
+multiplyDigitsByBaseHelper : [Int] -> Int -> Int -> [Int] -> [Int]
+multiplyDigitsByBaseHelper [] _base carry acc = if carry == 0 then acc else prependCarryDigits carry acc
+multiplyDigitsByBaseHelper (d :: ds) base carry acc =
+    let
+        product = d * base + carry
+        newDigit = product % 10
+        newCarry = product / 10
+    in
+        multiplyDigitsByBaseHelper ds base newCarry (newDigit :: acc)
+
+-- Multiply decimal string by 16
+multiplyDecimalBy16 : Text -> Text
+multiplyDecimalBy16 "0" = "0"
+multiplyDecimalBy16 decStr =
+    let
+        digits = parseDecimalDigits decStr []
+        result = multiplyDigitsByBase digits 16
+    in
+        digitsToDecimalString result
+
+-- Add two lists of digits with carry
+addDigitLists : [Int] -> [Int] -> Int -> [Int]
+addDigitLists [] [] carry = if carry == 0 then [] else [carry]
+addDigitLists (d1 :: ds1) [] carry =
+    let
+        sum = d1 + carry
+        newDigit = sum % 10
+        newCarry = sum / 10
+    in
+        newDigit :: addDigitLists ds1 [] newCarry
+addDigitLists [] (d2 :: ds2) carry =
+    let
+        sum = d2 + carry
+        newDigit = sum % 10
+        newCarry = sum / 10
+    in
+        newDigit :: addDigitLists [] ds2 newCarry
+addDigitLists (d1 :: ds1) (d2 :: ds2) carry =
+    let
+        sum = d1 + d2 + carry
+        newDigit = sum % 10
+        newCarry = sum / 10
+    in
+        newDigit :: addDigitLists ds1 ds2 newCarry
+
+-- Add two decimal strings
+addDecimalStrings : Text -> Text -> Text
+addDecimalStrings str1 str2 =
+    let
+        digits1 = reverse (parseDecimalDigits str1 [])
+        digits2 = reverse (parseDecimalDigits str2 [])
+        result = addDigitLists digits1 digits2 0
+    in
+        digitsToDecimalString (reverse result)
+
+-- Parse decimal string to list of digits
+parseDecimalDigits : Text -> [Int] -> [Int]
+parseDecimalDigits str acc =
+    if Text.length str == 0 then reverse acc
+    else
+        let
+            firstChar = Text.take 1 str
+            rest = Text.drop 1 str
+            digit = case firstChar of
+                "0" -> 0
+                "1" -> 1
+                "2" -> 2
+                "3" -> 3
+                "4" -> 4
+                "5" -> 5
+                "6" -> 6
+                "7" -> 7
+                "8" -> 8
+                "9" -> 9
+                _ -> error ("Invalid decimal digit character: " <> firstChar)
+        in
+            parseDecimalDigits rest (digit :: acc)
+
+-- Convert list of digits back to decimal string
+digitsToDecimalString : [Int] -> Text
+digitsToDecimalString [] = "0"
+digitsToDecimalString digits =
+    let
+        digitToChar d = case d of
+            0 -> "0"
+            1 -> "1"
+            2 -> "2"
+            3 -> "3"
+            4 -> "4"
+            5 -> "5"
+            6 -> "6"
+            7 -> "7"
+            8 -> "8"
+            9 -> "9"
+            _ -> error ("Invalid decimal digit: " <> show d)
+    in
+        foldl (<>) "" (map digitToChar digits)
+
+maxNumeric0IntegerText : Text
+maxNumeric0IntegerText = "99999999999999999999999999999999999999"
+
+decimalTextWithinNumeric0 : Text -> Bool
+decimalTextWithinNumeric0 str =
+    let stripped = stripLeadingZeros str
+        normalized = if Text.length stripped == 0 then "0" else stripped
+        normalizedLength = Text.length normalized
+        maxLength = Text.length maxNumeric0IntegerText
+    in
+        normalizedLength < maxLength
+            || (normalizedLength == maxLength && normalized <= maxNumeric0IntegerText)
+
+stripLeadingZeros : Text -> Text
+stripLeadingZeros str
+    | Text.length str == 0 = ""
+    | Text.take 1 str == "0" = stripLeadingZeros (Text.drop 1 str)
+    | otherwise = str
+
+-- Parse decimal string to Numeric 0
+parseDecimal : Text -> Optional (Numeric 0)
+parseDecimal str
+    | Text.length str == 0 = Some 0.0
+    | not (decimalTextWithinNumeric0 str) = None
+    | otherwise = Some (parseDecimalUnchecked str)
+
+parseDecimalUnchecked : Text -> Numeric 0
+parseDecimalUnchecked str =
+    if Text.length str == 0 then 0.0
+    else
+        let
+            len = Text.length str
+            lastChar = Text.take 1 (Text.drop (len - 1) str)
+            rest = Text.take (len - 1) str
+            digit = case lastChar of
+                "0" -> 0.0
+                "1" -> 1.0
+                "2" -> 2.0
+                "3" -> 3.0
+                "4" -> 4.0
+                "5" -> 5.0
+                "6" -> 6.0
+                "7" -> 7.0
+                "8" -> 8.0
+                "9" -> 9.0
+                _ -> error ("Invalid decimal digit in parseDecimal: " <> lastChar)
+        in
+            digit + 10.0 * parseDecimalUnchecked rest
+
+-- | Decode MessageV1 from bytes matching EVM MessageV1Codec._decodeMessageV1 exactly.
+-- Static section (69 bytes):
+--   version (1) + sourceChainSelector (8) + destChainSelector (8) + sequenceNumber (8) +
+--   executionGasLimit (4) + ccipReceiveGasLimit (4) + finality (4) + ccvAndExecutorHash (32)
+-- Variable section starts at offset 69.
+decodeMessageV1 : BytesHex -> Optional MessageV1
+decodeMessageV1 encoded =
+        do
+            -- === STATIC LENGTH SECTION (69 bytes) ===
+
+            -- Extract version (1 byte, offset 0)
+            versionHex <- extractBytes encoded 0 1
+            version <- decodeUint8 versionHex
+
+            if version /= 1 then None else do
+
+                -- Extract source chain selector (8 bytes, offset 1)
+                sourceChainHex <- extractBytes encoded 1 8
+                sourceChain <- decodeUint64 sourceChainHex
+
+                -- Extract dest chain selector (8 bytes, offset 9)
+                destChainHex <- extractBytes encoded 9 8
+                destChain <- decodeUint64 destChainHex
+
+                -- Extract sequence number (8 bytes, offset 17)
+                seqNumHex <- extractBytes encoded 17 8
+                seqNum <- decodeUint64 seqNumHex
+
+                -- Extract executionGasLimit (4 bytes, offset 25)
+                execGasLimitHex <- extractBytes encoded 25 4
+                execGasLimit <- decodeUint32 execGasLimitHex
+
+                -- Extract ccipReceiveGasLimit (4 bytes, offset 29)
+                ccipReceiveGasLimitHex <- extractBytes encoded 29 4
+                ccipRecvGasLimit <- decodeUint32 ccipReceiveGasLimitHex
+
+                -- Extract finality config (4 bytes, offset 33)
+                finalityHex <- extractBytes encoded 33 4
+                finality <- CCIP.CodecV2.FinalityConfig.decodeRequestedFinality finalityHex
+
+                -- Extract ccvAndExecutorHash (32 bytes, offset 37)
+                ccvHashHex <- extractBytes encoded 37 32
+
+                -- === VARIABLE LENGTH SECTION (starts at offset 69) ===
+
+                -- Extract onRamp address length (1 byte, offset 69)
+                onRampLenHex <- extractBytes encoded 69 1
+                onRampLen <- decodeUint8 onRampLenHex
+
+                -- Extract onRamp address
+                onRampHex <- extractBytes encoded 70 onRampLen
+
+                -- Extract offRamp address length (1 byte)
+                let offRampLenOffset = 70 + onRampLen
+                offRampLenHex <- extractBytes encoded offRampLenOffset 1
+                offRampLen <- decodeUint8 offRampLenHex
+
+                -- Extract offRamp address
+                offRampHex <- extractBytes encoded (offRampLenOffset + 1) offRampLen
+
+                -- Extract sender length (1 byte)
+                let senderLenOffset = offRampLenOffset + 1 + offRampLen
+                senderLenHex <- extractBytes encoded senderLenOffset 1
+                senderLen <- decodeUint8 senderLenHex
+
+                -- Extract sender
+                senderHex <- extractBytes encoded (senderLenOffset + 1) senderLen
+
+                -- Extract receiver length (1 byte)
+                let receiverLenOffset = senderLenOffset + 1 + senderLen
+                receiverLenHex <- extractBytes encoded receiverLenOffset 1
+                receiverLen <- decodeUint8 receiverLenHex
+
+                -- Extract receiver
+                receiverHex <- extractBytes encoded (receiverLenOffset + 1) receiverLen
+
+                -- Extract destBlob length (2 bytes)
+                let destBlobLenOffset = receiverLenOffset + 1 + receiverLen
+                destBlobLenHex <- extractBytes encoded destBlobLenOffset 2
+                destBlobLen <- decodeUint16 destBlobLenHex
+
+                -- Extract destBlob
+                destBlobHex <- extractBytes encoded (destBlobLenOffset + 2) destBlobLen
+
+                -- Extract token transfer length (2 bytes)
+                let tokenLenOffset = destBlobLenOffset + 2 + destBlobLen
+                tokenLenHex <- extractBytes encoded tokenLenOffset 2
+                tokenLen <- decodeUint16 tokenLenHex
+
+                -- Extract and decode token transfer (0 or 1)
+                tokenTransfer <-
+                    if tokenLen == 0 then Some None
+                    else do
+                        tokenHex <- extractBytes encoded (tokenLenOffset + 2) tokenLen
+                        tt <- decodeTokenTransfer tokenHex
+                        Some (Some tt)
+
+                -- Extract message data length (2 bytes)
+                let msgDataLenOffset = tokenLenOffset + 2 + tokenLen
+                msgDataLenHex <- extractBytes encoded msgDataLenOffset 2
+                msgDataLen <- decodeUint16 msgDataLenHex
+
+                -- Extract message data
+                msgDataHex <- extractBytes encoded (msgDataLenOffset + 2) msgDataLen
+
+                let finalOffset = msgDataLenOffset + 2 + msgDataLen
+                if finalOffset /= byteCount encoded then None
+                else return MessageV1
+                    { sourceChainSelector = sourceChain
+                    , destChainSelector = destChain
+                    , sequenceNumber = seqNum
+                    , executionGasLimit = execGasLimit
+                    , ccipReceiveGasLimit = ccipRecvGasLimit
+                    , finality = finality
+                    , ccvAndExecutorHash = ccvHashHex
+                    , onRampAddress = onRampHex
+                    , offRampAddress = offRampHex
+                    , sender = senderHex
+                    , receiver = receiverHex
+                    , destBlob = destBlobHex
+                    , tokenTransfer = tokenTransfer
+                    , messageData = msgDataHex
+                    }
+
+-- | Decode TokenTransferV1 from bytes
+decodeTokenTransfer : BytesHex -> Optional TokenTransferV1
+decodeTokenTransfer encoded =
+        do
+            -- Extract version (1 byte)
+            versionHex <- extractBytes encoded 0 1
+            version <- decodeUint8 versionHex
+
+            if version /= 1 then None else do
+
+                -- Extract amount (32 bytes)
+                amountHex <- extractBytes encoded 1 32
+                let amount = amountHex
+
+                -- Extract sourcePool length (1 byte)
+                sourcePoolLenHex <- extractBytes encoded 33 1
+                sourcePoolLen <- decodeUint8 sourcePoolLenHex
+
+                -- Extract sourcePool
+                sourcePoolHex <- extractBytes encoded 34 sourcePoolLen
+
+                -- Extract sourceToken length (1 byte)
+                sourceTokenLenHex <- extractBytes encoded (34 + sourcePoolLen) 1
+                sourceTokenLen <- decodeUint8 sourceTokenLenHex
+
+                -- Extract sourceToken
+                sourceTokenHex <- extractBytes encoded (35 + sourcePoolLen) sourceTokenLen
+
+                -- Extract destToken length (1 byte)
+                destTokenLenHex <- extractBytes encoded (35 + sourcePoolLen + sourceTokenLen) 1
+                destTokenLen <- decodeUint8 destTokenLenHex
+
+                -- Extract destToken
+                destTokenHex <- extractBytes encoded (36 + sourcePoolLen + sourceTokenLen) destTokenLen
+
+                -- Extract tokenReceiver length (1 byte)
+                tokenReceiverLenHex <- extractBytes encoded (36 + sourcePoolLen + sourceTokenLen + destTokenLen) 1
+                tokenReceiverLen <- decodeUint8 tokenReceiverLenHex
+
+                -- Extract tokenReceiver
+                tokenReceiverHex <- extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen) tokenReceiverLen
+
+                -- Extract extraData length (2 bytes)
+                extraDataLenHex <- extractBytes encoded (37 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen) 2
+                extraDataLen <- decodeUint16 extraDataLenHex
+
+                -- Extract extraData
+                let extraDataOffset = 39 + sourcePoolLen + sourceTokenLen + destTokenLen + tokenReceiverLen
+                extraDataHex <- extractBytes encoded extraDataOffset extraDataLen
+
+                let finalOffset = extraDataOffset + extraDataLen
+                if finalOffset /= byteCount encoded then None
+                else return TokenTransferV1
+                    { amount = amount
+                    , sourcePoolAddress = sourcePoolHex
+                    , sourceTokenAddress = sourceTokenHex
+                    , destTokenAddress = destTokenHex
+                    , tokenReceiver = tokenReceiverHex
+                    , extraData = extraDataHex
+                    }
+
+messageId : MessageV1 -> BytesHex
+messageId message =
+    let
+        encodedMessage = encodeMessageV1 message
+    in
+        keccak256 encodedMessage

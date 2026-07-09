@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rate-limiter-v2"
-	PackageID   = "973f5a6e681710e7ea5b8f19c01ef608e91c8b4f04d9779fa0337763fb1cf328"
+	PackageID   = "62e9c12c62db5de2138722340d7ff597f9a07678aeba1e1fbf9ad121a9e89d40"
 	SDKVersion  = "3.4.11"
 )
 
@@ -146,12 +146,12 @@ const (
 func (e RateLimitDirection) GetEnumConstructor() string { return string(e) }
 
 func (e RateLimitDirection) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimitDirection")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimitDirection")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e RateLimitDirection) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimitDirection")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimitDirection")
 }
 
 func (e RateLimitDirection) MarshalJSON() ([]byte, error) {
@@ -190,12 +190,12 @@ const (
 func (e RateLimitMode) GetEnumConstructor() string { return string(e) }
 
 func (e RateLimitMode) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimitMode")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimitMode")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e RateLimitMode) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimitMode")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimitMode")
 }
 
 func (e RateLimitMode) MarshalJSON() ([]byte, error) {
@@ -239,12 +239,12 @@ type RateLimiter struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t RateLimiter) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimiter")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimiter")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t RateLimiter) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimiter")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimiter")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -373,7 +373,7 @@ func (t *RateLimiter) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t RateLimiter) ConsumeCapacity(contractID string, args ConsumeCapacity) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimiter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
 		Choice:     "ConsumeCapacity",
 		Arguments:  argsToMap(args),
@@ -383,7 +383,7 @@ func (t RateLimiter) ConsumeCapacity(contractID string, args ConsumeCapacity) *m
 // ConsumeCapacityWithPackageID exercises the ConsumeCapacity choice using the provided package ID instead of package name
 func (t RateLimiter) ConsumeCapacityWithPackageID(contractID string, packageID string, args ConsumeCapacity) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimiter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
 		Choice:     "ConsumeCapacity",
 		Arguments:  argsToMap(args),
@@ -394,7 +394,7 @@ func (t RateLimiter) ConsumeCapacityWithPackageID(contractID string, packageID s
 // This method uses the package name in the template ID
 func (t RateLimiter) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimiter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
 		Choice:     "SetConfig",
 		Arguments:  argsToMap(args),
@@ -404,7 +404,7 @@ func (t RateLimiter) SetConfig(contractID string, args SetConfig) *model.Exercis
 // SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
 func (t RateLimiter) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimiter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
 		Choice:     "SetConfig",
 		Arguments:  argsToMap(args),
@@ -415,7 +415,7 @@ func (t RateLimiter) SetConfigWithPackageID(contractID string, packageID string,
 // This method uses the package name in the template ID
 func (t RateLimiter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -425,7 +425,7 @@ func (t RateLimiter) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -436,7 +436,7 @@ func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *
 // This method uses the package name in the template ID
 func (t RateLimiter) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -446,7 +446,7 @@ func (t RateLimiter) MCMSReceiverEntrypoint(contractID string, args api.MCMSRece
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
 func (t RateLimiter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),

@@ -1,0 +1,33 @@
+module CCIP.RuntimeV2.PerPartyRouterTypes where
+
+import qualified Chainlink.InstanceAddress
+
+data PerPartyRouterDeps = PerPartyRouterDeps
+    with
+        onRamp : Chainlink.InstanceAddress.RawInstanceAddress
+        offRamp : Chainlink.InstanceAddress.RawInstanceAddress
+        globalConfig : Chainlink.InstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : Chainlink.InstanceAddress.RawInstanceAddress
+        feeQuoter : Chainlink.InstanceAddress.RawInstanceAddress
+        rmnRemote : Chainlink.InstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
+data SetDepsParams = SetDepsParams
+    with
+        onRamp : Optional Chainlink.InstanceAddress.RawInstanceAddress
+        offRamp : Optional Chainlink.InstanceAddress.RawInstanceAddress
+        globalConfig : Optional Chainlink.InstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : Optional Chainlink.InstanceAddress.RawInstanceAddress
+        feeQuoter : Optional Chainlink.InstanceAddress.RawInstanceAddress
+        rmnRemote : Optional Chainlink.InstanceAddress.RawInstanceAddress
+    deriving (Eq, Show)
+
+data AddCustomObserversParams = AddCustomObserversParams
+    with
+        parties : [Party]
+    deriving (Eq, Show)
+
+data RemoveCustomObserversParams = RemoveCustomObserversParams
+    with
+        parties : [Party]
+    deriving (Eq, Show)

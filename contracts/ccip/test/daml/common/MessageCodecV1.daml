@@ -9,29 +9,29 @@ import DA.Optional
 
 import qualified Splice.Api.Token.HoldingV1
 
-import qualified CCIP.CodecV1.FinalityConfig
-import qualified CCIP.CodecV1.MessageCodecV1
-import qualified CCIP.CodecV1.Uint256
-import qualified CCIP.LockReleaseTokenPoolV1
-import qualified CCIP.RuntimeV1.OnRamp
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CodecV2.MessageCodecV1
+import qualified CCIP.CodecV2.Uint256
+import qualified CCIP.LockReleaseTokenPoolV2
+import qualified CCIP.RuntimeV2.OnRamp
 
 finalityConfig n =
     if n == 0
-    then CCIP.CodecV1.FinalityConfig.waitForFinalityDecoded
+    then CCIP.CodecV2.FinalityConfig.waitForFinalityDecoded
     else fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
-        (CCIP.CodecV1.FinalityConfig.decodeRequestedFinality (fromSome do
-        flagsHex <- CCIP.CodecV1.MessageCodecV1.encodeUint16 0
-        blockConfirmationsHex <- CCIP.CodecV1.MessageCodecV1.encodeUint16 n
+        (CCIP.CodecV2.FinalityConfig.decodeRequestedFinality (fromSome do
+        flagsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 n
         pure (flagsHex <> blockConfirmationsHex)))
 
 setup = script do
 
     -- ======== Encoding Tests ========
     -- Test encoding edge cases
-    let encodeZero8 = CCIP.CodecV1.MessageCodecV1.encodeUint8 0
-    let encodeMax8 = CCIP.CodecV1.MessageCodecV1.encodeUint8 255
-    let encodeOverflow8 = CCIP.CodecV1.MessageCodecV1.encodeUint8 256
-    let encodeNegative8 = CCIP.CodecV1.MessageCodecV1.encodeUint8 (-1)
+    let encodeZero8 = CCIP.CodecV2.MessageCodecV1.encodeUint8 0
+    let encodeMax8 = CCIP.CodecV2.MessageCodecV1.encodeUint8 255
+    let encodeOverflow8 = CCIP.CodecV2.MessageCodecV1.encodeUint8 256
+    let encodeNegative8 = CCIP.CodecV2.MessageCodecV1.encodeUint8 (-1)
 
     encodeZero8 === Some "00"
     encodeMax8 === Some "ff"
@@ -39,10 +39,10 @@ setup = script do
     encodeNegative8 === None
     debug("uint8 encoding edge cases passed")
 
-    let encodeZero16 = CCIP.CodecV1.MessageCodecV1.encodeUint16 0
-    let encodeMax16 = CCIP.CodecV1.MessageCodecV1.encodeUint16 65535
-    let encodeOverflow16 = CCIP.CodecV1.MessageCodecV1.encodeUint16 65536
-    let encodeNegative16 = CCIP.CodecV1.MessageCodecV1.encodeUint16 (-1)
+    let encodeZero16 = CCIP.CodecV2.MessageCodecV1.encodeUint16 0
+    let encodeMax16 = CCIP.CodecV2.MessageCodecV1.encodeUint16 65535
+    let encodeOverflow16 = CCIP.CodecV2.MessageCodecV1.encodeUint16 65536
+    let encodeNegative16 = CCIP.CodecV2.MessageCodecV1.encodeUint16 (-1)
 
     encodeZero16 === Some "0000"
     encodeMax16 === Some "ffff"
@@ -50,10 +50,10 @@ setup = script do
     encodeNegative16 === None
     debug("uint16 encoding edge cases passed")
 
-    let encodeZero32 = CCIP.CodecV1.MessageCodecV1.encodeUint32 0
-    let encodeMax32 = CCIP.CodecV1.MessageCodecV1.encodeUint32 4294967295
-    let encodeOverflow32 = CCIP.CodecV1.MessageCodecV1.encodeUint32 4294967296
-    let encodeNegative32 = CCIP.CodecV1.MessageCodecV1.encodeUint32 (-1)
+    let encodeZero32 = CCIP.CodecV2.MessageCodecV1.encodeUint32 0
+    let encodeMax32 = CCIP.CodecV2.MessageCodecV1.encodeUint32 4294967295
+    let encodeOverflow32 = CCIP.CodecV2.MessageCodecV1.encodeUint32 4294967296
+    let encodeNegative32 = CCIP.CodecV2.MessageCodecV1.encodeUint32 (-1)
 
     encodeZero32 === Some "00000000"
     encodeMax32 === Some "ffffffff"
@@ -61,10 +61,10 @@ setup = script do
     encodeNegative32 === None
     debug("uint32 encoding edge cases passed")
 
-    let encodeZero64 = CCIP.CodecV1.MessageCodecV1.encodeUint64 0.0
-    let encodeMax64 = CCIP.CodecV1.MessageCodecV1.encodeUint64 18446744073709551615.0
-    let encodeOverflow64 = CCIP.CodecV1.MessageCodecV1.encodeUint64 18446744073709551616.0
-    let encodeNegative64 = CCIP.CodecV1.MessageCodecV1.encodeUint64 (-1.0)
+    let encodeZero64 = CCIP.CodecV2.MessageCodecV1.encodeUint64 0.0
+    let encodeMax64 = CCIP.CodecV2.MessageCodecV1.encodeUint64 18446744073709551615.0
+    let encodeOverflow64 = CCIP.CodecV2.MessageCodecV1.encodeUint64 18446744073709551616.0
+    let encodeNegative64 = CCIP.CodecV2.MessageCodecV1.encodeUint64 (-1.0)
 
     encodeZero64 === Some "0000000000000000"
     encodeMax64 === Some "ffffffffffffffff"
@@ -72,13 +72,13 @@ setup = script do
     encodeNegative64 === None
     debug("uint64 encoding edge cases passed")
 
-    let encodeZero256 = CCIP.CodecV1.MessageCodecV1.encodeUint256 0.0
-    let encodeSmall256 = CCIP.CodecV1.MessageCodecV1.encodeUint256 1000000.0
+    let encodeZero256 = CCIP.CodecV2.MessageCodecV1.encodeUint256 0.0
+    let encodeSmall256 = CCIP.CodecV2.MessageCodecV1.encodeUint256 1000000.0
     -- Numeric 0 can only hold up to ~1e38, so max uint256 (~1.16e77) can't be
     -- expressed as a literal. Test the largest value Numeric 0 can represent and
     -- verify the overflow guard via the exceedsMaxUint256 string comparison.
-    let encodeLargeInRange = CCIP.CodecV1.MessageCodecV1.encodeUint256 99999999999999999999999999999999999999.0
-    let encodeNegative256 = CCIP.CodecV1.MessageCodecV1.encodeUint256 (-1.0)
+    let encodeLargeInRange = CCIP.CodecV2.MessageCodecV1.encodeUint256 99999999999999999999999999999999999999.0
+    let encodeNegative256 = CCIP.CodecV2.MessageCodecV1.encodeUint256 (-1.0)
 
     encodeZero256 === Some "0000000000000000000000000000000000000000000000000000000000000000"
     encodeSmall256 === Some "00000000000000000000000000000000000000000000000000000000000f4240"
@@ -90,29 +90,29 @@ setup = script do
     party <- allocateParty "testParty"
 
     -- Test encodePartyAddress produces 32-byte hash
-    let partyAddr = CCIP.CodecV1.MessageCodecV1.encodePartyAddress party
+    let partyAddr = CCIP.CodecV2.MessageCodecV1.encodePartyAddress party
     Text.length partyAddr === 64  -- 32 bytes = 64 hex chars
 
     -- Test encodeInstanceAddress produces 32-byte hash
-    let instanceAddr = CCIP.CodecV1.MessageCodecV1.encodeInstanceAddress "test-instance" party
+    let instanceAddr = CCIP.CodecV2.MessageCodecV1.encodeInstanceAddress "test-instance" party
     Text.length instanceAddr === 64  -- 32 bytes = 64 hex chars
 
     let ccvAddr1 = "1111111111111111111111111111111111111111111111111111111111111111"
     let ccvAddr2 = "2222222222222222222222222222222222222222222222222222222222222222"
     let executorAddr = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    let hashForward = CCIP.CodecV1.MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] executorAddr
-    let hashReverse = CCIP.CodecV1.MessageCodecV1.computeCCVAndExecutorHash [ccvAddr2, ccvAddr1] executorAddr
+    let hashForward = CCIP.CodecV2.MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] executorAddr
+    let hashReverse = CCIP.CodecV2.MessageCodecV1.computeCCVAndExecutorHash [ccvAddr2, ccvAddr1] executorAddr
     assertMsg "ccvAndExecutorHash must preserve CCV ordering"
         (hashForward /= hashReverse)
     debug("ccvAndExecutorHash ordering test passed")
 
     assertMsg "no-execution sentinel should produce different hash"
-        (CCIP.CodecV1.MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] CCIP.RuntimeV1.OnRamp.noExecutionAddressBytes /= hashForward)
+        (CCIP.CodecV2.MessageCodecV1.computeCCVAndExecutorHash [ccvAddr1, ccvAddr2] CCIP.RuntimeV2.OnRamp.noExecutionAddressBytes /= hashForward)
     debug("no-execution sentinel hashing test passed")
 
-    CCIP.RuntimeV1.OnRamp.noExecutionAddressBytes
+    CCIP.RuntimeV2.OnRamp.noExecutionAddressBytes
         === "eba517d200000000000000000000000000000000000000000000000000000000"
-    byteCount CCIP.RuntimeV1.OnRamp.noExecutionAddressBytes === 32
+    byteCount CCIP.RuntimeV2.OnRamp.noExecutionAddressBytes === 32
     debug("no-execution sentinel encoding test passed")
 
     -- Test InstrumentId round-trip with new id@party format
@@ -120,7 +120,7 @@ setup = script do
             admin = party
             id = "LINK"
 
-    let encodedInstrumentId = CCIP.CodecV1.MessageCodecV1.encodeInstrumentId instrumentId
+    let encodedInstrumentId = CCIP.CodecV2.MessageCodecV1.encodeInstrumentId instrumentId
 
     debug ("--- PASS ---")
 
@@ -130,7 +130,7 @@ setup = script do
     --   execGasLimit(4) + ccipReceiveGasLimit(4) + finality(4) + ccvAndExecutorHash(32)
     -- Variable section: onRampLen(1)+onRamp + offRampLen(1)+offRamp + senderLen(1)+sender +
     --   receiverLen(1)+receiver + destBlobLen(2)+destBlob + tokenLen(2)+token + dataLen(2)+data
-    let msg = CCIP.CodecV1.MessageCodecV1.MessageV1
+    let msg = CCIP.CodecV2.MessageCodecV1.MessageV1
             with
                 sourceChainSelector = 123.0
                 destChainSelector = 456.0
@@ -144,24 +144,24 @@ setup = script do
                 sender = "CD1722F3947DEf4Cf144679Da39c4c32BDC35681"
                 receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e"
                 destBlob = "636f6d706c65782064657374696e6174696f6e20626c6f62"
-                tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
-                    amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 1000000.0)
+                tokenTransfer = Some (CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
+                    amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 1000000.0)
                     sourcePoolAddress = "ed3ee8542acd9e483c658350ad4984483eb0afdc"
                     sourceTokenAddress = "c283f6085a391df8e3f78ddc49c6b47016122838"
                     destTokenAddress = "c22ff98123e0785520915c5bd97e83ac649180a1"
                     tokenReceiver = "bcd565166cafb25d53079c7e6522c18c2c0e39c3"
                     extraData = "746f6b656e2065787472612064617461")
                 messageData = "6d657373616765207769746820746f6b656e2064617461"
-    let encodedMessage = Text.asciiToLower (CCIP.CodecV1.MessageCodecV1.encodeMessageV1 msg)
+    let encodedMessage = Text.asciiToLower (CCIP.CodecV2.MessageCodecV1.encodeMessageV1 msg)
     debug("Encoded MessageV1: " <> encodedMessage)
 
     -- ======== Decoding Tests ========
 
     -- Test uint8 decoding
-    let test8_0 = CCIP.CodecV1.MessageCodecV1.decodeUint8 "00"
-    let test8_1 = CCIP.CodecV1.MessageCodecV1.decodeUint8 "01"
-    let test8_255 = CCIP.CodecV1.MessageCodecV1.decodeUint8 "ff"
-    let test8_invalid = CCIP.CodecV1.MessageCodecV1.decodeUint8 "0000" -- wrong length
+    let test8_0 = CCIP.CodecV2.MessageCodecV1.decodeUint8 "00"
+    let test8_1 = CCIP.CodecV2.MessageCodecV1.decodeUint8 "01"
+    let test8_255 = CCIP.CodecV2.MessageCodecV1.decodeUint8 "ff"
+    let test8_invalid = CCIP.CodecV2.MessageCodecV1.decodeUint8 "0000" -- wrong length
 
     test8_0 === Some 0
     test8_1 === Some 1
@@ -170,11 +170,11 @@ setup = script do
     debug("uint8 decoding tests passed")
 
     -- Test uint16 decoding
-    let test16_0 = CCIP.CodecV1.MessageCodecV1.decodeUint16 "0000"
-    let test16_1 = CCIP.CodecV1.MessageCodecV1.decodeUint16 "0001"
-    let test16_256 = CCIP.CodecV1.MessageCodecV1.decodeUint16 "0100"
-    let test16_max = CCIP.CodecV1.MessageCodecV1.decodeUint16 "ffff"
-    let test16_invalid = CCIP.CodecV1.MessageCodecV1.decodeUint16 "00" -- wrong length
+    let test16_0 = CCIP.CodecV2.MessageCodecV1.decodeUint16 "0000"
+    let test16_1 = CCIP.CodecV2.MessageCodecV1.decodeUint16 "0001"
+    let test16_256 = CCIP.CodecV2.MessageCodecV1.decodeUint16 "0100"
+    let test16_max = CCIP.CodecV2.MessageCodecV1.decodeUint16 "ffff"
+    let test16_invalid = CCIP.CodecV2.MessageCodecV1.decodeUint16 "00" -- wrong length
 
     test16_0 === Some 0
     test16_1 === Some 1
@@ -184,11 +184,11 @@ setup = script do
     debug("uint16 decoding tests passed")
 
     -- Test uint32 decoding
-    let test32_0 = CCIP.CodecV1.MessageCodecV1.decodeUint32 "00000000"
-    let test32_1 = CCIP.CodecV1.MessageCodecV1.decodeUint32 "00000001"
-    let test32_65536 = CCIP.CodecV1.MessageCodecV1.decodeUint32 "00010000"
-    let test32_max = CCIP.CodecV1.MessageCodecV1.decodeUint32 "ffffffff"
-    let test32_invalid = CCIP.CodecV1.MessageCodecV1.decodeUint32 "0000" -- wrong length
+    let test32_0 = CCIP.CodecV2.MessageCodecV1.decodeUint32 "00000000"
+    let test32_1 = CCIP.CodecV2.MessageCodecV1.decodeUint32 "00000001"
+    let test32_65536 = CCIP.CodecV2.MessageCodecV1.decodeUint32 "00010000"
+    let test32_max = CCIP.CodecV2.MessageCodecV1.decodeUint32 "ffffffff"
+    let test32_invalid = CCIP.CodecV2.MessageCodecV1.decodeUint32 "0000" -- wrong length
 
     test32_0 === Some 0
     test32_1 === Some 1
@@ -198,13 +198,13 @@ setup = script do
     debug("uint32 decoding tests passed")
 
     -- Test uint64 decoding
-    let test64_0 = CCIP.CodecV1.MessageCodecV1.decodeUint64 "0000000000000000"
-    let test64_1 = CCIP.CodecV1.MessageCodecV1.decodeUint64 "0000000000000001"
-    let test64_16 = CCIP.CodecV1.MessageCodecV1.decodeUint64 "0000000000000010"
-    let test64_256 = CCIP.CodecV1.MessageCodecV1.decodeUint64 "0000000000000100"
-    let test64_65536 = CCIP.CodecV1.MessageCodecV1.decodeUint64 "0000000000010000"
-    let test64_max = CCIP.CodecV1.MessageCodecV1.decodeUint64 "ffffffffffffffff"
-    let test64_invalid = CCIP.CodecV1.MessageCodecV1.decodeUint64 "00000000" -- wrong length
+    let test64_0 = CCIP.CodecV2.MessageCodecV1.decodeUint64 "0000000000000000"
+    let test64_1 = CCIP.CodecV2.MessageCodecV1.decodeUint64 "0000000000000001"
+    let test64_16 = CCIP.CodecV2.MessageCodecV1.decodeUint64 "0000000000000010"
+    let test64_256 = CCIP.CodecV2.MessageCodecV1.decodeUint64 "0000000000000100"
+    let test64_65536 = CCIP.CodecV2.MessageCodecV1.decodeUint64 "0000000000010000"
+    let test64_max = CCIP.CodecV2.MessageCodecV1.decodeUint64 "ffffffffffffffff"
+    let test64_invalid = CCIP.CodecV2.MessageCodecV1.decodeUint64 "00000000" -- wrong length
 
     test64_0 === Some 0.0
     test64_1 === Some 1.0
@@ -216,11 +216,11 @@ setup = script do
     debug("uint64 decoding tests passed")
 
     -- Test uint256 decoding
-    let test256_0 = CCIP.CodecV1.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000000"
-    let test256_1 = CCIP.CodecV1.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000001"
-    let test256_max64 = CCIP.CodecV1.MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000ffffffffffffffff"
-    let test256_tooLargeForNumeric0 = CCIP.CodecV1.MessageCodecV1.decodeUint256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-    let test256_invalid = CCIP.CodecV1.MessageCodecV1.decodeUint256 "0000000000000000" -- wrong length
+    let test256_0 = CCIP.CodecV2.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000000"
+    let test256_1 = CCIP.CodecV2.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000000000000001"
+    let test256_max64 = CCIP.CodecV2.MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000ffffffffffffffff"
+    let test256_tooLargeForNumeric0 = CCIP.CodecV2.MessageCodecV1.decodeUint256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    let test256_invalid = CCIP.CodecV2.MessageCodecV1.decodeUint256 "0000000000000000" -- wrong length
 
     test256_0 === Some 0.0
     test256_1 === Some 1.0
@@ -232,7 +232,7 @@ setup = script do
     -- ======== Round-Trip Tests ========
 
     -- Test round-trip encoding/decoding
-    case CCIP.CodecV1.MessageCodecV1.decodeMessageV1 encodedMessage of
+    case CCIP.CodecV2.MessageCodecV1.decodeMessageV1 encodedMessage of
         Some decodedMsg -> do
             debug("Round-trip test: Decoding successful")
             decodedMsg.sourceChainSelector === msg.sourceChainSelector
@@ -261,14 +261,14 @@ setup = script do
 
     -- Test 1: TokenTransfer encoding (from EVM test__encodeTokenTransferV1_checkRawBytes)
     -- Input: amount=100, sourcePoolAddress=0x1234567890abcdef, etc.
-    let tokenTransferTest = CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
-            amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 100.0)
+    let tokenTransferTest = CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
+            amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 100.0)
             sourcePoolAddress = "1234567890abcdef"
             sourceTokenAddress = "abcdef1234567890"
             destTokenAddress = "fedcba0987654321"
             tokenReceiver = "aabbccdd"
             extraData = "0c117e57da7a"
-    let encodedTokenTransfer = Text.asciiToLower (CCIP.CodecV1.MessageCodecV1.encodeTokenTransferV1 tokenTransferTest)
+    let encodedTokenTransfer = Text.asciiToLower (CCIP.CodecV2.MessageCodecV1.encodeTokenTransferV1 tokenTransferTest)
     -- Expected structure: version(1) + amount(32) + sourcePoolLen(1) + sourcePool(8) +
     --   sourceTokenLen(1) + sourceToken(8) + destTokenLen(1) + destToken(8) +
     --   tokenReceiverLen(1) + tokenReceiver(4) + extraDataLen(2) + extraData(6) = 73 bytes = 146 hex chars
@@ -279,13 +279,13 @@ setup = script do
     debug("TokenTransfer encoding length test PASSED")
 
     -- Test 2: Empty message encoding (minimal message)
-    let emptyMsg = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    let emptyMsg = CCIP.CodecV2.MessageCodecV1.MessageV1 with
             sourceChainSelector = 0.0
             destChainSelector = 0.0
             sequenceNumber = 0.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 0
-            finality = CCIP.CodecV1.FinalityConfig.waitForFinalityDecoded
+            finality = CCIP.CodecV2.FinalityConfig.waitForFinalityDecoded
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = ""
             offRampAddress = ""
@@ -294,7 +294,7 @@ setup = script do
             destBlob = ""
             tokenTransfer = None
             messageData = ""
-    let encodedEmptyMsg = Text.asciiToLower (CCIP.CodecV1.MessageCodecV1.encodeMessageV1 emptyMsg)
+    let encodedEmptyMsg = Text.asciiToLower (CCIP.CodecV2.MessageCodecV1.encodeMessageV1 emptyMsg)
     -- Expected: MESSAGE_V1_BASE_SIZE = 79 bytes = 158 hex chars
     -- Static(69) + onRampLen(1) + offRampLen(1) + senderLen(1) + receiverLen(1) +
     --   destBlobLen(2) + tokenLen(2) + dataLen(2) = 79
@@ -305,7 +305,7 @@ setup = script do
 
     -- Test 3: Verify messageId computation
     -- messageId = keccak256(encodedMessage)
-    let msgId = CCIP.CodecV1.MessageCodecV1.messageId msg
+    let msgId = CCIP.CodecV2.MessageCodecV1.messageId msg
     debug("MessageId: " <> msgId)
     -- The messageId should be a 32-byte (64 hex char) keccak256 hash
     Text.length msgId === 64
@@ -319,23 +319,23 @@ setup = script do
 testDecodeUint256_Numeric0Boundary : Script ()
 testDecodeUint256_Numeric0Boundary = script do
     -- 38 nines — largest integer that fits in Numeric 0
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "000000000000000000000000000000004b3b4ca85a86c47a098a223fffffffff"
         === Some 99999999999999999999999999999999999999.0
 
     -- 37 nines — comfortably within range
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "000000000000000000000000000000000785ee10d5da46d900f4369fffffffff"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "000000000000000000000000000000000785ee10d5da46d900f4369fffffffff"
         === Some 9999999999999999999999999999999999999.0
 
     -- 10^36 — large value well within range
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000c097ce7bc90715b34b9f1000000000"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000c097ce7bc90715b34b9f1000000000"
         === Some 1000000000000000000000000000000000000.0
 
     -- 10^38 — one above Numeric 0 range
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "000000000000000000000000000000004b3b4ca85a86c47a098a224000000000"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "000000000000000000000000000000004b3b4ca85a86c47a098a224000000000"
         === None
 
     -- uint256 max — well above Numeric 0 range
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
         === None
 
     debug "testDecodeUint256_Numeric0Boundary: PASSED"
@@ -345,27 +345,27 @@ testDecodeUint256_Numeric0Boundary = script do
 testDecodeUint256_HexArithmetic : Script ()
 testDecodeUint256_HexArithmetic = script do
     -- 0xdeadbeef = 3735928559
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "00000000000000000000000000000000000000000000000000000000deadbeef"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "00000000000000000000000000000000000000000000000000000000deadbeef"
         === Some 3735928559.0
 
     -- 1e18 (0xDE0B6B3A7640000) — standard 18-decimal token unit
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000de0b6b3a7640000"
         === Some 1000000000000000000.0
 
     -- 0xabcdef0123456789 — exercises hex digits a through f
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000abcdef0123456789"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000abcdef0123456789"
         === Some 12379813738877118345.0
 
     -- 0xffffffffffff (6 bytes of 0xff) — stress test for repeated carries
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000ffffffffffff"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000ffffffffffff"
         === Some 281474976710655.0
 
     -- uint64 max — already tested in setup but verify here in isolation
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000ffffffffffffffff"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "000000000000000000000000000000000000000000000000ffffffffffffffff"
         === Some 18446744073709551615.0
 
     -- 7e12 (0x65DD0837000) — the exact amount used in decimal conversion integration test
-    CCIP.CodecV1.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000065dd0837000"
+    CCIP.CodecV2.MessageCodecV1.decodeUint256 "0000000000000000000000000000000000000000000000000000065dd0837000"
         === Some 7000000000000.0
 
     debug "testDecodeUint256_HexArithmetic: PASSED"
@@ -373,14 +373,14 @@ testDecodeUint256_HexArithmetic = script do
 -- End-to-end: decode a full token transfer and verify extraData round-trips
 testDecodeTokenTransfer_WithExtraData : Script ()
 testDecodeTokenTransfer_WithExtraData = script do
-    let amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 7000000000000.0)
+    let amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 7000000000000.0)
     let sourcePool = "7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3"
     let sourceToken = "acdafefb07bff5b120b7afa6ea777cf7eabacc0d"
     let destToken = "2851f23b4fbecadbe74222334f9d9032e6cb3f4a77ae563ec17de729bec33d33"
     let receiver = "d73bc3441bce8f77ba3c605808d1b781910119725cb33636f34e2b86c7df0044"
-    let sourcePoolData = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 18.0)
+    let sourcePoolData = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 18.0)
 
-    let tt = CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
+    let tt = CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
             amount
             sourcePoolAddress = sourcePool
             sourceTokenAddress = sourceToken
@@ -388,88 +388,88 @@ testDecodeTokenTransfer_WithExtraData = script do
             tokenReceiver = receiver
             extraData = sourcePoolData
 
-    let encoded = CCIP.CodecV1.MessageCodecV1.encodeTokenTransferV1 tt
-    let decoded = fromSome (CCIP.CodecV1.MessageCodecV1.decodeTokenTransfer encoded)
+    let encoded = CCIP.CodecV2.MessageCodecV1.encodeTokenTransferV1 tt
+    let decoded = fromSome (CCIP.CodecV2.MessageCodecV1.decodeTokenTransfer encoded)
 
     decoded.amount === amount
     decoded.extraData === sourcePoolData
     decoded.sourcePoolAddress === sourcePool
 
-    let sourceDecimals = CCIP.LockReleaseTokenPoolV1.parseSourcePoolDecimals 6 decoded.extraData
+    let sourceDecimals = CCIP.LockReleaseTokenPoolV2.parseSourcePoolDecimals 6 decoded.extraData
     sourceDecimals === 18
 
-    let localAmount = (fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromUint256Checked "testDecodeTokenTransfer_WithExtraData" decoded.amount sourceDecimals 6)).localAmount
+    let localAmount = (fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromUint256Checked "testDecodeTokenTransfer_WithExtraData" decoded.amount sourceDecimals 6)).localAmount
     localAmount === 7.0
 
     debug "testDecodeTokenTransfer_WithExtraData: PASSED"
 
 testUint256_TextBytesRoundTripAndValidation : Script ()
 testUint256_TextBytesRoundTripAndValidation = script do
-    let maxBytes = fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes CCIP.CodecV1.Uint256.maxUint256DecimalText)
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText maxBytes === Some CCIP.CodecV1.Uint256.maxUint256DecimalText
-    CCIP.CodecV1.Uint256.isUint256Bytes maxBytes === True
+    let maxBytes = fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes CCIP.CodecV2.Uint256.maxUint256DecimalText)
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText maxBytes === Some CCIP.CodecV2.Uint256.maxUint256DecimalText
+    CCIP.CodecV2.Uint256.isUint256Bytes maxBytes === True
 
     let aboveNumeric0 = "100000000000000000000000000000000000000"
-    let aboveNumeric0Bytes = fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes aboveNumeric0)
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText aboveNumeric0Bytes === Some aboveNumeric0
-    CCIP.CodecV1.Uint256.decimalTextFitsNumeric0 aboveNumeric0 === False
-    CCIP.CodecV1.Uint256.decimalTextFitsNumeric0 CCIP.CodecV1.Uint256.maxNumeric0DecimalText === True
+    let aboveNumeric0Bytes = fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes aboveNumeric0)
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText aboveNumeric0Bytes === Some aboveNumeric0
+    CCIP.CodecV2.Uint256.decimalTextFitsNumeric0 aboveNumeric0 === False
+    CCIP.CodecV2.Uint256.decimalTextFitsNumeric0 CCIP.CodecV2.Uint256.maxNumeric0DecimalText === True
 
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "00000123" === CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "123"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "" === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "-1" === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "1.0" === None
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "abc" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "00000123" === CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "123"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "-1" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "1.0" === None
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "abc" === None
 
-    let aboveUint256 = CCIP.CodecV1.Uint256.maxUint256DecimalText <> "0"
-    CCIP.CodecV1.Uint256.decimalTextToUint256Bytes aboveUint256 === None
+    let aboveUint256 = CCIP.CodecV2.Uint256.maxUint256DecimalText <> "0"
+    CCIP.CodecV2.Uint256.decimalTextToUint256Bytes aboveUint256 === None
 
     debug "testUint256_TextBytesRoundTripAndValidation: PASSED"
 
 testUint256_LocalAmountConversion_EqualDecimals : Script ()
 testUint256_LocalAmountConversion_EqualDecimals = script do
-    let sameDecimals = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "same-decimals" "1234567890" 18 18)
+    let sameDecimals = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "same-decimals" "1234567890" 18 18)
     sameDecimals.localAmount === 1234567890.0
     sameDecimals.truncatedRemainder === "0"
     sameDecimals.wasTruncated === False
 
-    let maxNumeric = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "max-numeric" CCIP.CodecV1.Uint256.maxNumeric0DecimalText 18 18)
+    let maxNumeric = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "max-numeric" CCIP.CodecV2.Uint256.maxNumeric0DecimalText 18 18)
     maxNumeric.localAmount === 99999999999999999999999999999999999999.0
 
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "too-large-same-decimals" "100000000000000000000000000000000000000" 18 18
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "too-large-same-decimals" "100000000000000000000000000000000000000" 18 18
         === None
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "above-uint256-downscale" (CCIP.CodecV1.Uint256.maxUint256DecimalText <> "0") 80 0
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "above-uint256-downscale" (CCIP.CodecV2.Uint256.maxUint256DecimalText <> "0") 80 0
         === None
 
     debug "testUint256_LocalAmountConversion_EqualDecimals: PASSED"
 
 testUint256_LocalAmountConversion_Downscale : Script ()
 testUint256_LocalAmountConversion_Downscale = script do
-    let oneToken = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "one-token" "1000000000000000000" 18 6)
+    let oneToken = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "one-token" "1000000000000000000" 18 6)
     oneToken.localAmount === 1000000.0
     oneToken.truncatedRemainder === "0"
     oneToken.wasTruncated === False
 
-    let fractional = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "fractional" "123456789123456789" 18 6)
+    let fractional = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "fractional" "123456789123456789" 18 6)
     fractional.localAmount === 123456.0
     fractional.truncatedRemainder === "789123456789"
     fractional.wasTruncated === True
 
-    let belowUnit = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "below-unit" "999999999999" 18 6)
+    let belowUnit = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "below-unit" "999999999999" 18 6)
     belowUnit.localAmount === 0.0
     belowUnit.truncatedRemainder === "999999999999"
     belowUnit.wasTruncated === True
 
-    let exactUnit = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "exact-unit" "1000000000000" 18 6)
+    let exactUnit = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "exact-unit" "1000000000000" 18 6)
     exactUnit.localAmount === 1.0
     exactUnit.truncatedRemainder === "0"
     exactUnit.wasTruncated === False
 
-    let largeAboveNumeric0 = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "large-above-numeric0" "1000000000000000000000000000000000000000000000000" 30 6)
+    let largeAboveNumeric0 = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "large-above-numeric0" "1000000000000000000000000000000000000000000000000" 30 6)
     largeAboveNumeric0.localAmount === 1000000000000000000000000.0
     largeAboveNumeric0.wasTruncated === False
 
-    let maxUint256TinyLocal = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "max-uint256" CCIP.CodecV1.Uint256.maxUint256DecimalText 77 0)
+    let maxUint256TinyLocal = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "max-uint256" CCIP.CodecV2.Uint256.maxUint256DecimalText 77 0)
     maxUint256TinyLocal.localAmount === 1.0
     maxUint256TinyLocal.wasTruncated === True
 
@@ -477,42 +477,42 @@ testUint256_LocalAmountConversion_Downscale = script do
 
 testUint256_LocalAmountConversion_Upscale : Script ()
 testUint256_LocalAmountConversion_Upscale = script do
-    let sixToEighteen = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "six-to-eighteen" "123456" 6 18)
+    let sixToEighteen = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "six-to-eighteen" "123456" 6 18)
     sixToEighteen.localAmount === 123456000000000000.0
     sixToEighteen.wasTruncated === False
 
-    let zeroToEighteen = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "zero-to-eighteen" "1" 0 18)
+    let zeroToEighteen = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "zero-to-eighteen" "1" 0 18)
     zeroToEighteen.localAmount === 1000000000000000000.0
 
-    let boundary = fromSome (CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "upscale-boundary" "99999999999999999999999999" 6 18)
+    let boundary = fromSome (CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "upscale-boundary" "99999999999999999999999999" 6 18)
     boundary.localAmount === 99999999999999999999999999000000000000.0
 
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "upscale-overflow" "100000000000000000000000000" 6 18
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "upscale-overflow" "100000000000000000000000000" 6 18
         === None
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "negative-decimals" "1" (-1) 18
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "negative-decimals" "1" (-1) 18
         === None
-    CCIP.CodecV1.Uint256.calculateLocalAmountFromDecimalTextChecked "too-many-decimals" "1" 18 256
+    CCIP.CodecV2.Uint256.calculateLocalAmountFromDecimalTextChecked "too-many-decimals" "1" 18 256
         === None
 
     debug "testUint256_LocalAmountConversion_Upscale: PASSED"
 
 testMessageCodec_TokenTransferAmountAboveNumeric0Decodes : Script ()
 testMessageCodec_TokenTransferAmountAboveNumeric0Decodes = script do
-    let amountAboveNumeric0 = fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes "100000000000000000000000000000000000000")
-    let maxAmount = fromSome (CCIP.CodecV1.Uint256.decimalTextToUint256Bytes CCIP.CodecV1.Uint256.maxUint256DecimalText)
+    let amountAboveNumeric0 = fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes "100000000000000000000000000000000000000")
+    let maxAmount = fromSome (CCIP.CodecV2.Uint256.decimalTextToUint256Bytes CCIP.CodecV2.Uint256.maxUint256DecimalText)
 
-    let tt = CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
+    let tt = CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
             amount = amountAboveNumeric0
             sourcePoolAddress = "1234567890abcdef"
             sourceTokenAddress = "abcdef1234567890"
             destTokenAddress = "fedcba0987654321"
             tokenReceiver = "aabbccdd"
-            extraData = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 18.0)
-    let decodedTt = fromSome (CCIP.CodecV1.MessageCodecV1.decodeTokenTransfer (CCIP.CodecV1.MessageCodecV1.encodeTokenTransferV1 tt))
+            extraData = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 18.0)
+    let decodedTt = fromSome (CCIP.CodecV2.MessageCodecV1.decodeTokenTransfer (CCIP.CodecV2.MessageCodecV1.encodeTokenTransferV1 tt))
     decodedTt.amount === amountAboveNumeric0
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText decodedTt.amount === Some "100000000000000000000000000000000000000"
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText decodedTt.amount === Some "100000000000000000000000000000000000000"
 
-    let msg = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    let msg = CCIP.CodecV2.MessageCodecV1.MessageV1 with
             sourceChainSelector = 123.0
             destChainSelector = 456.0
             sequenceNumber = 789.0
@@ -527,9 +527,9 @@ testMessageCodec_TokenTransferAmountAboveNumeric0Decodes = script do
             destBlob = ""
             tokenTransfer = Some (tt with amount = maxAmount)
             messageData = ""
-    let decodedMsg = fromSome (CCIP.CodecV1.MessageCodecV1.decodeMessageV1 (CCIP.CodecV1.MessageCodecV1.encodeMessageV1 msg))
+    let decodedMsg = fromSome (CCIP.CodecV2.MessageCodecV1.decodeMessageV1 (CCIP.CodecV2.MessageCodecV1.encodeMessageV1 msg))
     let decodedMsgTt = fromSome decodedMsg.tokenTransfer
     decodedMsgTt.amount === maxAmount
-    CCIP.CodecV1.Uint256.uint256BytesToDecimalText decodedMsgTt.amount === Some CCIP.CodecV1.Uint256.maxUint256DecimalText
+    CCIP.CodecV2.Uint256.uint256BytesToDecimalText decodedMsgTt.amount === Some CCIP.CodecV2.Uint256.maxUint256DecimalText
 
     debug "testMessageCodec_TokenTransferAmountAboveNumeric0Decodes: PASSED"

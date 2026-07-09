@@ -30,7 +30,7 @@ var (
 
 const (
 	PackageName = "ccip-core-v2"
-	PackageID   = "862949d2ddbba0cf1e62b2f800a37bbc95f4710736533d25c342ec97680b0b97"
+	PackageID   = "7f6d5a64b55cc88008c9664d166ffa8eee2998e17425106ea1b036baeed85924"
 	SDKVersion  = "3.4.11"
 )
 
@@ -478,25 +478,22 @@ func (t *AddPriceUpdaters) UnmarshalHex(data string) error {
 
 // AddTokenSend is a Record type
 type AddTokenSend struct {
-	TokenConfigCid    types.CONTRACT_ID                        `json:"tokenConfigCid"`
-	SendingMessageCid types.CONTRACT_ID                        `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT                               `json:"poolInstanceId"`
-	InstrumentId      splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount            types.TEXT                               `json:"amount"`
-	DestTokenAddress  types.TEXT                               `json:"destTokenAddress"`
-	ExtraData         types.TEXT                               `json:"extraData"`
-	Caller            types.PARTY                              `json:"caller"`
+	PoolInstanceId   types.TEXT                                 `json:"poolInstanceId"`
+	PoolOwner        types.PARTY                                `json:"poolOwner"`
+	InstrumentId     splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Amount           types.TEXT                                 `json:"amount"`
+	DestTokenAddress types.TEXT                                 `json:"destTokenAddress"`
+	ExtraData        types.TEXT                                 `json:"extraData"`
+	Context          splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts AddTokenSend to a map for DAML arguments
 func (t AddTokenSend) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
-
-	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
-
 	m["poolInstanceId"] = string(t.PoolInstanceId)
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
 
 	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
 
@@ -506,7 +503,7 @@ func (t AddTokenSend) ToMap() map[string]any {
 
 	m["extraData"] = string(t.ExtraData)
 
-	m["caller"] = t.Caller.ToMap()
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -533,48 +530,23 @@ func (t *AddTokenSend) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// AddTokenSendMCMSParams is AddTokenSend without the Caller field for MCMS operationData encoding.
-// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
-type AddTokenSendMCMSParams struct {
-	PoolInstanceId   types.TEXT                               `json:"poolInstanceId"`
-	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount           types.TEXT                               `json:"amount"`
-	DestTokenAddress types.TEXT                               `json:"destTokenAddress"`
-	ExtraData        types.TEXT                               `json:"extraData"`
-}
-
-// MarshalHex encodes AddTokenSendMCMSParams to hex string for MCMS operationData.
-func (t AddTokenSendMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes AddTokenSendMCMSParams from hex string.
-func (t *AddTokenSendMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // AddTokenSendFee is a Record type
 type AddTokenSendFee struct {
-	TokenConfigCid    types.CONTRACT_ID `json:"tokenConfigCid"`
-	SendingMessageCid types.CONTRACT_ID `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT        `json:"poolInstanceId"`
-	FeeUSDCents       types.NUMERIC     `json:"feeUSDCents"`
-	DestGasOverhead   types.INT64       `json:"destGasOverhead"`
-	DestBytesOverhead types.INT64       `json:"destBytesOverhead"`
-	Caller            types.PARTY       `json:"caller"`
+	PoolInstanceId    types.TEXT                                 `json:"poolInstanceId"`
+	PoolOwner         types.PARTY                                `json:"poolOwner"`
+	FeeUSDCents       types.NUMERIC                              `json:"feeUSDCents"`
+	DestGasOverhead   types.INT64                                `json:"destGasOverhead"`
+	DestBytesOverhead types.INT64                                `json:"destBytesOverhead"`
+	Context           splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
 // ToMap converts AddTokenSendFee to a map for DAML arguments
 func (t AddTokenSendFee) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
-
-	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
-
 	m["poolInstanceId"] = string(t.PoolInstanceId)
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
 
 	m["feeUSDCents"] = t.FeeUSDCents
 
@@ -582,7 +554,7 @@ func (t AddTokenSendFee) ToMap() map[string]any {
 
 	m["destBytesOverhead"] = int64(t.DestBytesOverhead)
 
-	m["caller"] = t.Caller.ToMap()
+	m["context"] = model.NestedToDAMLValue(t.Context)
 
 	return m
 }
@@ -605,27 +577,6 @@ func (t AddTokenSendFee) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AddTokenSendFee from hex string (Canton MCMS format)
 func (t *AddTokenSendFee) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// AddTokenSendFeeMCMSParams is AddTokenSendFee without the Caller field for MCMS operationData encoding.
-// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
-type AddTokenSendFeeMCMSParams struct {
-	PoolInstanceId    types.TEXT    `json:"poolInstanceId"`
-	FeeUSDCents       types.NUMERIC `json:"feeUSDCents"`
-	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
-	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
-}
-
-// MarshalHex encodes AddTokenSendFeeMCMSParams to hex string for MCMS operationData.
-func (t AddTokenSendFeeMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes AddTokenSendFeeMCMSParams from hex string.
-func (t *AddTokenSendFeeMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1769,12 +1720,12 @@ type ExecutingMessage struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t ExecutingMessage) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t ExecutingMessage) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -2037,7 +1988,7 @@ func (t *ExecutingMessage) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t ExecutingMessage) CancelExecute(contractID string, args CancelExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "CancelExecute",
 		Arguments:  argsToMap(args),
@@ -2047,7 +1998,7 @@ func (t ExecutingMessage) CancelExecute(contractID string, args CancelExecute) *
 // CancelExecuteWithPackageID exercises the CancelExecute choice using the provided package ID instead of package name
 func (t ExecutingMessage) CancelExecuteWithPackageID(contractID string, packageID string, args CancelExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "CancelExecute",
 		Arguments:  argsToMap(args),
@@ -2058,7 +2009,7 @@ func (t ExecutingMessage) CancelExecuteWithPackageID(contractID string, packageI
 // This method uses the package name in the template ID
 func (t ExecutingMessage) AddCCVVerification(contractID string, args AddCCVVerification) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "AddCCVVerification",
 		Arguments:  argsToMap(args),
@@ -2068,7 +2019,7 @@ func (t ExecutingMessage) AddCCVVerification(contractID string, args AddCCVVerif
 // AddCCVVerificationWithPackageID exercises the AddCCVVerification choice using the provided package ID instead of package name
 func (t ExecutingMessage) AddCCVVerificationWithPackageID(contractID string, packageID string, args AddCCVVerification) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "AddCCVVerification",
 		Arguments:  argsToMap(args),
@@ -2079,7 +2030,7 @@ func (t ExecutingMessage) AddCCVVerificationWithPackageID(contractID string, pac
 // This method uses the package name in the template ID
 func (t ExecutingMessage) SetInboundPoolCCVs(contractID string, args SetInboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "SetInboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -2089,7 +2040,7 @@ func (t ExecutingMessage) SetInboundPoolCCVs(contractID string, args SetInboundP
 // SetInboundPoolCCVsWithPackageID exercises the SetInboundPoolCCVs choice using the provided package ID instead of package name
 func (t ExecutingMessage) SetInboundPoolCCVsWithPackageID(contractID string, packageID string, args SetInboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "SetInboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -2100,7 +2051,7 @@ func (t ExecutingMessage) SetInboundPoolCCVsWithPackageID(contractID string, pac
 // This method uses the package name in the template ID
 func (t ExecutingMessage) FinalizeExecute(contractID string, args FinalizeExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "FinalizeExecute",
 		Arguments:  argsToMap(args),
@@ -2110,7 +2061,7 @@ func (t ExecutingMessage) FinalizeExecute(contractID string, args FinalizeExecut
 // FinalizeExecuteWithPackageID exercises the FinalizeExecute choice using the provided package ID instead of package name
 func (t ExecutingMessage) FinalizeExecuteWithPackageID(contractID string, packageID string, args FinalizeExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "FinalizeExecute",
 		Arguments:  argsToMap(args),
@@ -2121,7 +2072,7 @@ func (t ExecutingMessage) FinalizeExecuteWithPackageID(contractID string, packag
 // This method uses the package name in the template ID
 func (t ExecutingMessage) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -2131,7 +2082,7 @@ func (t ExecutingMessage) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t ExecutingMessage) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -2142,7 +2093,7 @@ func (t ExecutingMessage) ArchiveWithPackageID(contractID string, packageID stri
 // This method uses the package name in the template ID
 func (t ExecutingMessage) ExecutingMessageCancelExecute(contractID string, args ccipapi.ExecutingMessageCancelExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "IExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.ExecutingMessage", "IExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "ExecutingMessage_CancelExecute",
 		Arguments:  argsToMap(args),
@@ -2152,7 +2103,7 @@ func (t ExecutingMessage) ExecutingMessageCancelExecute(contractID string, args 
 // ExecutingMessageCancelExecuteWithPackageID exercises the ExecutingMessage_CancelExecute choice using the provided package ID instead of package name
 func (t ExecutingMessage) ExecutingMessageCancelExecuteWithPackageID(contractID string, packageID string, args ccipapi.ExecutingMessageCancelExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "IExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.ExecutingMessage", "IExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "ExecutingMessage_CancelExecute",
 		Arguments:  argsToMap(args),
@@ -2163,7 +2114,7 @@ func (t ExecutingMessage) ExecutingMessageCancelExecuteWithPackageID(contractID 
 // This method uses the package name in the template ID
 func (t ExecutingMessage) ExecutingMessageAddCCVVerification(contractID string, args ccipapi.ExecutingMessageAddCCVVerification) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "IExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.ExecutingMessage", "IExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "ExecutingMessage_AddCCVVerification",
 		Arguments:  argsToMap(args),
@@ -2173,7 +2124,7 @@ func (t ExecutingMessage) ExecutingMessageAddCCVVerification(contractID string, 
 // ExecutingMessageAddCCVVerificationWithPackageID exercises the ExecutingMessage_AddCCVVerification choice using the provided package ID instead of package name
 func (t ExecutingMessage) ExecutingMessageAddCCVVerificationWithPackageID(contractID string, packageID string, args ccipapi.ExecutingMessageAddCCVVerification) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "IExecutingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.ExecutingMessage", "IExecutingMessage"),
 		ContractID: contractID,
 		Choice:     "ExecutingMessage_AddCCVVerification",
 		Arguments:  argsToMap(args),
@@ -2241,12 +2192,12 @@ const (
 func (e ExecutingMessageState) GetEnumConstructor() string { return string(e) }
 
 func (e ExecutingMessageState) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessageState")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessageState")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e ExecutingMessageState) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.ExecutingMessage", "ExecutingMessageState")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.ExecutingMessage", "ExecutingMessageState")
 }
 
 func (e ExecutingMessageState) MarshalJSON() ([]byte, error) {
@@ -2285,12 +2236,12 @@ const (
 func (e ExecutionMode) GetEnumConstructor() string { return string(e) }
 
 func (e ExecutionMode) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "ExecutionMode")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "ExecutionMode")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e ExecutionMode) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "ExecutionMode")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "ExecutionMode")
 }
 
 func (e ExecutionMode) MarshalJSON() ([]byte, error) {
@@ -2374,12 +2325,12 @@ type FeeQuoter struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t FeeQuoter) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t FeeQuoter) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -2536,7 +2487,7 @@ func (t *FeeQuoter) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t FeeQuoter) QuoteGasForExec(contractID string, args QuoteGasForExec) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "QuoteGasForExec",
 		Arguments:  argsToMap(args),
@@ -2546,7 +2497,7 @@ func (t FeeQuoter) QuoteGasForExec(contractID string, args QuoteGasForExec) *mod
 // QuoteGasForExecWithPackageID exercises the QuoteGasForExec choice using the provided package ID instead of package name
 func (t FeeQuoter) QuoteGasForExecWithPackageID(contractID string, packageID string, args QuoteGasForExec) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "QuoteGasForExec",
 		Arguments:  argsToMap(args),
@@ -2557,7 +2508,7 @@ func (t FeeQuoter) QuoteGasForExecWithPackageID(contractID string, packageID str
 // This method uses the package name in the template ID
 func (t FeeQuoter) GetTokenPrice(contractID string, args GetTokenPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetTokenPrice",
 		Arguments:  argsToMap(args),
@@ -2567,7 +2518,7 @@ func (t FeeQuoter) GetTokenPrice(contractID string, args GetTokenPrice) *model.E
 // GetTokenPriceWithPackageID exercises the GetTokenPrice choice using the provided package ID instead of package name
 func (t FeeQuoter) GetTokenPriceWithPackageID(contractID string, packageID string, args GetTokenPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetTokenPrice",
 		Arguments:  argsToMap(args),
@@ -2578,7 +2529,7 @@ func (t FeeQuoter) GetTokenPriceWithPackageID(contractID string, packageID strin
 // This method uses the package name in the template ID
 func (t FeeQuoter) GetDestinationChainGasPrice(contractID string, args GetDestinationChainGasPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetDestinationChainGasPrice",
 		Arguments:  argsToMap(args),
@@ -2588,7 +2539,7 @@ func (t FeeQuoter) GetDestinationChainGasPrice(contractID string, args GetDestin
 // GetDestinationChainGasPriceWithPackageID exercises the GetDestinationChainGasPrice choice using the provided package ID instead of package name
 func (t FeeQuoter) GetDestinationChainGasPriceWithPackageID(contractID string, packageID string, args GetDestinationChainGasPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetDestinationChainGasPrice",
 		Arguments:  argsToMap(args),
@@ -2599,7 +2550,7 @@ func (t FeeQuoter) GetDestinationChainGasPriceWithPackageID(contractID string, p
 // This method uses the package name in the template ID
 func (t FeeQuoter) UpdatePrices(contractID string, args UpdatePrices) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "UpdatePrices",
 		Arguments:  argsToMap(args),
@@ -2609,7 +2560,7 @@ func (t FeeQuoter) UpdatePrices(contractID string, args UpdatePrices) *model.Exe
 // UpdatePricesWithPackageID exercises the UpdatePrices choice using the provided package ID instead of package name
 func (t FeeQuoter) UpdatePricesWithPackageID(contractID string, packageID string, args UpdatePrices) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "UpdatePrices",
 		Arguments:  argsToMap(args),
@@ -2620,7 +2571,7 @@ func (t FeeQuoter) UpdatePricesWithPackageID(contractID string, packageID string
 // This method uses the package name in the template ID
 func (t FeeQuoter) GetTokenTransferFee(contractID string, args GetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetTokenTransferFee",
 		Arguments:  argsToMap(args),
@@ -2630,7 +2581,7 @@ func (t FeeQuoter) GetTokenTransferFee(contractID string, args GetTokenTransferF
 // GetTokenTransferFeeWithPackageID exercises the GetTokenTransferFee choice using the provided package ID instead of package name
 func (t FeeQuoter) GetTokenTransferFeeWithPackageID(contractID string, packageID string, args GetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetTokenTransferFee",
 		Arguments:  argsToMap(args),
@@ -2641,7 +2592,7 @@ func (t FeeQuoter) GetTokenTransferFeeWithPackageID(contractID string, packageID
 // This method uses the package name in the template ID
 func (t FeeQuoter) GetDestChainConfig(contractID string, args GetDestChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetDestChainConfig",
 		Arguments:  argsToMap(args),
@@ -2651,7 +2602,7 @@ func (t FeeQuoter) GetDestChainConfig(contractID string, args GetDestChainConfig
 // GetDestChainConfigWithPackageID exercises the GetDestChainConfig choice using the provided package ID instead of package name
 func (t FeeQuoter) GetDestChainConfigWithPackageID(contractID string, packageID string, args GetDestChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetDestChainConfig",
 		Arguments:  argsToMap(args),
@@ -2662,7 +2613,7 @@ func (t FeeQuoter) GetDestChainConfigWithPackageID(contractID string, packageID 
 // This method uses the package name in the template ID
 func (t FeeQuoter) ApplyFeeQuoterDestChainConfigUpdates(contractID string, args ApplyFeeQuoterDestChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "ApplyFeeQuoterDestChainConfigUpdates",
 		Arguments:  argsToMap(args),
@@ -2672,7 +2623,7 @@ func (t FeeQuoter) ApplyFeeQuoterDestChainConfigUpdates(contractID string, args 
 // ApplyFeeQuoterDestChainConfigUpdatesWithPackageID exercises the ApplyFeeQuoterDestChainConfigUpdates choice using the provided package ID instead of package name
 func (t FeeQuoter) ApplyFeeQuoterDestChainConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyFeeQuoterDestChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "ApplyFeeQuoterDestChainConfigUpdates",
 		Arguments:  argsToMap(args),
@@ -2683,7 +2634,7 @@ func (t FeeQuoter) ApplyFeeQuoterDestChainConfigUpdatesWithPackageID(contractID 
 // This method uses the package name in the template ID
 func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -2693,7 +2644,7 @@ func (t FeeQuoter) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t FeeQuoter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -2704,7 +2655,7 @@ func (t FeeQuoter) ArchiveWithPackageID(contractID string, packageID string) *mo
 // This method uses the package name in the template ID
 func (t FeeQuoter) Get(contractID string, args Get) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "Get",
 		Arguments:  argsToMap(args),
@@ -2714,7 +2665,7 @@ func (t FeeQuoter) Get(contractID string, args Get) *model.ExerciseCommand {
 // GetWithPackageID exercises the Get choice using the provided package ID instead of package name
 func (t FeeQuoter) GetWithPackageID(contractID string, packageID string, args Get) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "Get",
 		Arguments:  argsToMap(args),
@@ -2725,7 +2676,7 @@ func (t FeeQuoter) GetWithPackageID(contractID string, packageID string, args Ge
 // This method uses the package name in the template ID
 func (t FeeQuoter) GetFeeTokens(contractID string, args GetFeeTokens) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetFeeTokens",
 		Arguments:  argsToMap(args),
@@ -2735,7 +2686,7 @@ func (t FeeQuoter) GetFeeTokens(contractID string, args GetFeeTokens) *model.Exe
 // GetFeeTokensWithPackageID exercises the GetFeeTokens choice using the provided package ID instead of package name
 func (t FeeQuoter) GetFeeTokensWithPackageID(contractID string, packageID string, args GetFeeTokens) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "GetFeeTokens",
 		Arguments:  argsToMap(args),
@@ -2746,7 +2697,7 @@ func (t FeeQuoter) GetFeeTokensWithPackageID(contractID string, packageID string
 // This method uses the package name in the template ID
 func (t FeeQuoter) ApplyPriceUpdatersUpdate(contractID string, args ApplyPriceUpdatersUpdate) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "ApplyPriceUpdatersUpdate",
 		Arguments:  argsToMap(args),
@@ -2756,7 +2707,7 @@ func (t FeeQuoter) ApplyPriceUpdatersUpdate(contractID string, args ApplyPriceUp
 // ApplyPriceUpdatersUpdateWithPackageID exercises the ApplyPriceUpdatersUpdate choice using the provided package ID instead of package name
 func (t FeeQuoter) ApplyPriceUpdatersUpdateWithPackageID(contractID string, packageID string, args ApplyPriceUpdatersUpdate) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "ApplyPriceUpdatersUpdate",
 		Arguments:  argsToMap(args),
@@ -2767,7 +2718,7 @@ func (t FeeQuoter) ApplyPriceUpdatersUpdateWithPackageID(contractID string, pack
 // This method uses the package name in the template ID
 func (t FeeQuoter) AddPriceUpdaters(contractID string, args AddPriceUpdaters) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "AddPriceUpdaters",
 		Arguments:  argsToMap(args),
@@ -2777,7 +2728,7 @@ func (t FeeQuoter) AddPriceUpdaters(contractID string, args AddPriceUpdaters) *m
 // AddPriceUpdatersWithPackageID exercises the AddPriceUpdaters choice using the provided package ID instead of package name
 func (t FeeQuoter) AddPriceUpdatersWithPackageID(contractID string, packageID string, args AddPriceUpdaters) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "AddPriceUpdaters",
 		Arguments:  argsToMap(args),
@@ -2788,7 +2739,7 @@ func (t FeeQuoter) AddPriceUpdatersWithPackageID(contractID string, packageID st
 // This method uses the package name in the template ID
 func (t FeeQuoter) RemovePriceUpdaters(contractID string, args RemovePriceUpdaters) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "RemovePriceUpdaters",
 		Arguments:  argsToMap(args),
@@ -2798,7 +2749,7 @@ func (t FeeQuoter) RemovePriceUpdaters(contractID string, args RemovePriceUpdate
 // RemovePriceUpdatersWithPackageID exercises the RemovePriceUpdaters choice using the provided package ID instead of package name
 func (t FeeQuoter) RemovePriceUpdatersWithPackageID(contractID string, packageID string, args RemovePriceUpdaters) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "RemovePriceUpdaters",
 		Arguments:  argsToMap(args),
@@ -2809,7 +2760,7 @@ func (t FeeQuoter) RemovePriceUpdatersWithPackageID(contractID string, packageID
 // This method uses the package name in the template ID
 func (t FeeQuoter) RemoveFeeTokens(contractID string, args RemoveFeeTokens) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "RemoveFeeTokens",
 		Arguments:  argsToMap(args),
@@ -2819,7 +2770,7 @@ func (t FeeQuoter) RemoveFeeTokens(contractID string, args RemoveFeeTokens) *mod
 // RemoveFeeTokensWithPackageID exercises the RemoveFeeTokens choice using the provided package ID instead of package name
 func (t FeeQuoter) RemoveFeeTokensWithPackageID(contractID string, packageID string, args RemoveFeeTokens) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "FeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "FeeQuoter"),
 		ContractID: contractID,
 		Choice:     "RemoveFeeTokens",
 		Arguments:  argsToMap(args),
@@ -2830,7 +2781,7 @@ func (t FeeQuoter) RemoveFeeTokensWithPackageID(contractID string, packageID str
 // This method uses the package name in the template ID
 func (t FeeQuoter) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -2840,7 +2791,7 @@ func (t FeeQuoter) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiv
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
 func (t FeeQuoter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -2851,7 +2802,7 @@ func (t FeeQuoter) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterPublicFetch(contractID string, args ccipapi.FeeQuoterPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -2861,7 +2812,7 @@ func (t FeeQuoter) FeeQuoterPublicFetch(contractID string, args ccipapi.FeeQuote
 // FeeQuoterPublicFetchWithPackageID exercises the FeeQuoter_PublicFetch choice using the provided package ID instead of package name
 func (t FeeQuoter) FeeQuoterPublicFetchWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -2872,7 +2823,7 @@ func (t FeeQuoter) FeeQuoterPublicFetchWithPackageID(contractID string, packageI
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterGetTokenPrice(contractID string, args ccipapi.FeeQuoterGetTokenPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetTokenPrice",
 		Arguments:  argsToMap(args),
@@ -2882,7 +2833,7 @@ func (t FeeQuoter) FeeQuoterGetTokenPrice(contractID string, args ccipapi.FeeQuo
 // FeeQuoterGetTokenPriceWithPackageID exercises the FeeQuoter_GetTokenPrice choice using the provided package ID instead of package name
 func (t FeeQuoter) FeeQuoterGetTokenPriceWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterGetTokenPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetTokenPrice",
 		Arguments:  argsToMap(args),
@@ -2893,7 +2844,7 @@ func (t FeeQuoter) FeeQuoterGetTokenPriceWithPackageID(contractID string, packag
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterGetDestinationChainGasPrice(contractID string, args ccipapi.FeeQuoterGetDestinationChainGasPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetDestinationChainGasPrice",
 		Arguments:  argsToMap(args),
@@ -2903,7 +2854,7 @@ func (t FeeQuoter) FeeQuoterGetDestinationChainGasPrice(contractID string, args 
 // FeeQuoterGetDestinationChainGasPriceWithPackageID exercises the FeeQuoter_GetDestinationChainGasPrice choice using the provided package ID instead of package name
 func (t FeeQuoter) FeeQuoterGetDestinationChainGasPriceWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterGetDestinationChainGasPrice) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetDestinationChainGasPrice",
 		Arguments:  argsToMap(args),
@@ -2914,7 +2865,7 @@ func (t FeeQuoter) FeeQuoterGetDestinationChainGasPriceWithPackageID(contractID 
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args ccipapi.FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetTokenTransferFee",
 		Arguments:  argsToMap(args),
@@ -2924,7 +2875,7 @@ func (t FeeQuoter) FeeQuoterGetTokenTransferFee(contractID string, args ccipapi.
 // FeeQuoterGetTokenTransferFeeWithPackageID exercises the FeeQuoter_GetTokenTransferFee choice using the provided package ID instead of package name
 func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterGetTokenTransferFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetTokenTransferFee",
 		Arguments:  argsToMap(args),
@@ -2935,7 +2886,7 @@ func (t FeeQuoter) FeeQuoterGetTokenTransferFeeWithPackageID(contractID string, 
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterQuoteGasForExec(contractID string, args ccipapi.FeeQuoterQuoteGasForExec) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_QuoteGasForExec",
 		Arguments:  argsToMap(args),
@@ -2945,7 +2896,7 @@ func (t FeeQuoter) FeeQuoterQuoteGasForExec(contractID string, args ccipapi.FeeQ
 // FeeQuoterQuoteGasForExecWithPackageID exercises the FeeQuoter_QuoteGasForExec choice using the provided package ID instead of package name
 func (t FeeQuoter) FeeQuoterQuoteGasForExecWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterQuoteGasForExec) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_QuoteGasForExec",
 		Arguments:  argsToMap(args),
@@ -2956,7 +2907,7 @@ func (t FeeQuoter) FeeQuoterQuoteGasForExecWithPackageID(contractID string, pack
 // This method uses the package name in the template ID
 func (t FeeQuoter) FeeQuoterGetFeeTokens(contractID string, args ccipapi.FeeQuoterGetFeeTokens) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetFeeTokens",
 		Arguments:  argsToMap(args),
@@ -2966,7 +2917,7 @@ func (t FeeQuoter) FeeQuoterGetFeeTokens(contractID string, args ccipapi.FeeQuot
 // FeeQuoterGetFeeTokensWithPackageID exercises the FeeQuoter_GetFeeTokens choice using the provided package ID instead of package name
 func (t FeeQuoter) FeeQuoterGetFeeTokensWithPackageID(contractID string, packageID string, args ccipapi.FeeQuoterGetFeeTokens) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.FeeQuoter", "IFeeQuoter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.FeeQuoter", "IFeeQuoter"),
 		ContractID: contractID,
 		Choice:     "FeeQuoter_GetFeeTokens",
 		Arguments:  argsToMap(args),
@@ -3137,21 +3088,80 @@ func (t *FeeTokenAmountMCMSParams) UnmarshalHex(data string) error {
 
 // FinalizeExecute is a Record type
 type FinalizeExecute struct {
-	TokenConfigCid      types.CONTRACT_ID `json:"tokenConfigCid"`
-	ExecutingMessageCid types.CONTRACT_ID `json:"executingMessageCid"`
-	TicketReceiver      types.PARTY       `json:"ticketReceiver"`
-	ReturnData          types.TEXT        `json:"returnData"`
+	TokenAdminRegistryInstanceId types.TEXT                                `json:"tokenAdminRegistryInstanceId"`
+	MaybePoolAddress             *chainlinkapi.RawInstanceAddress          `json:"maybePoolAddress" hex:"optional"`
+	MaybeTicketReceiver          *types.PARTY                              `json:"maybeTicketReceiver" hex:"optional"`
+	MaybeTokenReceiver           *types.PARTY                              `json:"maybeTokenReceiver" hex:"optional"`
+	MaybeInstrumentId            *splice_api_token_holding_v1.InstrumentId `json:"maybeInstrumentId" hex:"optional"`
+	MaybeAmount                  *types.TEXT                               `json:"maybeAmount" hex:"optional"`
+	ReturnData                   types.TEXT                                `json:"returnData"`
 }
 
 // ToMap converts FinalizeExecute to a map for DAML arguments
 func (t FinalizeExecute) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
+	m["tokenAdminRegistryInstanceId"] = string(t.TokenAdminRegistryInstanceId)
 
-	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
+	if t.MaybePoolAddress != nil {
+		m["maybePoolAddress"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.MaybePoolAddress),
+		}
+	} else {
+		m["maybePoolAddress"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
-	m["ticketReceiver"] = t.TicketReceiver.ToMap()
+	if t.MaybeTicketReceiver != nil {
+		m["maybeTicketReceiver"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.MaybeTicketReceiver).ToMap(),
+		}
+	} else {
+		m["maybeTicketReceiver"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	if t.MaybeTokenReceiver != nil {
+		m["maybeTokenReceiver"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.MaybeTokenReceiver).ToMap(),
+		}
+	} else {
+		m["maybeTokenReceiver"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	if t.MaybeInstrumentId != nil {
+		m["maybeInstrumentId"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.MaybeInstrumentId),
+		}
+	} else {
+		m["maybeInstrumentId"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	if t.MaybeAmount != nil {
+		m["maybeAmount"] = map[string]any{
+			"_type": "optional",
+			"value": string(*t.MaybeAmount),
+		}
+	} else {
+		m["maybeAmount"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	m["returnData"] = string(t.ReturnData)
 
@@ -3961,12 +3971,12 @@ type GlobalConfig struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t GlobalConfig) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "GlobalConfig")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "GlobalConfig")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t GlobalConfig) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "GlobalConfig")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "GlobalConfig")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -4069,7 +4079,7 @@ func (t *GlobalConfig) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t GlobalConfig) ApplyDestChainConfigUpdates(contractID string, args ApplyDestChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "ApplyDestChainConfigUpdates",
 		Arguments:  argsToMap(args),
@@ -4079,7 +4089,7 @@ func (t GlobalConfig) ApplyDestChainConfigUpdates(contractID string, args ApplyD
 // ApplyDestChainConfigUpdatesWithPackageID exercises the ApplyDestChainConfigUpdates choice using the provided package ID instead of package name
 func (t GlobalConfig) ApplyDestChainConfigUpdatesWithPackageID(contractID string, packageID string, args ApplyDestChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "ApplyDestChainConfigUpdates",
 		Arguments:  argsToMap(args),
@@ -4090,7 +4100,7 @@ func (t GlobalConfig) ApplyDestChainConfigUpdatesWithPackageID(contractID string
 // This method uses the package name in the template ID
 func (t GlobalConfig) ApplySourceChainConfigUpdates(contractID string, args ApplySourceChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "ApplySourceChainConfigUpdates",
 		Arguments:  argsToMap(args),
@@ -4100,7 +4110,7 @@ func (t GlobalConfig) ApplySourceChainConfigUpdates(contractID string, args Appl
 // ApplySourceChainConfigUpdatesWithPackageID exercises the ApplySourceChainConfigUpdates choice using the provided package ID instead of package name
 func (t GlobalConfig) ApplySourceChainConfigUpdatesWithPackageID(contractID string, packageID string, args ApplySourceChainConfigUpdates) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "ApplySourceChainConfigUpdates",
 		Arguments:  argsToMap(args),
@@ -4111,7 +4121,7 @@ func (t GlobalConfig) ApplySourceChainConfigUpdatesWithPackageID(contractID stri
 // This method uses the package name in the template ID
 func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -4121,7 +4131,7 @@ func (t GlobalConfig) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t GlobalConfig) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -4132,7 +4142,7 @@ func (t GlobalConfig) ArchiveWithPackageID(contractID string, packageID string) 
 // This method uses the package name in the template ID
 func (t GlobalConfig) GetDestChainConfig(contractID string, args GetDestChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GetDestChainConfig",
 		Arguments:  argsToMap(args),
@@ -4142,7 +4152,7 @@ func (t GlobalConfig) GetDestChainConfig(contractID string, args GetDestChainCon
 // GetDestChainConfigWithPackageID exercises the GetDestChainConfig choice using the provided package ID instead of package name
 func (t GlobalConfig) GetDestChainConfigWithPackageID(contractID string, packageID string, args GetDestChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GetDestChainConfig",
 		Arguments:  argsToMap(args),
@@ -4153,7 +4163,7 @@ func (t GlobalConfig) GetDestChainConfigWithPackageID(contractID string, package
 // This method uses the package name in the template ID
 func (t GlobalConfig) GetSourceChainConfig(contractID string, args GetSourceChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GetSourceChainConfig",
 		Arguments:  argsToMap(args),
@@ -4163,7 +4173,7 @@ func (t GlobalConfig) GetSourceChainConfig(contractID string, args GetSourceChai
 // GetSourceChainConfigWithPackageID exercises the GetSourceChainConfig choice using the provided package ID instead of package name
 func (t GlobalConfig) GetSourceChainConfigWithPackageID(contractID string, packageID string, args GetSourceChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "GlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "GlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GetSourceChainConfig",
 		Arguments:  argsToMap(args),
@@ -4174,7 +4184,7 @@ func (t GlobalConfig) GetSourceChainConfigWithPackageID(contractID string, packa
 // This method uses the package name in the template ID
 func (t GlobalConfig) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -4184,7 +4194,7 @@ func (t GlobalConfig) MCMSReceiverEntrypoint(contractID string, args api.MCMSRec
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
 func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -4195,7 +4205,7 @@ func (t GlobalConfig) MCMSReceiverEntrypointWithPackageID(contractID string, pac
 // This method uses the package name in the template ID
 func (t GlobalConfig) GlobalConfigPublicFetch(contractID string, args ccipapi.GlobalConfigPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "IGlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "IGlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GlobalConfig_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -4205,7 +4215,7 @@ func (t GlobalConfig) GlobalConfigPublicFetch(contractID string, args ccipapi.Gl
 // GlobalConfigPublicFetchWithPackageID exercises the GlobalConfig_PublicFetch choice using the provided package ID instead of package name
 func (t GlobalConfig) GlobalConfigPublicFetchWithPackageID(contractID string, packageID string, args ccipapi.GlobalConfigPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "IGlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "IGlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GlobalConfig_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -4216,7 +4226,7 @@ func (t GlobalConfig) GlobalConfigPublicFetchWithPackageID(contractID string, pa
 // This method uses the package name in the template ID
 func (t GlobalConfig) GlobalConfigGetDestChainConfig(contractID string, args ccipapi.GlobalConfigGetDestChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "IGlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "IGlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GlobalConfig_GetDestChainConfig",
 		Arguments:  argsToMap(args),
@@ -4226,7 +4236,7 @@ func (t GlobalConfig) GlobalConfigGetDestChainConfig(contractID string, args cci
 // GlobalConfigGetDestChainConfigWithPackageID exercises the GlobalConfig_GetDestChainConfig choice using the provided package ID instead of package name
 func (t GlobalConfig) GlobalConfigGetDestChainConfigWithPackageID(contractID string, packageID string, args ccipapi.GlobalConfigGetDestChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "IGlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "IGlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GlobalConfig_GetDestChainConfig",
 		Arguments:  argsToMap(args),
@@ -4237,7 +4247,7 @@ func (t GlobalConfig) GlobalConfigGetDestChainConfigWithPackageID(contractID str
 // This method uses the package name in the template ID
 func (t GlobalConfig) GlobalConfigGetSourceChainConfig(contractID string, args ccipapi.GlobalConfigGetSourceChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.GlobalConfig", "IGlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.GlobalConfig", "IGlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GlobalConfig_GetSourceChainConfig",
 		Arguments:  argsToMap(args),
@@ -4247,7 +4257,7 @@ func (t GlobalConfig) GlobalConfigGetSourceChainConfig(contractID string, args c
 // GlobalConfigGetSourceChainConfigWithPackageID exercises the GlobalConfig_GetSourceChainConfig choice using the provided package ID instead of package name
 func (t GlobalConfig) GlobalConfigGetSourceChainConfigWithPackageID(contractID string, packageID string, args ccipapi.GlobalConfigGetSourceChainConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.GlobalConfig", "IGlobalConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.GlobalConfig", "IGlobalConfig"),
 		ContractID: contractID,
 		Choice:     "GlobalConfig_GetSourceChainConfig",
 		Arguments:  argsToMap(args),
@@ -4865,12 +4875,12 @@ type RMNRemote struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t RMNRemote) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t RMNRemote) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -4975,7 +4985,7 @@ func (t *RMNRemote) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t RMNRemote) UncurseChain(contractID string, args UncurseChain) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "UncurseChain",
 		Arguments:  argsToMap(args),
@@ -4985,7 +4995,7 @@ func (t RMNRemote) UncurseChain(contractID string, args UncurseChain) *model.Exe
 // UncurseChainWithPackageID exercises the UncurseChain choice using the provided package ID instead of package name
 func (t RMNRemote) UncurseChainWithPackageID(contractID string, packageID string, args UncurseChain) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "UncurseChain",
 		Arguments:  argsToMap(args),
@@ -4996,7 +5006,7 @@ func (t RMNRemote) UncurseChainWithPackageID(contractID string, packageID string
 // This method uses the package name in the template ID
 func (t RMNRemote) CurseChain(contractID string, args CurseChain) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "CurseChain",
 		Arguments:  argsToMap(args),
@@ -5006,7 +5016,7 @@ func (t RMNRemote) CurseChain(contractID string, args CurseChain) *model.Exercis
 // CurseChainWithPackageID exercises the CurseChain choice using the provided package ID instead of package name
 func (t RMNRemote) CurseChainWithPackageID(contractID string, packageID string, args CurseChain) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "CurseChain",
 		Arguments:  argsToMap(args),
@@ -5017,7 +5027,7 @@ func (t RMNRemote) CurseChainWithPackageID(contractID string, packageID string, 
 // This method uses the package name in the template ID
 func (t RMNRemote) UncurseGlobal(contractID string, args UncurseGlobal) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "UncurseGlobal",
 		Arguments:  argsToMap(args),
@@ -5027,7 +5037,7 @@ func (t RMNRemote) UncurseGlobal(contractID string, args UncurseGlobal) *model.E
 // UncurseGlobalWithPackageID exercises the UncurseGlobal choice using the provided package ID instead of package name
 func (t RMNRemote) UncurseGlobalWithPackageID(contractID string, packageID string, args UncurseGlobal) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "UncurseGlobal",
 		Arguments:  argsToMap(args),
@@ -5038,7 +5048,7 @@ func (t RMNRemote) UncurseGlobalWithPackageID(contractID string, packageID strin
 // This method uses the package name in the template ID
 func (t RMNRemote) CurseGlobal(contractID string, args CurseGlobal) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "CurseGlobal",
 		Arguments:  argsToMap(args),
@@ -5048,7 +5058,7 @@ func (t RMNRemote) CurseGlobal(contractID string, args CurseGlobal) *model.Exerc
 // CurseGlobalWithPackageID exercises the CurseGlobal choice using the provided package ID instead of package name
 func (t RMNRemote) CurseGlobalWithPackageID(contractID string, packageID string, args CurseGlobal) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "CurseGlobal",
 		Arguments:  argsToMap(args),
@@ -5059,7 +5069,7 @@ func (t RMNRemote) CurseGlobalWithPackageID(contractID string, packageID string,
 // This method uses the package name in the template ID
 func (t RMNRemote) IsCursedForChain(contractID string, args IsCursedForChain) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "IsCursedForChain",
 		Arguments:  argsToMap(args),
@@ -5069,7 +5079,7 @@ func (t RMNRemote) IsCursedForChain(contractID string, args IsCursedForChain) *m
 // IsCursedForChainWithPackageID exercises the IsCursedForChain choice using the provided package ID instead of package name
 func (t RMNRemote) IsCursedForChainWithPackageID(contractID string, packageID string, args IsCursedForChain) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "IsCursedForChain",
 		Arguments:  argsToMap(args),
@@ -5080,7 +5090,7 @@ func (t RMNRemote) IsCursedForChainWithPackageID(contractID string, packageID st
 // This method uses the package name in the template ID
 func (t RMNRemote) Curse(contractID string, args Curse) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Curse",
 		Arguments:  argsToMap(args),
@@ -5090,7 +5100,7 @@ func (t RMNRemote) Curse(contractID string, args Curse) *model.ExerciseCommand {
 // CurseWithPackageID exercises the Curse choice using the provided package ID instead of package name
 func (t RMNRemote) CurseWithPackageID(contractID string, packageID string, args Curse) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Curse",
 		Arguments:  argsToMap(args),
@@ -5101,7 +5111,7 @@ func (t RMNRemote) CurseWithPackageID(contractID string, packageID string, args 
 // This method uses the package name in the template ID
 func (t RMNRemote) Uncurse(contractID string, args Uncurse) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Uncurse",
 		Arguments:  argsToMap(args),
@@ -5111,7 +5121,7 @@ func (t RMNRemote) Uncurse(contractID string, args Uncurse) *model.ExerciseComma
 // UncurseWithPackageID exercises the Uncurse choice using the provided package ID instead of package name
 func (t RMNRemote) UncurseWithPackageID(contractID string, packageID string, args Uncurse) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Uncurse",
 		Arguments:  argsToMap(args),
@@ -5122,7 +5132,7 @@ func (t RMNRemote) UncurseWithPackageID(contractID string, packageID string, arg
 // This method uses the package name in the template ID
 func (t RMNRemote) CurseMultiple(contractID string, args CurseMultiple) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "CurseMultiple",
 		Arguments:  argsToMap(args),
@@ -5132,7 +5142,7 @@ func (t RMNRemote) CurseMultiple(contractID string, args CurseMultiple) *model.E
 // CurseMultipleWithPackageID exercises the CurseMultiple choice using the provided package ID instead of package name
 func (t RMNRemote) CurseMultipleWithPackageID(contractID string, packageID string, args CurseMultiple) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "CurseMultiple",
 		Arguments:  argsToMap(args),
@@ -5143,7 +5153,7 @@ func (t RMNRemote) CurseMultipleWithPackageID(contractID string, packageID strin
 // This method uses the package name in the template ID
 func (t RMNRemote) UncurseMultiple(contractID string, args UncurseMultiple) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "UncurseMultiple",
 		Arguments:  argsToMap(args),
@@ -5153,7 +5163,7 @@ func (t RMNRemote) UncurseMultiple(contractID string, args UncurseMultiple) *mod
 // UncurseMultipleWithPackageID exercises the UncurseMultiple choice using the provided package ID instead of package name
 func (t RMNRemote) UncurseMultipleWithPackageID(contractID string, packageID string, args UncurseMultiple) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "UncurseMultiple",
 		Arguments:  argsToMap(args),
@@ -5164,7 +5174,7 @@ func (t RMNRemote) UncurseMultipleWithPackageID(contractID string, packageID str
 // This method uses the package name in the template ID
 func (t RMNRemote) IsCursed(contractID string, args IsCursed) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "IsCursed",
 		Arguments:  argsToMap(args),
@@ -5174,7 +5184,7 @@ func (t RMNRemote) IsCursed(contractID string, args IsCursed) *model.ExerciseCom
 // IsCursedWithPackageID exercises the IsCursed choice using the provided package ID instead of package name
 func (t RMNRemote) IsCursedWithPackageID(contractID string, packageID string, args IsCursed) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "IsCursed",
 		Arguments:  argsToMap(args),
@@ -5185,7 +5195,7 @@ func (t RMNRemote) IsCursedWithPackageID(contractID string, packageID string, ar
 // This method uses the package name in the template ID
 func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -5195,7 +5205,7 @@ func (t RMNRemote) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t RMNRemote) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -5206,7 +5216,7 @@ func (t RMNRemote) ArchiveWithPackageID(contractID string, packageID string) *mo
 // This method uses the package name in the template ID
 func (t RMNRemote) GetCursedSubjects(contractID string, args GetCursedSubjects) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "GetCursedSubjects",
 		Arguments:  argsToMap(args),
@@ -5216,7 +5226,7 @@ func (t RMNRemote) GetCursedSubjects(contractID string, args GetCursedSubjects) 
 // GetCursedSubjectsWithPackageID exercises the GetCursedSubjects choice using the provided package ID instead of package name
 func (t RMNRemote) GetCursedSubjectsWithPackageID(contractID string, packageID string, args GetCursedSubjects) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "GetCursedSubjects",
 		Arguments:  argsToMap(args),
@@ -5227,7 +5237,7 @@ func (t RMNRemote) GetCursedSubjectsWithPackageID(contractID string, packageID s
 // This method uses the package name in the template ID
 func (t RMNRemote) AddCustomObservers(contractID string, args AddCustomObservers) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "AddCustomObservers",
 		Arguments:  argsToMap(args),
@@ -5237,7 +5247,7 @@ func (t RMNRemote) AddCustomObservers(contractID string, args AddCustomObservers
 // AddCustomObserversWithPackageID exercises the AddCustomObservers choice using the provided package ID instead of package name
 func (t RMNRemote) AddCustomObserversWithPackageID(contractID string, packageID string, args AddCustomObservers) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "AddCustomObservers",
 		Arguments:  argsToMap(args),
@@ -5248,7 +5258,7 @@ func (t RMNRemote) AddCustomObserversWithPackageID(contractID string, packageID 
 // This method uses the package name in the template ID
 func (t RMNRemote) RemoveCustomObservers(contractID string, args RemoveCustomObservers) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "RemoveCustomObservers",
 		Arguments:  argsToMap(args),
@@ -5258,7 +5268,7 @@ func (t RMNRemote) RemoveCustomObservers(contractID string, args RemoveCustomObs
 // RemoveCustomObserversWithPackageID exercises the RemoveCustomObservers choice using the provided package ID instead of package name
 func (t RMNRemote) RemoveCustomObserversWithPackageID(contractID string, packageID string, args RemoveCustomObservers) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "RemoveCustomObservers",
 		Arguments:  argsToMap(args),
@@ -5269,7 +5279,7 @@ func (t RMNRemote) RemoveCustomObserversWithPackageID(contractID string, package
 // This method uses the package name in the template ID
 func (t RMNRemote) UpdateCCIPOwner(contractID string, args UpdateCCIPOwner) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "UpdateCCIPOwner",
 		Arguments:  argsToMap(args),
@@ -5279,7 +5289,7 @@ func (t RMNRemote) UpdateCCIPOwner(contractID string, args UpdateCCIPOwner) *mod
 // UpdateCCIPOwnerWithPackageID exercises the UpdateCCIPOwner choice using the provided package ID instead of package name
 func (t RMNRemote) UpdateCCIPOwnerWithPackageID(contractID string, packageID string, args UpdateCCIPOwner) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "RMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "RMNRemote"),
 		ContractID: contractID,
 		Choice:     "UpdateCCIPOwner",
 		Arguments:  argsToMap(args),
@@ -5290,7 +5300,7 @@ func (t RMNRemote) UpdateCCIPOwnerWithPackageID(contractID string, packageID str
 // This method uses the package name in the template ID
 func (t RMNRemote) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -5300,7 +5310,7 @@ func (t RMNRemote) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiv
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
 func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -5311,7 +5321,7 @@ func (t RMNRemote) MCMSReceiverEntrypointWithPackageID(contractID string, packag
 // This method uses the package name in the template ID
 func (t RMNRemote) RMNRemotePublicFetch(contractID string, args ccipapi.RMNRemotePublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "IRMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "IRMNRemote"),
 		ContractID: contractID,
 		Choice:     "RMNRemote_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -5321,7 +5331,7 @@ func (t RMNRemote) RMNRemotePublicFetch(contractID string, args ccipapi.RMNRemot
 // RMNRemotePublicFetchWithPackageID exercises the RMNRemote_PublicFetch choice using the provided package ID instead of package name
 func (t RMNRemote) RMNRemotePublicFetchWithPackageID(contractID string, packageID string, args ccipapi.RMNRemotePublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "IRMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "IRMNRemote"),
 		ContractID: contractID,
 		Choice:     "RMNRemote_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -5332,7 +5342,7 @@ func (t RMNRemote) RMNRemotePublicFetchWithPackageID(contractID string, packageI
 // This method uses the package name in the template ID
 func (t RMNRemote) RMNRemoteIsCursed(contractID string, args ccipapi.RMNRemoteIsCursed) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "IRMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "IRMNRemote"),
 		ContractID: contractID,
 		Choice:     "RMNRemote_IsCursed",
 		Arguments:  argsToMap(args),
@@ -5342,7 +5352,7 @@ func (t RMNRemote) RMNRemoteIsCursed(contractID string, args ccipapi.RMNRemoteIs
 // RMNRemoteIsCursedWithPackageID exercises the RMNRemote_IsCursed choice using the provided package ID instead of package name
 func (t RMNRemote) RMNRemoteIsCursedWithPackageID(contractID string, packageID string, args ccipapi.RMNRemoteIsCursed) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "IRMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "IRMNRemote"),
 		ContractID: contractID,
 		Choice:     "RMNRemote_IsCursed",
 		Arguments:  argsToMap(args),
@@ -5353,7 +5363,7 @@ func (t RMNRemote) RMNRemoteIsCursedWithPackageID(contractID string, packageID s
 // This method uses the package name in the template ID
 func (t RMNRemote) RMNRemoteIsCursedForChain(contractID string, args ccipapi.RMNRemoteIsCursedForChain) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "IRMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "IRMNRemote"),
 		ContractID: contractID,
 		Choice:     "RMNRemote_IsCursedForChain",
 		Arguments:  argsToMap(args),
@@ -5363,7 +5373,7 @@ func (t RMNRemote) RMNRemoteIsCursedForChain(contractID string, args ccipapi.RMN
 // RMNRemoteIsCursedForChainWithPackageID exercises the RMNRemote_IsCursedForChain choice using the provided package ID instead of package name
 func (t RMNRemote) RMNRemoteIsCursedForChainWithPackageID(contractID string, packageID string, args ccipapi.RMNRemoteIsCursedForChain) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "IRMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "IRMNRemote"),
 		ContractID: contractID,
 		Choice:     "RMNRemote_IsCursedForChain",
 		Arguments:  argsToMap(args),
@@ -5374,7 +5384,7 @@ func (t RMNRemote) RMNRemoteIsCursedForChainWithPackageID(contractID string, pac
 // This method uses the package name in the template ID
 func (t RMNRemote) RMNRemoteGetCursedSubjects(contractID string, args ccipapi.RMNRemoteGetCursedSubjects) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.RMNRemote", "IRMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.RMNRemote", "IRMNRemote"),
 		ContractID: contractID,
 		Choice:     "RMNRemote_GetCursedSubjects",
 		Arguments:  argsToMap(args),
@@ -5384,7 +5394,7 @@ func (t RMNRemote) RMNRemoteGetCursedSubjects(contractID string, args ccipapi.RM
 // RMNRemoteGetCursedSubjectsWithPackageID exercises the RMNRemote_GetCursedSubjects choice using the provided package ID instead of package name
 func (t RMNRemote) RMNRemoteGetCursedSubjectsWithPackageID(contractID string, packageID string, args ccipapi.RMNRemoteGetCursedSubjects) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.RMNRemote", "IRMNRemote"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.RMNRemote", "IRMNRemote"),
 		ContractID: contractID,
 		Choice:     "RMNRemote_GetCursedSubjects",
 		Arguments:  argsToMap(args),
@@ -5658,12 +5668,12 @@ type SendingMessage struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t SendingMessage) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t SendingMessage) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -6230,7 +6240,7 @@ func (t *SendingMessage) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t SendingMessage) AddTokenSend(contractID string, args AddTokenSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddTokenSend",
 		Arguments:  argsToMap(args),
@@ -6240,7 +6250,7 @@ func (t SendingMessage) AddTokenSend(contractID string, args AddTokenSend) *mode
 // AddTokenSendWithPackageID exercises the AddTokenSend choice using the provided package ID instead of package name
 func (t SendingMessage) AddTokenSendWithPackageID(contractID string, packageID string, args AddTokenSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddTokenSend",
 		Arguments:  argsToMap(args),
@@ -6251,7 +6261,7 @@ func (t SendingMessage) AddTokenSendWithPackageID(contractID string, packageID s
 // This method uses the package name in the template ID
 func (t SendingMessage) AddVerifierData(contractID string, args AddVerifierData) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddVerifierData",
 		Arguments:  argsToMap(args),
@@ -6261,7 +6271,7 @@ func (t SendingMessage) AddVerifierData(contractID string, args AddVerifierData)
 // AddVerifierDataWithPackageID exercises the AddVerifierData choice using the provided package ID instead of package name
 func (t SendingMessage) AddVerifierDataWithPackageID(contractID string, packageID string, args AddVerifierData) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddVerifierData",
 		Arguments:  argsToMap(args),
@@ -6272,7 +6282,7 @@ func (t SendingMessage) AddVerifierDataWithPackageID(contractID string, packageI
 // This method uses the package name in the template ID
 func (t SendingMessage) AddCCVFee(contractID string, args AddCCVFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddCCVFee",
 		Arguments:  argsToMap(args),
@@ -6282,7 +6292,7 @@ func (t SendingMessage) AddCCVFee(contractID string, args AddCCVFee) *model.Exer
 // AddCCVFeeWithPackageID exercises the AddCCVFee choice using the provided package ID instead of package name
 func (t SendingMessage) AddCCVFeeWithPackageID(contractID string, packageID string, args AddCCVFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddCCVFee",
 		Arguments:  argsToMap(args),
@@ -6293,7 +6303,7 @@ func (t SendingMessage) AddCCVFeeWithPackageID(contractID string, packageID stri
 // This method uses the package name in the template ID
 func (t SendingMessage) BuildMessage(contractID string, args BuildMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "BuildMessage",
 		Arguments:  argsToMap(args),
@@ -6303,7 +6313,7 @@ func (t SendingMessage) BuildMessage(contractID string, args BuildMessage) *mode
 // BuildMessageWithPackageID exercises the BuildMessage choice using the provided package ID instead of package name
 func (t SendingMessage) BuildMessageWithPackageID(contractID string, packageID string, args BuildMessage) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "BuildMessage",
 		Arguments:  argsToMap(args),
@@ -6314,7 +6324,7 @@ func (t SendingMessage) BuildMessageWithPackageID(contractID string, packageID s
 // This method uses the package name in the template ID
 func (t SendingMessage) AddTokenSendFee(contractID string, args AddTokenSendFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddTokenSendFee",
 		Arguments:  argsToMap(args),
@@ -6324,7 +6334,7 @@ func (t SendingMessage) AddTokenSendFee(contractID string, args AddTokenSendFee)
 // AddTokenSendFeeWithPackageID exercises the AddTokenSendFee choice using the provided package ID instead of package name
 func (t SendingMessage) AddTokenSendFeeWithPackageID(contractID string, packageID string, args AddTokenSendFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddTokenSendFee",
 		Arguments:  argsToMap(args),
@@ -6335,7 +6345,7 @@ func (t SendingMessage) AddTokenSendFeeWithPackageID(contractID string, packageI
 // This method uses the package name in the template ID
 func (t SendingMessage) SetOutboundPoolCCVs(contractID string, args SetOutboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "SetOutboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -6345,7 +6355,7 @@ func (t SendingMessage) SetOutboundPoolCCVs(contractID string, args SetOutboundP
 // SetOutboundPoolCCVsWithPackageID exercises the SetOutboundPoolCCVs choice using the provided package ID instead of package name
 func (t SendingMessage) SetOutboundPoolCCVsWithPackageID(contractID string, packageID string, args SetOutboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "SetOutboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -6356,7 +6366,7 @@ func (t SendingMessage) SetOutboundPoolCCVsWithPackageID(contractID string, pack
 // This method uses the package name in the template ID
 func (t SendingMessage) AddExecutorFee(contractID string, args AddExecutorFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddExecutorFee",
 		Arguments:  argsToMap(args),
@@ -6366,7 +6376,7 @@ func (t SendingMessage) AddExecutorFee(contractID string, args AddExecutorFee) *
 // AddExecutorFeeWithPackageID exercises the AddExecutorFee choice using the provided package ID instead of package name
 func (t SendingMessage) AddExecutorFeeWithPackageID(contractID string, packageID string, args AddExecutorFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "AddExecutorFee",
 		Arguments:  argsToMap(args),
@@ -6377,7 +6387,7 @@ func (t SendingMessage) AddExecutorFeeWithPackageID(contractID string, packageID
 // This method uses the package name in the template ID
 func (t SendingMessage) FinalizeFee(contractID string, args FinalizeFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "FinalizeFee",
 		Arguments:  argsToMap(args),
@@ -6387,7 +6397,7 @@ func (t SendingMessage) FinalizeFee(contractID string, args FinalizeFee) *model.
 // FinalizeFeeWithPackageID exercises the FinalizeFee choice using the provided package ID instead of package name
 func (t SendingMessage) FinalizeFeeWithPackageID(contractID string, packageID string, args FinalizeFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "FinalizeFee",
 		Arguments:  argsToMap(args),
@@ -6398,7 +6408,7 @@ func (t SendingMessage) FinalizeFeeWithPackageID(contractID string, packageID st
 // This method uses the package name in the template ID
 func (t SendingMessage) FinalizeSend(contractID string, args FinalizeSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "FinalizeSend",
 		Arguments:  argsToMap(args),
@@ -6408,7 +6418,7 @@ func (t SendingMessage) FinalizeSend(contractID string, args FinalizeSend) *mode
 // FinalizeSendWithPackageID exercises the FinalizeSend choice using the provided package ID instead of package name
 func (t SendingMessage) FinalizeSendWithPackageID(contractID string, packageID string, args FinalizeSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "FinalizeSend",
 		Arguments:  argsToMap(args),
@@ -6419,7 +6429,7 @@ func (t SendingMessage) FinalizeSendWithPackageID(contractID string, packageID s
 // This method uses the package name in the template ID
 func (t SendingMessage) FeeTokenAmount(contractID string, args FeeTokenAmount) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "FeeTokenAmount",
 		Arguments:  argsToMap(args),
@@ -6429,7 +6439,7 @@ func (t SendingMessage) FeeTokenAmount(contractID string, args FeeTokenAmount) *
 // FeeTokenAmountWithPackageID exercises the FeeTokenAmount choice using the provided package ID instead of package name
 func (t SendingMessage) FeeTokenAmountWithPackageID(contractID string, packageID string, args FeeTokenAmount) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "FeeTokenAmount",
 		Arguments:  argsToMap(args),
@@ -6440,7 +6450,7 @@ func (t SendingMessage) FeeTokenAmountWithPackageID(contractID string, packageID
 // This method uses the package name in the template ID
 func (t SendingMessage) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -6450,7 +6460,7 @@ func (t SendingMessage) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t SendingMessage) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessage"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -6461,7 +6471,7 @@ func (t SendingMessage) ArchiveWithPackageID(contractID string, packageID string
 // This method uses the package name in the template ID
 func (t SendingMessage) SendingMessageFeeTokenAmount(contractID string, args ccipapi.SendingMessageFeeTokenAmount) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "ISendingMessage"),
 		ContractID: contractID,
 		Choice:     "SendingMessage_FeeTokenAmount",
 		Arguments:  argsToMap(args),
@@ -6471,7 +6481,7 @@ func (t SendingMessage) SendingMessageFeeTokenAmount(contractID string, args cci
 // SendingMessageFeeTokenAmountWithPackageID exercises the SendingMessage_FeeTokenAmount choice using the provided package ID instead of package name
 func (t SendingMessage) SendingMessageFeeTokenAmountWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageFeeTokenAmount) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "ISendingMessage"),
 		ContractID: contractID,
 		Choice:     "SendingMessage_FeeTokenAmount",
 		Arguments:  argsToMap(args),
@@ -6482,7 +6492,7 @@ func (t SendingMessage) SendingMessageFeeTokenAmountWithPackageID(contractID str
 // This method uses the package name in the template ID
 func (t SendingMessage) SendingMessageAddCCVFee(contractID string, args ccipapi.SendingMessageAddCCVFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "ISendingMessage"),
 		ContractID: contractID,
 		Choice:     "SendingMessage_AddCCVFee",
 		Arguments:  argsToMap(args),
@@ -6492,7 +6502,7 @@ func (t SendingMessage) SendingMessageAddCCVFee(contractID string, args ccipapi.
 // SendingMessageAddCCVFeeWithPackageID exercises the SendingMessage_AddCCVFee choice using the provided package ID instead of package name
 func (t SendingMessage) SendingMessageAddCCVFeeWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageAddCCVFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "ISendingMessage"),
 		ContractID: contractID,
 		Choice:     "SendingMessage_AddCCVFee",
 		Arguments:  argsToMap(args),
@@ -6503,7 +6513,7 @@ func (t SendingMessage) SendingMessageAddCCVFeeWithPackageID(contractID string, 
 // This method uses the package name in the template ID
 func (t SendingMessage) SendingMessageAddVerifierData(contractID string, args ccipapi.SendingMessageAddVerifierData) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "ISendingMessage"),
 		ContractID: contractID,
 		Choice:     "SendingMessage_AddVerifierData",
 		Arguments:  argsToMap(args),
@@ -6513,7 +6523,7 @@ func (t SendingMessage) SendingMessageAddVerifierData(contractID string, args cc
 // SendingMessageAddVerifierDataWithPackageID exercises the SendingMessage_AddVerifierData choice using the provided package ID instead of package name
 func (t SendingMessage) SendingMessageAddVerifierDataWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageAddVerifierData) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "ISendingMessage"),
 		ContractID: contractID,
 		Choice:     "SendingMessage_AddVerifierData",
 		Arguments:  argsToMap(args),
@@ -6524,7 +6534,7 @@ func (t SendingMessage) SendingMessageAddVerifierDataWithPackageID(contractID st
 // This method uses the package name in the template ID
 func (t SendingMessage) SendingMessageAddExecutorFee(contractID string, args ccipapi.SendingMessageAddExecutorFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "ISendingMessage"),
 		ContractID: contractID,
 		Choice:     "SendingMessage_AddExecutorFee",
 		Arguments:  argsToMap(args),
@@ -6534,7 +6544,7 @@ func (t SendingMessage) SendingMessageAddExecutorFee(contractID string, args cci
 // SendingMessageAddExecutorFeeWithPackageID exercises the SendingMessage_AddExecutorFee choice using the provided package ID instead of package name
 func (t SendingMessage) SendingMessageAddExecutorFeeWithPackageID(contractID string, packageID string, args ccipapi.SendingMessageAddExecutorFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "ISendingMessage"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "ISendingMessage"),
 		ContractID: contractID,
 		Choice:     "SendingMessage_AddExecutorFee",
 		Arguments:  argsToMap(args),
@@ -6614,12 +6624,12 @@ const (
 func (e SendingMessageState) GetEnumConstructor() string { return string(e) }
 
 func (e SendingMessageState) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.SendingMessage", "SendingMessageState")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.SendingMessage", "SendingMessageState")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e SendingMessageState) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.SendingMessage", "SendingMessageState")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.SendingMessage", "SendingMessageState")
 }
 
 func (e SendingMessageState) MarshalJSON() ([]byte, error) {
@@ -6775,22 +6785,18 @@ func (t *SetBurnMintFactoryParams) UnmarshalHex(data string) error {
 
 // SetInboundPoolCCVs is a Record type
 type SetInboundPoolCCVs struct {
-	TokenConfigCid      types.CONTRACT_ID                 `json:"tokenConfigCid"`
-	ExecutingMessageCid types.CONTRACT_ID                 `json:"executingMessageCid"`
-	PoolInstanceId      types.TEXT                        `json:"poolInstanceId"`
-	PoolCCVs            []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
-	Caller              types.PARTY                       `json:"caller"`
+	PoolInstanceId types.TEXT                        `json:"poolInstanceId"`
+	PoolOwner      types.PARTY                       `json:"poolOwner"`
+	PoolCCVs       []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts SetInboundPoolCCVs to a map for DAML arguments
 func (t SetInboundPoolCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
-
-	m["executingMessageCid"] = model.NestedToDAMLValue(t.ExecutingMessageCid)
-
 	m["poolInstanceId"] = string(t.PoolInstanceId)
+
+	m["poolOwner"] = t.PoolOwner.ToMap()
 
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
@@ -6799,8 +6805,6 @@ func (t SetInboundPoolCCVs) ToMap() map[string]any {
 		}
 		return res
 	}()
-
-	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
@@ -6827,43 +6831,14 @@ func (t *SetInboundPoolCCVs) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// SetInboundPoolCCVsMCMSParams is SetInboundPoolCCVs without the Caller field for MCMS operationData encoding.
-// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
-type SetInboundPoolCCVsMCMSParams struct {
-	PoolInstanceId types.TEXT                        `json:"poolInstanceId"`
-	PoolCCVs       []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
-}
-
-// MarshalHex encodes SetInboundPoolCCVsMCMSParams to hex string for MCMS operationData.
-func (t SetInboundPoolCCVsMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes SetInboundPoolCCVsMCMSParams from hex string.
-func (t *SetInboundPoolCCVsMCMSParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // SetOutboundPoolCCVs is a Record type
 type SetOutboundPoolCCVs struct {
-	TokenConfigCid    types.CONTRACT_ID                 `json:"tokenConfigCid"`
-	SendingMessageCid types.CONTRACT_ID                 `json:"sendingMessageCid"`
-	PoolInstanceId    types.TEXT                        `json:"poolInstanceId"`
-	PoolCCVs          []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
-	Caller            types.PARTY                       `json:"caller"`
+	PoolCCVs []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
 }
 
 // ToMap converts SetOutboundPoolCCVs to a map for DAML arguments
 func (t SetOutboundPoolCCVs) ToMap() map[string]any {
 	m := make(map[string]any)
-
-	m["tokenConfigCid"] = model.NestedToDAMLValue(t.TokenConfigCid)
-
-	m["sendingMessageCid"] = model.NestedToDAMLValue(t.SendingMessageCid)
-
-	m["poolInstanceId"] = string(t.PoolInstanceId)
 
 	m["poolCCVs"] = func() []any {
 		res := make([]any, 0, len(t.PoolCCVs))
@@ -6872,8 +6847,6 @@ func (t SetOutboundPoolCCVs) ToMap() map[string]any {
 		}
 		return res
 	}()
-
-	m["caller"] = t.Caller.ToMap()
 
 	return m
 }
@@ -6896,25 +6869,6 @@ func (t SetOutboundPoolCCVs) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetOutboundPoolCCVs from hex string (Canton MCMS format)
 func (t *SetOutboundPoolCCVs) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// SetOutboundPoolCCVsMCMSParams is SetOutboundPoolCCVs without the Caller field for MCMS operationData encoding.
-// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
-type SetOutboundPoolCCVsMCMSParams struct {
-	PoolInstanceId types.TEXT                        `json:"poolInstanceId"`
-	PoolCCVs       []chainlinkapi.RawInstanceAddress `json:"poolCCVs"`
-}
-
-// MarshalHex encodes SetOutboundPoolCCVsMCMSParams to hex string for MCMS operationData.
-func (t SetOutboundPoolCCVsMCMSParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes SetOutboundPoolCCVsMCMSParams from hex string.
-func (t *SetOutboundPoolCCVsMCMSParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -7350,12 +7304,12 @@ type TokenAdminRegistry struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t TokenAdminRegistry) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t TokenAdminRegistry) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -7424,7 +7378,7 @@ func (t *TokenAdminRegistry) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) ProposeAdministrator(contractID string, args ProposeAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "ProposeAdministrator",
 		Arguments:  argsToMap(args),
@@ -7434,7 +7388,7 @@ func (t TokenAdminRegistry) ProposeAdministrator(contractID string, args Propose
 // ProposeAdministratorWithPackageID exercises the ProposeAdministrator choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) ProposeAdministratorWithPackageID(contractID string, packageID string, args ProposeAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "ProposeAdministrator",
 		Arguments:  argsToMap(args),
@@ -7445,7 +7399,7 @@ func (t TokenAdminRegistry) ProposeAdministratorWithPackageID(contractID string,
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) FinalizeExecute(contractID string, args FinalizeExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "FinalizeExecute",
 		Arguments:  argsToMap(args),
@@ -7455,7 +7409,7 @@ func (t TokenAdminRegistry) FinalizeExecute(contractID string, args FinalizeExec
 // FinalizeExecuteWithPackageID exercises the FinalizeExecute choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) FinalizeExecuteWithPackageID(contractID string, packageID string, args FinalizeExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "FinalizeExecute",
 		Arguments:  argsToMap(args),
@@ -7466,7 +7420,7 @@ func (t TokenAdminRegistry) FinalizeExecuteWithPackageID(contractID string, pack
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) AddTokenSend(contractID string, args AddTokenSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "AddTokenSend",
 		Arguments:  argsToMap(args),
@@ -7476,7 +7430,7 @@ func (t TokenAdminRegistry) AddTokenSend(contractID string, args AddTokenSend) *
 // AddTokenSendWithPackageID exercises the AddTokenSend choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) AddTokenSendWithPackageID(contractID string, packageID string, args AddTokenSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "AddTokenSend",
 		Arguments:  argsToMap(args),
@@ -7487,7 +7441,7 @@ func (t TokenAdminRegistry) AddTokenSendWithPackageID(contractID string, package
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) AddTokenSendFee(contractID string, args AddTokenSendFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "AddTokenSendFee",
 		Arguments:  argsToMap(args),
@@ -7497,7 +7451,7 @@ func (t TokenAdminRegistry) AddTokenSendFee(contractID string, args AddTokenSend
 // AddTokenSendFeeWithPackageID exercises the AddTokenSendFee choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) AddTokenSendFeeWithPackageID(contractID string, packageID string, args AddTokenSendFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "AddTokenSendFee",
 		Arguments:  argsToMap(args),
@@ -7508,7 +7462,7 @@ func (t TokenAdminRegistry) AddTokenSendFeeWithPackageID(contractID string, pack
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) SetOutboundPoolCCVs(contractID string, args SetOutboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetOutboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -7518,7 +7472,7 @@ func (t TokenAdminRegistry) SetOutboundPoolCCVs(contractID string, args SetOutbo
 // SetOutboundPoolCCVsWithPackageID exercises the SetOutboundPoolCCVs choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) SetOutboundPoolCCVsWithPackageID(contractID string, packageID string, args SetOutboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetOutboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -7529,7 +7483,7 @@ func (t TokenAdminRegistry) SetOutboundPoolCCVsWithPackageID(contractID string, 
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) IsAdministrator(contractID string, args IsAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "IsAdministrator",
 		Arguments:  argsToMap(args),
@@ -7539,7 +7493,7 @@ func (t TokenAdminRegistry) IsAdministrator(contractID string, args IsAdministra
 // IsAdministratorWithPackageID exercises the IsAdministrator choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) IsAdministratorWithPackageID(contractID string, packageID string, args IsAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "IsAdministrator",
 		Arguments:  argsToMap(args),
@@ -7550,7 +7504,7 @@ func (t TokenAdminRegistry) IsAdministratorWithPackageID(contractID string, pack
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TransferAdminRole(contractID string, args TransferAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TransferAdminRole",
 		Arguments:  argsToMap(args),
@@ -7560,7 +7514,7 @@ func (t TokenAdminRegistry) TransferAdminRole(contractID string, args TransferAd
 // TransferAdminRoleWithPackageID exercises the TransferAdminRole choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TransferAdminRoleWithPackageID(contractID string, packageID string, args TransferAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TransferAdminRole",
 		Arguments:  argsToMap(args),
@@ -7571,7 +7525,7 @@ func (t TokenAdminRegistry) TransferAdminRoleWithPackageID(contractID string, pa
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) AcceptAdminRole(contractID string, args AcceptAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "AcceptAdminRole",
 		Arguments:  argsToMap(args),
@@ -7581,7 +7535,7 @@ func (t TokenAdminRegistry) AcceptAdminRole(contractID string, args AcceptAdminR
 // AcceptAdminRoleWithPackageID exercises the AcceptAdminRole choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) AcceptAdminRoleWithPackageID(contractID string, packageID string, args AcceptAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "AcceptAdminRole",
 		Arguments:  argsToMap(args),
@@ -7592,7 +7546,7 @@ func (t TokenAdminRegistry) AcceptAdminRoleWithPackageID(contractID string, pack
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) SetBurnMintFactory(contractID string, args SetBurnMintFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetBurnMintFactory",
 		Arguments:  argsToMap(args),
@@ -7602,7 +7556,7 @@ func (t TokenAdminRegistry) SetBurnMintFactory(contractID string, args SetBurnMi
 // SetBurnMintFactoryWithPackageID exercises the SetBurnMintFactory choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) SetBurnMintFactoryWithPackageID(contractID string, packageID string, args SetBurnMintFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetBurnMintFactory",
 		Arguments:  argsToMap(args),
@@ -7613,7 +7567,7 @@ func (t TokenAdminRegistry) SetBurnMintFactoryWithPackageID(contractID string, p
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) SetTransferFactory(contractID string, args SetTransferFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetTransferFactory",
 		Arguments:  argsToMap(args),
@@ -7623,7 +7577,7 @@ func (t TokenAdminRegistry) SetTransferFactory(contractID string, args SetTransf
 // SetTransferFactoryWithPackageID exercises the SetTransferFactory choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) SetTransferFactoryWithPackageID(contractID string, packageID string, args SetTransferFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetTransferFactory",
 		Arguments:  argsToMap(args),
@@ -7634,7 +7588,7 @@ func (t TokenAdminRegistry) SetTransferFactoryWithPackageID(contractID string, p
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) SetPool(contractID string, args SetPool) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetPool",
 		Arguments:  argsToMap(args),
@@ -7644,7 +7598,7 @@ func (t TokenAdminRegistry) SetPool(contractID string, args SetPool) *model.Exer
 // SetPoolWithPackageID exercises the SetPool choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) SetPoolWithPackageID(contractID string, packageID string, args SetPool) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetPool",
 		Arguments:  argsToMap(args),
@@ -7655,7 +7609,7 @@ func (t TokenAdminRegistry) SetPoolWithPackageID(contractID string, packageID st
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) GetTokenConfigByCid(contractID string, args GetTokenConfigByCid) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "GetTokenConfigByCid",
 		Arguments:  argsToMap(args),
@@ -7665,7 +7619,7 @@ func (t TokenAdminRegistry) GetTokenConfigByCid(contractID string, args GetToken
 // GetTokenConfigByCidWithPackageID exercises the GetTokenConfigByCid choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) GetTokenConfigByCidWithPackageID(contractID string, packageID string, args GetTokenConfigByCid) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "GetTokenConfigByCid",
 		Arguments:  argsToMap(args),
@@ -7676,7 +7630,7 @@ func (t TokenAdminRegistry) GetTokenConfigByCidWithPackageID(contractID string, 
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) SetInboundPoolCCVs(contractID string, args SetInboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetInboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -7686,7 +7640,7 @@ func (t TokenAdminRegistry) SetInboundPoolCCVs(contractID string, args SetInboun
 // SetInboundPoolCCVsWithPackageID exercises the SetInboundPoolCCVs choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) SetInboundPoolCCVsWithPackageID(contractID string, packageID string, args SetInboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "SetInboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -7697,7 +7651,7 @@ func (t TokenAdminRegistry) SetInboundPoolCCVsWithPackageID(contractID string, p
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) ConsumeReceiveTicket(contractID string, args ConsumeReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "ConsumeReceiveTicket",
 		Arguments:  argsToMap(args),
@@ -7707,7 +7661,7 @@ func (t TokenAdminRegistry) ConsumeReceiveTicket(contractID string, args Consume
 // ConsumeReceiveTicketWithPackageID exercises the ConsumeReceiveTicket choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) ConsumeReceiveTicketWithPackageID(contractID string, packageID string, args ConsumeReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "ConsumeReceiveTicket",
 		Arguments:  argsToMap(args),
@@ -7718,7 +7672,7 @@ func (t TokenAdminRegistry) ConsumeReceiveTicketWithPackageID(contractID string,
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -7728,7 +7682,7 @@ func (t TokenAdminRegistry) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -7739,7 +7693,7 @@ func (t TokenAdminRegistry) ArchiveWithPackageID(contractID string, packageID st
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) Get(contractID string, args Get) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Get",
 		Arguments:  argsToMap(args),
@@ -7749,7 +7703,7 @@ func (t TokenAdminRegistry) Get(contractID string, args Get) *model.ExerciseComm
 // GetWithPackageID exercises the Get choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) GetWithPackageID(contractID string, packageID string, args Get) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "Get",
 		Arguments:  argsToMap(args),
@@ -7760,7 +7714,7 @@ func (t TokenAdminRegistry) GetWithPackageID(contractID string, packageID string
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -7770,7 +7724,7 @@ func (t TokenAdminRegistry) MCMSReceiverEntrypoint(contractID string, args api.M
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -7781,7 +7735,7 @@ func (t TokenAdminRegistry) MCMSReceiverEntrypointWithPackageID(contractID strin
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryPublicFetch(contractID string, args ccipapi.TokenAdminRegistryPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -7791,7 +7745,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryPublicFetch(contractID string, arg
 // TokenAdminRegistryPublicFetchWithPackageID exercises the TokenAdminRegistry_PublicFetch choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistryPublicFetchWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -7802,7 +7756,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryPublicFetchWithPackageID(contractI
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryFetchTokenConfig(contractID string, args ccipapi.TokenAdminRegistryFetchTokenConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_FetchTokenConfig",
 		Arguments:  argsToMap(args),
@@ -7812,7 +7766,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryFetchTokenConfig(contractID string
 // TokenAdminRegistryFetchTokenConfigWithPackageID exercises the TokenAdminRegistry_FetchTokenConfig choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistryFetchTokenConfigWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryFetchTokenConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_FetchTokenConfig",
 		Arguments:  argsToMap(args),
@@ -7823,7 +7777,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryFetchTokenConfigWithPackageID(cont
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistrySetPool(contractID string, args ccipapi.TokenAdminRegistrySetPool) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetPool",
 		Arguments:  argsToMap(args),
@@ -7833,7 +7787,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetPool(contractID string, args cc
 // TokenAdminRegistrySetPoolWithPackageID exercises the TokenAdminRegistry_SetPool choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistrySetPoolWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistrySetPool) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetPool",
 		Arguments:  argsToMap(args),
@@ -7844,7 +7798,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetPoolWithPackageID(contractID st
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistrySetTransferFactory(contractID string, args ccipapi.TokenAdminRegistrySetTransferFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetTransferFactory",
 		Arguments:  argsToMap(args),
@@ -7854,7 +7808,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetTransferFactory(contractID stri
 // TokenAdminRegistrySetTransferFactoryWithPackageID exercises the TokenAdminRegistry_SetTransferFactory choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistrySetTransferFactoryWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistrySetTransferFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetTransferFactory",
 		Arguments:  argsToMap(args),
@@ -7865,7 +7819,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetTransferFactoryWithPackageID(co
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistrySetBurnMintFactory(contractID string, args ccipapi.TokenAdminRegistrySetBurnMintFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetBurnMintFactory",
 		Arguments:  argsToMap(args),
@@ -7875,7 +7829,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetBurnMintFactory(contractID stri
 // TokenAdminRegistrySetBurnMintFactoryWithPackageID exercises the TokenAdminRegistry_SetBurnMintFactory choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistrySetBurnMintFactoryWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistrySetBurnMintFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetBurnMintFactory",
 		Arguments:  argsToMap(args),
@@ -7886,7 +7840,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetBurnMintFactoryWithPackageID(co
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministrator(contractID string, args ccipapi.TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ProposeAdministrator",
 		Arguments:  argsToMap(args),
@@ -7896,7 +7850,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministrator(contractID st
 // TokenAdminRegistryProposeAdministratorWithPackageID exercises the TokenAdminRegistry_ProposeAdministrator choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministratorWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryProposeAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ProposeAdministrator",
 		Arguments:  argsToMap(args),
@@ -7907,7 +7861,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryProposeAdministratorWithPackageID(
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryAcceptAdminRole(contractID string, args ccipapi.TokenAdminRegistryAcceptAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_AcceptAdminRole",
 		Arguments:  argsToMap(args),
@@ -7917,7 +7871,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryAcceptAdminRole(contractID string,
 // TokenAdminRegistryAcceptAdminRoleWithPackageID exercises the TokenAdminRegistry_AcceptAdminRole choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistryAcceptAdminRoleWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryAcceptAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_AcceptAdminRole",
 		Arguments:  argsToMap(args),
@@ -7928,7 +7882,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryAcceptAdminRoleWithPackageID(contr
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRole(contractID string, args ccipapi.TokenAdminRegistryTransferAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_TransferAdminRole",
 		Arguments:  argsToMap(args),
@@ -7938,7 +7892,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRole(contractID strin
 // TokenAdminRegistryTransferAdminRoleWithPackageID exercises the TokenAdminRegistry_TransferAdminRole choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRoleWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryTransferAdminRole) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_TransferAdminRole",
 		Arguments:  argsToMap(args),
@@ -7949,7 +7903,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryTransferAdminRoleWithPackageID(con
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryIsAdministrator(contractID string, args ccipapi.TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_IsAdministrator",
 		Arguments:  argsToMap(args),
@@ -7959,7 +7913,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryIsAdministrator(contractID string,
 // TokenAdminRegistryIsAdministratorWithPackageID exercises the TokenAdminRegistry_IsAdministrator choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistryIsAdministratorWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryIsAdministrator) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_IsAdministrator",
 		Arguments:  argsToMap(args),
@@ -7970,7 +7924,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryIsAdministratorWithPackageID(contr
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVs(contractID string, args ccipapi.TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -7980,7 +7934,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVs(contractID stri
 // TokenAdminRegistrySetInboundPoolCCVsWithPackageID exercises the TokenAdminRegistry_SetInboundPoolCCVs choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVsWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistrySetInboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetInboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -7991,7 +7945,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetInboundPoolCCVsWithPackageID(co
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVs(contractID string, args ccipapi.TokenAdminRegistrySetOutboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetOutboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -8001,7 +7955,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVs(contractID str
 // TokenAdminRegistrySetOutboundPoolCCVsWithPackageID exercises the TokenAdminRegistry_SetOutboundPoolCCVs choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVsWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistrySetOutboundPoolCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_SetOutboundPoolCCVs",
 		Arguments:  argsToMap(args),
@@ -8012,7 +7966,7 @@ func (t TokenAdminRegistry) TokenAdminRegistrySetOutboundPoolCCVsWithPackageID(c
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSend(contractID string, args ccipapi.TokenAdminRegistryAddTokenSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_AddTokenSend",
 		Arguments:  argsToMap(args),
@@ -8022,7 +7976,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSend(contractID string, ar
 // TokenAdminRegistryAddTokenSendWithPackageID exercises the TokenAdminRegistry_AddTokenSend choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSendWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryAddTokenSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_AddTokenSend",
 		Arguments:  argsToMap(args),
@@ -8033,7 +7987,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSendWithPackageID(contract
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSendFee(contractID string, args ccipapi.TokenAdminRegistryAddTokenSendFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_AddTokenSendFee",
 		Arguments:  argsToMap(args),
@@ -8043,7 +7997,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSendFee(contractID string,
 // TokenAdminRegistryAddTokenSendFeeWithPackageID exercises the TokenAdminRegistry_AddTokenSendFee choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSendFeeWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryAddTokenSendFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_AddTokenSendFee",
 		Arguments:  argsToMap(args),
@@ -8054,7 +8008,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryAddTokenSendFeeWithPackageID(contr
 // This method uses the package name in the template ID
 func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicket(contractID string, args ccipapi.TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
 		Arguments:  argsToMap(args),
@@ -8064,7 +8018,7 @@ func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicket(contractID st
 // TokenAdminRegistryConsumeReceiveTicketWithPackageID exercises the TokenAdminRegistry_ConsumeReceiveTicket choice using the provided package ID instead of package name
 func (t TokenAdminRegistry) TokenAdminRegistryConsumeReceiveTicketWithPackageID(contractID string, packageID string, args ccipapi.TokenAdminRegistryConsumeReceiveTicket) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenAdminRegistry"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenAdminRegistry"),
 		ContractID: contractID,
 		Choice:     "TokenAdminRegistry_ConsumeReceiveTicket",
 		Arguments:  argsToMap(args),
@@ -8094,12 +8048,12 @@ type TokenConfig struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t TokenConfig) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenConfig")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenConfig")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t TokenConfig) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenConfig")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenConfig")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -8306,7 +8260,7 @@ func (t *TokenConfig) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t TokenConfig) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "TokenConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "TokenConfig"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -8316,7 +8270,7 @@ func (t TokenConfig) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t TokenConfig) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "TokenConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "TokenConfig"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -8327,7 +8281,7 @@ func (t TokenConfig) ArchiveWithPackageID(contractID string, packageID string) *
 // This method uses the package name in the template ID
 func (t TokenConfig) TokenConfigPublicFetch(contractID string, args ccipapi.TokenConfigPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenConfig"),
 		ContractID: contractID,
 		Choice:     "TokenConfig_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -8337,7 +8291,7 @@ func (t TokenConfig) TokenConfigPublicFetch(contractID string, args ccipapi.Toke
 // TokenConfigPublicFetchWithPackageID exercises the TokenConfig_PublicFetch choice using the provided package ID instead of package name
 func (t TokenConfig) TokenConfigPublicFetchWithPackageID(contractID string, packageID string, args ccipapi.TokenConfigPublicFetch) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenConfig"),
 		ContractID: contractID,
 		Choice:     "TokenConfig_PublicFetch",
 		Arguments:  argsToMap(args),
@@ -8348,7 +8302,7 @@ func (t TokenConfig) TokenConfigPublicFetchWithPackageID(contractID string, pack
 // This method uses the package name in the template ID
 func (t TokenConfig) TokenConfigAssertConfiguredTransferFactory(contractID string, args ccipapi.TokenConfigAssertConfiguredTransferFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenConfig"),
 		ContractID: contractID,
 		Choice:     "TokenConfig_AssertConfiguredTransferFactory",
 		Arguments:  argsToMap(args),
@@ -8358,7 +8312,7 @@ func (t TokenConfig) TokenConfigAssertConfiguredTransferFactory(contractID strin
 // TokenConfigAssertConfiguredTransferFactoryWithPackageID exercises the TokenConfig_AssertConfiguredTransferFactory choice using the provided package ID instead of package name
 func (t TokenConfig) TokenConfigAssertConfiguredTransferFactoryWithPackageID(contractID string, packageID string, args ccipapi.TokenConfigAssertConfiguredTransferFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenConfig"),
 		ContractID: contractID,
 		Choice:     "TokenConfig_AssertConfiguredTransferFactory",
 		Arguments:  argsToMap(args),
@@ -8369,7 +8323,7 @@ func (t TokenConfig) TokenConfigAssertConfiguredTransferFactoryWithPackageID(con
 // This method uses the package name in the template ID
 func (t TokenConfig) TokenConfigAssertConfiguredBurnMintFactory(contractID string, args ccipapi.TokenConfigAssertConfiguredBurnMintFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV1.TokenAdminRegistry", "ITokenConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CoreV2.TokenAdminRegistry", "ITokenConfig"),
 		ContractID: contractID,
 		Choice:     "TokenConfig_AssertConfiguredBurnMintFactory",
 		Arguments:  argsToMap(args),
@@ -8379,7 +8333,7 @@ func (t TokenConfig) TokenConfigAssertConfiguredBurnMintFactory(contractID strin
 // TokenConfigAssertConfiguredBurnMintFactoryWithPackageID exercises the TokenConfig_AssertConfiguredBurnMintFactory choice using the provided package ID instead of package name
 func (t TokenConfig) TokenConfigAssertConfiguredBurnMintFactoryWithPackageID(contractID string, packageID string, args ccipapi.TokenConfigAssertConfiguredBurnMintFactory) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV1.TokenAdminRegistry", "ITokenConfig"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CoreV2.TokenAdminRegistry", "ITokenConfig"),
 		ContractID: contractID,
 		Choice:     "TokenConfig_AssertConfiguredBurnMintFactory",
 		Arguments:  argsToMap(args),
@@ -9120,9 +9074,7 @@ type MCMSEncoder interface {
 	AddExecutorFeeMCMSParams(args AddExecutorFeeMCMSParams) (*bind.EncodedChoice, error)
 	AddPriceUpdaters(args AddPriceUpdaters) (*bind.EncodedChoice, error)
 	AddTokenSend(args AddTokenSend) (*bind.EncodedChoice, error)
-	AddTokenSendMCMSParams(args AddTokenSendMCMSParams) (*bind.EncodedChoice, error)
 	AddTokenSendFee(args AddTokenSendFee) (*bind.EncodedChoice, error)
-	AddTokenSendFeeMCMSParams(args AddTokenSendFeeMCMSParams) (*bind.EncodedChoice, error)
 	AddVerifierData(args AddVerifierData) (*bind.EncodedChoice, error)
 	AddVerifierDataMCMSParams(args AddVerifierDataMCMSParams) (*bind.EncodedChoice, error)
 	ApplyDestChainConfigUpdates(args ApplyDestChainConfigUpdates) (*bind.EncodedChoice, error)
@@ -9186,9 +9138,7 @@ type MCMSEncoder interface {
 	SetBurnMintFactoryMCMSParams(args SetBurnMintFactoryMCMSParams) (*bind.EncodedChoice, error)
 	SetBurnMintFactoryParams(args SetBurnMintFactoryParams) (*bind.EncodedChoice, error)
 	SetInboundPoolCCVs(args SetInboundPoolCCVs) (*bind.EncodedChoice, error)
-	SetInboundPoolCCVsMCMSParams(args SetInboundPoolCCVsMCMSParams) (*bind.EncodedChoice, error)
 	SetOutboundPoolCCVs(args SetOutboundPoolCCVs) (*bind.EncodedChoice, error)
-	SetOutboundPoolCCVsMCMSParams(args SetOutboundPoolCCVsMCMSParams) (*bind.EncodedChoice, error)
 	SetPool(args SetPool) (*bind.EncodedChoice, error)
 	SetPoolMCMSParams(args SetPoolMCMSParams) (*bind.EncodedChoice, error)
 	SetPoolParams(args SetPoolParams) (*bind.EncodedChoice, error)
@@ -9291,18 +9241,8 @@ func (e *encoder) AddTokenSend(args AddTokenSend) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddTokenSend", args)
 }
 
-// AddTokenSendMCMSParams encodes MCMS parameters (without Caller) for the AddTokenSend choice.
-func (e *encoder) AddTokenSendMCMSParams(args AddTokenSendMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddTokenSend", args)
-}
-
 // AddTokenSendFee encodes parameters for the AddTokenSendFee choice.
 func (e *encoder) AddTokenSendFee(args AddTokenSendFee) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("AddTokenSendFee", args)
-}
-
-// AddTokenSendFeeMCMSParams encodes MCMS parameters (without Caller) for the AddTokenSendFee choice.
-func (e *encoder) AddTokenSendFeeMCMSParams(args AddTokenSendFeeMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AddTokenSendFee", args)
 }
 
@@ -9621,18 +9561,8 @@ func (e *encoder) SetInboundPoolCCVs(args SetInboundPoolCCVs) (*bind.EncodedChoi
 	return e.EncodeChoiceArgs("SetInboundPoolCCVs", args)
 }
 
-// SetInboundPoolCCVsMCMSParams encodes MCMS parameters (without Caller) for the SetInboundPoolCCVs choice.
-func (e *encoder) SetInboundPoolCCVsMCMSParams(args SetInboundPoolCCVsMCMSParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetInboundPoolCCVs", args)
-}
-
 // SetOutboundPoolCCVs encodes parameters for the SetOutboundPoolCCVs choice.
 func (e *encoder) SetOutboundPoolCCVs(args SetOutboundPoolCCVs) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetOutboundPoolCCVs", args)
-}
-
-// SetOutboundPoolCCVsMCMSParams encodes MCMS parameters (without Caller) for the SetOutboundPoolCCVs choice.
-func (e *encoder) SetOutboundPoolCCVsMCMSParams(args SetOutboundPoolCCVsMCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetOutboundPoolCCVs", args)
 }
 

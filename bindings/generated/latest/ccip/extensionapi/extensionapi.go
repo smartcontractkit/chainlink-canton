@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-extension-api-v2"
-	PackageID   = "967b5291290b1944b34b5c11dba4dd2422bab42bed768658b91e02445b2d006e"
+	PackageID   = "289011bdbefe42c7dbea0a4f101127095e8b5f5281d45c84f6eca06de11689a4"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1317,12 +1317,12 @@ const (
 func (e TransferDirection) GetEnumConstructor() string { return string(e) }
 
 func (e TransferDirection) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV1.TokenPool", "TransferDirection")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV2.TokenPool", "TransferDirection")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e TransferDirection) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.InterfacesV1.TokenPool", "TransferDirection")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.InterfacesV2.TokenPool", "TransferDirection")
 }
 
 func (e TransferDirection) MarshalJSON() ([]byte, error) {
@@ -1351,32 +1351,32 @@ var _ types.ENUM = TransferDirection("")
 
 // IICrossChainVerifierInterfaceID returns the interface ID for the IICrossChainVerifier interface using the package name
 func IICrossChainVerifierInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV1.CrossChainVerifier", "ICrossChainVerifier")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV2.CrossChainVerifier", "ICrossChainVerifier")
 }
 
 // IICrossChainVerifierInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IICrossChainVerifierInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.InterfacesV1.CrossChainVerifier", "ICrossChainVerifier")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.InterfacesV2.CrossChainVerifier", "ICrossChainVerifier")
 }
 
 // IIExecutorInterfaceID returns the interface ID for the IIExecutor interface using the package name
 func IIExecutorInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV1.Executor", "IExecutor")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV2.Executor", "IExecutor")
 }
 
 // IIExecutorInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IIExecutorInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.InterfacesV1.Executor", "IExecutor")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.InterfacesV2.Executor", "IExecutor")
 }
 
 // IITokenPoolInterfaceID returns the interface ID for the IITokenPool interface using the package name
 func IITokenPoolInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV1.TokenPool", "ITokenPool")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.InterfacesV2.TokenPool", "ITokenPool")
 }
 
 // IITokenPoolInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IITokenPoolInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.InterfacesV1.TokenPool", "ITokenPool")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.InterfacesV2.TokenPool", "ITokenPool")
 }
 
 // MCMSEncoder interface for typed encoding methods.
