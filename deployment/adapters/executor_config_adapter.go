@@ -50,6 +50,22 @@ func (a *CantonExecutorConfigAdapter) RequiresNodeChainSupportInJD() bool {
 	return false
 }
 
+// ResolveExecutorAddress resolves the Canton executor address for the given chain and
+// qualifier from the datastore.
+func (a *CantonExecutorConfigAdapter) ResolveExecutorAddress(ds datastore.DataStore, chainSelector uint64, qualifier string) (string, error) {
+	toAddress := func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }
+	executorAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
+		Type:      datastore.ContractType(executor.ContractType),
+		Qualifier: qualifier,
+		Version:   executor.Version,
+	}, chainSelector, toAddress)
+	if err != nil {
+		return "", fmt.Errorf("failed to get executor address for chain %d: %w", chainSelector, err)
+	}
+
+	return executorAddr, nil
+}
+
 func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, chainSelector uint64, qualifier string) (ccvexecutor.ChainConfiguration, error) {
 	toAddress := func(ref datastore.AddressRef) (string, error) { return ref.Address, nil }
 
@@ -69,13 +85,9 @@ func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, c
 		return ccvexecutor.ChainConfiguration{}, fmt.Errorf("failed to get rmn remote address for chain %d: %w", chainSelector, err)
 	}
 
-	executorAddr, err := dsutils.FindAndFormatRef(ds, datastore.AddressRef{
-		Type:      datastore.ContractType(executor.ContractType),
-		Qualifier: qualifier,
-		Version:   executor.Version,
-	}, chainSelector, toAddress)
+	executorAddr, err := a.ResolveExecutorAddress(ds, chainSelector, qualifier)
 	if err != nil {
-		return ccvexecutor.ChainConfiguration{}, fmt.Errorf("failed to get executor address for chain %d: %w", chainSelector, err)
+		return ccvexecutor.ChainConfiguration{}, err
 	}
 
 	return ccvexecutor.ChainConfiguration{
