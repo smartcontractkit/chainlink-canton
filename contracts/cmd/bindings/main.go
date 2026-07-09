@@ -42,8 +42,6 @@ func main() {
 		Packages: make(map[string]model.ExternalPackage, len(contracts.BindingsOutputDirs)),
 	}
 	for p, s := range contracts.BindingsOutputDirs {
-		fmt.Println(p)
-		fmt.Println(contracts.Versions[p])
 		dar, err := contracts.GetDar(p, contracts.Versions[p][len(contracts.Versions[p])-1])
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Msg("Failed to get DAR for package")
