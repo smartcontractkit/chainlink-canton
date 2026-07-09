@@ -279,11 +279,9 @@ entity, and args file are auto-populated:
 | `mcms-core`  | `MCMS.Main` | `MCMS` | `mcms-args.json` |
 
 DARs are loaded from the `dars/` directory by default (relative to the working
-directory), under versioned subdirectories such as `dars/current/` (dev) or
-`dars/v1_0_0/` (pinned release). Each participant must have the required DAR
-files available locally. When the repo bumps its Canton release, update
-`releaseDir` in `ceremony/ops/ledger/deps.go` to match `contracts.ReleaseDir`
-(see [bindings/README.md](../bindings/README.md)).
+directory), under versioned subdirectories such as `dars/dev/` (dev) or
+`dars/released/` (pinned release). Each participant must have the required DAR
+files available locally.
 
 ### Example (Mock)
 
