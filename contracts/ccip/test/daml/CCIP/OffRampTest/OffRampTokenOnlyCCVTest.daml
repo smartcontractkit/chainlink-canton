@@ -9,10 +9,10 @@ import DA.Optional (fromSome)
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.CodecV1.FinalityConfig
-import qualified CCIP.CodecV1.MessageCodecV1
-import qualified CCIP.CoreV1.GlobalConfig
-import qualified CCIP.RuntimeV1.OffRamp
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CodecV2.MessageCodecV1
+import qualified CCIP.CoreV2.GlobalConfig
+import qualified CCIP.RuntimeV2.OffRamp
 
 -- | Token-only transfers include lane-mandated CCVs in the required set.
 testTokenOnlyExecuteIncludesLaneMandatedCCVs : Script ()
@@ -26,13 +26,13 @@ testTokenOnlyExecuteIncludesLaneMandatedCCVs = script do
     let offRampInstanceId = "offramp-token-only"
     let laneCcv = Chainlink.InstanceAddress.make "lane-ccv" laneCcvOwner
     globalConfigCid <- submit ccipOwner do
-        createCmd CCIP.CoreV1.GlobalConfig.GlobalConfig with
+        createCmd CCIP.CoreV2.GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = destChainSelector
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList
-                [ (sourceChainSelector, CCIP.CoreV1.GlobalConfig.SourceChainConfig with
+                [ (sourceChainSelector, CCIP.CoreV2.GlobalConfig.SourceChainConfig with
                     isEnabled = True
                     onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                     laneMandatedCCVs = [laneCcv]
@@ -44,29 +44,29 @@ testTokenOnlyExecuteIncludesLaneMandatedCCVs = script do
     let offRampAddr = Chainlink.InstanceAddress.make offRampInstanceId ccipOwner
 
     offRampCid <- submit ccipOwner do
-        createCmd CCIP.RuntimeV1.OffRamp.OffRamp with
+        createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
             instanceId = offRampInstanceId
             ccipOwner = ccipOwner
-            deps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+            deps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
                 globalConfig = globalConfigAddr
                 rmnRemote = Chainlink.InstanceAddress.make "rmn-token-only" ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-token-only" ccipOwner
 
-    let tokenOnlyMessage = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    let tokenOnlyMessage = CCIP.CodecV2.MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 0
-            finality = CCIP.CodecV1.FinalityConfig.waitForFinalityDecoded
+            finality = CCIP.CodecV2.FinalityConfig.waitForFinalityDecoded
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = Chainlink.InstanceAddress.toInstanceAddress offRampAddr
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
             receiver = "0000000000000000000000000000000000000000000000000000000000000004"
             destBlob = ""
-            tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
-                amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 1.0)
+            tokenTransfer = Some (CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
+                amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 1.0)
                 sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000005"
                 sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
                 destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000007"
@@ -75,7 +75,7 @@ testTokenOnlyExecuteIncludesLaneMandatedCCVs = script do
             messageData = ""
 
     requiredCCVs <- submit ccipOwner do
-        exerciseCmd offRampCid CCIP.RuntimeV1.OffRamp.GetRequiredCCVsForExecuteFromRouter with
+        exerciseCmd offRampCid CCIP.RuntimeV2.OffRamp.GetRequiredCCVsForExecuteFromRouter with
             globalConfigCid = globalConfigCid
             message = tokenOnlyMessage
             receiverRequiredCCVs = []
@@ -97,13 +97,13 @@ testTokenOnlyExecuteMergesPoolAndLaneCCVs = script do
     let poolCcv = Chainlink.InstanceAddress.make "pool-ccv-merge" laneCcvOwner
 
     globalConfigCid <- submit ccipOwner do
-        createCmd CCIP.CoreV1.GlobalConfig.GlobalConfig with
+        createCmd CCIP.CoreV2.GlobalConfig.GlobalConfig with
             instanceId = "globalconfig-merge"
             ccipOwner = ccipOwner
             chainSelector = destChainSelector
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList
-                [ (sourceChainSelector, CCIP.CoreV1.GlobalConfig.SourceChainConfig with
+                [ (sourceChainSelector, CCIP.CoreV2.GlobalConfig.SourceChainConfig with
                     isEnabled = True
                     onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                     laneMandatedCCVs = [laneCcv]
@@ -112,29 +112,29 @@ testTokenOnlyExecuteMergesPoolAndLaneCCVs = script do
                 ]
 
     offRampCid <- submit ccipOwner do
-        createCmd CCIP.RuntimeV1.OffRamp.OffRamp with
+        createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
             instanceId = "offramp-merge"
             ccipOwner = ccipOwner
-            deps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+            deps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
                 globalConfig = Chainlink.InstanceAddress.make "globalconfig-merge" ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make "rmn-merge" ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-merge" ccipOwner
 
-    let tokenOnlyMessage = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    let tokenOnlyMessage = CCIP.CodecV2.MessageCodecV1.MessageV1 with
             sourceChainSelector = sourceChainSelector
             destChainSelector = destChainSelector
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 0
-            finality = CCIP.CodecV1.FinalityConfig.waitForFinalityDecoded
+            finality = CCIP.CodecV2.FinalityConfig.waitForFinalityDecoded
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
             receiver = "0000000000000000000000000000000000000000000000000000000000000004"
             destBlob = ""
-            tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
-                amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 1.0)
+            tokenTransfer = Some (CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
+                amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 1.0)
                 sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000005"
                 sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
                 destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000007"
@@ -143,7 +143,7 @@ testTokenOnlyExecuteMergesPoolAndLaneCCVs = script do
             messageData = ""
 
     requiredCCVs <- submit ccipOwner do
-        exerciseCmd offRampCid CCIP.RuntimeV1.OffRamp.GetRequiredCCVsForExecuteFromRouter with
+        exerciseCmd offRampCid CCIP.RuntimeV2.OffRamp.GetRequiredCCVsForExecuteFromRouter with
             globalConfigCid = globalConfigCid
             message = tokenOnlyMessage
             receiverRequiredCCVs = []

@@ -1,0 +1,42 @@
+module CCIP.ExecutorV2.ExecutorTypes where
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.CodecV2.FinalityConfig
+
+data RemoteChainConfig = RemoteChainConfig
+    with
+        feeUSDCents : Numeric 0
+        enabled : Bool
+    deriving (Eq, Show)
+
+data RemoteChainConfigArgs = RemoteChainConfigArgs
+    with
+        destChainSelector : Numeric 0
+        config : RemoteChainConfig
+    deriving (Eq, Show)
+
+data DynamicConfig = DynamicConfig
+    with
+        feeAggregator : Optional Party
+        allowedFinalityConfig : CCIP.CodecV2.FinalityConfig.FinalityConfig
+        ccvAllowlistEnabled : Bool
+    deriving (Eq, Show)
+
+data ApplyDestChainUpdatesParams = ApplyDestChainUpdatesParams
+    with
+        destChainSelectorsToRemove : [Numeric 0]
+        destChainSelectorsToAdd : [RemoteChainConfigArgs]
+    deriving (Eq, Show)
+
+data SetDynamicConfigParams = SetDynamicConfigParams
+    with
+        newDynamicConfig : DynamicConfig
+    deriving (Eq, Show)
+
+data ApplyAllowedCCVUpdatesParams = ApplyAllowedCCVUpdatesParams
+    with
+        ccvsToRemove : [Chainlink.InstanceAddress.RawInstanceAddress]
+        ccvsToAdd : [Chainlink.InstanceAddress.RawInstanceAddress]
+        ccvAllowlistEnabled : Bool
+    deriving (Eq, Show)

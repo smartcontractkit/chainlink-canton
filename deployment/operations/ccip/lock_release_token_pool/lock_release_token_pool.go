@@ -17,7 +17,7 @@ var ContractType = deployment.ContractType("CantonLockReleaseTokenPool")
 
 var Version = semver.MustParse("2.0.0")
 
-var lrtpEncoder = lockreleasetokenpool.NewContract("", "CCIP.LockReleaseTokenPool", "LockReleaseTokenPool").Encoder()
+var lrtpEncoder = lockreleasetokenpool.NewContract("", "CCIP.LockReleaseTokenPoolV2", "LockReleaseTokenPool").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[lockreleasetokenpool.LockReleaseTokenPool]{
 	Name:           "canton/ccip/lock_release_token_pool/deploy",
@@ -39,7 +39,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[lockreleasetokenpool.LockR
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPLockReleaseTokenPool),
+	PackageName: string(contracts.CCIPLockReleaseTokenPoolV2),
 	Prefix:      "lockreleasetokenpool",
 })
 

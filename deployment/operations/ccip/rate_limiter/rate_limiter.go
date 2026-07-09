@@ -39,7 +39,7 @@ var DeployInbound = contract.NewDeploy(contract.DeployParams[ratelimiter.RateLim
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPCommon),
+	PackageName: string(contracts.CCIPRateLimiterV2),
 	Prefix:      "inbound-rate-limiter",
 })
 
@@ -66,6 +66,6 @@ var DeployOutbound = contract.NewDeploy(contract.DeployParams[ratelimiter.RateLi
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPCommon),
+	PackageName: string(contracts.CCIPRateLimiterV2),
 	Prefix:      "outbound-rate-limiter",
 })

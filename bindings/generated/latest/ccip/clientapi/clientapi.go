@@ -28,8 +28,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-client-api"
-	PackageID   = "556d37da759e61d9868a28782cdbd207b0330317ccac88cd4bd4d58021c6942a"
+	PackageName = "ccip-client-api-v2"
+	PackageID   = "b8e4dfb8d64853c7f9aee4e93385462587745bdc703fceb750993f2723ebd984"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1324,32 +1324,32 @@ func (t *TokenTransfer) UnmarshalHex(data string) error {
 
 // IICCIPMessageSentInterfaceID returns the interface ID for the IICCIPMessageSent interface using the package name
 func IICCIPMessageSentInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ClientV1", "ICCIPMessageSent")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ClientV2", "ICCIPMessageSent")
 }
 
 // IICCIPMessageSentInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IICCIPMessageSentInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.ClientV1", "ICCIPMessageSent")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.ClientV2", "ICCIPMessageSent")
 }
 
 // IIExecutionStateChangedInterfaceID returns the interface ID for the IIExecutionStateChanged interface using the package name
 func IIExecutionStateChangedInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ClientV1", "IExecutionStateChanged")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ClientV2", "IExecutionStateChanged")
 }
 
 // IIExecutionStateChangedInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IIExecutionStateChangedInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.ClientV1", "IExecutionStateChanged")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.ClientV2", "IExecutionStateChanged")
 }
 
 // IPerPartyRouterInterfaceID returns the interface ID for the IPerPartyRouter interface using the package name
 func IPerPartyRouterInterfaceID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ClientV1", "PerPartyRouter")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.ClientV2", "PerPartyRouter")
 }
 
 // IPerPartyRouterInterfaceIDWithPackageID returns the interface ID using the provided package ID instead of package name
 func IPerPartyRouterInterfaceIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.ClientV1", "PerPartyRouter")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.ClientV2", "PerPartyRouter")
 }
 
 // MCMSEncoder interface for typed encoding methods.

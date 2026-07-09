@@ -11,6 +11,13 @@ compile-contracts: generate-daml-codecs
 generate-bindings:
 	go run ./contracts/cmd/bindings
 
+.PHONY: inspect-dars
+inspect-dars:
+	@echo "Inspecting DARs..."
+	go run ./contracts/cmd/inspect -output ./contracts/dars/dev/PACKAGE_INFO.md ./contracts/dars/dev/*.dar
+	go run ./contracts/cmd/inspect -output ./contracts/dars/legacy/PACKAGE_INFO.md ./contracts/dars/legacy/*.dar
+	go run ./contracts/cmd/inspect -output ./contracts/dars/released/PACKAGE_INFO.md ./contracts/dars/released/*.dar
+
 .PHONY: freeze-release
 freeze-release: ## Freeze DARs into a versioned snapshot (bindings stay in latest/). Usage: make freeze-release VERSION=2.0.0
 	@test -n "$(VERSION)" || (echo "VERSION is required, e.g. make freeze-release VERSION=1.0.0" && exit 1)
