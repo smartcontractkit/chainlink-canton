@@ -47,6 +47,7 @@ const (
 	CCIPLockReleaseTokenPoolV2 = Package("ccip-lock-release-token-pool-v2")
 	CCIPBurnMintTokenPoolV2    = Package("ccip-burn-mint-token-pool-v2")
 	CCIPFactoryV2              = Package("ccip-factory-v2")
+	CCIPFeeTreasury            = Package("ccip-fee-treasury")
 
 	// CCIP - Legacy
 
@@ -147,9 +148,10 @@ var Versions map[Package][]string = map[Package][]string{
 	SpliceApiTokenMetadataV1:            []string{"1.0.0"},
 	SpliceApiTokenTransferInstructionV1: []string{"1.0.0"},
 
-	Coin:         []string{DevVersion},
-	GlobalConfig: []string{DevVersion},
-	MCMSTest:     []string{DevVersion},
+	Coin:            []string{DevVersion},
+	GlobalConfig:    []string{DevVersion},
+	MCMSTest:        []string{DevVersion},
+	CCIPFeeTreasury: []string{DevVersion},
 }
 
 // versionDir maps a DAR version string to its artifact subdirectory.
@@ -256,6 +258,7 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2: []string{"ccip", "lockreleasetokenpool"},
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
+	CCIPFeeTreasury:            []string{"ccip", "feetreasury"},
 
 	SpliceApiTokenBurnMintV1:            []string{"splice", "splice_api_token_burn_mint_v1"},
 	SpliceApiTokenHoldingV1:             []string{"splice", "splice_api_token_holding_v1"},

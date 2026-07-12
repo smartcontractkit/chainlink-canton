@@ -35,6 +35,7 @@ data-dependencies:
   - ../sender/.daml/dist/ccip-sender-v2-2.0.0.dar
   - ../receiver/.daml/dist/ccip-receiver-v2-2.0.0.dar
   - ../factory/.daml/dist/ccip-factory-v2-2.0.0.dar
+  - ../fee-treasury/.daml/dist/ccip-fee-treasury-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

@@ -1,0 +1,17 @@
+-- | Parameter types for MCMSFeeTreasury MCMS entrypoint functions.
+-- AUTO-GENERATED codecs are derived from this file by `make generate-daml-codecs`.
+module CCIP.FeeTreasuryTypes where
+
+import Splice.Api.Token.HoldingV1 (InstrumentId)
+
+-- | Params for the "AuthorizeFeeWithdrawal" MCMS function.
+-- All fields are scalars so they can be safely encoded in the signed merkle leaf.
+-- ContractIds (holdings, factory, mining-round context) are NOT included here —
+-- they must be supplied at execution time via ExecuteFeeWithdrawal choice args.
+data AuthorizeFeeWithdrawalParams = AuthorizeFeeWithdrawalParams
+    with
+        recipient    : Party
+        instrumentId : InstrumentId
+        maxAmount    : Decimal
+        validitySecs : Int
+    deriving (Eq, Show)

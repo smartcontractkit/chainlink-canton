@@ -66,7 +66,75 @@ var (
 	sharedCCIPMCMSTwoPartEnv     *SharedCCIPMCMSTwoParticipantEnvironment
 	sharedCCIPMCMSTwoPartEnvOnce sync.Once
 	errSharedCCIPMCMSTwoPartEnv  error
+
+	sharedFeeTreasuryEnv     *SharedFeeTreasuryEnvironment
+	sharedFeeTreasuryEnvOnce sync.Once
+	errSharedFeeTreasuryEnv  error
 )
+
+// SharedFeeTreasuryEnvironment adds a second participant hosting the withdrawal recipient,
+// so a real Amulet transfer can be received and its balance read as the recipient party.
+type SharedFeeTreasuryEnvironment struct {
+	SharedCantonEnvironment
+	RecipientParticipant canton.Participant
+	Recipient            string
+}
+
+// GetSharedFeeTreasuryEnvironment initializes a 2-participant environment with the MCMS core
+// and CCIPFeeTreasury packages on participant[0] (feeOwner / MCMS owner). participant[1] hosts
+// the fee-withdrawal recipient; the Splice token-standard packages it needs are pre-deployed on localnet.
+func GetSharedFeeTreasuryEnvironment(t *testing.T) *SharedFeeTreasuryEnvironment {
+	t.Helper()
+
+	sharedFeeTreasuryEnvOnce.Do(func() {
+		env := testhelpers.NewTestEnvironment(t, testhelpers.WithNumberOfParticipants(2))
+		participant := env.Chain.Participants[0]
+		recipientParticipant := env.Chain.Participants[1]
+
+		darPackages := []contracts.Package{
+			contracts.MCMSCore,
+			contracts.CCIPFeeTreasury,
+		}
+
+		darBytes := make([][]byte, 0, len(darPackages))
+		for _, pkg := range darPackages {
+			dar, err := contracts.GetDar(pkg, contracts.DevVersion)
+			if err != nil {
+				errSharedFeeTreasuryEnv = err
+				return
+			}
+			darBytes = append(darBytes, dar)
+		}
+
+		// Both participants need the fee-treasury package: the recipient (participant[1]) is an
+		// observer on the FeeWithdrawalAuthorization, so its participant must resolve/host it.
+		if _, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), darBytes, participant, recipientParticipant); err != nil {
+			errSharedFeeTreasuryEnv = err
+			return
+		}
+
+		signers := createSigners(t)
+		sortedSigners := SortSignersByAddress(signers)
+
+		sharedFeeTreasuryEnv = &SharedFeeTreasuryEnvironment{
+			SharedCantonEnvironment: SharedCantonEnvironment{
+				Participant:   participant,
+				McmsEncoder:   NewMCMSEncoder(),
+				CcipOwner:     participant.PartyID,
+				Signers:       signers,
+				SortedSigners: sortedSigners,
+				Config:        New2of3Config(signers),
+			},
+			RecipientParticipant: recipientParticipant,
+			Recipient:            recipientParticipant.PartyID,
+		}
+	})
+
+	require.NoError(t, errSharedFeeTreasuryEnv, "failed to initialize fee treasury environment")
+	require.NotNil(t, sharedFeeTreasuryEnv, "fee treasury environment is nil")
+
+	return sharedFeeTreasuryEnv
+}
 
 // GetSharedEnvironment initializes the shared test environment once and returns it.
 // This uses sync.Once to ensure thread-safe initialization even when tests run in parallel.
