@@ -28,6 +28,7 @@ require (
 	github.com/jpillora/backoff v1.0.0
 	github.com/lib/pq v1.12.3
 	github.com/moby/moby/api v1.55.0
+	github.com/nao1215/markdown v0.7.1
 	github.com/oapi-codegen/runtime v1.4.2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.1
@@ -122,6 +123,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jaegertracing/jaeger-idl v0.5.0 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
+	github.com/karrick/godirwalk v1.17.0 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/knadh/koanf/providers/confmap v0.1.0 // indirect
 	github.com/knadh/koanf/v2 v2.1.2 // indirect
