@@ -61,7 +61,7 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	// --- Step 2: Upload DARs and prepare encoders ---
 	uploadCCIPMCMSFactoryDARs(t, participants)
 	mcmsEncoder := NewMCMSEncoder()
-	factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.Factory", "CCIPFactory").Encoder()
+	factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.FactoryV2", "CCIPFactory").Encoder()
 
 	signers := createSigners(t)
 	sortedSigners := SortSignersByAddress(signers)
@@ -245,7 +245,7 @@ func TestCCIP_MCMSFactoryDeploy_DecentralizedParty(t *testing.T) {
 	require.NotEmpty(t, gcCid)
 
 	remoteChainSelector := types.NUMERIC("456")
-	gcEncoder := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.GlobalConfig", "GlobalConfig").Encoder()
+	gcEncoder := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.CoreV2.GlobalConfig", "GlobalConfig").Encoder()
 
 	sourceConfigArgs := core.ApplySourceChainConfigUpdates{
 		SourceChainConfigUpdates: []core.SourceChainConfigArgs{{
@@ -358,8 +358,8 @@ func deployMCMSWithDecentralizedParty(
 		DecentralizedPartyID: decentralizedParty,
 		SynchronizerID:       synchronizerID,
 		Packages: []contractdeploy.PackageRef{{
-			Name:    string(contracts.MCMS),
-			Version: contracts.CurrentVersion,
+			Name:    string(contracts.MCMSCore),
+			Version: contracts.DevVersion,
 		}},
 		TemplateModule: "MCMS.Main",
 		TemplateEntity: "MCMS",
@@ -439,25 +439,20 @@ func uploadCCIPMCMSFactoryDARs(t *testing.T, participants []canton.Participant) 
 	t.Helper()
 
 	darPackages := []contracts.Package{
-		contracts.MCMS,
+		contracts.MCMSCore,
 		contracts.MCMSTest,
-		contracts.CCIPCommon,
-		contracts.CCIPRMN,
-		contracts.CCIPOffRamp,
-		contracts.CCIPOnRamp,
-		contracts.CCIPFeeQuoter,
-		contracts.CCIPTokenAdminRegistry,
-		contracts.CCIPCommitteeVerifier,
-		contracts.CCIPPerPartyRouter,
-		contracts.CCIPPoolInterfaces,
-		contracts.CCIPLockReleaseTokenPool,
-		contracts.CCIPExecutor,
-		contracts.CCIPFactory,
+		contracts.CCIPRuntimeV2,
+		contracts.CCIPCoreV2,
+		contracts.CCIPCommitteeVerifierV2,
+		contracts.CCIPExtensionAPIV2,
+		contracts.CCIPLockReleaseTokenPoolV2,
+		contracts.CCIPExecutorV2,
+		contracts.CCIPFactoryV2,
 	}
 
 	darBytes := make([][]byte, 0, len(darPackages))
 	for _, pkg := range darPackages {
-		dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
+		dar, err := contracts.GetDar(pkg, contracts.DevVersion)
 		require.NoError(t, err)
 		darBytes = append(darBytes, dar)
 	}

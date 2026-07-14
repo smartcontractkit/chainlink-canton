@@ -4,14 +4,18 @@ import (
 	"bytes"
 	"context"
 	"flag"
-	"log"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/exp/maps"
 	"gopkg.in/yaml.v3"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 type packageDaml struct {
@@ -22,6 +26,7 @@ type packageDaml struct {
 
 func main() {
 	ctx := context.Background()
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	artifactsDir := flag.String("artifacts", "dar", "Path to the artifacts directory")
 	rootDir := flag.String("root", "", "Path to the contracts root directory, must contain multi-package.yaml file, defaults to current working directory")
@@ -31,14 +36,14 @@ func main() {
 	// Parse multi-package.yaml to get all packages to-be-compiled
 	content, err := os.ReadFile(filepath.Join(*rootDir, "multi-package.yaml"))
 	if err != nil {
-		log.Fatalf("failed to read multi-package.yaml: %v", err)
+		log.Fatal().Err(err).Msg("failed to read multi-package.yaml")
 	}
 	var multiPackage struct {
 		Packages []string `yaml:"packages"`
 	}
 	err = yaml.Unmarshal(content, &multiPackage)
 	if err != nil {
-		log.Fatalf("failed to parse multi-package.yaml: %v", err)
+		log.Fatal().Err(err).Msg("failed to parse multi-package.yaml")
 	}
 
 	sdkVersions := make(map[string]struct{})
@@ -47,12 +52,12 @@ func main() {
 		damlYamlPath := filepath.Join(*rootDir, pkg, "daml.yaml")
 		content, err := os.ReadFile(damlYamlPath)
 		if err != nil {
-			log.Fatalf("failed to read daml.yaml for package %q: %v", pkg, err)
+			log.Fatal().Err(err).Str("package", pkg).Msg("failed to read daml.yaml")
 		}
 		var config packageDaml
 		err = yaml.Unmarshal(content, &config)
 		if err != nil {
-			log.Fatalf("failed to parse daml.yaml for package %q: %v", pkg, err)
+			log.Fatal().Err(err).Str("package", pkg).Msg("failed to parse daml.yaml")
 		}
 		sdkVersions[config.SdkVersion] = struct{}{}
 	}
@@ -60,7 +65,7 @@ func main() {
 	// Install required SDK versions
 	versions := maps.Keys(sdkVersions)
 	slices.Sort(versions)
-	log.Printf("Installing required DAML SDK versions: %v...", versions)
+	log.Info().Any("versions", versions).Msg("Installing required DAML SDK versions")
 	for _, version := range versions {
 		cmd := exec.CommandContext(ctx, "dpm", "install", version)
 		if *rootDir != "" {
@@ -72,16 +77,15 @@ func main() {
 		cmd.Stderr = stdErr
 		err := cmd.Run()
 		if err != nil {
-			log.Println("dpm install command failed:")
-			log.Println(stdErr.String())
-			log.Println(stdOut.String())
-			log.Fatalf("failed to run dpm install command for version %q: %v", version, err)
+			log.Error().Str("output", stdErr.String()).Msg("dpm install command failed")
+			log.Error().Str("stdout", stdOut.String()).Msg("dpm install stdout")
+			log.Fatal().Err(err).Str("version", version).Msg("failed to run dpm install command")
 		}
-		log.Printf("DAML SDK version %q installed successfully", version)
+		log.Info().Str("version", version).Msg("DAML SDK version installed successfully")
 	}
 
 	// Compile contracts using dpm
-	log.Printf("Compiling contracts using dpm...")
+	log.Info().Msg("Compiling contracts using dpm")
 	cmd := exec.CommandContext(ctx, "dpm", "build", "--all")
 	if *rootDir != "" {
 		cmd.Dir = *rootDir
@@ -92,13 +96,12 @@ func main() {
 	cmd.Stderr = stdErr
 	err = cmd.Run()
 	if err != nil {
-		log.Println("dpm build command failed:")
-		log.Println(stdErr.String())
-		log.Println(stdOut.String())
-		log.Fatalf("failed to run dpm build command: %v", err)
+		log.Error().Str("output", stdErr.String()).Msg("dpm build command failed")
+		log.Error().Str("stdout", stdOut.String()).Msg("dpm build stdout")
+		log.Fatal().Err(err).Msg("failed to run dpm build command")
 	}
 
-	log.Println("Contracts compiled successfully")
+	log.Info().Msg("Contracts compiled successfully")
 
 	// Assemble artifacts
 
@@ -110,35 +113,43 @@ func main() {
 		damlYamlPath := filepath.Join(*rootDir, pkg, "daml.yaml")
 		content, err := os.ReadFile(damlYamlPath)
 		if err != nil {
-			log.Fatalf("failed to read daml.yaml for package %q: %v", pkg, err)
+			log.Fatal().Err(err).Str("package", pkg).Msg("failed to read daml.yaml")
 		}
 		var config packageDaml
 		err = yaml.Unmarshal(content, &config)
 		if err != nil {
-			log.Fatalf("failed to parse daml.yaml for package %q: %v", pkg, err)
+			log.Fatal().Err(err).Str("package", pkg).Msg("failed to parse daml.yaml")
 		}
 
 		// Read compiled DAR file
 		darPath := filepath.Join(*rootDir, pkg, ".daml", "dist", config.Name+"-"+config.Version+".dar")
 		darBytes, err := os.ReadFile(darPath)
 		if err != nil {
-			log.Fatalf("failed to read compiled DAR file for package %q: %v", pkg, err)
+			log.Fatal().Err(err).Str("package", pkg).Msg("failed to read compiled DAR file")
 		}
 
-		// Write dev DAR to dars/current/. Versioned snapshots (e.g. v1_0_0/) are
-		// created separately via make freeze-release.
-		currentDir := filepath.Join(*artifactsDir, "current")
-		err = os.MkdirAll(currentDir, 0o755)
-		if err != nil {
-			log.Fatalf("failed to create current DAR directory: %v", err)
+		// Write DAR file(s) to artifacts directory
+
+		// Check if the package + version is marked as released
+		releasedVersions := contracts.ReleasedVersions[contracts.Package(config.Name)]
+		if slices.Contains(releasedVersions, config.Version) {
+			// If released, write to the release directory
+			outPath := filepath.Join(*artifactsDir, contracts.ReleaseDir, fmt.Sprintf("%s-%s.dar", config.Name, config.Version))
+			err = os.WriteFile(outPath, darBytes, 0600) //nolint:gosec // Only used during compilation
+			if err != nil {
+				log.Fatal().Err(err).Str("package", pkg).Msg("failed to write DAR file to artifacts directory")
+			}
+			log.Info().Str("package", pkg).Str("version", config.Version).Msg("added DAR file")
 		}
-		outPath := filepath.Join(currentDir, config.Name+"-current.dar")
+
+		// Write dev version to dev directory
+		outPath := filepath.Join(*artifactsDir, contracts.DevDir, fmt.Sprintf("%s-dev.dar", config.Name))
 		err = os.WriteFile(outPath, darBytes, 0600) //nolint:gosec // Only used during compilation
 		if err != nil {
-			log.Fatalf("failed to write DAR file for package %q to artifacts directory: %v", pkg, err)
+			log.Fatal().Err(err).Str("package", pkg).Msg("failed to write DAR file to artifacts directory")
 		}
-		log.Printf("added DAR file for package %q version %q", pkg, "current")
+		log.Info().Str("package", pkg).Str("version", "dev").Msg("added DAR file")
 	}
 
-	log.Println("Artifacts assembled successfully")
+	log.Info().Msg("Artifacts assembled successfully")
 }

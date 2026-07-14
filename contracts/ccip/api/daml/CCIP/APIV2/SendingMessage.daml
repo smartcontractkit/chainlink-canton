@@ -1,0 +1,81 @@
+module CCIP.APIV2.SendingMessage where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+interface ISendingMessage where
+    viewtype SendingMessageView
+
+    sendingMessage_feeTokenAmountImpl : ContractId ISendingMessage -> SendingMessage_FeeTokenAmount -> Update Decimal
+    sendingMessage_addCCVFeeImpl : ContractId ISendingMessage -> SendingMessage_AddCCVFee -> Update (ContractId ISendingMessage)
+    sendingMessage_addVerifierDataImpl : ContractId ISendingMessage -> SendingMessage_AddVerifierData -> Update (ContractId ISendingMessage)
+    sendingMessage_addExecutorFeeImpl : ContractId ISendingMessage -> SendingMessage_AddExecutorFee -> Update (ContractId ISendingMessage)
+
+    nonconsuming choice SendingMessage_FeeTokenAmount : Decimal
+        with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do sendingMessage_feeTokenAmountImpl this self arg
+
+    -- CCVs
+
+    nonconsuming choice SendingMessage_AddCCVFee : ContractId ISendingMessage
+        with
+            ccvInstanceId : Text
+            feeUSDCents : Numeric 0
+            destGasLimit : Int
+            destBytesOverhead : Int
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do sendingMessage_addCCVFeeImpl this self arg
+
+    nonconsuming choice SendingMessage_AddVerifierData : ContractId ISendingMessage
+        with
+            ccvInstanceId : Text
+            versionTag : Text
+            verifierBlob : BytesHex
+            messageSentObservers : [Party]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do sendingMessage_addVerifierDataImpl this self arg
+
+    -- Executors
+
+    nonconsuming choice SendingMessage_AddExecutorFee : ContractId ISendingMessage
+        with
+            executorInstanceId : Text
+            executorArgs : BytesHex
+            feeUSDCents : Numeric 0
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do sendingMessage_addExecutorFeeImpl this self arg
+
+    -- Token Pools interact with the SendingMessage via TokenAdminRegistry only.
+
+
+data SendingMessageView = SendingMessageView
+    with
+        ccipOwner : Party
+        sender : Party
+        destChainSelector : Numeric 0
+
+        -- CCVs
+        requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        outboundPoolCCVs : Optional [Chainlink.InstanceAddress.RawInstanceAddress]
+
+        router : Chainlink.InstanceAddress.RawInstanceAddress
+        onRamp : Chainlink.InstanceAddress.RawInstanceAddress
+        globalConfig : Chainlink.InstanceAddress.RawInstanceAddress
+        rmnRemote : Chainlink.InstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : Chainlink.InstanceAddress.RawInstanceAddress
+        feeQuoter : Chainlink.InstanceAddress.RawInstanceAddress
+
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)

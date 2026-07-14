@@ -20,14 +20,14 @@ var customCodecs = map[string]damltemplate.CustomCodec{
 	"RawInstanceAddress": {
 		EncodeFunc:     "encodeRawInstanceAddress",
 		DecodeFunc:     "decodeRawInstanceAddressAt",
-		ImportModule:   "CCIP.CodecV1",
+		ImportModule:   "CCIP.CodecV2",
 		EncodeListFunc: "encodeRawInstanceAddressList",
 		DecodeListFunc: "decodeRawInstanceAddressList",
 	},
 	"InstrumentId": {
 		EncodeFunc:     "encodeInstrumentId",
 		DecodeFunc:     "decodeInstrumentId",
-		ImportModule:   "CCIP.CodecV1",
+		ImportModule:   "CCIP.CodecV2",
 		EncodeListFunc: "encodeInstrumentIdList",
 		DecodeListFunc: "decodeInstrumentIdList",
 	},
@@ -46,7 +46,7 @@ var customCodecs = map[string]damltemplate.CustomCodec{
 	"FinalityConfig": {
 		EncodeFunc:   "encodeRequestedFinality",
 		DecodeFunc:   "decodeRequestedFinalityAt",
-		ImportModule: "CCIP.CodecV1",
+		ImportModule: "CCIP.CodecV2",
 	},
 }
 

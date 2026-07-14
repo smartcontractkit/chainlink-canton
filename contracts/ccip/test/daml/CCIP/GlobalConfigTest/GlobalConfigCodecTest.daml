@@ -7,8 +7,8 @@ import DA.Optional (fromSome)
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.CoreV1.GlobalConfig
-import qualified CCIP.CoreV1.GlobalConfigCodecGen
+import qualified CCIP.CoreV2.GlobalConfig
+import qualified CCIP.CoreV2.GlobalConfigCodecGen
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
@@ -20,7 +20,7 @@ cents c = intToNumeric (truncate c)
 testApplyDestChainConfigUpdatesParamsRoundtrip : Script ()
 testApplyDestChainConfigUpdatesParamsRoundtrip = do
     let destChainConfigs = [
-            CCIP.CoreV1.GlobalConfig.DestChainConfigArgs with
+            CCIP.CoreV2.GlobalConfig.DestChainConfigArgs with
                 destChainSelector = 1.0
                 isEnabled = True
                 addressBytesLength = 20
@@ -32,7 +32,7 @@ testApplyDestChainConfigUpdatesParamsRoundtrip = do
                 defaultCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "default-ccv@party3"]
                 messageNetworkFeeUSDCents = 10.0
                 tokenNetworkFeeUSDCents = 5.0
-            ,CCIP.CoreV1.GlobalConfig.DestChainConfigArgs with
+            ,CCIP.CoreV2.GlobalConfig.DestChainConfigArgs with
                 destChainSelector = 18446744073709551615.0 -- max uint64
                 isEnabled = False
                 addressBytesLength = 32
@@ -44,7 +44,7 @@ testApplyDestChainConfigUpdatesParamsRoundtrip = do
                 defaultCCVs = []
                 messageNetworkFeeUSDCents = 1.0
                 tokenNetworkFeeUSDCents = 1000.0
-            ,CCIP.CoreV1.GlobalConfig.DestChainConfigArgs with
+            ,CCIP.CoreV2.GlobalConfig.DestChainConfigArgs with
                 destChainSelector = 0.0 -- edge case: zero selector
                 isEnabled = False
                 addressBytesLength = 20
@@ -57,9 +57,9 @@ testApplyDestChainConfigUpdatesParamsRoundtrip = do
                 messageNetworkFeeUSDCents = 1.0
                 tokenNetworkFeeUSDCents = 1000.0
             ]
-        args = CCIP.CoreV1.GlobalConfig.ApplyDestChainConfigUpdatesParams with destChainConfigArgs = destChainConfigs
-    let encoded = CCIP.CoreV1.GlobalConfigCodecGen.encodeApplyDestChainConfigUpdatesParams args
-    fst (fromSome (CCIP.CoreV1.GlobalConfigCodecGen.decodeApplyDestChainConfigUpdatesParamsAt encoded 0)) === args
+        args = CCIP.CoreV2.GlobalConfig.ApplyDestChainConfigUpdatesParams with destChainConfigArgs = destChainConfigs
+    let encoded = CCIP.CoreV2.GlobalConfigCodecGen.encodeApplyDestChainConfigUpdatesParams args
+    fst (fromSome (CCIP.CoreV2.GlobalConfigCodecGen.decodeApplyDestChainConfigUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |        ApplySourceChainConfigUpdates        |
@@ -68,28 +68,28 @@ testApplyDestChainConfigUpdatesParamsRoundtrip = do
 testApplySourceChainConfigUpdatesParamsRoundtrip : Script ()
 testApplySourceChainConfigUpdatesParamsRoundtrip = do
     let sourceChainConfigs = [
-            CCIP.CoreV1.GlobalConfig.SourceChainConfigArgs with
+            CCIP.CoreV2.GlobalConfig.SourceChainConfigArgs with
                 sourceChainSelector = 1.0
                 isEnabled = True
                 onRampAddresses = ["abcdef1234567890"]
                 laneMandatedCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "src-ccv1@partyA", Chainlink.InstanceAddress.RawInstanceAddress "src-ccv2@partyB"]
                 defaultCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "src-default@partyC"]
-            ,CCIP.CoreV1.GlobalConfig.SourceChainConfigArgs with
+            ,CCIP.CoreV2.GlobalConfig.SourceChainConfigArgs with
                 sourceChainSelector = 18446744073709551615.0 -- max uint64
                 isEnabled = False
                 onRampAddresses = ["feedface"]
                 laneMandatedCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "src-ccv2@partyB"]
                 defaultCCVs = []
-            ,CCIP.CoreV1.GlobalConfig.SourceChainConfigArgs with
+            ,CCIP.CoreV2.GlobalConfig.SourceChainConfigArgs with
                 sourceChainSelector = 0.0 -- edge case: zero selector
                 isEnabled = False
                 onRampAddresses = ["feedface"]
                 laneMandatedCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "src-ccv2@partyB"]
                 defaultCCVs = []
             ]
-        args = CCIP.CoreV1.GlobalConfig.ApplySourceChainConfigUpdatesParams with sourceChainConfigArgs = sourceChainConfigs
-    let encoded = CCIP.CoreV1.GlobalConfigCodecGen.encodeApplySourceChainConfigUpdatesParams args
-    fst (fromSome (CCIP.CoreV1.GlobalConfigCodecGen.decodeApplySourceChainConfigUpdatesParamsAt encoded 0)) === args
+        args = CCIP.CoreV2.GlobalConfig.ApplySourceChainConfigUpdatesParams with sourceChainConfigArgs = sourceChainConfigs
+    let encoded = CCIP.CoreV2.GlobalConfigCodecGen.encodeApplySourceChainConfigUpdatesParams args
+    fst (fromSome (CCIP.CoreV2.GlobalConfigCodecGen.decodeApplySourceChainConfigUpdatesParamsAt encoded 0)) === args
 
 -- ===========================================================================
 -- INVALID DATA REJECTION TESTS
@@ -98,16 +98,16 @@ testApplySourceChainConfigUpdatesParamsRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
     -- Empty data should fail
-    case CCIP.CoreV1.GlobalConfigCodecGen.decodeApplyDestChainConfigUpdatesParamsAt "" 0 of
+    case CCIP.CoreV2.GlobalConfigCodecGen.decodeApplyDestChainConfigUpdatesParamsAt "" 0 of
         None -> pure ()  -- Expected
         Some _ -> abort "Expected decodeApplyDestChainConfigUpdatesParams to fail on empty data"
 
-    case CCIP.CoreV1.GlobalConfigCodecGen.decodeApplyDestChainConfigUpdatesParamsAt "00" 0 of
+    case CCIP.CoreV2.GlobalConfigCodecGen.decodeApplyDestChainConfigUpdatesParamsAt "00" 0 of
         Some _ -> pure () -- Expected (an empty list of updates is technically valid, so we should get Some [])
         None -> abort "Expected decodeApplyDestChainConfigUpdatesParams to succeed on empty list data"
 
     -- Invalid data should fail
-    case CCIP.CoreV1.GlobalConfigCodecGen.decodeApplySourceChainConfigUpdatesParamsAt "1234" 0 of
+    case CCIP.CoreV2.GlobalConfigCodecGen.decodeApplySourceChainConfigUpdatesParamsAt "1234" 0 of
         None -> pure ()  -- Expected
         Some got -> abort ("Expected decodeApplySourceChainConfigUpdatesParams to fail on invalid data, got: " <> show got)
 

@@ -27,8 +27,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-events"
-	PackageID   = "8cf1b15f40b7021beca31fca9deefe2944d5c18d7e1f9c00d0a7b38a513e1f5d"
+	PackageName = "ccip-events-v2"
+	PackageID   = "bfe1045f369796e1f8320e3c3d3b43142009ce1e8a6773b57b12f49c357c2f3f"
 	SDKVersion  = "3.4.11"
 )
 
@@ -67,12 +67,12 @@ type CCIPMessageSent struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t CCIPMessageSent) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV1.Events", "CCIPMessageSent")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV2.Events", "CCIPMessageSent")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t CCIPMessageSent) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.EventsV1.Events", "CCIPMessageSent")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.EventsV2.Events", "CCIPMessageSent")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -177,7 +177,7 @@ func (t *CCIPMessageSent) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t CCIPMessageSent) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV1.Events", "CCIPMessageSent"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV2.Events", "CCIPMessageSent"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -187,7 +187,7 @@ func (t CCIPMessageSent) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t CCIPMessageSent) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.EventsV1.Events", "CCIPMessageSent"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.EventsV2.Events", "CCIPMessageSent"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -277,12 +277,12 @@ type ExecutionStateChanged struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t ExecutionStateChanged) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV1.Events", "ExecutionStateChanged")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV2.Events", "ExecutionStateChanged")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t ExecutionStateChanged) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.EventsV1.Events", "ExecutionStateChanged")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.EventsV2.Events", "ExecutionStateChanged")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -369,7 +369,7 @@ func (t *ExecutionStateChanged) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t ExecutionStateChanged) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV1.Events", "ExecutionStateChanged"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV2.Events", "ExecutionStateChanged"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -379,7 +379,7 @@ func (t ExecutionStateChanged) Archive(contractID string) *model.ExerciseCommand
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t ExecutionStateChanged) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.EventsV1.Events", "ExecutionStateChanged"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.EventsV2.Events", "ExecutionStateChanged"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -454,12 +454,12 @@ const (
 func (e IssuerType) GetEnumConstructor() string { return string(e) }
 
 func (e IssuerType) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV1.Receipts", "IssuerType")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV2.Receipts", "IssuerType")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e IssuerType) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.EventsV1.Receipts", "IssuerType")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.EventsV2.Receipts", "IssuerType")
 }
 
 func (e IssuerType) MarshalJSON() ([]byte, error) {
@@ -563,12 +563,12 @@ type TokenReceiveTicketClaimed struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t TokenReceiveTicketClaimed) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV1.Events", "TokenReceiveTicketClaimed")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV2.Events", "TokenReceiveTicketClaimed")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t TokenReceiveTicketClaimed) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.EventsV1.Events", "TokenReceiveTicketClaimed")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.EventsV2.Events", "TokenReceiveTicketClaimed")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -673,7 +673,7 @@ func (t *TokenReceiveTicketClaimed) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t TokenReceiveTicketClaimed) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV1.Events", "TokenReceiveTicketClaimed"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.EventsV2.Events", "TokenReceiveTicketClaimed"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -683,7 +683,7 @@ func (t TokenReceiveTicketClaimed) Archive(contractID string) *model.ExerciseCom
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t TokenReceiveTicketClaimed) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.EventsV1.Events", "TokenReceiveTicketClaimed"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.EventsV2.Events", "TokenReceiveTicketClaimed"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

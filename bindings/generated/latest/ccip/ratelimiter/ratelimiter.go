@@ -23,8 +23,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-rate-limiter"
-	PackageID   = "cf163092a8c62f4692e9026cb1d4769e158ba507787783938d85b74e16cfe28a"
+	PackageName = "ccip-rate-limiter-v2"
+	PackageID   = "62e9c12c62db5de2138722340d7ff597f9a07678aeba1e1fbf9ad121a9e89d40"
 	SDKVersion  = "3.4.11"
 )
 
@@ -146,12 +146,12 @@ const (
 func (e RateLimitDirection) GetEnumConstructor() string { return string(e) }
 
 func (e RateLimitDirection) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimitDirection")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimitDirection")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e RateLimitDirection) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimitDirection")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimitDirection")
 }
 
 func (e RateLimitDirection) MarshalJSON() ([]byte, error) {
@@ -178,6 +178,36 @@ func (e *RateLimitDirection) UnmarshalHex(data string) error {
 
 var _ types.ENUM = RateLimitDirection("")
 
+// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
+func (e RateLimitDirection) GetEnumTagByte() byte {
+
+	if string(e) == "RateLimitDirection_Outbound" {
+		return 0
+	}
+
+	if string(e) == "RateLimitDirection_Inbound" {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown constructor
+}
+
+// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
+func (e RateLimitDirection) EnumConstructorForTagByte(tag byte) (string, bool) {
+
+	if tag == 0 {
+		return "RateLimitDirection_Outbound", true
+	}
+
+	if tag == 1 {
+		return "RateLimitDirection_Inbound", true
+	}
+
+	return "", false
+}
+
+var _ types.EnumWithTagByte = RateLimitDirection("")
+
 // RateLimitMode is an enum type
 type RateLimitMode string
 
@@ -190,12 +220,12 @@ const (
 func (e RateLimitMode) GetEnumConstructor() string { return string(e) }
 
 func (e RateLimitMode) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimitMode")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimitMode")
 }
 
 // GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
 func (e RateLimitMode) GetEnumTypeIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimitMode")
+	return fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimitMode")
 }
 
 func (e RateLimitMode) MarshalJSON() ([]byte, error) {
@@ -222,6 +252,36 @@ func (e *RateLimitMode) UnmarshalHex(data string) error {
 
 var _ types.ENUM = RateLimitMode("")
 
+// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
+func (e RateLimitMode) GetEnumTagByte() byte {
+
+	if string(e) == "RateLimitMode_DefaultFinality" {
+		return 0
+	}
+
+	if string(e) == "RateLimitMode_CustomFinality" {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown constructor
+}
+
+// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
+func (e RateLimitMode) EnumConstructorForTagByte(tag byte) (string, bool) {
+
+	if tag == 0 {
+		return "RateLimitMode_DefaultFinality", true
+	}
+
+	if tag == 1 {
+		return "RateLimitMode_CustomFinality", true
+	}
+
+	return "", false
+}
+
+var _ types.EnumWithTagByte = RateLimitMode("")
+
 // RateLimiter is a Template type
 type RateLimiter struct {
 	InstanceId          types.TEXT         `json:"instanceId"`
@@ -239,12 +299,12 @@ type RateLimiter struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t RateLimiter) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimiter")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimiter")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t RateLimiter) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimiter")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimiter")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -373,7 +433,7 @@ func (t *RateLimiter) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t RateLimiter) ConsumeCapacity(contractID string, args ConsumeCapacity) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimiter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
 		Choice:     "ConsumeCapacity",
 		Arguments:  argsToMap(args),
@@ -383,7 +443,7 @@ func (t RateLimiter) ConsumeCapacity(contractID string, args ConsumeCapacity) *m
 // ConsumeCapacityWithPackageID exercises the ConsumeCapacity choice using the provided package ID instead of package name
 func (t RateLimiter) ConsumeCapacityWithPackageID(contractID string, packageID string, args ConsumeCapacity) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimiter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
 		Choice:     "ConsumeCapacity",
 		Arguments:  argsToMap(args),
@@ -394,7 +454,7 @@ func (t RateLimiter) ConsumeCapacityWithPackageID(contractID string, packageID s
 // This method uses the package name in the template ID
 func (t RateLimiter) SetConfig(contractID string, args SetConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "RateLimiter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
 		Choice:     "SetConfig",
 		Arguments:  argsToMap(args),
@@ -404,7 +464,7 @@ func (t RateLimiter) SetConfig(contractID string, args SetConfig) *model.Exercis
 // SetConfigWithPackageID exercises the SetConfig choice using the provided package ID instead of package name
 func (t RateLimiter) SetConfigWithPackageID(contractID string, packageID string, args SetConfig) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "RateLimiter"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
 		Choice:     "SetConfig",
 		Arguments:  argsToMap(args),
@@ -415,7 +475,7 @@ func (t RateLimiter) SetConfigWithPackageID(contractID string, packageID string,
 // This method uses the package name in the template ID
 func (t RateLimiter) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -425,7 +485,7 @@ func (t RateLimiter) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -436,7 +496,7 @@ func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *
 // This method uses the package name in the template ID
 func (t RateLimiter) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV1", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.RateLimiterV2", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),
@@ -446,7 +506,7 @@ func (t RateLimiter) MCMSReceiverEntrypoint(contractID string, args api.MCMSRece
 // MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
 func (t RateLimiter) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV1", "MCMSReceiver"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.RateLimiterV2", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "MCMSReceiver_Entrypoint",
 		Arguments:  argsToMap(args),

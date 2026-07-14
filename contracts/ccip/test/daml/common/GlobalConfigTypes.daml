@@ -4,7 +4,7 @@ import Daml.Script
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.CoreV1.GlobalConfigTypes
+import qualified CCIP.CoreV2.GlobalConfigTypes
 
 template ValidationHarness
     with
@@ -18,21 +18,21 @@ template ValidationHarness
                 laneMandatedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
             controller owner
             do
-                CCIP.CoreV1.GlobalConfigTypes.validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
+                CCIP.CoreV2.GlobalConfigTypes.validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
         nonconsuming choice RunAssertNoDuplicates : ()
             with
                 addresses : [Chainlink.InstanceAddress.RawInstanceAddress]
             controller owner
             do
-                CCIP.CoreV1.GlobalConfigTypes.assertNoDuplicates addresses
+                CCIP.CoreV2.GlobalConfigTypes.assertNoDuplicates addresses
         
         nonconsuming choice RunValidateNoEmptyAddresses : ()
             with
                 addresses : [Chainlink.InstanceAddress.RawInstanceAddress]
             controller owner
             do
-                CCIP.CoreV1.GlobalConfigTypes.validateNoEmptyAddresses addresses
+                CCIP.CoreV2.GlobalConfigTypes.validateNoEmptyAddresses addresses
 
 testValidateDefaultAndMandatedCCVs : Script ()
 testValidateDefaultAndMandatedCCVs = do

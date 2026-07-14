@@ -13,16 +13,16 @@ import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.APIV1.FeeQuoter
-import qualified CCIP.APIV1.GlobalConfig
-import qualified CCIP.CodecV1.FinalityConfig
-import qualified CCIP.CoreV1.FeeQuoter
-import qualified CCIP.CoreV1.GlobalConfig
-import qualified CCIP.ClientV1
-import qualified CCIP.ExecutorV1
-import qualified CCIP.InterfacesV1.Executor
-import qualified CCIP.RuntimeV1.OnRamp
-import qualified CCIP.RuntimeV1.PerPartyRouter
+import qualified CCIP.APIV2.FeeQuoter
+import qualified CCIP.APIV2.GlobalConfig
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CoreV2.FeeQuoter
+import qualified CCIP.CoreV2.GlobalConfig
+import qualified CCIP.ClientV2
+import qualified CCIP.ExecutorV2
+import qualified CCIP.InterfacesV2.Executor
+import qualified CCIP.RuntimeV2.OnRamp
+import qualified CCIP.RuntimeV2.PerPartyRouter
 
 
 import qualified CCIP.CCIPSender
@@ -39,13 +39,13 @@ data FeeFixture = FeeFixture
         sourceChainSelector : Numeric 0
         destChainSelector : Numeric 0
         feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-        globalConfig : ContractId CCIP.CoreV1.GlobalConfig.GlobalConfig
-        feeQuoter : ContractId CCIP.CoreV1.FeeQuoter.FeeQuoter
-        onRamp : ContractId CCIP.RuntimeV1.OnRamp.OnRamp
-        router : ContractId CCIP.RuntimeV1.PerPartyRouter.PerPartyRouter
+        globalConfig : ContractId CCIP.CoreV2.GlobalConfig.GlobalConfig
+        feeQuoter : ContractId CCIP.CoreV2.FeeQuoter.FeeQuoter
+        onRamp : ContractId CCIP.RuntimeV2.OnRamp.OnRamp
+        router : ContractId CCIP.RuntimeV2.PerPartyRouter.PerPartyRouter
         sender : ContractId CCIP.CCIPSender.CCIPSender
-        executorA : ContractId CCIP.ExecutorV1.Executor
-        executorB : ContractId CCIP.ExecutorV1.Executor
+        executorA : ContractId CCIP.ExecutorV2.Executor
+        executorB : ContractId CCIP.ExecutorV2.Executor
         executorAAddress : Chainlink.InstanceAddress.RawInstanceAddress
         executorBAddress : Chainlink.InstanceAddress.RawInstanceAddress
 
@@ -53,22 +53,22 @@ feeContext : FeeFixture -> Splice.Api.Token.MetadataV1.ChoiceContext
 feeContext f =
     Splice.Api.Token.MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.APIV1.FeeQuoter.feeQuoterContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.feeQuoter)
-            , (CCIP.APIV1.GlobalConfig.globalConfigContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
-            , (CCIP.RuntimeV1.OnRamp.onRampContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.onRamp)
+            [ (CCIP.APIV2.FeeQuoter.feeQuoterContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.feeQuoter)
+            , (CCIP.APIV2.GlobalConfig.globalConfigContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
+            , (CCIP.RuntimeV2.OnRamp.onRampContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.onRamp)
             ]
 
 messageWithExecutor
     : FeeFixture
-    -> CCIP.ClientV1.ExecutorExtraArg
-    -> CCIP.ClientV1.Canton2AnyMessage
+    -> CCIP.ClientV2.ExecutorExtraArg
+    -> CCIP.ClientV2.Canton2AnyMessage
 messageWithExecutor f executor =
-    CCIP.ClientV1.Canton2AnyMessage with
+    CCIP.ClientV2.Canton2AnyMessage with
         receiver = "0000000000000000000000000000000000000001"
         payload = "abcd"
         tokenTransfer = None
         feeToken = f.feeToken
-        extraArgs = CCIP.ClientV1.V3 CCIP.ClientV1.GenericExtraArgsV3 with
+        extraArgs = CCIP.ClientV2.V3 CCIP.ClientV2.GenericExtraArgsV3 with
             gasLimit = 0
             ccvs = []
             executor = executor
@@ -76,22 +76,22 @@ messageWithExecutor f executor =
             tokenArgs = ""
 
 executorInput
-    : ContractId CCIP.ExecutorV1.Executor
+    : ContractId CCIP.ExecutorV2.Executor
     -> CCIP.CCIPSender.ExecutorInput
 executorInput executorCid =
     CCIP.CCIPSender.ExecutorInput with
-        executorCid = toInterfaceContractId @CCIP.InterfacesV1.Executor.IExecutor executorCid
+        executorCid = toInterfaceContractId @CCIP.InterfacesV2.Executor.IExecutor executorCid
         context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
 executorFeeQuote
     : Chainlink.InstanceAddress.RawInstanceAddress
     -> Numeric 0
-    -> CCIP.InterfacesV1.Executor.ExecutorFeeQuote
+    -> CCIP.InterfacesV2.Executor.ExecutorFeeQuote
 executorFeeQuote executorAddress feeUSDCents =
     let executorInstanceId =
             fromSome (Chainlink.InstanceAddress.parseInstanceIdText (Chainlink.InstanceAddress.toText executorAddress))
         executorOwner = Chainlink.InstanceAddress.ownerParty executorAddress
-    in CCIP.InterfacesV1.Executor.ExecutorFeeQuote with
+    in CCIP.InterfacesV2.Executor.ExecutorFeeQuote with
         executorInstanceId
         executorOwner
         feeUSDCents
@@ -120,12 +120,12 @@ setupFeeFixture suffix useDefaultExecutor = do
             id = "FeeToken"
 
     globalConfig <- submit ccipOwner do
-        createCmd CCIP.CoreV1.GlobalConfig.GlobalConfig with
+        createCmd CCIP.CoreV2.GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = sourceChainSelector
             destChainConfigs = Map.fromList
-                [ (destChainSelector, CCIP.CoreV1.GlobalConfig.DestChainConfig with
+                [ (destChainSelector, CCIP.CoreV2.GlobalConfig.DestChainConfig with
                     isEnabled = True
                     addressBytesLength = 20
                     tokenReceiverAllowed = False
@@ -142,12 +142,12 @@ setupFeeFixture suffix useDefaultExecutor = do
             sourceChainConfigs = Map.empty
 
     feeQuoter <- submit ccipOwner do
-        createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
+        createCmd CCIP.CoreV2.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
             ccipOwner = ccipOwner
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList
-                [ (destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
+                [ (destChainSelector, CCIP.CoreV2.FeeQuoter.FeeQuoterDestChainConfig with
                     isEnabled = True
                     maxDataBytes = 100000
                     maxPerMsgGasLimit = 1000000
@@ -161,13 +161,13 @@ setupFeeFixture suffix useDefaultExecutor = do
                 ]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList
-                [ (destChainSelector, CCIP.CoreV1.FeeQuoter.TimestampedPrice with
+                [ (destChainSelector, CCIP.CoreV2.FeeQuoter.TimestampedPrice with
                     price = 0.0
                     timestamp = datetime 2025 Jan 1 0 0 0
                   )
                 ]
             usdPerToken = Map.fromList
-                [ (feeToken, CCIP.CoreV1.FeeQuoter.TimestampedPrice with
+                [ (feeToken, CCIP.CoreV2.FeeQuoter.TimestampedPrice with
                     price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0
                   )
@@ -176,22 +176,22 @@ setupFeeFixture suffix useDefaultExecutor = do
             priceUpdaters = []
 
     onRamp <- submit ccipOwner do
-        createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
+        createCmd CCIP.RuntimeV2.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
             maxUSDCentsPerMsg = 1000000000.0
-            deps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+            deps = CCIP.RuntimeV2.OnRamp.OnRampDeps with
                 globalConfig = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make ("rmn-unused-" <> suffix) ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make ("tar-unused-" <> suffix) ccipOwner
                 feeQuoter = Chainlink.InstanceAddress.make feeQuoterInstanceId ccipOwner
 
     router <- submit ccipOwner do
-        createCmd CCIP.RuntimeV1.PerPartyRouter.PerPartyRouter with
+        createCmd CCIP.RuntimeV2.PerPartyRouter.PerPartyRouter with
             instanceId = routerInstanceId
             ccipOwner = ccipOwner
             partyOwner = user
-            deps = CCIP.RuntimeV1.PerPartyRouter.PerPartyRouterDeps with
+            deps = CCIP.RuntimeV2.PerPartyRouter.PerPartyRouterDeps with
                 onRamp = Chainlink.InstanceAddress.make onRampInstanceId ccipOwner
                 offRamp = Chainlink.InstanceAddress.make ("offramp-unused-" <> suffix) ccipOwner
                 globalConfig = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
@@ -209,34 +209,34 @@ setupFeeFixture suffix useDefaultExecutor = do
             owner = user
 
     executorA <- submit executorOwnerA do
-        createCmd CCIP.ExecutorV1.Executor with
+        createCmd CCIP.ExecutorV2.Executor with
             instanceId = executorAInstanceId
             owner = executorOwnerA
             maxCCVsPerMsg = 10
-            dynamicConfig = CCIP.ExecutorV1.DynamicConfig with
+            dynamicConfig = CCIP.ExecutorV2.DynamicConfig with
                 feeAggregator = None
-                allowedFinalityConfig = CCIP.CodecV1.FinalityConfig.WaitForFinality
+                allowedFinalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
                 ccvAllowlistEnabled = False
             allowedCCVs = []
             remoteChainConfigs = Map.fromList
-                [ (destChainSelector, CCIP.ExecutorV1.RemoteChainConfig with
+                [ (destChainSelector, CCIP.ExecutorV2.RemoteChainConfig with
                     feeUSDCents = cents 5.0
                     enabled = True
                   )
                 ]
 
     executorB <- submit executorOwnerB do
-        createCmd CCIP.ExecutorV1.Executor with
+        createCmd CCIP.ExecutorV2.Executor with
             instanceId = executorBInstanceId
             owner = executorOwnerB
             maxCCVsPerMsg = 10
-            dynamicConfig = CCIP.ExecutorV1.DynamicConfig with
+            dynamicConfig = CCIP.ExecutorV2.DynamicConfig with
                 feeAggregator = None
-                allowedFinalityConfig = CCIP.CodecV1.FinalityConfig.WaitForFinality
+                allowedFinalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
                 ccvAllowlistEnabled = False
             allowedCCVs = []
             remoteChainConfigs = Map.fromList
-                [ (destChainSelector, CCIP.ExecutorV1.RemoteChainConfig with
+                [ (destChainSelector, CCIP.ExecutorV2.RemoteChainConfig with
                     feeUSDCents = cents 9.0
                     enabled = True
                   )
@@ -267,8 +267,8 @@ testExecutorInterfaceRejectsMismatchedExpectedExecutor = script do
     disclosedExecutorA <- fromSome <$> queryDisclosure f.executorOwnerA f.executorA
 
     submitMustFail (actAs f.user <> disclose disclosedExecutorA) do
-        exerciseCmd (toInterfaceContractId @CCIP.InterfacesV1.Executor.IExecutor f.executorA)
-            CCIP.InterfacesV1.Executor.Executor_GetFee with
+        exerciseCmd (toInterfaceContractId @CCIP.InterfacesV2.Executor.IExecutor f.executorA)
+            CCIP.InterfacesV2.Executor.Executor_GetFee with
                 expectedExecutor = f.executorBAddress
                 destChainSelector = f.destChainSelector
                 requiredCCVs = []
@@ -294,7 +294,7 @@ testSenderGetFeeRejectsWrongDefaultExecutorInput = script do
         ) do
         exerciseCmd f.sender CCIP.CCIPSender.GetFee with
             destinationChainSelector = f.destChainSelector
-            message = messageWithExecutor f (CCIP.ClientV1.Executor_UseDefault "")
+            message = messageWithExecutor f (CCIP.ClientV2.Executor_UseDefault "")
             context = feeContext f
             routerCid = coerceContractId f.router
             ccvSendInputs = []
@@ -321,7 +321,7 @@ testSenderGetFeeRejectsWrongExplicitExecutorInput = script do
         exerciseCmd f.sender CCIP.CCIPSender.GetFee with
             destinationChainSelector = f.destChainSelector
             message = messageWithExecutor f
-                (CCIP.ClientV1.Executor_WithAddress f.executorAAddress "")
+                (CCIP.ClientV2.Executor_WithAddress f.executorAAddress "")
             context = feeContext f
             routerCid = coerceContractId f.router
             ccvSendInputs = []
@@ -343,11 +343,11 @@ testRouterGetFeeRejectsMismatchedExecutorQuote = script do
         <> disclose disclosedGlobalConfig
         <> disclose disclosedFeeQuoter
         ) do
-        exerciseCmd f.router CCIP.RuntimeV1.PerPartyRouter.GetFee with
+        exerciseCmd f.router CCIP.RuntimeV2.PerPartyRouter.GetFee with
             context = feeContext f
             destChainSelector = f.destChainSelector
             message = messageWithExecutor f
-                (CCIP.ClientV1.Executor_WithAddress f.executorAAddress "")
+                (CCIP.ClientV2.Executor_WithAddress f.executorAAddress "")
             ccvFeeQuotes = []
             tokenPoolFeeQuote = None
             executorFeeQuote = Some (executorFeeQuote f.executorBAddress 9.0)
@@ -367,11 +367,11 @@ testRouterGetFeeRequiresExplicitExecutorQuote = script do
         <> disclose disclosedGlobalConfig
         <> disclose disclosedFeeQuoter
         ) do
-        exerciseCmd f.router CCIP.RuntimeV1.PerPartyRouter.GetFee with
+        exerciseCmd f.router CCIP.RuntimeV2.PerPartyRouter.GetFee with
             context = feeContext f
             destChainSelector = f.destChainSelector
             message = messageWithExecutor f
-                (CCIP.ClientV1.Executor_WithAddress f.executorAAddress "")
+                (CCIP.ClientV2.Executor_WithAddress f.executorAAddress "")
             ccvFeeQuotes = []
             tokenPoolFeeQuote = None
             executorFeeQuote = None

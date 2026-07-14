@@ -104,7 +104,7 @@ func TestConfigureGlobalConfig_MCMSProposal(t *testing.T) {
 	participant := cantonChain.Participants[0]
 	party := participant.PartyID
 
-	uploadDARs(t, participant, contracts.CCIPCommon, contracts.MCMS)
+	uploadDARs(t, participant, contracts.CCIPRuntimeV2, contracts.MCMSCore)
 
 	gcAddrRef := deployGlobalConfig(t, bundle, *cantonChain, party)
 	gcRawAddr, err := contracts.RawInstanceAddressFromString(gcAddrRef.Labels.List()[0])
@@ -199,7 +199,7 @@ func uploadDARs(t *testing.T, participant canton.Participant, packages ...contra
 	// Upload one DAR per request: after DAR consolidation, the combined request can exceed
 	// Canton admin API's default 10 MiB gRPC message limit even though each DAR is valid.
 	for _, pkg := range packages {
-		dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
+		dar, err := contracts.GetDar(pkg, contracts.DevVersion)
 		require.NoError(t, err, "failed to get DAR for %s", pkg)
 
 		_, err = participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
@@ -217,14 +217,10 @@ func uploadDARs(t *testing.T, participant canton.Participant, packages ...contra
 func uploadChainContractDARs(t *testing.T, participant canton.Participant) {
 	t.Helper()
 	uploadDARs(t, participant,
-		contracts.CCIPCommon,
-		contracts.CCIPOffRamp,
-		contracts.CCIPOnRamp,
-		contracts.CCIPTokenAdminRegistry,
-		contracts.CCIPCommitteeVerifier,
-		contracts.CCIPLockReleaseTokenPool,
-		contracts.CCIPPerPartyRouter,
-		contracts.CCIPRMN,
+		contracts.CCIPRuntimeV2,
+		contracts.CCIPCoreV2,
+		contracts.CCIPCommitteeVerifierV2,
+		contracts.CCIPLockReleaseTokenPoolV2,
 	)
 }
 

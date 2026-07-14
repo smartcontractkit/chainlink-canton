@@ -17,7 +17,7 @@ var ContractType = deployment.ContractType("CCIPFactory")
 
 var Version = semver.MustParse("2.0.0")
 
-var factoryEncoder = factorybindings.NewContract("", "CCIP.Factory", "CCIPFactory").Encoder()
+var factoryEncoder = factorybindings.NewContract("", "CCIP.FactoryV2", "CCIPFactory").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[factorybindings.CCIPFactory]{
 	Name:           "canton/ccip/factory/deploy",
@@ -33,7 +33,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[factorybindings.CCIPFactor
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPFactory),
+	PackageName: string(contracts.CCIPFactoryV2),
 	Prefix:      "factory",
 })
 

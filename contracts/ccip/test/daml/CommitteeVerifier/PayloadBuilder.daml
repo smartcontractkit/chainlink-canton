@@ -4,24 +4,24 @@ import DA.Crypto.Text (BytesHex, byteCount)
 import DA.List ((!!))
 import DA.Optional (fromSome, fromSomeNote)
 
-import qualified CCIP.CodecV1.FinalityConfig
-import qualified CCIP.CodecV1.MessageCodecV1
-import qualified CCIP.CommitteeVerifierV1
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CodecV2.MessageCodecV1
+import qualified CCIP.CommitteeVerifierV2
 
-unsafeDecodeRequestedFinality : BytesHex -> CCIP.CodecV1.FinalityConfig.DecodedFinality
+unsafeDecodeRequestedFinality : BytesHex -> CCIP.CodecV2.FinalityConfig.DecodedFinality
 unsafeDecodeRequestedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
-        (CCIP.CodecV1.FinalityConfig.decodeRequestedFinality finalityConfig)
+        (CCIP.CodecV2.FinalityConfig.decodeRequestedFinality finalityConfig)
 
-blockDepthFinalityConfig : Int -> CCIP.CodecV1.FinalityConfig.DecodedFinality
+blockDepthFinalityConfig : Int -> CCIP.CodecV2.FinalityConfig.DecodedFinality
 blockDepthFinalityConfig n =
     unsafeDecodeRequestedFinality (fromSome do
-        flagsHex <- CCIP.CodecV1.MessageCodecV1.encodeUint16 0
-        blockConfirmationsHex <- CCIP.CodecV1.MessageCodecV1.encodeUint16 n
+        flagsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 n
         pure (flagsHex <> blockConfirmationsHex))
 
-testMessage1 : CCIP.CodecV1.MessageCodecV1.MessageV1
-testMessage1 = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+testMessage1 : CCIP.CodecV2.MessageCodecV1.MessageV1
+testMessage1 = CCIP.CodecV2.MessageCodecV1.MessageV1 with
     sourceChainSelector = 123.0
     destChainSelector = 456.0
     sequenceNumber = 789.0
@@ -34,8 +34,8 @@ testMessage1 = CCIP.CodecV1.MessageCodecV1.MessageV1 with
     sender = "CD1722F3947DEf4Cf144679Da39c4c32BDC35681"
     receiver = "B6D4805bf6943c5875C0C7b67EDa24b2bDACBF6e"
     destBlob = "636f6d706c65782064657374696e6174696f6e20626c6f62"
-    tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
-        amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 1000000.0)
+    tokenTransfer = Some (CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
+        amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 1000000.0)
         sourcePoolAddress = "ed3ee8542acd9e483c658350ad4984483eb0afdc"
         sourceTokenAddress = "c283f6085a391df8e3f78ddc49c6b47016122838"
         destTokenAddress = "c22ff98123e0785520915c5bd97e83ac649180a1"
@@ -44,7 +44,7 @@ testMessage1 = CCIP.CodecV1.MessageCodecV1.MessageV1 with
     messageData = "6d657373616765207769746820746f6b656e2064617461"
 
 testMessage1Encoded : BytesHex
-testMessage1Encoded = CCIP.CodecV1.MessageCodecV1.encodeMessageV1 testMessage1
+testMessage1Encoded = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 testMessage1
 
 -- Predefined keys and signatures for testing
 -- To generate: go run scripts/gen_test_signatures/main.go <preimage-hex>
@@ -130,6 +130,6 @@ getVerifierResultsForIndices indices =
     let signatures = map (\i -> rValues !! i <> sValues !! i) indices
         concatenatedSignatures = foldl (<>) "" signatures
         signatureLength = byteCount concatenatedSignatures
-    in CCIP.CommitteeVerifierV1.versionTagV2_0_0
-       <> fromSome(CCIP.CodecV1.MessageCodecV1.encodeUint16 signatureLength)
+    in CCIP.CommitteeVerifierV2.versionTagV2_0_0
+       <> fromSome(CCIP.CodecV2.MessageCodecV1.encodeUint16 signatureLength)
        <> concatenatedSignatures

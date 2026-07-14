@@ -18,7 +18,7 @@ var ContractType = deployment.ContractType("FeeQuoter")
 
 var Version = semver.MustParse("2.0.0")
 
-var feeQuoterEncoder = core.NewContract("", "CCIP.FeeQuoter", "FeeQuoter").Encoder()
+var feeQuoterEncoder = core.NewContract("", "CCIP.CoreV2.FeeQuoter", "FeeQuoter").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[core.FeeQuoter]{
 	Name:           "canton/ccip/fee_quoter/deploy",
@@ -31,7 +31,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[core.FeeQuoter]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPFeeQuoter),
+	PackageName: string(contracts.CCIPCoreV2),
 	Prefix:      "feequoter",
 })
 

@@ -57,7 +57,7 @@ func TestSetPoolViaMCMS(t *testing.T) {
 	tokenConfigInstanceAddr := makeTokenConfigInstanceAddr(ccipOwner, testInstrumentId)
 
 	// Create MCMS encoder for TokenAdminRegistry
-	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
+	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry")
 
 	// Build set_pool operation
 	poolReg := &core.PoolRegistration2{
@@ -167,7 +167,7 @@ func TestTokenAdminRegistry_ClearPoolViaMCMS(t *testing.T) {
 	require.NotNil(t, config.TokenPool, "pool should be set initially")
 
 	// Create MCMS encoder for TokenAdminRegistry
-	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
+	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry")
 
 	// Clear pool by setting to None via MCMS
 	encodedClearPool, err := tarContract.Encoder().SetPoolParams(
@@ -250,7 +250,7 @@ func TestTokenAdminRegistry_ProposeAdminViaMCMS(t *testing.T) {
 	tarCid := createTokenAdminRegistryEmpty(t, participant, ccipOwner, tarInstanceID)
 
 	// Create MCMS encoder for TokenAdminRegistry
-	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.TokenAdminRegistry", "TokenAdminRegistry")
+	tarContract := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.CoreV2.TokenAdminRegistry", "TokenAdminRegistry")
 
 	// Propose a new admin via MCMS
 	newAdmin := types.PARTY(ccipOwner) // For simplicity, propose self as admin

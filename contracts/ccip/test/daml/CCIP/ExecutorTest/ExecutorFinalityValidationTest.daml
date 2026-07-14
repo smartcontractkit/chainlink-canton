@@ -3,15 +3,15 @@ module ExecutorTest.ExecutorFinalityValidationTest where
 import Daml.Script
 import DA.Map qualified as Map
 
-import qualified CCIP.ExecutorV1
-import qualified CCIP.CodecV1.FinalityConfig
+import qualified CCIP.ExecutorV2
+import qualified CCIP.CodecV2.FinalityConfig
 
-mkExecutorWith : Party -> CCIP.CodecV1.FinalityConfig.FinalityConfig -> CCIP.ExecutorV1.Executor
-mkExecutorWith owner finality = CCIP.ExecutorV1.Executor with
+mkExecutorWith : Party -> CCIP.CodecV2.FinalityConfig.FinalityConfig -> CCIP.ExecutorV2.Executor
+mkExecutorWith owner finality = CCIP.ExecutorV2.Executor with
     instanceId = "executor-finality-test"
     owner
     maxCCVsPerMsg = 10
-    dynamicConfig = CCIP.ExecutorV1.DynamicConfig with
+    dynamicConfig = CCIP.ExecutorV2.DynamicConfig with
         feeAggregator = None
         allowedFinalityConfig = finality
         ccvAllowlistEnabled = False
@@ -23,13 +23,13 @@ testExecutor_Create_RejectsInvalidBlockDepth = script do
     owner <- allocateParty "executor_owner"
 
     submitMustFail owner do
-        createCmd (mkExecutorWith owner (CCIP.CodecV1.FinalityConfig.BlockDepth 0))
+        createCmd (mkExecutorWith owner (CCIP.CodecV2.FinalityConfig.BlockDepth 0))
 
     submitMustFail owner do
-        createCmd (mkExecutorWith owner (CCIP.CodecV1.FinalityConfig.BlockDepth (-1)))
+        createCmd (mkExecutorWith owner (CCIP.CodecV2.FinalityConfig.BlockDepth (-1)))
 
     _ <- submit owner do
-        createCmd (mkExecutorWith owner (CCIP.CodecV1.FinalityConfig.BlockDepth 1))
+        createCmd (mkExecutorWith owner (CCIP.CodecV2.FinalityConfig.BlockDepth 1))
     pure ()
 
 testExecutor_SetDynamicConfig_RejectsInvalidBlockDepth : Script ()
@@ -37,25 +37,25 @@ testExecutor_SetDynamicConfig_RejectsInvalidBlockDepth = script do
     owner <- allocateParty "executor_owner"
 
     executorCid <- submit owner do
-        createCmd (mkExecutorWith owner CCIP.CodecV1.FinalityConfig.WaitForFinality)
+        createCmd (mkExecutorWith owner CCIP.CodecV2.FinalityConfig.WaitForFinality)
 
-    let baseConfig = CCIP.ExecutorV1.DynamicConfig with
+    let baseConfig = CCIP.ExecutorV2.DynamicConfig with
             feeAggregator = None
-            allowedFinalityConfig = CCIP.CodecV1.FinalityConfig.WaitForFinality
+            allowedFinalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
             ccvAllowlistEnabled = False
 
     submitMustFail owner do
-        exerciseCmd executorCid CCIP.ExecutorV1.SetDynamicConfig with
+        exerciseCmd executorCid CCIP.ExecutorV2.SetDynamicConfig with
             newDynamicConfig = baseConfig with
-                allowedFinalityConfig = CCIP.CodecV1.FinalityConfig.BlockDepth 0
+                allowedFinalityConfig = CCIP.CodecV2.FinalityConfig.BlockDepth 0
 
     submitMustFail owner do
-        exerciseCmd executorCid CCIP.ExecutorV1.SetDynamicConfig with
+        exerciseCmd executorCid CCIP.ExecutorV2.SetDynamicConfig with
             newDynamicConfig = baseConfig with
-                allowedFinalityConfig = CCIP.CodecV1.FinalityConfig.BlockDepth (-7)
+                allowedFinalityConfig = CCIP.CodecV2.FinalityConfig.BlockDepth (-7)
 
     _ <- submit owner do
-        exerciseCmd executorCid CCIP.ExecutorV1.SetDynamicConfig with
+        exerciseCmd executorCid CCIP.ExecutorV2.SetDynamicConfig with
             newDynamicConfig = baseConfig with
-                allowedFinalityConfig = CCIP.CodecV1.FinalityConfig.BlockDepth 42
+                allowedFinalityConfig = CCIP.CodecV2.FinalityConfig.BlockDepth 42
     pure ()

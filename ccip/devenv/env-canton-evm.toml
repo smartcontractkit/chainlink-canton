@@ -163,12 +163,12 @@ execution_interval = 15_000_000_000
     [verifier.opaque_configs.canton.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
       [verifier.opaque_configs.canton.reader_configs.8706591216959472610.ccip_message_sent_template_id]
-        package_id = "#ccip-events"
-        module_name = "CCIP.EventsV1.Events"
+        package_id = "#ccip-events-v2"
+        module_name = "CCIP.EventsV2.Events"
         entity_name = "CCIPMessageSent"
       [verifier.opaque_configs.canton.reader_configs.8706591216959472610.rmn_remote_template_id]
-        package_id = "#ccip-core"
-        module_name = "CCIP.CoreV1.RMNRemote"
+        package_id = "#ccip-core-v2"
+        module_name = "CCIP.CoreV2.RMNRemote"
         entity_name = "RMNRemote"
     [verifier.opaque_configs.canton.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
@@ -197,12 +197,12 @@ execution_interval = 15_000_000_000
     [verifier.opaque_configs.canton.reader_configs.8706591216959472610]
       ccip_owner_party = "participant1-localparty-1"
       [verifier.opaque_configs.canton.reader_configs.8706591216959472610.ccip_message_sent_template_id]
-        package_id = "#ccip-events"
-        module_name = "CCIP.EventsV1.Events"
+        package_id = "#ccip-events-v2"
+        module_name = "CCIP.EventsV2.Events"
         entity_name = "CCIPMessageSent"
       [verifier.opaque_configs.canton.reader_configs.8706591216959472610.rmn_remote_template_id]
-        package_id = "#ccip-core"
-        module_name = "CCIP.CoreV1.RMNRemote"
+        package_id = "#ccip-core-v2"
+        module_name = "CCIP.CoreV2.RMNRemote"
         entity_name = "RMNRemote"
     [verifier.opaque_configs.canton.blockchain_infos.8706591216959472610]
       # These will be filled in by the modifier, which hydrates the config with
@@ -335,37 +335,31 @@ URI = "postgresql://indexer:indexer@indexer-db:5432/indexer?sslmode=disable"
 
   [[aggregator.api_clients]]
   client_id = "default-verifier-1"
-  description = "Development default verifier 1"
   enabled = true
   groups = ["verifiers"]
 
   [[aggregator.api_clients]]
   client_id = "default-verifier-2"
-  description = "Development default verifier 2"
   enabled = true
   groups = ["verifiers"]
 
   [[aggregator.api_clients]]
   client_id = "canton-default-verifier-1"
-  description = "Development canton verifier 1"
   enabled = true
   groups = ["verifiers"]
 
   [[aggregator.api_clients]]
   client_id = "canton-default-verifier-2"
-  description = "Development canton verifier 2"
   enabled = true
   groups = ["verifiers"]
 
   [[aggregator.api_clients]]
   client_id = "monitoring"
-  description = "Monitoring and infrastructure client"
   enabled = true
   groups = ["monitoring"]
 
   [[aggregator.api_clients]]
   client_id = "indexer"
-  description = "Development Indexer"
   enabled = true
   groups = ["indexer"]
 

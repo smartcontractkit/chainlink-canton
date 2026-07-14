@@ -4,7 +4,7 @@ import Daml.Script
 
 import DA.Assert
 
-import qualified CCIP.CodecV1.Math
+import qualified CCIP.CodecV2.Math
 
 template MathHarness
   with
@@ -20,51 +20,51 @@ template MathHarness
         localDecimals : Int
       controller owner
       do
-        pure (CCIP.CodecV1.Math.calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals)
+        pure (CCIP.CodecV2.Math.calculateLocalAmountChecked label remoteAmount remoteDecimals localDecimals)
 
 usd8 : Decimal -> Numeric 0
 usd8 d = intToNumeric (truncate (d * 100000000.0))
 
 testMulDivDown_SmallValues = script do
-    CCIP.CodecV1.Math.mulDivDown 7.0 3.0 2.0 === 10.0
-    CCIP.CodecV1.Math.mulDivDown 5.0 3.0 2.0 === 7.0
-    CCIP.CodecV1.Math.mulDivDown 1.0 1.0 3.0 === 0.0
-    CCIP.CodecV1.Math.mulDivDown 10.0 10.0 3.0 === 33.0
-    CCIP.CodecV1.Math.mulDivDown 123.0 456.0 1.0 === 56088.0
+    CCIP.CodecV2.Math.mulDivDown 7.0 3.0 2.0 === 10.0
+    CCIP.CodecV2.Math.mulDivDown 5.0 3.0 2.0 === 7.0
+    CCIP.CodecV2.Math.mulDivDown 1.0 1.0 3.0 === 0.0
+    CCIP.CodecV2.Math.mulDivDown 10.0 10.0 3.0 === 33.0
+    CCIP.CodecV2.Math.mulDivDown 123.0 456.0 1.0 === 56088.0
 
 testMulDivDown_E8Scale = script do
     let oneDollarInCents : Numeric 0 = 100.0
     let usd8PerUsdCent : Numeric 0 = 1000000.0
     let premiumIdentity : Numeric 0 = 100000000.0
-    let feeUsd8 = CCIP.CodecV1.Math.mulDivDown oneDollarInCents usd8PerUsdCent 1.0
+    let feeUsd8 = CCIP.CodecV2.Math.mulDivDown oneDollarInCents usd8PerUsdCent 1.0
     feeUsd8 === 100000000.0
-    CCIP.CodecV1.Math.mulDivDown feeUsd8 premiumIdentity (usd8 20.0) === 5000000.0
+    CCIP.CodecV2.Math.mulDivDown feeUsd8 premiumIdentity (usd8 20.0) === 5000000.0
 
 testMulDivDown_LargePrice = script do
-    let feeUsd8 = CCIP.CodecV1.Math.mulDivDown 250.0 1000000.0 1.0
+    let feeUsd8 = CCIP.CodecV2.Math.mulDivDown 250.0 1000000.0 1.0
     let veryLargePrice = usd8 10000000.0
-    CCIP.CodecV1.Math.mulDivDown feeUsd8 100000000.0 veryLargePrice === 25.0
+    CCIP.CodecV2.Math.mulDivDown feeUsd8 100000000.0 veryLargePrice === 25.0
 
 testDecimalBoundaryShifts = script do
-    CCIP.CodecV1.Math.decimalToNumeric0 1.0 === 10000000000.0
-    CCIP.CodecV1.Math.decimalToNumeric0 0.0000000001 === 1.0
-    CCIP.CodecV1.Math.numeric0ToDecimal 10000000000.0 === 1.0
-    CCIP.CodecV1.Math.numeric0ToDecimal 1.0 === 0.0000000001
+    CCIP.CodecV2.Math.decimalToNumeric0 1.0 === 10000000000.0
+    CCIP.CodecV2.Math.decimalToNumeric0 0.0000000001 === 1.0
+    CCIP.CodecV2.Math.numeric0ToDecimal 10000000000.0 === 1.0
+    CCIP.CodecV2.Math.numeric0ToDecimal 1.0 === 0.0000000001
 
 testCalculateLocalAmountChecked_EqualDecimals = script do
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 123456789.0 18 18 === 123456789.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 0.0 6 6 === 0.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 123456789.0 18 18 === 123456789.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 0.0 6 6 === 0.0
 
 testCalculateLocalAmountChecked_ScaleUp = script do
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 1.0 6 18 === 1000000000000.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 1000000.0 6 18 === 1000000000000000000.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 1.0 0 18 === 1000000000000000000.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 1.0 6 18 === 1000000000000.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 1000000.0 6 18 === 1000000000000000000.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 1.0 0 18 === 1000000000000000000.0
 
 testCalculateLocalAmountChecked_ScaleUpBoundary_Succeeds = script do
     let largestPassing : Numeric 0 = 99999999999999999999999999.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" largestPassing 6 18
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" largestPassing 6 18
         === 99999999999999999999999999000000000000.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 9.0 0 37
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 9.0 0 37
         === 90000000000000000000000000000000000000.0
 
 testCalculateLocalAmountChecked_ScaleUpBoundary_Fails = script do
@@ -87,15 +87,15 @@ testCalculateLocalAmountChecked_ScaleUpBoundary_Fails = script do
             localDecimals = 37
 
 testCalculateLocalAmountChecked_ScaleDownExact = script do
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 1000000000000000000.0 18 6 === 1000000.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 1000000000000.0 18 6 === 1.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 5000000000000000000.0 18 0 === 5.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 1000000000000000000.0 18 6 === 1000000.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 1000000000000.0 18 6 === 1.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 5000000000000000000.0 18 0 === 5.0
 
 testCalculateLocalAmountChecked_ScaleDownInexactRoundsDown = script do
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 1234567890123456789.0 18 6 === 1234567.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 999999999999.0 18 6 === 0.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 1500000000000.0 18 6 === 1.0
-    CCIP.CodecV1.Math.calculateLocalAmountChecked "test" 1999999999999.0 18 6 === 1.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 1234567890123456789.0 18 6 === 1234567.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 999999999999.0 18 6 === 0.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 1500000000000.0 18 6 === 1.0
+    CCIP.CodecV2.Math.calculateLocalAmountChecked "test" 1999999999999.0 18 6 === 1.0
 
 testCalculateLocalAmountChecked_RejectsNegativeOrUnsupported = script do
     owner <- allocateParty "negative-owner"

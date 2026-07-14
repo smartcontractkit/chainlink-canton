@@ -235,7 +235,7 @@ func baseInput(pkgs []contractdeploy.PackageRef) contractdeploy.ContractDeployIn
 func TestContractDeploySequence_ThresholdNotMet(t *testing.T) {
 	t.Parallel()
 
-	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}})
 
 	sharedReporter := operations.NewMemoryReporter()
 	newBundle := func() operations.Bundle {
@@ -255,7 +255,7 @@ func TestContractDeploySequence_ThresholdNotMet(t *testing.T) {
 func TestContractDeploySequence_FullFlow(t *testing.T) {
 	t.Parallel()
 
-	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}})
 
 	sharedReporter := operations.NewMemoryReporter()
 	newBundle := func() operations.Bundle {
@@ -295,7 +295,7 @@ func TestContractDeploySequence_FullFlow(t *testing.T) {
 func TestContractDeploySequence_Idempotent(t *testing.T) {
 	t.Parallel()
 
-	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}})
 
 	sharedReporter := operations.NewMemoryReporter()
 	newBundle := func() operations.Bundle {
@@ -329,7 +329,7 @@ func TestContractDeploySequence_PartyNotFound(t *testing.T) {
 	input := contractdeploy.ContractDeployInput{
 		DecentralizedPartyID: "test-party::1220abcdef",
 		SynchronizerID:       "global",
-		Packages:             []contractdeploy.PackageRef{{Name: "mcms", Version: "current"}},
+		Packages:             []contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}},
 		TemplateModule:       "MCMS.Main",
 		TemplateEntity:       "MCMS",
 		ContractArgs:         `{}`,
@@ -350,7 +350,7 @@ func TestContractDeploySequence_MultipleDARs(t *testing.T) {
 	t.Parallel()
 
 	input := baseInput([]contractdeploy.PackageRef{
-		{Name: "mcms", Version: "current"},
+		{Name: "mcms", Version: "dev"},
 		{Name: "globalconfig", Version: "1.0.0"},
 	})
 
@@ -378,7 +378,7 @@ func TestContractDeploySequence_MultipleDARs(t *testing.T) {
 func TestContractDeploySequence_UsesSignerFactoryWithTopologyKeys(t *testing.T) {
 	t.Parallel()
 
-	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}})
 
 	sharedReporter := operations.NewMemoryReporter()
 	newBundle := func() operations.Bundle {
