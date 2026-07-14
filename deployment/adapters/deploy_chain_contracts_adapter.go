@@ -22,6 +22,8 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/deployment/cciptokens"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 )
@@ -130,6 +132,10 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 		FeeQuoterConfig: sequences.FeeQuoterParams{
 			Template: core.FeeQuoter{
 				PriceUpdaters: []types.PARTY{types.PARTY(ownerParty)},
+				LinkTokenInstrumentId: splice_api_token_holding_v1.InstrumentId{
+					Admin: types.PARTY(ownerParty),
+					Id:    types.TEXT(cciptokens.LinkTokenInstrumentID),
+				},
 			},
 		},
 		RMNRemote: sequences.RMNRemoteParams{
