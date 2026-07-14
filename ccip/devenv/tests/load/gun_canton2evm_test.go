@@ -2,6 +2,7 @@ package load
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"testing"
 
@@ -79,11 +80,11 @@ func TestCanton2EVM_Load(t *testing.T) {
 	if estimatedMessages == 0 {
 		estimatedMessages = 1
 	}
-	mintAmount := estimatedMessages * uint64(devenvtests.CantonToEVMFeeAmount) * mintBufferNumerator / mintBufferDenominator
+	mintAmount := estimatedMessages * uint64(cantondevenv.CantonToEVMFeeAmount) * mintBufferNumerator / mintBufferDenominator
 	t.Logf("Pre-mint: estimatedMessages=%d feePerMessage=%d totalFeeMint=%d",
-		estimatedMessages, devenvtests.CantonToEVMFeeAmount, mintAmount)
-	require.NoError(t, cantonImpl.MintTokens(ctx, mintAmount))
-	require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), 0))
+		estimatedMessages, cantondevenv.CantonToEVMFeeAmount, mintAmount)
+	require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(mintAmount)))
+	require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantondevenv.CantonToEVMFeeAmount), nil))
 
 	gun, err := NewCCIPLoadGun(
 		cantonChain,

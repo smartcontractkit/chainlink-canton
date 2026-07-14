@@ -79,6 +79,15 @@ jobs:
             echo "test_timeout=30m" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Setup CCIP devenv
+        if: steps.params.outputs.ccip_env == 'devenv'
+        uses: ./.github/actions/setup-ccip-devenv
+        with:
+          canton-path: .
+          ccv-iam-role: ${{ secrets.CCV_IAM_ROLE }}
+          jd-registry: ${{ secrets.JD_REGISTRY }}
+          jd-image: ${{ secrets.JD_IMAGE }}
+
       - name: Run CCIP load test
         uses: ./.github/actions/ccip-load-test
         with:
@@ -97,6 +106,15 @@ jobs:
           CANTON_OKTA_CLIENT_ID_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_ID_TESTNET }}
           CANTON_OKTA_CLIENT_SECRET_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_SECRET_TESTNET }}
           CCIP_PROD_TESTNET_PRIVATE_KEY: ${{ secrets.CCIP_PROD_TESTNET_PRIVATE_KEY }}
+
+      - name: Upload devenv logs
+        if: always() && steps.params.outputs.ccip_env == 'devenv'
+        uses: ./.github/actions/upload-ccip-devenv-logs
+        with:
+          canton-path: .
+          test-package-dir: load
+          log-dump-suffix: ccip-load-tests
+          artifact-name: container-logs-ccip-load-tests
 
       - name: Update comment
         if: always()

@@ -54,14 +54,15 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 	// TODO: currently minting 2 holdings of 2k for all the e2e tests. Otherwise one holding might conflict with the other.
 	// the tests need to be hardened to not rely on this and instead correctly pick the holding that suffices.
-	require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)*100))
-	require.NoError(t, cantonImpl.MintTokens(ctx, uint64(devenvtests.CantonToEVMFeeAmount)*100))
+	require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(uint64(cantondevenv.CantonToEVMFeeAmount)*10000)))
+	require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(uint64(cantondevenv.CantonToEVMFeeAmount)*10000)))
 
 	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		// Setup message send
-		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), 0))
+		cantonImpl.SetSequentialSends(1)
+		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantondevenv.CantonToEVMFeeAmount), nil))
 
 		ds, err := lib.DataStore()
 		require.NoError(t, err)
@@ -146,11 +147,17 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
 		// Send params (transfer amount, gas limit, finality) come from token_transfer_config.toml.
-		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
-		tokenTransferAmount := lane.TransferAmount.Uint64()
+		lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
 
-		// Setup message send
-		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
+		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
+		sends := cantondevenv.CantonToEVMTokenSequentialSends
+		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
+		cantonImpl.SetSequentialSends(sends)
+		if lane.TransferInstrument.Admin != "" {
+			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
+		} else {
+			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
+		}
 
 		ds, err := lib.DataStore()
 		require.NoError(t, err)
@@ -176,8 +183,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)
 
-		for sendIdx := range devenvtests.CantonToEVMTokenSequentialSends {
-			t.Logf("Token transfer send %d/%d", sendIdx+1, devenvtests.CantonToEVMTokenSequentialSends)
+		for sendIdx := range cantondevenv.CantonToEVMTokenSequentialSends {
+			t.Logf("Token transfer send %d/%d", sendIdx+1, cantondevenv.CantonToEVMTokenSequentialSends)
 			sendMessageResult, err := cantonChain.SendMessage(
 				subtestCtx,
 				evmChain.ChainSelector(),
@@ -221,8 +228,8 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceAfter)
 
-		expectedTransferPerMessage := new(big.Int).Mul(lane.TransferAmount, big.NewInt(devenvtests.EVMDecimalsScale))
-		totalExpectedTransfer := new(big.Int).Mul(expectedTransferPerMessage, big.NewInt(devenvtests.CantonToEVMTokenSequentialSends))
+		expectedTransferPerMessage := new(big.Int).Mul(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointToEVMScale))
+		totalExpectedTransfer := new(big.Int).Mul(expectedTransferPerMessage, big.NewInt(cantondevenv.CantonToEVMTokenSequentialSends))
 		expectedReceiverBalanceAfter := new(big.Int).Add(new(big.Int).Set(receiverBalanceBefore), totalExpectedTransfer)
 		t.Logf("EVM receiver token balance: before=%s after=%s totalExpectedTransfer=%s", receiverBalanceBefore.String(), receiverBalanceAfter.String(), totalExpectedTransfer.String())
 		require.Equal(t, expectedReceiverBalanceAfter, receiverBalanceAfter)
@@ -232,10 +239,16 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("token transfer with default extraArgs", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
-		tokenTransferAmount := lane.TransferAmount.Uint64()
+		lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
 
-		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
+		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
+		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
+		cantonImpl.SetSequentialSends(1)
+		if lane.TransferInstrument.Admin != "" {
+			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
+		} else {
+			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
+		}
 
 		receiver, err := evmChain.GetEOAReceiverAddress()
 		require.NoError(t, err)
@@ -274,10 +287,16 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("token transfer with zero gas limit", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		lane := devenvtests.ResolveTokenLane(t, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
-		tokenTransferAmount := lane.TransferAmount.Uint64()
+		lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
 
-		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(devenvtests.CantonToEVMFeeAmount), tokenTransferAmount))
+		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
+		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
+		cantonImpl.SetSequentialSends(1)
+		if lane.TransferInstrument.Admin != "" {
+			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
+		} else {
+			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
+		}
 
 		ds, err := lib.DataStore()
 		require.NoError(t, err)
