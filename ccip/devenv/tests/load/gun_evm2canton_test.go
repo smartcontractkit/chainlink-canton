@@ -1,27 +1,21 @@
 package load
 
 import (
-	"fmt"
-	"os"
 	"testing"
 
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
-	utilstests "github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // registers Canton via init
-	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 )
 
 // TestEVM2Canton_Load runs WASP RPS=1 against the real EVM→Canton path (message-only).
 //
-// Requires a running devenv and ../../env-canton-evm-out.toml (same as the basic e2e test).
-// EVM source accounts are pre-funded by devenv; no Canton MintTokens/SetupSend.
+// Devenv: requires a running devenv and env-canton-evm-out.toml; EVM accounts are pre-funded.
+// Prod-testnet: set CANTON_GRPC_URL, CANTON_PARTY_ID, CANTON_AUTH_*, and PRIVATE_KEY; Canton
+// party must already be funded (no MintTokens on this path).
 //
 //nolint:paralleltest // single-flight exec on Canton dest; shares env with e2e.
 func TestEVM2Canton_Load(t *testing.T) {
@@ -29,49 +23,29 @@ func TestEVM2Canton_Load(t *testing.T) {
 		t.Skip("skipping EVM→Canton load test in short mode")
 	}
 
-	configPath := "../../env-canton-evm-out.toml"
-	if _, err := os.Stat(configPath); err != nil {
-		t.Skipf("skipping EVM→Canton load test: %v (start devenv to generate %s)", err, configPath)
-	}
-
-	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
-	require.NoError(t, err)
-
+	env := devenvtests.ParseEnvFromFlag(t)
+	boot := devenvtests.BootstrapE2E(t, env)
 	ctx := ccv.Plog.WithContext(t.Context())
-	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath, chainsel.FamilyEVM, chainsel.FamilyCanton)
-	require.NoError(t, err)
+	boot.SetupCantonReceive(t, ctx)
 
-	chainMap, err := lib.ChainsMap(ctx)
-	require.NoError(t, err)
-	require.NoError(t, devenvtests.WireVerifierObservationFromLib(lib, chainMap))
-
-	evmChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
-	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
-	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
-	require.True(t, ok, "Canton dest chain must be *devenv.Chain")
-	require.NoError(t, cantonImpl.SetupReceive(ctx))
-	cantonDest := discoverCantonDest(t, in, chainMap)
+	cantonDest := discoverCantonDestFromBoot(t, boot)
 	t.Logf("EVM→Canton load: source=%d dest=%d receiver=%x",
-		evmChain.ChainSelector(), cantonDest.Chain.ChainSelector(), cantonDest.Receiver)
+		boot.EVM.ChainSelector(), cantonDest.Chain.ChainSelector(), cantonDest.Receiver)
 
-	t.Cleanup(func() {
-		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
-		require.NoError(t, err)
-	})
-
-	ccvAddr, executorAddr := resolveEVMSourceAddrs(t, lib, evmChain.ChainSelector())
+	ccvAddr, executorAddr := resolveEVMSourceAddrs(t, boot.Lib, boot.EVM.ChainSelector())
 
 	gun, err := NewCCIPLoadGun(
-		evmChain,
+		boot.EVM,
 		[]Destination{cantonDest},
 		ccvAddr,
 		executorAddr,
 		LoadGunOptions{
-			ConfirmSend:        evmSourceConfirmSend(evmChain), // TODO: this confirmation will change on prod-testnet PR
-			ConfirmExecTimeout: utilstests.WaitTimeout(t),
+			ConfirmSend:        EVMSourceConfirmSend(boot),
+			ConfirmExecTimeout: devenvtests.ConfirmExecTimeout(t),
+			SkipExecConfirm:    false,
 		},
 	)
 	require.NoError(t, err)
 
-	runWASP(t, gun, "canton-load-evm2canton", loadSchedule(t), "message_only")
+	runWASP(t, gun, "canton-load-evm2canton", loadSchedule(t), "message_only", false, boot.Cfg.IndexerEndpoints)
 }
