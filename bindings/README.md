@@ -1,29 +1,26 @@
 # Go bindings & contract releases
 
-Generated Go bindings and DAR artifacts share a **dev** vs **frozen release** split for DARs. Bindings are **not** versioned per release in this repo — all in-repo code uses `latest/`.
+Generated Go bindings and DAR artifacts share a **dev** vs **released** split. Bindings are **not** versioned per release in this repo — all in-repo code uses `latest/`.
 
 | Directory | Purpose | Updated by |
 |-----------|---------|------------|
-| `contracts/dars/current/` | Dev DARs (`*-current.dar`) | `make compile-contracts` / `make contracts` |
+| `contracts/dars/dev/` | Dev DARs (`*-dev.dar`) | `make compile-contracts` / `make contracts` |
+| `contracts/dars/released/` | All released DARs, grown additively | `make contracts` (when version is in `ReleasedVersions`) |
 | `bindings/generated/latest/` | Dev bindings (sole in-repo import path) | `make generate-bindings` / `make contracts` |
-| `contracts/dars/v1_0_0/`, `v2_0_0/`, … | Frozen release DARs | `make freeze-release VERSION=…` |
-| `bindings/generated/v1_0_0/` | Legacy frozen bindings (historical only) | Do not add new `v*_*/` binding trees |
-| `bindings/generated/mcms/` | Legacy MCMS SDK import path (single file) | `make freeze-release VERSION=…` when `latest/mcms/mcms.go` exists |
+| `bindings/generated/v1_0_0/` | **Deprecated** — legacy frozen bindings (historical only) | Do not use; see note below |
 
 **Rules**
 
-- In-repo application code (**deployment**, **integration-tests**, **EDS**, **CCIP devenv**, **party-ceremony** Go) imports **`bindings/generated/latest/...`** and must stay aligned with **`contracts/dars/current/`** (run `make contracts` after DAML changes).
-- Frozen **`contracts/dars/v*_*/`** snapshots are for audited releases and components that load pinned DARs (e.g. **party-ceremony** production ceremony via `ReleaseDir`). Downstream repos pin a **chainlink-canton git tag/SHA** and use `bindings/generated/latest/` at that commit — not a versioned bindings folder.
-- `latest/` and `current/` are regenerated during development and are not guaranteed stable or audited until tagged.
-- **Do not rewrite** existing files under `contracts/dars/v*_*/` or legacy `bindings/generated/v1_0_0/` in normal PRs. CI blocks **modifications** to frozen paths that already exist on the base branch (`make check-frozen-release-artifacts`). After DAML changes, run `make contracts` and commit only `current/` + `latest/`.
-- Frozen DAR snapshots change only via **`make freeze-release VERSION=…`** on a dedicated release PR. Add the GitHub label **`release-artifacts`** so CI allows those paths to change.
-- Git tags for releases: `contracts-canton-v<x.y.z>` (e.g. `contracts-canton-v2.0.0`).
-- Snapshot folder names use underscores: release `2.0.0` → `v2_0_0/`.
+- In-repo application code (**deployment**, **integration-tests**, **EDS**, **CCIP devenv**, **party-ceremony** Go) imports **`bindings/generated/latest/...`** and must stay aligned with **`contracts/dars/dev/`** (run `make contracts` after DAML changes).
+- `contracts/dars/released/` is **append-only**: new versioned DAR files are added alongside existing ones; existing files are never modified. CI blocks modifications to already-committed artifacts there.
+- `latest/` and `dev/` DARs are regenerated during development and are not guaranteed stable or audited until tagged.
+- **Do not rewrite** existing files under `contracts/dars/released/` in normal PRs. After DAML changes, run `make contracts` and commit only `dev/` + `latest/` (and `released/` only when intentionally publishing a new version).
+- Git tags for releases follow `contracts-canton-v<x.y.z>` (e.g. `contracts-canton-v2.0.0`).
 
-There are two notions of “version”:
+There are two notions of "version":
 
-1. **Release snapshot** — whole audited DAR cut (`v1_0_0`, `v2_0_0`, …). Published for external pin; in-repo Go always uses `latest/` at the tagged commit.
-2. **Package semver** — per-package `version:` in each `daml.yaml` (e.g. `mcms-core-1.0.0.dar`, `ccip-core-2.0.0.dar`). Multiple package versions can live in the **same** release folder.
+1. **Package semver** — per-package `version:` in each `daml.yaml` (e.g. `mcms-core-2.0.0.dar`). Multiple package versions can coexist in `contracts/dars/released/`.
+2. **Repo release tag** — a `contracts-canton-vX.Y.Z` git tag marking a stable, audited snapshot of the whole repo at a point in time.
 
 ---
 
@@ -38,106 +35,82 @@ make contracts
 Equivalent to:
 
 ```bash
-make compile-contracts   # → contracts/dars/current/
+make compile-contracts   # → contracts/dars/dev/
 make generate-bindings   # → bindings/generated/latest/
 ```
 
-- Bindings are generated from **`current`** DARs (`contracts.GetDar(pkg, "current")`).
-- `make contracts` does **not** update `contracts/dars/v*_*/` or `bindings/generated/mcms/`.
-
-Use `contracts.GetDar(pkg, "current")` in dev tooling; use a pinned package version string (e.g. `"2.0.0"`) with `GetDar` for release-aligned behavior once `ReleaseDir` points at that snapshot.
+- This updates the dev DARs and regenerates bindings from them.
+- `make contracts` does **not** touch `contracts/dars/released/` unless a package's current version is listed in `ReleasedVersions` in `contracts/contracts.go`.
 
 ---
 
-## Releasing a new version (e.g. 2.0.0)
+## Releasing a package version
 
-Example: cut release **2.0.0** after DAML/bindings work on `main` or your branch.
+### Staging changes without releasing
 
-### 1. Build dev artifacts
+You can bump a package's version in its `daml.yaml` **without** immediately committing a release artifact. This is useful to accumulate multiple changes under one version before publishing.
 
-```bash
-make contracts
-```
+1. Bump `version:` in the package's `daml.yaml`.
+2. Update `upgrades:` in the package's `daml.yaml` to point at the previous released version in `dars/released/`
+3. Run `make contracts`.
 
-Commit any intentional DAML / `current` / `latest` changes from active development.
+Result: only `dars/dev/{name}-dev.dar` is updated. Nothing is written to `dars/released/`. You can keep iterating.
 
-### 2. Freeze the DAR snapshot
+### Publishing a release
 
-```bash
-make freeze-release VERSION=2.0.0
-```
+Once changes are ready to ship:
 
-This runs `contracts/scripts/freeze-release.sh`, which:
+1. **Bump the version** in the package's `daml.yaml` (if not already done).
+2. **Update `upgrades:`** in the package's `daml.yaml` to point at the previous released version in `dars/released/`. (if not already done)
+3. **Add the new version** to `ReleasedVersions` in `contracts/contracts.go`:
+   ```go
+   CCIPCoreV2: []string{"2.0.0", "3.0.0"},
+   ```
+4. **Run `make contracts`** — the new `{name}-{version}.dar` is written to `dars/released/` alongside existing versions.
+5. **Commit** both the updated `contracts/contracts.go` and the new file(s) under `dars/released/`.
+6. **Tag and push**:
+   ```bash
+   git tag contracts-canton-v3.0.0
+   git push origin contracts-canton-v3.0.0
+   ```
 
-- Copies every `daml.yaml` package from `dars/current/{name}-current.dar` → `dars/v2_0_0/{name}-{version}.dar` (version from each `daml.yaml`)
-- Optionally copies `latest/mcms/mcms.go` → `bindings/generated/mcms/mcms.go` (external [mcms SDK](https://github.com/smartcontractkit/mcms) Canton import path)
-
-It does **not** create `bindings/generated/v2_0_0/`. Bindings at the release commit are whatever is in `latest/`.
-
-Review the diff, then commit the new `contracts/dars/v2_0_0/` tree (and `bindings/generated/mcms/mcms.go` if updated).
-
-### 3. Point DAR consumers at the new release (manual)
-
-`freeze-release` does **not** switch consumers automatically. Update:
-
-| Location | Change |
-|----------|--------|
-| `contracts/contracts.go` | `ReleaseDir = "v2_0_0"` |
-| `party-ceremony/ceremony/ops/ledger/deps.go` | `releaseDir = "v2_0_0"` (must match `ReleaseDir`) |
-
-**Do not** migrate Go imports to `bindings/generated/v2_0_0/` — keep `bindings/generated/latest/`.
-
-### 4. Verify
-
-```bash
-make contracts
-go test ./contracts/...
-go test ./deployment/...
-# other modules as needed
-```
-
-`contracts` package tests iterate embedded DARs under `ReleaseDir`; after bumping `ReleaseDir`, embedded `v2_0_0/` must contain all packages listed in `contracts.Versions`.
-
-### 5. Tag and push
-
-```bash
-git tag contracts-canton-v2.0.0
-git push origin contracts-canton-v2.0.0
-```
-
-Open a PR with the freeze commit and `ReleaseDir` bump. Add label **`release-artifacts`**.
-
-**Note:** Older DAR snapshots (`v1_0_0/`, …) stay in the tree so existing deployments can keep using them. Legacy `bindings/generated/v1_0_0/` remains for historical reference only.
-
----
-
-## Legacy `bindings/generated/mcms/`
-
-MCMS spans `mcms-api` and `mcms-core` DAML packages; generated code may also provide a unified facade at `latest/mcms/mcms.go`.
-
-The flat path `github.com/smartcontractkit/chainlink-canton/bindings/generated/mcms` exists for **`github.com/smartcontractkit/mcms/sdk/canton`**, which predates versioned bindings. Only `mcms.go` lives there; it is refreshed on **`make freeze-release`** when present in `latest/`, not on `make contracts`.
-
-In-repo Canton code should use `bindings/generated/latest/mcms`, not the flat shim.
+CI will fail if any already-committed file under `dars/released/` is modified — only additions are allowed.
 
 ---
 
 ## CI
 
-- **Compile Contracts** / **Generate Bindings**: build `current/` and `latest/`.
-- **Test Contracts**: embedded `contracts/dars/` via `ReleaseDir`.
-- **Party ceremony integration tests**: test-only packages use `current` (e.g. `test-test@current`); production ceremony DARs use the pinned release directory.
+- **Compile Contracts** / **Generate Bindings**: build `dev/` DARs and `latest/` bindings.
+- **Test Contracts**: run against embedded `contracts/dars/` artifacts.
+- **Frozen artifact check**: fails if any existing file under `contracts/dars/released/` is modified or deleted (additions are allowed).
 
 ---
+
+## Legacy: `bindings/generated/v1_0_0/`
+
+> ⚠️ **Deprecated.** The `bindings/generated/v1_0_0/` directory is a historical snapshot and is no longer maintained. Do not rely on it. Migrate any remaining consumers to `bindings/generated/latest/`.
+
+---
+
 
 ## Quick reference
 
 ```bash
-# Dev loop
+# Dev loop — update dev DARs and latest bindings
 make contracts
 
-# New release 2.0.0
+# Stage a version bump without releasing
+# (edit daml.yaml version only, do NOT add to ReleasedVersions yet)
 make contracts
-make freeze-release VERSION=2.0.0
-# → edit ReleaseDir + party-ceremony releaseDir
-git tag contracts-canton-v2.0.0
+# → only dars/dev/ is updated
+
+# Publish a release
+# 1. Edit daml.yaml: bump version, update upgrades: field
+# 2. Add version to ReleasedVersions in contracts/contracts.go
+make contracts
+# → dars/released/{name}-{version}.dar added
+git add contracts/contracts.go contracts/dars/released/
+git commit -m "release: bump ccip-core-v2 to 3.0.0"
+git tag contracts-canton-v3.0.0
+git push origin contracts-canton-v3.0.0
 ```

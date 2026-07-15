@@ -31,7 +31,7 @@ func TestDeployCoin(t *testing.T) {
 	participant := cantonChain.Participants[0]
 
 	// Upload Dar
-	coinDar, err := contracts.GetDar(contracts.Coin, contracts.CurrentVersion)
+	coinDar, err := contracts.GetDar(contracts.Coin, contracts.DevVersion)
 	require.NoError(t, err, "failed to get coin dar file")
 	_, err = participant.AdminServices.Package.UploadDar(t.Context(), &participantv30.UploadDarRequest{
 		Dars: []*participantv30.UploadDarRequest_UploadDarData{

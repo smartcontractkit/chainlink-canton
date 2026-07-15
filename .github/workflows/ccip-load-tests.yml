@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       ccip_env:
-        description: 'Target environment'
+        description: "Target environment"
         required: true
         default: devenv
         type: choice
@@ -12,7 +12,7 @@ on:
           - devenv
           - prod-testnet
       direction:
-        description: 'Load test direction'
+        description: "Load test direction"
         required: true
         default: canton2evm
         type: choice
@@ -22,39 +22,39 @@ on:
           - canton2evm-token
           - evm2canton-token
       message_rate:
-        description: 'CANTON_LOAD_MESSAGE_RATE (e.g. 1/1s, 1/45s)'
+        description: "CANTON_LOAD_MESSAGE_RATE (e.g. 1/1s, 1/45s)"
         required: false
-        default: '1/1s'
+        default: "1/1s"
         type: string
       load_duration:
-        description: 'CANTON_LOAD_DURATION (Go duration, e.g. 90s, 2m)'
+        description: "CANTON_LOAD_DURATION (Go duration, e.g. 90s, 2m)"
         required: false
-        default: '90s'
+        default: "90s"
         type: string
       test_timeout:
-        description: 'go test -timeout value (must exceed load duration + teardown)'
+        description: "go test -timeout value (must exceed load duration + teardown)"
         required: false
-        default: '40m'
+        default: "40m"
         type: string
       canton_ref:
-        description: 'chainlink-canton git ref (empty = workflow ref; devenv only)'
+        description: "chainlink-canton git ref (empty = workflow ref; devenv only)"
         required: false
-        default: ''
+        default: ""
         type: string
       config_file:
-        description: 'CCIP_CONFIG_FILE basename under ccip/devenv (prod-testnet only)'
+        description: "CCIP_CONFIG_FILE basename under ccip/devenv (prod-testnet only)"
         required: false
         default: env-prod-testnet.ci.toml
         type: string
       skip_exec_confirm:
-        description: 'CANTON_LOAD_SKIP_EXEC_CONFIRM (prod-testnet only)'
+        description: "CANTON_LOAD_SKIP_EXEC_CONFIRM (prod-testnet only)"
         required: false
-        default: 'true'
+        default: "true"
         type: string
       confirm_exec_timeout:
-        description: 'CANTON_CONFIRM_EXEC_TIMEOUT (prod-testnet only)'
+        description: "CANTON_CONFIRM_EXEC_TIMEOUT (prod-testnet only)"
         required: false
-        default: '10m'
+        default: "10m"
         type: string
 
 concurrency:

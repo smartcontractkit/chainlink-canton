@@ -5,7 +5,11 @@ on Canton.
 
 ## Contract artifacts & releases
 
-DARs live under `contracts/dars/` (`current/` for dev, `v2_0_0/` etc. for frozen releases). Go bindings live under `bindings/generated/latest/` for all in-repo code; frozen releases snapshot DARs only (not versioned binding trees).
+DARs live under:
+- `contracts/dars/dev` for development artifacts, rebuilt on every contract change
+- `contracts/dars/released` for stable, frozen, release versions
+
+Go bindings live under `bindings/generated/latest/` for all in-repo code; frozen releases snapshot DARs only (not versioned binding trees).
 
 For day-to-day builds (`make contracts`) and **how to cut and migrate to a new release** (e.g. 2.1.0 — freeze, update `ReleaseDir`, import paths, and git tag), see **[bindings/README.md](../bindings/README.md)**.
 
@@ -85,23 +89,23 @@ CCIP Canton contracts are organized in a modular, layered architecture:
 ```
 contracts/ccip/
 ├── api/                    # API interfaces (APIV1) — public contract signatures
-│   └── daml/CCIP/APIV1/
+│   └── daml/CCIP/APIV2/
 │       ├── GlobalConfig.daml       # Configuration interface
 │       ├── ExecutingMessage.daml   # Inbound message processing
 │       ├── SendingMessage.daml     # Outbound message processing
 │       ├── FeeQuoter.daml          # Fee calculation interface
 │       ├── RMNRemote.daml          # Risk management interface
 │       └── TokenAdminRegistry.daml # Token authority interface
-├── core/                   # Core implementations (CoreV1)
-│   └── daml/CCIP/CoreV1/
+├── core/                   # Core implementations (CoreV2)
+│   └── daml/CCIP/CoreV2/
 │       ├── GlobalConfig.daml       # Chain & lane configuration
 │       ├── TokenAdminRegistry.daml # Token pool registry & ticket authority
 │       ├── FeeQuoter.daml          # Fee calculation engine
 │       ├── RMNRemote.daml          # Risk management with curse mechanism
 │       ├── SendingMessage.daml     # Outbound message state machine
 │       └── ExecutingMessage.daml   # Inbound message state machine
-├── runtime/                # Runtime layer (RuntimeV1) — message processing
-│   └── daml/CCIP/RuntimeV1/
+├── runtime/                # Runtime layer (RuntimeV2) — message processing
+│   └── daml/CCIP/RuntimeV2/
 │       ├── PerPartyRouter.daml     # Per-user state & routing (+ factory)
 │       ├── OnRamp.daml             # Outbound message processing
 │       └── OffRamp.daml            # Inbound message processing
@@ -112,32 +116,32 @@ contracts/ccip/
 │   └── daml/CCIP/
 │       └── CCIPReceiver.daml       # Inbound orchestration & CCV threading
 ├── executor/               # Message executor (extensible)
-│   └── daml/CCIP/ExecutorV1/
+│   └── daml/CCIP/ExecutorV2/
 │       └── Executor.daml           # Remote chain execution wrapper
 ├── committee-verifier/     # CCV implementation — committee ECDSA
-│   └── daml/CCIP/CommitteeVerifierV1/
+│   └── daml/CCIP/CommitteeVerifierV2/
 │       ├── CommitteeVerifier.daml  # Committee-based signature verification
 │       └── Crypto/                 # DER encoding & signature validation
 ├── extension-api/          # Extension interfaces for pluggable components
-│   └── daml/CCIP/InterfacesV1/
+│   └── daml/CCIP/InterfacesV2/
 │       ├── CrossChainVerifier.daml # ICrossChainVerifier interface
 │       ├── TokenPool.daml          # ITokenPool interface
 │       └── Executor.daml           # IExecutor interface
 ├── codec/                  # Message encoding & cryptographic utilities
-│   └── daml/CCIP/CodecV1/
-│       ├── MessageCodecV1.daml     # MessageV1 encoding (EVM-compatible)
+│   └── daml/CCIP/CodecV2/
+│       ├── MessageCodecV2.daml     # MessageV1 encoding (EVM-compatible)
 │       ├── CCVCodec.daml           # CCV attestation encoding
 │       ├── FinalityConfig.daml     # Finality policy encoding
 │       ├── Math.daml               # Numeric utilities
 │       └── Uint256.daml            # 256-bit integer handling
 ├── tickets/                # Ticket templates
 │   └── daml/CCIP/
-│       └── TicketsV1.daml          # TokenReceiveTicket definition
+│       └── TicketsV2.daml          # TokenReceiveTicket definition
 ├── client/                 # Client interfaces for applications
 │   └── daml/CCIP/
-│       └── ClientV1.daml           # Public-facing PerPartyRouter interface
+│       └── ClientV2.daml           # Public-facing PerPartyRouter interface
 ├── events/                 # Event contracts for off-chain observation
-│   └── daml/CCIP/EventsV1/
+│   └── daml/CCIP/EventsV2/
 │       ├── Events.daml             # CCIPMessageSent, ExecutionStateChanged
 │       └── Receipts.daml           # Event receipts
 ├── pools/                  # Reference token pool implementations
@@ -146,13 +150,13 @@ contracts/ccip/
 ├── rate-limiter/           # Rate limiting contracts
 ├── factory/                # Factory for contract deployment
 │   └── daml/CCIP/
-│       └── FactoryV1.daml          # Contract deployment factory
+│       └── FactoryV2.daml          # Contract deployment factory
 ├── test/                   # Test contracts & mocks
 │   └── daml/CCIP/
 │       └── *Test.daml              # Unit & integration tests
 └── utils/                  # Utility modules
     └── daml/CCIP/
-        └── UtilsV1/                # Common helpers
+        └── UtilsV2/                # Common helpers
 ```
 
 ### Package imports
@@ -1126,5 +1130,5 @@ cd contracts && dpm clean --all
 ```
 
 Built DARs are output to `.daml/dist/` in each package directory. After building, run `make contracts` from the repo root to:
-1. Copy DARs to `contracts/dars/current/`
+1. Copy DARs to `contracts/dars/dev/`
 2. Generate Go bindings to `bindings/generated/latest/`

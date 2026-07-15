@@ -16,4 +16,11 @@ func TestEmbeddedArtifacts(t *testing.T) {
 			require.NotEmptyf(t, content, "DAR content is empty for package %s version %s", pkg, v)
 		}
 	}
+	for pkg, versions := range LegacyVersions {
+		for _, v := range versions {
+			content, err := GetLegacyDar(pkg, v)
+			require.NoErrorf(t, err, "failed to get legacy DAR for package %s version %s", pkg, v)
+			require.NotEmptyf(t, content, "legacy DAR content is empty for package %s version %s", pkg, v)
+		}
+	}
 }

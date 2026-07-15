@@ -1,5 +1,5 @@
 sdk-version: 3.4.11
-name: ccip-codec
+name: ccip-codec-v2
 source: daml
 version: 2.0.0
 build-options:
@@ -8,8 +8,8 @@ build-options:
 data-dependencies:
   - ../../dependencies/splice/splice-api-token-metadata-v1-1.0.0.dar
   - ../../dependencies/splice/splice-api-token-holding-v1-1.0.0.dar
-  - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
   - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
+  - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

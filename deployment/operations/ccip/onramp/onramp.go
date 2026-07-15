@@ -26,6 +26,6 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccipruntime.OnRamp]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPOnRamp),
+	PackageName: string(contracts.CCIPRuntimeV2),
 	Prefix:      "onramp",
 })

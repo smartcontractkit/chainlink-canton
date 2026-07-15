@@ -26,7 +26,7 @@ func TestCoin(t *testing.T) {
 	fmt.Println(version.Version)
 
 	// Upload the DARs to all participants
-	coinDar, err := contracts.GetDar(contracts.Coin, contracts.CurrentVersion)
+	coinDar, err := contracts.GetDar(contracts.Coin, contracts.DevVersion)
 	require.NoError(t, err)
 	packageIDs, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{coinDar}, env.Chain.Participants...)
 	require.NoError(t, err)

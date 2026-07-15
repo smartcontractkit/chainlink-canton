@@ -16,7 +16,7 @@ var ContractType = deployment.ContractType("CantonPerPartyRouterFactory")
 
 var Version = semver.MustParse("2.0.0")
 
-var pprfEncoder = ccipruntime.NewContract("", "CCIP.PerPartyRouter", "PerPartyRouterFactory").Encoder()
+var pprfEncoder = ccipruntime.NewContract("", "CCIP.RuntimeV2.PerPartyRouter", "PerPartyRouterFactory").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[ccipruntime.PerPartyRouterFactory]{
 	Name:           "canton/ccip/per_party_router_factory/deploy",
@@ -29,7 +29,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccipruntime.PerPartyRouter
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPPerPartyRouter),
+	PackageName: string(contracts.CCIPRuntimeV2),
 	Prefix:      "perpartyrouterfactory",
 })
 

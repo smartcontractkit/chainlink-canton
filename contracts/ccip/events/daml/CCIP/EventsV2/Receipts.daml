@@ -1,0 +1,25 @@
+-- | Ticket contracts for cross-participant CCIP communication.
+module CCIP.EventsV2.Receipts where
+
+import DA.Crypto.Text (BytesHex)
+
+-- | Issuer type for receipts.
+data IssuerType
+    = IssuerType_CCV      -- Cross-chain verifier
+    | IssuerType_Pool     -- Token pool
+    | IssuerType_Executor -- Executor
+    | IssuerType_Network  -- Network/protocol fee
+    deriving (Eq, Show)
+
+-- | Fee/gas accounting for a single entity (CCV, pool, executor, or network).
+data Receipt = Receipt
+    with
+        issuerType : IssuerType        -- Type of issuer
+        issuerAddress : BytesHex       -- 32-byte instance address
+        versionTag : Optional BytesHex -- 4-byte version tag for CCVs, None for pools/network
+        destGasLimit : Int             -- Gas allocated for dest chain execution
+        destBytesOverhead : Int        -- Data availability overhead in bytes
+        feeTokenAmount : Numeric 0     -- Fee amount in fee token units
+        extraArgs : BytesHex           -- Entity-specific arguments
+    deriving (Eq, Show)
+

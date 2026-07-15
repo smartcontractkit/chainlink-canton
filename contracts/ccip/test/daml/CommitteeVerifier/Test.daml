@@ -15,26 +15,26 @@ import qualified Splice.Api.Token.HoldingV1
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.CommitteeVerifierV1
-import qualified CCIP.CodecV1.FinalityConfig
-import qualified CCIP.CoreV1.ExecutingMessage
-import qualified CCIP.CoreV1.SendingMessage
+import qualified CCIP.CommitteeVerifierV2
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CoreV2.ExecutingMessage
+import qualified CCIP.CoreV2.SendingMessage
 
-import qualified CCIP.CoreV1.RMNRemote
+import qualified CCIP.CoreV2.RMNRemote
 
 import CommitteeVerifier.PayloadBuilder qualified as PayloadBuilder
 
 finalityConfig n =
     if n == 0
-    then CCIP.CodecV1.FinalityConfig.WaitForFinality
-    else CCIP.CodecV1.FinalityConfig.BlockDepth n
+    then CCIP.CodecV2.FinalityConfig.WaitForFinality
+    else CCIP.CodecV2.FinalityConfig.BlockDepth n
 
 -- | Helper to create a fresh ExecutingMessage for each test.
 -- AddCCVVerification is a consuming choice, so each successful verify
 -- consumes the contract.
-createExecMsg : Party -> Party -> Script (ContractId CCIP.CoreV1.ExecutingMessage.ExecutingMessage)
+createExecMsg : Party -> Party -> Script (ContractId CCIP.CoreV2.ExecutingMessage.ExecutingMessage)
 createExecMsg owner rmnOwner = submit owner do
-    createCmd CCIP.CoreV1.ExecutingMessage.ExecutingMessage with
+    createCmd CCIP.CoreV2.ExecutingMessage.ExecutingMessage with
         ccipOwner = owner
         message = PayloadBuilder.testMessage1
         messageId = keccak256 PayloadBuilder.testMessage1Encoded
@@ -61,12 +61,12 @@ createExecMsg owner rmnOwner = submit owner do
         receiverFinalityConfig = finalityConfig 0
         sourceDefaultCCVs = []
         inboundPoolVerification = None
-        deps = CCIP.CoreV1.ExecutingMessage.ExecutingMessageDeps with
+        deps = CCIP.CoreV2.ExecutingMessage.ExecutingMessageDeps with
             offRamp = Chainlink.InstanceAddress.make "test-offramp" owner
             globalConfig = Chainlink.InstanceAddress.make "test-globalconfig" owner
             rmnRemote = Chainlink.InstanceAddress.make "test-rmn" rmnOwner
             tokenAdminRegistry = Chainlink.InstanceAddress.make "test-tar" owner
-        state = CCIP.CoreV1.ExecutingMessage.ExecutingMessageState_Prepared
+        state = CCIP.CoreV2.ExecutingMessage.ExecutingMessageState_Prepared
 
 testCommitteeVerifier : Script ()
 testCommitteeVerifier = script do
@@ -78,14 +78,14 @@ testCommitteeVerifier = script do
     debug ("encodedMsg: " <> encodedMsg)
     let messageId = keccak256 encodedMsg
     debug ("messageId: " <> messageId)
-    let signedHash = keccak256 (CCIP.CommitteeVerifierV1.versionTagV2_0_0 <> messageId)
+    let signedHash = keccak256 (CCIP.CommitteeVerifierV2.versionTagV2_0_0 <> messageId)
     debug ("signedHash: " <> signedHash)
 
     let rmnInstanceId = "test-rmn"
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
 
     rmnRemote <- submit rmnOwner do
-        createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
+        createCmd CCIP.CoreV2.RMNRemote.RMNRemote with
             instanceId = rmnInstanceId
             rmnOwner = rmnOwner
             ccipOwner = owner
@@ -97,7 +97,7 @@ testCommitteeVerifier = script do
     -- Validate signatures individually
     executingMessageCid <- createExecMsg owner rmnOwner
     forA_ (zip3 PayloadBuilder.pubkeys PayloadBuilder.rValues PayloadBuilder.sValues) \(pubKey, r, s) -> do
-        let verified = CCIP.CommitteeVerifierV1.validateSignature signedHash pubKey r s
+        let verified = CCIP.CommitteeVerifierV2.validateSignature signedHash pubKey r s
         assertMsg ("Signature verification failed for index " <> (show pubKey)) verified
 
     debug ("===== Test1 =====")
@@ -107,21 +107,21 @@ testCommitteeVerifier = script do
     let pubKeys1 = PayloadBuilder.getPubkeysForIndices indices1
     let verifierResults1 = PayloadBuilder.getVerifierResultsForIndices indices1
     ccv1 <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = Some owner
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = pubKeys1)]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = pubKeys1)]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submit (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv1 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv1 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -136,21 +136,21 @@ testCommitteeVerifier = script do
     let pubKeys2 = PayloadBuilder.getPubkeysForIndices indices2
     let verifierResults2 = PayloadBuilder.getVerifierResultsForIndices indices2
     ccv2 <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv2"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [] -- test that empty observers list works, we will still observe via the ccvOwners
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys2)]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys2)]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submit (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv2 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv2 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -164,19 +164,19 @@ testCommitteeVerifier = script do
     let pubKeys3 = PayloadBuilder.getPubkeysForIndices indices3
     let verifierResults3 = PayloadBuilder.getVerifierResultsForIndices indices3
     ccv3 <- submitMustFail owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv3"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 20, signerKeys = pubKeys3)]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 20, signerKeys = pubKeys3)]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     debug ("===== Passed Test3 =====")
 
     debug ("===== Test4 =====")
@@ -185,21 +185,21 @@ testCommitteeVerifier = script do
     let pubKeys4 = PayloadBuilder.getPubkeysForIndices [0, 2, 4, 6, 8, 10]
     let verifierResults4 = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 3, 4, 5]
     ccv4 <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv4"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys4)]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys4)]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv4 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv4 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -212,21 +212,21 @@ testCommitteeVerifier = script do
     let pubKeys5 = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4]
     let verifierResults5 = PayloadBuilder.getVerifierResultsForIndices [5, 6, 7, 8, 9]
     ccv5 <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv5"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 4, signerKeys = pubKeys5)]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 4, signerKeys = pubKeys5)]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv5 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv5 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -239,21 +239,21 @@ testCommitteeVerifier = script do
     let pubKeys6 = PayloadBuilder.getPubkeysForIndices [0, 1, 2]
     let verifierResults6 = PayloadBuilder.getVerifierResultsForIndices [0, 1, 2, 0]
     ccv6 <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv6"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys6)]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = pubKeys6)]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv6 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv6 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -264,58 +264,58 @@ testCommitteeVerifier = script do
     debug ("===== Test7 =====")
     -- try to create without any signers, should fail
     ccv7 <- submitMustFail owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv7"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 0, signerKeys = [])]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 0, signerKeys = [])]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     debug ("===== Passed Test7 =====")
 
     debug ("===== Test8 =====")
     -- try to create without a storage location, should succeed
     ccv8 <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv8"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = PayloadBuilder.getPubkeysForIndices [0])]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = PayloadBuilder.getPubkeysForIndices [0])]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     debug ("===== Passed Test8 =====")
 
     debug ("===== Test9 =====")
     -- pass invalid verifierResults
     let pubKeys9 = PayloadBuilder.getPubkeysForIndices [0, 1, 2]
     ccv9 <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv9"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = pubKeys9)]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = pubKeys9)]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv9 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv9 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -325,22 +325,22 @@ testCommitteeVerifier = script do
                 "deadbeef"    -- invalid signature data
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv9 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv9 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults =
-                CCIP.CommitteeVerifierV1.versionTagV2_0_0 <> -- version tag
+                CCIP.CommitteeVerifierV2.versionTagV2_0_0 <> -- version tag
                 "ffff" <>     -- signature length too long
                 "deadbeef"    -- invalid signature data
             caller = owner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv9 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv9 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
             verifierResults =
-                CCIP.CommitteeVerifierV1.versionTagV2_0_0 <> -- version tag
+                CCIP.CommitteeVerifierV2.versionTagV2_0_0 <> -- version tag
                 "0001" <>     -- signature length too short
                 "deadbeef"    -- invalid signature data
             caller = owner
@@ -352,21 +352,21 @@ testCommitteeVerifier = script do
     -- multiple signers, threshold 3
     executingMessageCid <- createExecMsg owner rmnOwner
     ccv10 <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv10"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3])]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 3, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3])]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submit (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv10 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv10 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -374,17 +374,17 @@ testCommitteeVerifier = script do
             caller = owner
     -- Update signer config to 6, should fail due to threshold > number of signers
     submitMustFail owner do
-        exerciseCmd ccv10 CCIP.CommitteeVerifierV1.ApplySignatureConfigs with
+        exerciseCmd ccv10 CCIP.CommitteeVerifierV2.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
-            signatureConfigs = [CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4]]
+            signatureConfigs = [CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4]]
     -- Update signers to 6 addresses and threshold 6, should pass
     ccv10 <- submit owner do
-        exerciseCmd ccv10 CCIP.CommitteeVerifierV1.ApplySignatureConfigs with
+        exerciseCmd ccv10 CCIP.CommitteeVerifierV2.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
-            signatureConfigs = [CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4, 5]]
+            signatureConfigs = [CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 6, signerKeys = PayloadBuilder.getPubkeysForIndices [0, 1, 2, 3, 4, 5]]
     executingMessageCid <- createExecMsg owner rmnOwner
     submit (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv10 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv10 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -392,12 +392,12 @@ testCommitteeVerifier = script do
             caller = owner
     -- Remove source chain config, afterward verification should fail
     ccv10 <- submit owner do
-        exerciseCmd ccv10 CCIP.CommitteeVerifierV1.ApplySignatureConfigs with
+        exerciseCmd ccv10 CCIP.CommitteeVerifierV2.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = [123.0]
             signatureConfigs = []
     executingMessageCid <- createExecMsg owner rmnOwner
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccv10 CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccv10 CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -408,54 +408,54 @@ testCommitteeVerifier = script do
     debug ("===== Test10b =====")
     -- mismatched map key vs embedded sourceChainSelector should be rejected at creation time
     submitMustFail owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv10b-mismatch"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(456.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [head PayloadBuilder.pubkeys])]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(456.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [head PayloadBuilder.pubkeys])]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     -- duplicate signer keys should be rejected at creation time
     submitMustFail owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv10b"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [head PayloadBuilder.pubkeys, head PayloadBuilder.pubkeys])]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [head PayloadBuilder.pubkeys, head PayloadBuilder.pubkeys])]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
     -- duplicate signer keys should be rejected on config updates as well
     ccv10b <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv10c"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [head PayloadBuilder.pubkeys])]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [head PayloadBuilder.pubkeys])]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail owner do
-        exerciseCmd ccv10b CCIP.CommitteeVerifierV1.ApplySignatureConfigs with
+        exerciseCmd ccv10b CCIP.CommitteeVerifierV2.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
-            signatureConfigs = [CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [head PayloadBuilder.pubkeys, head PayloadBuilder.pubkeys]]
+            signatureConfigs = [CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 2, signerKeys = [head PayloadBuilder.pubkeys, head PayloadBuilder.pubkeys]]
     debug ("===== Passed Test10b =====")
 
     debug ("===== Test11: Malformed keys rejected at config time =====")
@@ -464,55 +464,55 @@ testCommitteeVerifier = script do
 
     -- short key rejected at create time
     submitMustFail owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv11a"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [shortKey])]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [shortKey])]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
     -- wrong-prefix key (65 bytes, not starting with 04) rejected at create time
     submitMustFail owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv11b"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [wrongPrefixKey])]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [wrongPrefixKey])]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
     -- malformed key rejected at ApplySignatureConfigs time
     ccv11c <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv11c"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = ["ipfs://example"]
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [head PayloadBuilder.pubkeys])]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [head PayloadBuilder.pubkeys])]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     submitMustFail owner do
-        exerciseCmd ccv11c CCIP.CommitteeVerifierV1.ApplySignatureConfigs with
+        exerciseCmd ccv11c CCIP.CommitteeVerifierV2.ApplySignatureConfigs with
             sourceChainSelectorsToRemove = []
-            signatureConfigs = [CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [shortKey]]
+            signatureConfigs = [CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = [shortKey]]
     debug ("===== Passed Test11 =====")
 
     debug ("===== All Tests Passed =====")
@@ -529,11 +529,11 @@ testCommitteeVerifier_StorageLocations = script do
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId owner
 
     ccv1 <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
@@ -541,30 +541,30 @@ testCommitteeVerifier_StorageLocations = script do
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
             signerConfigs = Map.empty
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
     -- Transfer storage location admin role to another party
     ccv1 <- submit owner do
-        exerciseCmd ccv1 CCIP.CommitteeVerifierV1.TransferStorageLocationsAdmin with
+        exerciseCmd ccv1 CCIP.CommitteeVerifierV2.TransferStorageLocationsAdmin with
             newAdmin = admin
 
     -- Accept admin role from wrong party, should fail
     submitMustFail owner do
-        exerciseCmd ccv1 CCIP.CommitteeVerifierV1.AcceptStorageLocationsAdmin
+        exerciseCmd ccv1 CCIP.CommitteeVerifierV2.AcceptStorageLocationsAdmin
 
     -- Accept admin role
     ccv1 <- submit admin do
-        exerciseCmd ccv1 CCIP.CommitteeVerifierV1.AcceptStorageLocationsAdmin
+        exerciseCmd ccv1 CCIP.CommitteeVerifierV2.AcceptStorageLocationsAdmin
     let newLocations = ["ipfs://new-location1", "ipfs://new-location2"]
 
     -- Update storage locations with new admin, should succeed
     ccv1 <- submit admin do
-        exerciseCmd ccv1 CCIP.CommitteeVerifierV1.UpdateStorageLocations with
+        exerciseCmd ccv1 CCIP.CommitteeVerifierV2.UpdateStorageLocations with
             newLocations = newLocations
     
     -- Try updating storage locations with old admin, should fail
     submitMustFail owner do
-        exerciseCmd ccv1 CCIP.CommitteeVerifierV1.UpdateStorageLocations with
+        exerciseCmd ccv1 CCIP.CommitteeVerifierV2.UpdateStorageLocations with
             newLocations = ["ipfs://another-location"]
 
     -- Fetch contract and verify storage locations updated
@@ -583,18 +583,18 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId owner
 
     ccvCid <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.fromList [
-                (123.0, CCIP.CommitteeVerifierV1.RemoteChainConfig with 
+                (123.0, CCIP.CommitteeVerifierV2.RemoteChainConfig with
                     feeUSDCents = 50.0,
                      gasForVerification = 1000,
                      payloadSizeBytes = 100,
@@ -602,23 +602,23 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
                      allowedSendersList = [allowedParty1, allowedParty2])
                 ]
             signerConfigs = Map.empty
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
     -- | Test adding remote chain configs
-    let configArgs123 = CCIP.CommitteeVerifierV1.RemoteChainConfigArgs with
+    let configArgs123 = CCIP.CommitteeVerifierV2.RemoteChainConfigArgs with
                 remoteChainSelector = 123.0
                 feeUSDCents = 100.0
                 gasForVerification = 5000
                 payloadSizeBytes = 200
                 allowListEnabled = False
-    let configArgs456 = CCIP.CommitteeVerifierV1.RemoteChainConfigArgs with
+    let configArgs456 = CCIP.CommitteeVerifierV2.RemoteChainConfigArgs with
                 remoteChainSelector = 456.0
                 feeUSDCents = 200.0
                 gasForVerification = 10000
                 payloadSizeBytes = 250
                 allowListEnabled = True
     ccvCid <- submit owner do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyRemoteChainConfigUpdates with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyRemoteChainConfigUpdates with
             remoteChainConfigArgs = [configArgs123, configArgs456]
     gotCCV <- fromSome <$> queryContractId owner ccvCid
     assertMsg "Expected 2 remote chain configs" (Map.size gotCCV.remoteChainConfigs == 2)
@@ -641,8 +641,8 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
     
     -- Test invalid chain selector
     submitMustFail owner do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyRemoteChainConfigUpdates with
-            remoteChainConfigArgs = [CCIP.CommitteeVerifierV1.RemoteChainConfigArgs with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [CCIP.CommitteeVerifierV2.RemoteChainConfigArgs with
                 remoteChainSelector = -1.0
                 feeUSDCents = 100.0
                 gasForVerification = 5000
@@ -651,8 +651,8 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
     
     -- Test invalid gas for verification
     submitMustFail owner do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyRemoteChainConfigUpdates with
-            remoteChainConfigArgs = [CCIP.CommitteeVerifierV1.RemoteChainConfigArgs with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [CCIP.CommitteeVerifierV2.RemoteChainConfigArgs with
                 remoteChainSelector = 123.0
                 feeUSDCents = 100.0
                 gasForVerification = 0
@@ -661,8 +661,8 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
 
     -- Test invalid negative payload size
     submitMustFail owner do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyRemoteChainConfigUpdates with
-            remoteChainConfigArgs = [CCIP.CommitteeVerifierV1.RemoteChainConfigArgs with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [CCIP.CommitteeVerifierV2.RemoteChainConfigArgs with
                 remoteChainSelector = 123.0
                 feeUSDCents = 100.0
                 gasForVerification = 5000
@@ -671,8 +671,8 @@ testCommitteeVerifier_ApplyRemoteChainConfigs = script do
 
     -- Negative verifier fee fields are rejected.
     submitMustFail owner do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyRemoteChainConfigUpdates with
-            remoteChainConfigArgs = [CCIP.CommitteeVerifierV1.RemoteChainConfigArgs with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyRemoteChainConfigUpdates with
+            remoteChainConfigArgs = [CCIP.CommitteeVerifierV2.RemoteChainConfigArgs with
                 remoteChainSelector = 123.0
                 feeUSDCents = -1.0
                 gasForVerification = 5000
@@ -693,18 +693,18 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId owner
 
     ccvCid <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = Some admin
             messageSentObservers = [owner]
             storageLocations = []
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.fromList [
-                (123.0, CCIP.CommitteeVerifierV1.RemoteChainConfig with 
+                (123.0, CCIP.CommitteeVerifierV2.RemoteChainConfig with
                     feeUSDCents = 50.0,
                      gasForVerification = 1000,
                      payloadSizeBytes = 100,
@@ -712,13 +712,13 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
                      allowedSendersList = [allowedParty1, allowedParty2])
                 ]
             signerConfigs = Map.empty
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
     
     -- Test updating allow list as owner
     ccvCid <- submit owner do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyAllowListUpdates with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyAllowListUpdates with
             allowListConfigArgsItems = [
-                CCIP.CommitteeVerifierV1.AllowListConfigArgs with
+                CCIP.CommitteeVerifierV2.AllowListConfigArgs with
                     destChainSelector = 123.0
                     allowListEnabled = True
                     addedAllowListedSenders = [allowedParty1, allowedParty3] -- party1 is already in the list, party3 is new
@@ -734,9 +734,9 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
 
     -- Test updating allow list for a non-existing chain selector, should add new config with allow list enabled and only the added senders in the list
     ccvCid <- submit owner do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyAllowListUpdates with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyAllowListUpdates with
             allowListConfigArgsItems = [
-                CCIP.CommitteeVerifierV1.AllowListConfigArgs with
+                CCIP.CommitteeVerifierV2.AllowListConfigArgs with
                     destChainSelector = 456.0
                     allowListEnabled = True
                     addedAllowListedSenders = [allowedParty2]
@@ -755,9 +755,9 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
 
     -- Test updating allow list as allow list admin
     ccvCid <- submit admin do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyAllowListUpdates with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyAllowListUpdates with
             allowListConfigArgsItems = [
-                CCIP.CommitteeVerifierV1.AllowListConfigArgs with
+                CCIP.CommitteeVerifierV2.AllowListConfigArgs with
                     destChainSelector = 123.0
                     allowListEnabled = False
                     addedAllowListedSenders = []
@@ -773,9 +773,9 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
 
     -- Test updating allow list with invalid dest chain selector
     submitMustFail admin do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyAllowListUpdates with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyAllowListUpdates with
             allowListConfigArgsItems = [
-                CCIP.CommitteeVerifierV1.AllowListConfigArgs with
+                CCIP.CommitteeVerifierV2.AllowListConfigArgs with
                     destChainSelector = -1.0
                     allowListEnabled = False
                     addedAllowListedSenders = []
@@ -785,9 +785,9 @@ testCommitteeVerifier_ApplyAllowListUpdates = script do
 
     -- Test invalid update (cannot set to false and add allowed senders at the same time)
     submitMustFail admin do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ApplyAllowListUpdates with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ApplyAllowListUpdates with
             allowListConfigArgsItems = [
-                CCIP.CommitteeVerifierV1.AllowListConfigArgs with
+                CCIP.CommitteeVerifierV2.AllowListConfigArgs with
                     destChainSelector = 123.0
                     allowListEnabled = False
                     addedAllowListedSenders = [allowedParty1]
@@ -806,11 +806,11 @@ testCommitteeVerifier_SetDynamicConfig = script do
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId owner
 
     ccvCid <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv1"
             owner = owner
             ccipOwner = owner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
@@ -818,12 +818,12 @@ testCommitteeVerifier_SetDynamicConfig = script do
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
             signerConfigs = Map.empty
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
     -- Test updating dynamic config as owner
     ccvCid <- submit owner do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.SetDynamicConfig with
-            dynamicConfig = CCIP.CommitteeVerifierV1.DynamicConfig with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.SetDynamicConfig with
+            dynamicConfig = CCIP.CommitteeVerifierV2.DynamicConfig with
                 allowListAdmin = Some admin
                 messageSentObservers = [owner, admin]
 
@@ -847,7 +847,7 @@ testVerifyMessage_RejectsCrossDomainExecutingMessage = script do
     let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
 
     rmnRemote <- submit rmnOwner do
-        createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
+        createCmd CCIP.CoreV2.RMNRemote.RMNRemote with
             instanceId = rmnInstanceId
             rmnOwner = rmnOwner
             ccipOwner = owner
@@ -865,22 +865,22 @@ testVerifyMessage_RejectsCrossDomainExecutingMessage = script do
 
     -- Verifier is under a DIFFERENT ccipOwner domain.
     ccvCid <- submit owner do
-        createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+        createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
             instanceId = "test-ccv-cross-domain"
             owner = owner
             ccipOwner = otherCcipOwner
-            versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+            versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
             allowListAdmin = None
             messageSentObservers = [owner]
             storageLocations = []
             storageLocationsAdmin = owner
             pendingStorageLocationsAdmin = owner
             remoteChainConfigs = Map.empty
-            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV1.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = pubKeys)]
-            deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+            signerConfigs = Map.fromList [(123.0, CCIP.CommitteeVerifierV2.SignatureConfig with sourceChainSelector = 123.0, threshold = 1, signerKeys = pubKeys)]
+            deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
     submitMustFail (actAs owner <> disclose disclosedRmnRemote) do
-        exerciseCmd ccvCid CCIP.CommitteeVerifierV1.VerifyMessage with
+        exerciseCmd ccvCid CCIP.CommitteeVerifierV2.VerifyMessage with
             rmnRemoteCid = toInterfaceContractId rmnRemote
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             executingMessageCid = coerceContractId executingMessageCid
@@ -902,17 +902,17 @@ testCommitteeVerifier_MaxSignaturesPerProofThreshold : Script ()
 testCommitteeVerifier_MaxSignaturesPerProofThreshold = script do
   owner <- allocateParty "cv-max-threshold-owner"
   let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make "test-rmn" owner
-  let n = CCIP.CommitteeVerifierV1.maxCommitteeSignaturesPerProof
+  let n = CCIP.CommitteeVerifierV2.maxCommitteeSignaturesPerProof
   let keysN = map syntheticCommitteePubKey [0 .. (n - 1)]
   let keysNPlus1 = map syntheticCommitteePubKey [0 .. n]
 
   -- At the cap: create and update succeed.
   ccvOk <- submit owner do
-    createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+    createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
       instanceId = "test-ccv-max-threshold-ok"
       owner = owner
       ccipOwner = owner
-      versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+      versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
       allowListAdmin = None
       messageSentObservers = []
       storageLocations = []
@@ -920,25 +920,25 @@ testCommitteeVerifier_MaxSignaturesPerProofThreshold = script do
       pendingStorageLocationsAdmin = owner
       remoteChainConfigs = Map.empty
       signerConfigs = Map.fromList [
-          (123.0, CCIP.CommitteeVerifierV1.SignatureConfig with
+          (123.0, CCIP.CommitteeVerifierV2.SignatureConfig with
             sourceChainSelector = 123.0, threshold = n, signerKeys = keysN)
         ]
-      deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+      deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
   _ <- submit owner do
-    exerciseCmd ccvOk CCIP.CommitteeVerifierV1.ApplySignatureConfigs with
+    exerciseCmd ccvOk CCIP.CommitteeVerifierV2.ApplySignatureConfigs with
       sourceChainSelectorsToRemove = []
       signatureConfigs = [
-          CCIP.CommitteeVerifierV1.SignatureConfig with
+          CCIP.CommitteeVerifierV2.SignatureConfig with
             sourceChainSelector = 456.0, threshold = n, signerKeys = keysN
         ]
 
   -- One past the cap: create fails.
   submitMustFail owner do
-    createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+    createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
       instanceId = "test-ccv-max-threshold-bad-create"
       owner = owner
       ccipOwner = owner
-      versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+      versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
       allowListAdmin = None
       messageSentObservers = []
       storageLocations = []
@@ -946,18 +946,18 @@ testCommitteeVerifier_MaxSignaturesPerProofThreshold = script do
       pendingStorageLocationsAdmin = owner
       remoteChainConfigs = Map.empty
       signerConfigs = Map.fromList [
-          (123.0, CCIP.CommitteeVerifierV1.SignatureConfig with
+          (123.0, CCIP.CommitteeVerifierV2.SignatureConfig with
             sourceChainSelector = 123.0, threshold = n + 1, signerKeys = keysNPlus1)
         ]
-      deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+      deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
   -- One past the cap: ApplySignatureConfigs fails.
   ccvUpd <- submit owner do
-    createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+    createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
       instanceId = "test-ccv-max-threshold-bad-update"
       owner = owner
       ccipOwner = owner
-      versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+      versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
       allowListAdmin = None
       messageSentObservers = []
       storageLocations = []
@@ -965,12 +965,12 @@ testCommitteeVerifier_MaxSignaturesPerProofThreshold = script do
       pendingStorageLocationsAdmin = owner
       remoteChainConfigs = Map.empty
       signerConfigs = Map.empty
-      deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+      deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
   submitMustFail owner do
-    exerciseCmd ccvUpd CCIP.CommitteeVerifierV1.ApplySignatureConfigs with
+    exerciseCmd ccvUpd CCIP.CommitteeVerifierV2.ApplySignatureConfigs with
       sourceChainSelectorsToRemove = []
       signatureConfigs = [
-          CCIP.CommitteeVerifierV1.SignatureConfig with
+          CCIP.CommitteeVerifierV2.SignatureConfig with
             sourceChainSelector = 789.0, threshold = n + 1, signerKeys = keysNPlus1
         ]
 
@@ -986,14 +986,14 @@ testForwardToVerifier_AllowlistChecksSender = script do
       rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make "rmnRemote" owner
 
   rmnRemoteCid <- submit owner do
-    createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
+    createCmd CCIP.CoreV2.RMNRemote.RMNRemote with
       instanceId = "rmnRemote"
       rmnOwner = owner
       ccipOwner = owner
       customObservers = [allowlistedParty, nonAllowlistedSender]
       cursedSubjects = []
 
-  let remoteChainConfig = CCIP.CommitteeVerifierV1.RemoteChainConfig with
+  let remoteChainConfig = CCIP.CommitteeVerifierV2.RemoteChainConfig with
         feeUSDCents = 0.0
         gasForVerification = 0
         payloadSizeBytes = 0
@@ -1001,11 +1001,11 @@ testForwardToVerifier_AllowlistChecksSender = script do
         allowedSendersList = [allowlistedParty]
 
   ccvCid <- submit owner do
-    createCmd CCIP.CommitteeVerifierV1.CommitteeVerifier with
+    createCmd CCIP.CommitteeVerifierV2.CommitteeVerifier with
       instanceId = "ccv1"
       owner = owner
       ccipOwner = owner
-      versionTag = CCIP.CommitteeVerifierV1.versionTagV2_0_0
+      versionTag = CCIP.CommitteeVerifierV2.versionTagV2_0_0
       remoteChainConfigs = Map.fromList [(destChainSelector, remoteChainConfig)]
       signerConfigs = Map.empty
       allowListAdmin = None
@@ -1013,9 +1013,9 @@ testForwardToVerifier_AllowlistChecksSender = script do
       storageLocations = []
       storageLocationsAdmin = owner
       pendingStorageLocationsAdmin = owner
-      deps = CCIP.CommitteeVerifierV1.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
+      deps = CCIP.CommitteeVerifierV2.CommitteeVerifierDeps with rmnRemote = rmnRemoteInstanceAddress
 
-  let sendingMsgDeps = CCIP.CoreV1.SendingMessage.SendingMessageDeps with
+  let sendingMsgDeps = CCIP.CoreV2.SendingMessage.SendingMessageDeps with
         router = Chainlink.InstanceAddress.make "router" owner
         onRamp = Chainlink.InstanceAddress.make "onRamp" owner
         globalConfig = Chainlink.InstanceAddress.make "globalConfig" owner
@@ -1025,7 +1025,7 @@ testForwardToVerifier_AllowlistChecksSender = script do
 
   let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with admin = owner; id = "feeToken"
       ccvAddress = Chainlink.InstanceAddress.make "ccv1" owner
-      mkSendingMsg senderParty seqNum msgId = CCIP.CoreV1.SendingMessage.SendingMessage with
+      mkSendingMsg senderParty seqNum msgId = CCIP.CoreV2.SendingMessage.SendingMessage with
         deps = sendingMsgDeps
         ccipOwner = owner
         sender = senderParty
@@ -1070,7 +1070,7 @@ testForwardToVerifier_AllowlistChecksSender = script do
         message = None
         encodedMessage = ""
         messageId = msgId
-        state = CCIP.CoreV1.SendingMessage.SendingMessageState_FeeFinalized
+        state = CCIP.CoreV2.SendingMessage.SendingMessageState_FeeFinalized
 
   -- Message from non-allowlisted sender
   nonAllowlistedMsgCid <- submit owner do
@@ -1082,7 +1082,7 @@ testForwardToVerifier_AllowlistChecksSender = script do
 
   -- Allowlisted party calls ForwardToVerifier for non-allowlisted sender's message → should FAIL
   submitMustFail (actAs allowlistedParty <> disclose disclosedCcv <> disclose disclosedRmn) do
-    exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ForwardToVerifier with
+    exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ForwardToVerifier with
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       sendingMessageCid = toInterfaceContractId nonAllowlistedMsgCid
@@ -1095,7 +1095,7 @@ testForwardToVerifier_AllowlistChecksSender = script do
 
   -- Allowlisted sender's message via ForwardToVerifier → should SUCCEED
   submit (actAs allowlistedParty <> disclose disclosedCcv <> disclose disclosedRmn) do
-    exerciseCmd ccvCid CCIP.CommitteeVerifierV1.ForwardToVerifier with
+    exerciseCmd ccvCid CCIP.CommitteeVerifierV2.ForwardToVerifier with
       rmnRemoteCid = toInterfaceContractId rmnRemoteCid
       context = Splice.Api.Token.MetadataV1.emptyChoiceContext
       sendingMessageCid = toInterfaceContractId allowlistedMsgCid

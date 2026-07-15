@@ -23,7 +23,7 @@ func TestState_ThresholdNotMet(t *testing.T) {
 
 	reporter := operations.NewMemoryReporter()
 	newBundle := func() operations.Bundle { return bundleWith(t, reporter) }
-	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}})
 
 	// p1 uploads DAR, threshold not met.
 	sr, err := operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p1", true), input)
@@ -40,7 +40,7 @@ func TestState_SigningGate(t *testing.T) {
 
 	reporter := operations.NewMemoryReporter()
 	newBundle := func() operations.Bundle { return bundleWith(t, reporter) }
-	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}})
 
 	// p1 uploads DAR, threshold not met.
 	_, _ = operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p1", true), input)
@@ -63,7 +63,7 @@ func TestState_Completed(t *testing.T) {
 
 	reporter := operations.NewMemoryReporter()
 	newBundle := func() operations.Bundle { return bundleWith(t, reporter) }
-	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}})
 
 	// Complete the ceremony (p1 DAR, p2 DAR+sign, p1 sign+execute+verify).
 	_, _ = operations.ExecuteSequence(newBundle(), contractdeploy.ContractDeploySequence, newDeps("p1", true), input)
@@ -82,7 +82,7 @@ func TestState_LatestSequenceState(t *testing.T) {
 	t.Parallel()
 
 	reporter := operations.NewMemoryReporter()
-	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+	input := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}})
 
 	_, found := contractdeploy.LatestSequenceState(reporter, input)
 	assert.False(t, found)
@@ -100,11 +100,11 @@ func TestState_Scoping(t *testing.T) {
 	t.Parallel()
 
 	reporter := operations.NewMemoryReporter()
-	inputA := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "current"}})
+	inputA := baseInput([]contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}})
 	inputB := contractdeploy.ContractDeployInput{
 		DecentralizedPartyID: "test-party::1220abcdef",
 		SynchronizerID:       "global",
-		Packages:             []contractdeploy.PackageRef{{Name: "mcms", Version: "current"}},
+		Packages:             []contractdeploy.PackageRef{{Name: "mcms", Version: "dev"}},
 		TemplateModule:       "Other.Module",
 		TemplateEntity:       "Other",
 		ContractArgs:         `{}`,

@@ -84,7 +84,7 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 		ContractId: "lockReleaseContractId",
 		TemplateId: &apiv2.Identifier{
 			PackageId:  "package1",
-			ModuleName: "CCIP.LockReleaseTokenPool",
+			ModuleName: "CCIP.LockReleaseTokenPoolV2",
 			EntityName: "LockReleaseTokenPool",
 		},
 		CreateArguments: bindings.MarshalTemplateToRecord(lockReleaseTokenPool),
@@ -94,7 +94,7 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 		ContractId: "rateLimiterContractId",
 		TemplateId: &apiv2.Identifier{
 			PackageId:  "package2",
-			ModuleName: "CCIP.Common",
+			ModuleName: "CCIP.RateLimiterV2",
 			EntityName: "RateLimiter",
 		},
 	}}
@@ -182,11 +182,11 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 			},
 			{
 				ContractId: "lockReleaseContractId",
-				TemplateId: "package1:CCIP.LockReleaseTokenPool:LockReleaseTokenPool",
+				TemplateId: "package1:CCIP.LockReleaseTokenPoolV2:LockReleaseTokenPool",
 			},
 			{
 				ContractId: "rateLimiterContractId",
-				TemplateId: "package2:CCIP.Common:RateLimiter",
+				TemplateId: "package2:CCIP.RateLimiterV2:RateLimiter",
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})
@@ -208,11 +208,11 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 		require.ElementsMatch(t, []oapiCommon.DisclosedContract{
 			{
 				ContractId: "lockReleaseContractId",
-				TemplateId: "package1:CCIP.LockReleaseTokenPool:LockReleaseTokenPool",
+				TemplateId: "package1:CCIP.LockReleaseTokenPoolV2:LockReleaseTokenPool",
 			},
 			{
 				ContractId: "rateLimiterContractId",
-				TemplateId: "package2:CCIP.Common:RateLimiter",
+				TemplateId: "package2:CCIP.RateLimiterV2:RateLimiter",
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})
@@ -235,11 +235,11 @@ func TestServer_PostTokenPoolSend_LockRelease(t *testing.T) {
 		require.ElementsMatch(t, []oapiCommon.DisclosedContract{
 			{
 				ContractId: "lockReleaseContractId",
-				TemplateId: "package1:CCIP.LockReleaseTokenPool:LockReleaseTokenPool",
+				TemplateId: "package1:CCIP.LockReleaseTokenPoolV2:LockReleaseTokenPool",
 			},
 			{
 				ContractId: "rateLimiterContractId",
-				TemplateId: "package2:CCIP.Common:RateLimiter",
+				TemplateId: "package2:CCIP.RateLimiterV2:RateLimiter",
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})
@@ -433,7 +433,7 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 		ContractId: "burnMintContractId",
 		TemplateId: &apiv2.Identifier{
 			PackageId:  "package1",
-			ModuleName: "CCIP.BurnMintTokenPool",
+			ModuleName: "CCIP.BurnMintTokenPoolV2",
 			EntityName: "BurnMintTokenPool",
 		},
 		CreateArguments: bindings.MarshalTemplateToRecord(burnMintPool),
@@ -443,7 +443,7 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 		ContractId: "rateLimiterContractId",
 		TemplateId: &apiv2.Identifier{
 			PackageId:  "package2",
-			ModuleName: "CCIP.Common",
+			ModuleName: "CCIP.RateLimiterV2",
 			EntityName: "RateLimiter",
 		},
 	}}
@@ -516,11 +516,11 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 		require.ElementsMatch(t, []oapiCommon.DisclosedContract{
 			{
 				ContractId: "burnMintContractId",
-				TemplateId: "package1:CCIP.BurnMintTokenPool:BurnMintTokenPool",
+				TemplateId: "package1:CCIP.BurnMintTokenPoolV2:BurnMintTokenPool",
 			},
 			{
 				ContractId: "rateLimiterContractId",
-				TemplateId: "package2:CCIP.Common:RateLimiter",
+				TemplateId: "package2:CCIP.RateLimiterV2:RateLimiter",
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})
@@ -540,11 +540,11 @@ func TestServer_PostTokenPoolSend_BurnMint(t *testing.T) {
 		require.ElementsMatch(t, []oapiCommon.DisclosedContract{
 			{
 				ContractId: "burnMintContractId",
-				TemplateId: "package1:CCIP.BurnMintTokenPool:BurnMintTokenPool",
+				TemplateId: "package1:CCIP.BurnMintTokenPoolV2:BurnMintTokenPool",
 			},
 			{
 				ContractId: "rateLimiterContractId",
-				TemplateId: "package2:CCIP.Common:RateLimiter",
+				TemplateId: "package2:CCIP.RateLimiterV2:RateLimiter",
 			},
 		}, resp.JSON200.DisclosedContracts)
 	})

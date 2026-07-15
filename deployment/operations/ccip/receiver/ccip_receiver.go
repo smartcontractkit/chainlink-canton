@@ -28,7 +28,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[ccipreceiver.CCIPReceiver]
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPReceiver),
+	PackageName: string(contracts.CCIPReceiverV2),
 	Prefix:      "ccipreceiver",
 })
 

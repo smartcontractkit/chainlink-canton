@@ -18,7 +18,7 @@ var ContractType = deployment.ContractType("CantonBurnMintTokenPool")
 
 var Version = semver.MustParse("2.0.0")
 
-var lrtpEncoder = burnminttokenpool.NewContract("", "CCIP.BurnMintTokenPool", "BurnMintTokenPool").Encoder()
+var lrtpEncoder = burnminttokenpool.NewContract("", "CCIP.BurnMintTokenPoolV2", "BurnMintTokenPool").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[burnminttokenpool.BurnMintTokenPool]{
 	Name:           "canton/ccip/burn_mint_token_pool/deploy",
@@ -40,7 +40,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[burnminttokenpool.BurnMint
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPBurnMintTokenPool),
+	PackageName: string(contracts.CCIPBurnMintTokenPoolV2),
 	Prefix:      "burnminttokenpool",
 })
 

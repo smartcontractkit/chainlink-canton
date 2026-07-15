@@ -17,18 +17,18 @@ import (
 type DARLoader func(packageName, version string) ([]byte, error)
 
 // releaseDir must stay in sync with contracts.ReleaseDir in the parent module.
-const releaseDir = "v2_0_0"
+const releaseDir = "released"
 
 func darVersionDir(version string) string {
-	if version == "current" {
-		return "current"
+	if version == "dev" {
+		return "dev"
 	}
 
 	return releaseDir
 }
 
 // FileDARLoader returns a [DARLoader] that reads DARs from a directory on the
-// local filesystem. Files live under versioned subdirectories (e.g. current/,
+// local filesystem. Files live under versioned subdirectories (e.g. dev/,
 // v1_0_0/) matching the embedded FS layout in the contracts package.
 func FileDARLoader(dir string) DARLoader {
 	return func(packageName, version string) ([]byte, error) {

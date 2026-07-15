@@ -247,7 +247,7 @@ func TestCCIP_MCMSFactoryDeploy(t *testing.T) {
 
 	// GlobalConfig: ApplySourceChainConfigUpdates
 	remoteChainSelector := types.NUMERIC("456")
-	gcEncoder := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.GlobalConfig", "GlobalConfig").Encoder()
+	gcEncoder := core.NewContract(fmt.Sprintf("#%s", core.PackageName), "CCIP.CoreV2.GlobalConfig", "GlobalConfig").Encoder()
 
 	sourceConfigArgs := core.ApplySourceChainConfigUpdates{
 		SourceChainConfigUpdates: []core.SourceChainConfigArgs{{
@@ -780,7 +780,7 @@ func queryContractFields(
 		}
 	}
 
-	t.Fatalf("contract not found: CCIP.Factory/CCIPFactory CID=%s", contractCid)
+	t.Fatalf("contract not found: CCIP.FactoryV2/CCIPFactory CID=%s", contractCid)
 
 	return nil
 }
