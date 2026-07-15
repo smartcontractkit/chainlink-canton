@@ -34,11 +34,11 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/smartcontractkit/chain-selectors v1.0.106
-	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260702144426-865f1e5fe90d
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260702144426-865f1e5fe90d
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260709174019-f20ea93af300
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260709174019-f20ea93af300
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260709174019-f20ea93af300
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260715043322-e1793fb1a7e1
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260715043322-e1793fb1a7e1
+	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260715044934-94e5aba91e2a 
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260715044934-94e5aba91e2a
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260715044934-94e5aba91e2a
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
 	github.com/smartcontractkit/chainlink-deployments-framework v0.114.2
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260708113039-95f97b2d25e9
@@ -160,7 +160,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/sercand/kuberesolver/v6 v6.0.0 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.2-0.20260709174019-f20ea93af300 // indirect
+	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.2-0.20260715042953-27a8f0cccbf5 // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20260423135514-5b1a7565a99c // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260423135514-5b1a7565a99c // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20260423135514-5b1a7565a99c // indirect
