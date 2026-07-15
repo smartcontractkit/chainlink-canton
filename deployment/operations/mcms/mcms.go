@@ -31,7 +31,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[mcmsCore.MCMS]{
 
 		return nil
 	},
-	PackageName: string(contracts.MCMS),
+	PackageName: string(contracts.MCMSCore),
 	Prefix:      "mcms",
 })
 

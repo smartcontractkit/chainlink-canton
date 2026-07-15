@@ -6,36 +6,36 @@ import DA.Assert
 import DA.Optional
 import DA.Crypto.Text (byteCount)
 
-import qualified CCIP.CodecV1.FinalityConfig
-import qualified CCIP.CodecV1.MessageCodecV1
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CodecV2.MessageCodecV1
 
 mkFinalityConfig : Int -> Int -> Text
 mkFinalityConfig flags blockConfirmations =
     fromSome do
-        flagsHex <- CCIP.CodecV1.MessageCodecV1.encodeUint16 flags
-        blockConfirmationsHex <- CCIP.CodecV1.MessageCodecV1.encodeUint16 blockConfirmations
+        flagsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 flags
+        blockConfirmationsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 blockConfirmations
         pure (flagsHex <> blockConfirmationsHex)
 
-decodedFinality : Text -> CCIP.CodecV1.FinalityConfig.DecodedFinality
+decodedFinality : Text -> CCIP.CodecV2.FinalityConfig.DecodedFinality
 decodedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
-        (CCIP.CodecV1.FinalityConfig.decodeRequestedFinality finalityConfig)
+        (CCIP.CodecV2.FinalityConfig.decodeRequestedFinality finalityConfig)
 
 decodeFlags : Text -> Optional Int
 decodeFlags finalityConfig = do
     if byteCount finalityConfig /= 4 then None else do
-        flagsHex <- CCIP.CodecV1.MessageCodecV1.extractBytes finalityConfig 0 2
-        CCIP.CodecV1.MessageCodecV1.decodeUint16 flagsHex
+        flagsHex <- CCIP.CodecV2.MessageCodecV1.extractBytes finalityConfig 0 2
+        CCIP.CodecV2.MessageCodecV1.decodeUint16 flagsHex
 
 decodeBlockConfirmations : Text -> Optional Int
 decodeBlockConfirmations finalityConfig = do
     if byteCount finalityConfig /= 4 then None else do
-        blockConfirmationsHex <- CCIP.CodecV1.MessageCodecV1.extractBytes finalityConfig 2 2
-        CCIP.CodecV1.MessageCodecV1.decodeUint16 blockConfirmationsHex
+        blockConfirmationsHex <- CCIP.CodecV2.MessageCodecV1.extractBytes finalityConfig 2 2
+        CCIP.CodecV2.MessageCodecV1.decodeUint16 blockConfirmationsHex
 
 validateRequestedFinality : Text -> Bool
 validateRequestedFinality finalityConfig =
-    isSome (CCIP.CodecV1.FinalityConfig.decodeRequestedFinality finalityConfig)
+    isSome (CCIP.CodecV2.FinalityConfig.decodeRequestedFinality finalityConfig)
 
 testDecodeKnownEncodings : Script ()
 testDecodeKnownEncodings = do
@@ -71,11 +71,11 @@ testValidateRequestedFinalityModes = do
     assertMsg "multiple flag bits should be rejected"
         (not (validateRequestedFinality multipleFlags))
 
-    CCIP.CodecV1.FinalityConfig.decodeRequestedFinality finalizedOnly === Some (decodedFinality finalizedOnly)
-    CCIP.CodecV1.FinalityConfig.decodeRequestedFinality safe === Some (decodedFinality safe)
-    CCIP.CodecV1.FinalityConfig.decodeRequestedFinality depth2000 === Some (decodedFinality depth2000)
-    CCIP.CodecV1.FinalityConfig.decodeRequestedFinality mixedSafeAndDepth === None
-    CCIP.CodecV1.FinalityConfig.decodeRequestedFinality multipleFlags === None
+    CCIP.CodecV2.FinalityConfig.decodeRequestedFinality finalizedOnly === Some (decodedFinality finalizedOnly)
+    CCIP.CodecV2.FinalityConfig.decodeRequestedFinality safe === Some (decodedFinality safe)
+    CCIP.CodecV2.FinalityConfig.decodeRequestedFinality depth2000 === Some (decodedFinality depth2000)
+    CCIP.CodecV2.FinalityConfig.decodeRequestedFinality mixedSafeAndDepth === None
+    CCIP.CodecV2.FinalityConfig.decodeRequestedFinality multipleFlags === None
 
 testRequestedFinalityAllowed : Script ()
 testRequestedFinalityAllowed = do
@@ -86,13 +86,13 @@ testRequestedFinalityAllowed = do
     let requested = (.requested) . decodedFinality
 
     assertMsg "finalized-only requests are always allowed"
-        (CCIP.CodecV1.FinalityConfig.requestedFinalityAllowed (requested finalizedOnly) (requested safe))
+        (CCIP.CodecV2.FinalityConfig.requestedFinalityAllowed (requested finalizedOnly) (requested safe))
     assertMsg "safe requested should be allowed when safe is allowed"
-        (CCIP.CodecV1.FinalityConfig.requestedFinalityAllowed (requested safe) (requested safe))
+        (CCIP.CodecV2.FinalityConfig.requestedFinalityAllowed (requested safe) (requested safe))
     assertMsg "deeper block depth should satisfy a lower allowed depth"
-        (CCIP.CodecV1.FinalityConfig.requestedFinalityAllowed (requested depth2000) (requested depth12))
+        (CCIP.CodecV2.FinalityConfig.requestedFinalityAllowed (requested depth2000) (requested depth12))
     assertMsg "safe requested should not satisfy a block-depth-only config"
-        (not (CCIP.CodecV1.FinalityConfig.requestedFinalityAllowed (requested safe) (requested depth12)))
+        (not (CCIP.CodecV2.FinalityConfig.requestedFinalityAllowed (requested safe) (requested depth12)))
 
 testValidateRequestedFinalityAlignsWithDecoder : Script ()
 testValidateRequestedFinalityAlignsWithDecoder = do
@@ -106,21 +106,21 @@ testValidateRequestedFinalityAlignsWithDecoder = do
         safePlusDepth = "0001000c"            -- flags=1 + depth=12: mixed
 
     -- Patterns the decoder accepts must validate.
-    CCIP.CodecV1.FinalityConfig.validateRequestedFinality finalizedOnly === True
-    CCIP.CodecV1.FinalityConfig.validateRequestedFinality safe          === True
-    CCIP.CodecV1.FinalityConfig.validateRequestedFinality depth5        === True
+    CCIP.CodecV2.FinalityConfig.validateRequestedFinality finalizedOnly === True
+    CCIP.CodecV2.FinalityConfig.validateRequestedFinality safe          === True
+    CCIP.CodecV2.FinalityConfig.validateRequestedFinality depth5        === True
 
     -- Patterns the decoder rejects must NOT validate.
-    CCIP.CodecV1.FinalityConfig.validateRequestedFinality flagBit1      === False
-    CCIP.CodecV1.FinalityConfig.validateRequestedFinality flagBit2      === False
-    CCIP.CodecV1.FinalityConfig.validateRequestedFinality flagBit3      === False
-    CCIP.CodecV1.FinalityConfig.validateRequestedFinality safePlusDepth === False
+    CCIP.CodecV2.FinalityConfig.validateRequestedFinality flagBit1      === False
+    CCIP.CodecV2.FinalityConfig.validateRequestedFinality flagBit2      === False
+    CCIP.CodecV2.FinalityConfig.validateRequestedFinality flagBit3      === False
+    CCIP.CodecV2.FinalityConfig.validateRequestedFinality safePlusDepth === False
 
     -- And the decoder must agree.
-    CCIP.CodecV1.FinalityConfig.decodeRequestedFinality flagBit1      === None
-    CCIP.CodecV1.FinalityConfig.decodeRequestedFinality flagBit2      === None
-    CCIP.CodecV1.FinalityConfig.decodeRequestedFinality flagBit3      === None
-    CCIP.CodecV1.FinalityConfig.decodeRequestedFinality safePlusDepth === None
+    CCIP.CodecV2.FinalityConfig.decodeRequestedFinality flagBit1      === None
+    CCIP.CodecV2.FinalityConfig.decodeRequestedFinality flagBit2      === None
+    CCIP.CodecV2.FinalityConfig.decodeRequestedFinality flagBit3      === None
+    CCIP.CodecV2.FinalityConfig.decodeRequestedFinality safePlusDepth === None
 
 testCustomFinalityRateLimiterRequired : Script ()
 testCustomFinalityRateLimiterRequired = do
@@ -130,8 +130,8 @@ testCustomFinalityRateLimiterRequired = do
     let requested = (.requested) . decodedFinality
 
     assertMsg "finalized-only should use the default limiter path"
-        (not (CCIP.CodecV1.FinalityConfig.customFinalityRateLimiterRequired (requested finalizedOnly)))
+        (not (CCIP.CodecV2.FinalityConfig.customFinalityRateLimiterRequired (requested finalizedOnly)))
     assertMsg "safe should require the custom finality limiter path"
-        (CCIP.CodecV1.FinalityConfig.customFinalityRateLimiterRequired (requested safe))
+        (CCIP.CodecV2.FinalityConfig.customFinalityRateLimiterRequired (requested safe))
     assertMsg "block-depth should require the custom finality limiter path"
-        (CCIP.CodecV1.FinalityConfig.customFinalityRateLimiterRequired (requested depth2000))
+        (CCIP.CodecV2.FinalityConfig.customFinalityRateLimiterRequired (requested depth2000))

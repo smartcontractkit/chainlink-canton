@@ -1,0 +1,57 @@
+-- | Types module for RMNRemote MCMS parameters
+-- Separate module to enable auto-generated codec via go-daml
+module CCIP.CoreV2.RMNRemoteTypes where
+
+import DA.Crypto.Text (BytesHex)
+
+-- ===========================================================================
+-- MCMS Choice Params Types
+-- ===========================================================================
+
+-- | Params for Curse choice (curse a single subject)
+data CurseParams = CurseParams
+    with
+        subject : BytesHex
+    deriving (Eq, Show)
+
+-- | Params for Uncurse choice (uncurse a single subject)
+data UncurseParams = UncurseParams
+    with
+        subject : BytesHex
+    deriving (Eq, Show)
+
+-- | Params for CurseChain choice (curse by chain selector)
+data CurseChainParams = CurseChainParams
+    with
+        chainSelector : Numeric 0
+    deriving (Eq, Show)
+
+-- | Params for UncurseChain choice (uncurse by chain selector)
+data UncurseChainParams = UncurseChainParams
+    with
+        chainSelector : Numeric 0
+    deriving (Eq, Show)
+
+-- | Params for CurseMultiple choice (curse multiple subjects)
+data CurseMultipleParams = CurseMultipleParams
+    with
+        subjects : [BytesHex]
+    deriving (Eq, Show)
+
+-- | Params for UncurseMultiple choice (uncurse multiple subjects)
+data UncurseMultipleParams = UncurseMultipleParams
+    with
+        subjects : [BytesHex]
+    deriving (Eq, Show)
+
+-- | Params for AddCustomObservers choice
+data AddCustomObserversParams = AddCustomObserversParams
+    with
+        parties : [Party]
+    deriving (Eq, Show)
+
+-- | Params for RemoveCustomObservers choice
+data RemoveCustomObserversParams = RemoveCustomObserversParams
+    with
+        parties : [Party]
+    deriving (Eq, Show)

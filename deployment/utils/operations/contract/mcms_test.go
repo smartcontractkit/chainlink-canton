@@ -22,7 +22,7 @@ func TestNewCantonTransaction(t *testing.T) {
 	encodedChoice := &bind.EncodedChoice{
 		TemplateID: bind.TemplateInformation{
 			PackageID:    "pkg-123",
-			ModuleName:   "CCIP.GlobalConfig",
+			ModuleName:   "CCIP.CoreV2.GlobalConfig",
 			TemplateName: "GlobalConfig",
 		},
 		Choice:        "ApplyDestChainConfigUpdates",
@@ -30,7 +30,7 @@ func TestNewCantonTransaction(t *testing.T) {
 	}
 	contractType := deployment.ContractType("CantonGlobalConfig")
 
-	templateID := "#pkg-123:CCIP.GlobalConfig:GlobalConfig"
+	templateID := "#pkg-123:CCIP.CoreV2.GlobalConfig:GlobalConfig"
 	tx, err := NewCantonTransaction(rawAddr, instanceAddr, encodedChoice, contractType, templateID)
 	require.NoError(t, err)
 

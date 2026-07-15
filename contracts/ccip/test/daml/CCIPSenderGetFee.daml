@@ -8,7 +8,7 @@ import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.ClientV1
+import qualified CCIP.ClientV2
 import qualified CCIP.CCIPSender
 
 import qualified CommitteeVerifier.DummyCommitteeVerifier
@@ -35,10 +35,10 @@ mkCCVSendInput ccvAddress verifierCid =
 
 messageRequiringRequiredVerifier
     : SenderGetFeeFixture
-    -> CCIP.ClientV1.Canton2AnyMessage
+    -> CCIP.ClientV2.Canton2AnyMessage
 messageRequiringRequiredVerifier f =
     CCVMaxBounds.messageOnly f.outbound
-        [ CCIP.ClientV1.CCVExtraArg with
+        [ CCIP.ClientV2.CCVExtraArg with
             ccvAddress = f.requiredVerifierAddress
             ccvArgs = ""
         ]
@@ -85,7 +85,7 @@ setupSenderGetFeeFixture suffix = do
 
 submitGetFee
     : SenderGetFeeFixture
-    -> CCIP.ClientV1.Canton2AnyMessage
+    -> CCIP.ClientV2.Canton2AnyMessage
     -> [CCIP.CCIPSender.CCVSendInput]
     -> Script CCIP.CCIPSender.GetFeeResult
 submitGetFee f message ccvSendInputs = do
@@ -111,7 +111,7 @@ submitGetFee f message ccvSendInputs = do
 
 submitGetFeeMustFail
     : SenderGetFeeFixture
-    -> CCIP.ClientV1.Canton2AnyMessage
+    -> CCIP.ClientV2.Canton2AnyMessage
     -> [CCIP.CCIPSender.CCVSendInput]
     -> Script ()
 submitGetFeeMustFail f message ccvSendInputs = do

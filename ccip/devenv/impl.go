@@ -80,20 +80,14 @@ var (
 	cantonTokenPoolVersion        = semver.MustParse("2.0.0")
 	errLockReleasePoolNotDeployed = errors.New("lock release token pool not deployed")
 	cantonDeployDarPackages       = []contracts.Package{
-		contracts.CCIPFactory,
-		contracts.CCIPCommon,
-		contracts.CCIPReceiver,
-		contracts.CCIPOffRamp,
-		contracts.CCIPOnRamp,
-		contracts.CCIPTokenAdminRegistry,
-		contracts.CCIPCommitteeVerifier,
-		contracts.CCIPPerPartyRouter,
-		contracts.CCIPFeeQuoter,
-		contracts.CCIPRMN,
-		contracts.CCIPSender,
-		contracts.CCIPExecutor,
-		contracts.CCIPTest,
-		contracts.CCIPLockReleaseTokenPool,
+		contracts.CCIPFactoryV2,
+		contracts.CCIPRuntimeV2,
+		contracts.CCIPReceiverV2,
+		contracts.CCIPCoreV2,
+		contracts.CCIPCommitteeVerifierV2,
+		contracts.CCIPSenderV2,
+		contracts.CCIPExecutorV2,
+		contracts.CCIPLockReleaseTokenPoolV2,
 	}
 )
 
@@ -286,7 +280,7 @@ func (c *Chain) ConfigureNodes(ctx context.Context, blockchain *blockchain.Input
 }
 
 func uploadAndVetDar(ctx context.Context, participant canton.Participant, pkg contracts.Package) error {
-	dar, err := contracts.GetDar(pkg, contracts.CurrentVersion)
+	dar, err := contracts.GetDar(pkg, contracts.DevVersion)
 	if err != nil {
 		return fmt.Errorf("failed to get %s dar file: %w", pkg, err)
 	}

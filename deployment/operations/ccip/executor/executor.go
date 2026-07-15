@@ -16,7 +16,7 @@ var ContractType = deployment.ContractType("Executor")
 
 var Version = semver.MustParse("2.0.0")
 
-var executorEncoder = executor.NewContract("", "CCIP.Executor", "Executor").Encoder()
+var executorEncoder = executor.NewContract("", "CCIP.ExecutorV2", "Executor").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[executor.Executor]{
 	Name:           "canton/ccip/executor/deploy",
@@ -32,7 +32,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[executor.Executor]{
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPExecutor),
+	PackageName: string(contracts.CCIPExecutorV2),
 	Prefix:      "executor",
 })
 

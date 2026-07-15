@@ -14,28 +14,28 @@ import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.APIV1.FeeQuoter
-import qualified CCIP.APIV1.GlobalConfig
-import qualified CCIP.APIV1.RMNRemote
-import qualified CCIP.APIV1.TokenAdminRegistry
-import qualified CCIP.ClientV1
-import qualified CCIP.CodecV1.CCVCodec
-import qualified CCIP.CodecV1.FinalityConfig
-import qualified CCIP.CodecV1.MessageCodecV1
-import qualified CCIP.CoreV1.ExecutingMessage
-import qualified CCIP.CoreV1.FeeQuoter
-import qualified CCIP.CoreV1.GlobalConfig
-import qualified CCIP.CoreV1.RMNRemote
-import qualified CCIP.CoreV1.SendingMessage
-import qualified CCIP.CoreV1.TokenAdminRegistry
-import qualified CCIP.InterfacesV1.CrossChainVerifier
-import qualified CCIP.RuntimeV1.OffRamp
-import qualified CCIP.RuntimeV1.OnRamp
-import qualified CCIP.RuntimeV1.PerPartyRouter
+import qualified CCIP.APIV2.FeeQuoter
+import qualified CCIP.APIV2.GlobalConfig
+import qualified CCIP.APIV2.RMNRemote
+import qualified CCIP.APIV2.TokenAdminRegistry
+import qualified CCIP.ClientV2
+import qualified CCIP.CodecV2.CCVCodec
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CodecV2.MessageCodecV1
+import qualified CCIP.CoreV2.ExecutingMessage
+import qualified CCIP.CoreV2.FeeQuoter
+import qualified CCIP.CoreV2.GlobalConfig
+import qualified CCIP.CoreV2.RMNRemote
+import qualified CCIP.CoreV2.SendingMessage
+import qualified CCIP.CoreV2.TokenAdminRegistry
+import qualified CCIP.InterfacesV2.CrossChainVerifier
+import qualified CCIP.RuntimeV2.OffRamp
+import qualified CCIP.RuntimeV2.OnRamp
+import qualified CCIP.RuntimeV2.PerPartyRouter
 
 
 overMaxCCVCount : Int
-overMaxCCVCount = CCIP.CodecV1.CCVCodec.maxCCVsPerMessage + 1
+overMaxCCVCount = CCIP.CodecV2.CCVCodec.maxCCVsPerMessage + 1
 
 cents : Decimal -> Numeric 0
 cents c = intToNumeric (truncate c)
@@ -44,17 +44,17 @@ mkRawCCVs : Text -> Party -> Int -> [Chainlink.InstanceAddress.RawInstanceAddres
 mkRawCCVs prefix owner count =
     [ Chainlink.InstanceAddress.make (prefix <> show i) owner | i <- [0..(count - 1)] ]
 
-mkCCVExtraArgs : Text -> Party -> Int -> [CCIP.ClientV1.CCVExtraArg]
+mkCCVExtraArgs : Text -> Party -> Int -> [CCIP.ClientV2.CCVExtraArg]
 mkCCVExtraArgs prefix owner count =
-    [ CCIP.ClientV1.CCVExtraArg with
+    [ CCIP.ClientV2.CCVExtraArg with
         ccvAddress = Chainlink.InstanceAddress.make (prefix <> show i) owner
         ccvArgs = ""
     | i <- [0..(count - 1)]
     ]
 
-mkFeeQuotes : Text -> Party -> Int -> [CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierFeeQuote]
+mkFeeQuotes : Text -> Party -> Int -> [CCIP.InterfacesV2.CrossChainVerifier.CrossChainVerifierFeeQuote]
 mkFeeQuotes prefix owner count =
-    [ CCIP.InterfacesV1.CrossChainVerifier.CrossChainVerifierFeeQuote with
+    [ CCIP.InterfacesV2.CrossChainVerifier.CrossChainVerifierFeeQuote with
         ccvInstanceId = prefix <> show i
         ccvOwner = owner
         feeUSDCents = 0.0
@@ -64,11 +64,11 @@ mkFeeQuotes prefix owner count =
     | i <- [0..(count - 1)]
     ]
 
-basicExtraArgs : [CCIP.ClientV1.CCVExtraArg] -> CCIP.ClientV1.ExtraArgs
-basicExtraArgs ccvs = CCIP.ClientV1.V3 CCIP.ClientV1.GenericExtraArgsV3 with
+basicExtraArgs : [CCIP.ClientV2.CCVExtraArg] -> CCIP.ClientV2.ExtraArgs
+basicExtraArgs ccvs = CCIP.ClientV2.V3 CCIP.ClientV2.GenericExtraArgsV3 with
     gasLimit = 0
     ccvs = ccvs
-    executor = CCIP.ClientV1.Executor_NoExecutor
+    executor = CCIP.ClientV2.Executor_NoExecutor
     tokenReceiver = ""
     tokenArgs = ""
 
@@ -80,39 +80,39 @@ data OutboundFixture = OutboundFixture
         sourceChainSelector : Numeric 0
         destChainSelector : Numeric 0
         feeToken : Splice.Api.Token.HoldingV1.InstrumentId
-        globalConfig : ContractId CCIP.CoreV1.GlobalConfig.GlobalConfig
-        onRamp : ContractId CCIP.RuntimeV1.OnRamp.OnRamp
-        router : ContractId CCIP.RuntimeV1.PerPartyRouter.PerPartyRouter
-        tokenAdminRegistry : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry
-        feeQuoter : ContractId CCIP.CoreV1.FeeQuoter.FeeQuoter
-        rmnRemote : ContractId CCIP.CoreV1.RMNRemote.RMNRemote
+        globalConfig : ContractId CCIP.CoreV2.GlobalConfig.GlobalConfig
+        onRamp : ContractId CCIP.RuntimeV2.OnRamp.OnRamp
+        router : ContractId CCIP.RuntimeV2.PerPartyRouter.PerPartyRouter
+        tokenAdminRegistry : ContractId CCIP.CoreV2.TokenAdminRegistry.TokenAdminRegistry
+        feeQuoter : ContractId CCIP.CoreV2.FeeQuoter.FeeQuoter
+        rmnRemote : ContractId CCIP.CoreV2.RMNRemote.RMNRemote
 
 outboundContext : OutboundFixture -> Splice.Api.Token.MetadataV1.ChoiceContext
 outboundContext f =
     Splice.Api.Token.MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.APIV1.RMNRemote.rmnRemoteContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
-            , (CCIP.APIV1.TokenAdminRegistry.tokenAdminRegistryContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
-            , (CCIP.APIV1.FeeQuoter.feeQuoterContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.feeQuoter)
-            , (CCIP.APIV1.GlobalConfig.globalConfigContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
-            , (CCIP.RuntimeV1.OnRamp.onRampContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.onRamp)
+            [ (CCIP.APIV2.RMNRemote.rmnRemoteContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
+            , (CCIP.APIV2.TokenAdminRegistry.tokenAdminRegistryContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
+            , (CCIP.APIV2.FeeQuoter.feeQuoterContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.feeQuoter)
+            , (CCIP.APIV2.GlobalConfig.globalConfigContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
+            , (CCIP.RuntimeV2.OnRamp.onRampContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.onRamp)
             ]
 
-messageOnly : OutboundFixture -> [CCIP.ClientV1.CCVExtraArg] -> CCIP.ClientV1.Canton2AnyMessage
+messageOnly : OutboundFixture -> [CCIP.ClientV2.CCVExtraArg] -> CCIP.ClientV2.Canton2AnyMessage
 messageOnly f ccvs =
-    CCIP.ClientV1.Canton2AnyMessage with
+    CCIP.ClientV2.Canton2AnyMessage with
         receiver = "0000000000000000000000000000000000000001"
         payload = "abcd"
         tokenTransfer = None
         feeToken = f.feeToken
         extraArgs = basicExtraArgs ccvs
 
-tokenOnlyClientMessage : OutboundFixture -> CCIP.ClientV1.Canton2AnyMessage
+tokenOnlyClientMessage : OutboundFixture -> CCIP.ClientV2.Canton2AnyMessage
 tokenOnlyClientMessage f =
-    CCIP.ClientV1.Canton2AnyMessage with
+    CCIP.ClientV2.Canton2AnyMessage with
         receiver = "0000000000000000000000000000000000000001"
         payload = ""
-        tokenTransfer = Some (CCIP.ClientV1.TokenTransfer with
+        tokenTransfer = Some (CCIP.ClientV2.TokenTransfer with
             token = f.feeToken
             amount = 1.0)
         feeToken = f.feeToken
@@ -137,12 +137,12 @@ setupOutboundFixture suffix = do
             id = "FeeToken"
 
     globalConfig <- submit ccipOwner do
-        createCmd CCIP.CoreV1.GlobalConfig.GlobalConfig with
+        createCmd CCIP.CoreV2.GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = sourceChainSelector
             destChainConfigs = Map.fromList
-                [ (destChainSelector, CCIP.CoreV1.GlobalConfig.DestChainConfig with
+                [ (destChainSelector, CCIP.CoreV2.GlobalConfig.DestChainConfig with
                     isEnabled = True
                     addressBytesLength = 20
                     tokenReceiverAllowed = False
@@ -158,7 +158,7 @@ setupOutboundFixture suffix = do
             sourceChainConfigs = Map.empty
 
     rmnRemote <- submit rmnOwner do
-        createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
+        createCmd CCIP.CoreV2.RMNRemote.RMNRemote with
             instanceId = rmnInstanceId
             rmnOwner = rmnOwner
             ccipOwner = ccipOwner
@@ -166,18 +166,18 @@ setupOutboundFixture suffix = do
             cursedSubjects = []
 
     tokenAdminRegistry <- submit ccipOwner do
-        createCmd CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry with
+        createCmd CCIP.CoreV2.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
             entryCount = 0
 
     feeQuoter <- submit ccipOwner do
-        createCmd CCIP.CoreV1.FeeQuoter.FeeQuoter with
+        createCmd CCIP.CoreV2.FeeQuoter.FeeQuoter with
             instanceId = feeQuoterInstanceId
             ccipOwner = ccipOwner
             feeTokens = Set.fromList [feeToken]
             destChainConfigs = Map.fromList
-                [ (destChainSelector, CCIP.CoreV1.FeeQuoter.FeeQuoterDestChainConfig with
+                [ (destChainSelector, CCIP.CoreV2.FeeQuoter.FeeQuoterDestChainConfig with
                     isEnabled = True
                     maxDataBytes = 100000
                     maxPerMsgGasLimit = 1000000
@@ -191,13 +191,13 @@ setupOutboundFixture suffix = do
                 ]
             tokenTransferFeeConfigs = Map.empty
             usdPerUnitGasByDestChainSelector = Map.fromList
-                [ (destChainSelector, CCIP.CoreV1.FeeQuoter.TimestampedPrice with
+                [ (destChainSelector, CCIP.CoreV2.FeeQuoter.TimestampedPrice with
                     price = 0.0
                     timestamp = datetime 2025 Jan 1 0 0 0
                   )
                 ]
             usdPerToken = Map.fromList
-                [ (feeToken, CCIP.CoreV1.FeeQuoter.TimestampedPrice with
+                [ (feeToken, CCIP.CoreV2.FeeQuoter.TimestampedPrice with
                     price = 100000000.0
                     timestamp = datetime 2025 Jan 1 0 0 0
                   )
@@ -206,22 +206,22 @@ setupOutboundFixture suffix = do
             priceUpdaters = []
 
     onRamp <- submit ccipOwner do
-        createCmd CCIP.RuntimeV1.OnRamp.OnRamp with
+        createCmd CCIP.RuntimeV2.OnRamp.OnRamp with
             instanceId = onRampInstanceId
             ccipOwner = ccipOwner
             maxUSDCentsPerMsg = 1000000000.0
-            deps = CCIP.RuntimeV1.OnRamp.OnRampDeps with
+            deps = CCIP.RuntimeV2.OnRamp.OnRampDeps with
                 globalConfig = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
                 feeQuoter = Chainlink.InstanceAddress.make feeQuoterInstanceId ccipOwner
 
     router <- submit ccipOwner do
-        createCmd CCIP.RuntimeV1.PerPartyRouter.PerPartyRouter with
+        createCmd CCIP.RuntimeV2.PerPartyRouter.PerPartyRouter with
             instanceId = routerInstanceId
             ccipOwner = ccipOwner
             partyOwner = user
-            deps = CCIP.RuntimeV1.PerPartyRouter.PerPartyRouterDeps with
+            deps = CCIP.RuntimeV2.PerPartyRouter.PerPartyRouterDeps with
                 onRamp = Chainlink.InstanceAddress.make onRampInstanceId ccipOwner
                 offRamp = Chainlink.InstanceAddress.make ("offramp-unused-bounds-" <> suffix) ccipOwner
                 globalConfig = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
@@ -257,7 +257,7 @@ testGetFeeRejectsTooManyCCVFeeQuotes = script do
     let tooManyQuotes = mkFeeQuotes "quote-" f.user overMaxCCVCount
 
     submitMustFail (actAs f.user <> actAs f.ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedFeeQuoter) do
-        exerciseCmd f.router CCIP.RuntimeV1.PerPartyRouter.GetFee with
+        exerciseCmd f.router CCIP.RuntimeV2.PerPartyRouter.GetFee with
             context = outboundContext f
             destChainSelector = f.destChainSelector
             message = messageOnly f []
@@ -266,7 +266,7 @@ testGetFeeRejectsTooManyCCVFeeQuotes = script do
             executorFeeQuote = None
 
     submitMustFail (actAs f.ccipOwner) do
-        exerciseCmd f.onRamp CCIP.RuntimeV1.OnRamp.GetFeeFromRouter with
+        exerciseCmd f.onRamp CCIP.RuntimeV2.OnRamp.GetFeeFromRouter with
             routerPartyOwner = f.user
             routerInstanceId = "router-bounds-fee-quotes"
             globalConfigCid = f.globalConfig
@@ -291,20 +291,20 @@ testOutboundRequiredCCVGuardsRejectTooManyLists = script do
     let tooManySenderMessage = messageOnly f tooManySenderCCVs
 
     submitMustFail (actAs f.user <> actAs f.ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig) do
-        exerciseCmd f.router CCIP.RuntimeV1.PerPartyRouter.GetRequiredCCVsForSend with
+        exerciseCmd f.router CCIP.RuntimeV2.PerPartyRouter.GetRequiredCCVsForSend with
             context = outboundContext f
             destChainSelector = f.destChainSelector
             message = tooManySenderMessage
             poolReportedCCVs = []
 
     submitMustFail (actAs f.user <> actAs f.ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig <> disclose disclosedTokenAdminRegistry <> disclose disclosedFeeQuoter <> disclose disclosedRmnRemote) do
-        exerciseCmd f.router CCIP.RuntimeV1.PerPartyRouter.PrepareSend with
+        exerciseCmd f.router CCIP.RuntimeV2.PerPartyRouter.PrepareSend with
             destinationChainSelector = f.destChainSelector
             message = tooManySenderMessage
             context = outboundContext f
 
     submitMustFail (actAs f.user <> actAs f.ccipOwner <> disclose disclosedOnRamp <> disclose disclosedGlobalConfig) do
-        exerciseCmd f.router CCIP.RuntimeV1.PerPartyRouter.GetRequiredCCVsForSend with
+        exerciseCmd f.router CCIP.RuntimeV2.PerPartyRouter.GetRequiredCCVsForSend with
             context = outboundContext f
             destChainSelector = f.destChainSelector
             message = tokenOnlyClientMessage f
@@ -315,7 +315,7 @@ mkSendingMessage
     -> Party
     -> [Chainlink.InstanceAddress.RawInstanceAddress]
     -> Numeric 0
-    -> Script (ContractId CCIP.CoreV1.SendingMessage.SendingMessage)
+    -> Script (ContractId CCIP.CoreV2.SendingMessage.SendingMessage)
 mkSendingMessage ccipOwner sender destDefaultCCVs sequenceNumber = do
     let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with
             admin = ccipOwner
@@ -324,10 +324,10 @@ mkSendingMessage ccipOwner sender destDefaultCCVs sequenceNumber = do
             admin = ccipOwner
             id = "SendToken"
     submit ccipOwner do
-        createCmd CCIP.CoreV1.SendingMessage.SendingMessage with
+        createCmd CCIP.CoreV2.SendingMessage.SendingMessage with
             ccipOwner = ccipOwner
             sender = sender
-            deps = CCIP.CoreV1.SendingMessage.SendingMessageDeps with
+            deps = CCIP.CoreV2.SendingMessage.SendingMessageDeps with
                 router = Chainlink.InstanceAddress.make "router-pool-bounds" sender
                 onRamp = Chainlink.InstanceAddress.make "onramp-pool-bounds" ccipOwner
                 globalConfig = Chainlink.InstanceAddress.make "globalconfig-pool-bounds" ccipOwner
@@ -341,9 +341,9 @@ mkSendingMessage ccipOwner sender destDefaultCCVs sequenceNumber = do
             requiredCCVs = []
             requiredExecutor = None
             executorAddress = ""
-            executionMode = Some CCIP.CoreV1.SendingMessage.ExecutionMode_NoExecutor
+            executionMode = Some CCIP.CoreV2.SendingMessage.ExecutionMode_NoExecutor
             sourceChainSelector = 1111111111.0
-            senderAddress = CCIP.CodecV1.MessageCodecV1.encodePartyAddress sender
+            senderAddress = CCIP.CodecV2.MessageCodecV1.encodePartyAddress sender
             receiver = "0000000000000000000000000000000000000001"
             payload = ""
             executionGasLimit = 0
@@ -375,7 +375,7 @@ mkSendingMessage ccipOwner sender destDefaultCCVs sequenceNumber = do
             message = None
             encodedMessage = ""
             messageId = ""
-            state = CCIP.CoreV1.SendingMessage.SendingMessageState_RequirePoolCCVs
+            state = CCIP.CoreV2.SendingMessage.SendingMessageState_RequirePoolCCVs
 
 testSetOutboundPoolCCVsRejectsTooManyAndExpandedCCVs : Script ()
 testSetOutboundPoolCCVsRejectsTooManyAndExpandedCCVs = script do
@@ -385,13 +385,13 @@ testSetOutboundPoolCCVsRejectsTooManyAndExpandedCCVs = script do
 
     smTooMany <- mkSendingMessage ccipOwner sender [] 1.0
     submitMustFail (actAs ccipOwner) do
-        exerciseCmd smTooMany CCIP.CoreV1.SendingMessage.SetOutboundPoolCCVs with
+        exerciseCmd smTooMany CCIP.CoreV2.SendingMessage.SetOutboundPoolCCVs with
             poolCCVs = mkRawCCVs "outbound-pool-ccv-" ccvOwner overMaxCCVCount
 
     smExpanded <- mkSendingMessage ccipOwner sender (mkRawCCVs "outbound-default-ccv-" ccvOwner overMaxCCVCount) 2.0
     submitMustFail (actAs ccipOwner) do
-        exerciseCmd smExpanded CCIP.CoreV1.SendingMessage.SetOutboundPoolCCVs with
-            poolCCVs = [CCIP.CodecV1.CCVCodec.useDefaultCCVs]
+        exerciseCmd smExpanded CCIP.CoreV2.SendingMessage.SetOutboundPoolCCVs with
+            poolCCVs = [CCIP.CodecV2.CCVCodec.useDefaultCCVs]
 
 data ExecuteFixture = ExecuteFixture
     with
@@ -400,21 +400,21 @@ data ExecuteFixture = ExecuteFixture
         receiver : Party
         sourceChainSelector : Numeric 0
         destChainSelector : Numeric 0
-        globalConfig : ContractId CCIP.CoreV1.GlobalConfig.GlobalConfig
-        offRamp : ContractId CCIP.RuntimeV1.OffRamp.OffRamp
-        router : ContractId CCIP.RuntimeV1.PerPartyRouter.PerPartyRouter
-        tokenAdminRegistry : ContractId CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry
-        rmnRemote : ContractId CCIP.CoreV1.RMNRemote.RMNRemote
+        globalConfig : ContractId CCIP.CoreV2.GlobalConfig.GlobalConfig
+        offRamp : ContractId CCIP.RuntimeV2.OffRamp.OffRamp
+        router : ContractId CCIP.RuntimeV2.PerPartyRouter.PerPartyRouter
+        tokenAdminRegistry : ContractId CCIP.CoreV2.TokenAdminRegistry.TokenAdminRegistry
+        rmnRemote : ContractId CCIP.CoreV2.RMNRemote.RMNRemote
         offRampAddress : Chainlink.InstanceAddress.RawInstanceAddress
 
 executeContext : ExecuteFixture -> Splice.Api.Token.MetadataV1.ChoiceContext
 executeContext f =
     Splice.Api.Token.MetadataV1.ChoiceContext with
         values = TextMap.fromList
-            [ (CCIP.APIV1.RMNRemote.rmnRemoteContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
-            , (CCIP.APIV1.TokenAdminRegistry.tokenAdminRegistryContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
-            , (CCIP.APIV1.GlobalConfig.globalConfigContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
-            , (CCIP.RuntimeV1.OffRamp.offRampContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.offRamp)
+            [ (CCIP.APIV2.RMNRemote.rmnRemoteContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.rmnRemote)
+            , (CCIP.APIV2.TokenAdminRegistry.tokenAdminRegistryContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.tokenAdminRegistry)
+            , (CCIP.APIV2.GlobalConfig.globalConfigContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.globalConfig)
+            , (CCIP.RuntimeV2.OffRamp.offRampContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId f.offRamp)
             ]
 
 setupExecuteFixture : Text -> [Chainlink.InstanceAddress.RawInstanceAddress] -> Script ExecuteFixture
@@ -433,13 +433,13 @@ setupExecuteFixture suffix sourceDefaultCCVs = do
     let offRampAddress = Chainlink.InstanceAddress.make offRampInstanceId ccipOwner
 
     globalConfig <- submit ccipOwner do
-        createCmd CCIP.CoreV1.GlobalConfig.GlobalConfig with
+        createCmd CCIP.CoreV2.GlobalConfig.GlobalConfig with
             instanceId = globalConfigInstanceId
             ccipOwner = ccipOwner
             chainSelector = destChainSelector
             destChainConfigs = Map.empty
             sourceChainConfigs = Map.fromList
-                [ (sourceChainSelector, CCIP.CoreV1.GlobalConfig.SourceChainConfig with
+                [ (sourceChainSelector, CCIP.CoreV2.GlobalConfig.SourceChainConfig with
                     isEnabled = True
                     onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                     defaultCCVs = sourceDefaultCCVs
@@ -448,7 +448,7 @@ setupExecuteFixture suffix sourceDefaultCCVs = do
                 ]
 
     rmnRemote <- submit rmnOwner do
-        createCmd CCIP.CoreV1.RMNRemote.RMNRemote with
+        createCmd CCIP.CoreV2.RMNRemote.RMNRemote with
             instanceId = rmnInstanceId
             rmnOwner = rmnOwner
             ccipOwner = ccipOwner
@@ -456,26 +456,26 @@ setupExecuteFixture suffix sourceDefaultCCVs = do
             cursedSubjects = []
 
     tokenAdminRegistry <- submit ccipOwner do
-        createCmd CCIP.CoreV1.TokenAdminRegistry.TokenAdminRegistry with
+        createCmd CCIP.CoreV2.TokenAdminRegistry.TokenAdminRegistry with
             instanceId = tokenAdminRegistryInstanceId
             ccipOwner = ccipOwner
             entryCount = 0
 
     offRamp <- submit ccipOwner do
-        createCmd CCIP.RuntimeV1.OffRamp.OffRamp with
+        createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
             instanceId = offRampInstanceId
             ccipOwner = ccipOwner
-            deps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+            deps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
                 globalConfig = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
 
     router <- submit ccipOwner do
-        createCmd CCIP.RuntimeV1.PerPartyRouter.PerPartyRouter with
+        createCmd CCIP.RuntimeV2.PerPartyRouter.PerPartyRouter with
             instanceId = routerInstanceId
             ccipOwner = ccipOwner
             partyOwner = receiver
-            deps = CCIP.RuntimeV1.PerPartyRouter.PerPartyRouterDeps with
+            deps = CCIP.RuntimeV2.PerPartyRouter.PerPartyRouterDeps with
                 onRamp = Chainlink.InstanceAddress.make ("onramp-unused-execute-bounds-" <> suffix) ccipOwner
                 offRamp = offRampAddress
                 globalConfig = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
@@ -500,27 +500,27 @@ setupExecuteFixture suffix sourceDefaultCCVs = do
         rmnRemote
         offRampAddress
 
-tokenMessage : ExecuteFixture -> CCIP.CodecV1.MessageCodecV1.MessageV1
+tokenMessage : ExecuteFixture -> CCIP.CodecV2.MessageCodecV1.MessageV1
 tokenMessage f =
-    CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    CCIP.CodecV2.MessageCodecV1.MessageV1 with
         sourceChainSelector = f.sourceChainSelector
         destChainSelector = f.destChainSelector
         sequenceNumber = 1.0
         executionGasLimit = 0
         ccipReceiveGasLimit = 0
-        finality = CCIP.CodecV1.FinalityConfig.waitForFinalityDecoded
+        finality = CCIP.CodecV2.FinalityConfig.waitForFinalityDecoded
         ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
         onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
         offRampAddress = Chainlink.InstanceAddress.toInstanceAddress f.offRampAddress
         sender = "0000000000000000000000000000000000000000000000000000000000000003"
-        receiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress f.receiver
+        receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress f.receiver
         destBlob = ""
-        tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
-            amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 1.0)
+        tokenTransfer = Some (CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
+            amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 1.0)
             sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000005"
             sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
             destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000007"
-            tokenReceiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress f.receiver
+            tokenReceiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress f.receiver
             extraData = "")
         messageData = ""
 
@@ -532,7 +532,7 @@ testGetRequiredCCVsForExecuteRejectsTooManyAndExpandedPoolCCVs = script do
     disclosedGlobalConfig <- fromSome <$> queryDisclosure f.ccipOwner f.globalConfig
 
     submitMustFail (actAs f.receiver <> actAs f.ccipOwner <> disclose disclosedOffRamp <> disclose disclosedGlobalConfig) do
-        exerciseCmd f.router CCIP.RuntimeV1.PerPartyRouter.GetRequiredCCVsForExecute with
+        exerciseCmd f.router CCIP.RuntimeV2.PerPartyRouter.GetRequiredCCVsForExecute with
             context = executeContext f
             message = tokenMessage f
             receiverRequiredCCVs = []
@@ -546,47 +546,47 @@ testGetRequiredCCVsForExecuteRejectsTooManyAndExpandedPoolCCVs = script do
     disclosedExpandedGlobalConfig <- fromSome <$> queryDisclosure expanded.ccipOwner expanded.globalConfig
 
     submitMustFail (actAs expanded.receiver <> actAs expanded.ccipOwner <> disclose disclosedExpandedOffRamp <> disclose disclosedExpandedGlobalConfig) do
-        exerciseCmd expanded.router CCIP.RuntimeV1.PerPartyRouter.GetRequiredCCVsForExecute with
+        exerciseCmd expanded.router CCIP.RuntimeV2.PerPartyRouter.GetRequiredCCVsForExecute with
             context = executeContext expanded
             message = tokenMessage expanded
             receiverRequiredCCVs = []
             receiverOptionalCCVs = []
             receiverOptionalThreshold = 0
-            tokenPoolRequiredCCVs = [CCIP.CodecV1.CCVCodec.useDefaultCCVs]
+            tokenPoolRequiredCCVs = [CCIP.CodecV2.CCVCodec.useDefaultCCVs]
 
 mkExecutingMessage
     : Party
     -> Party
     -> [Chainlink.InstanceAddress.RawInstanceAddress]
-    -> Script (ContractId CCIP.CoreV1.ExecutingMessage.ExecutingMessage)
+    -> Script (ContractId CCIP.CoreV2.ExecutingMessage.ExecutingMessage)
 mkExecutingMessage ccipOwner receiver sourceDefaultCCVs = do
     let offRampAddress = Chainlink.InstanceAddress.make "offramp-inbound-pool-bounds" ccipOwner
-    let message = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    let message = CCIP.CodecV2.MessageCodecV1.MessageV1 with
             sourceChainSelector = 3333333333.0
             destChainSelector = 4444444444.0
             sequenceNumber = 1.0
             executionGasLimit = 0
             ccipReceiveGasLimit = 0
-            finality = CCIP.CodecV1.FinalityConfig.waitForFinalityDecoded
+            finality = CCIP.CodecV2.FinalityConfig.waitForFinalityDecoded
             ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = Chainlink.InstanceAddress.toInstanceAddress offRampAddress
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
-            receiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
+            receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
-            tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
-                amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 1.0)
+            tokenTransfer = Some (CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
+                amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 1.0)
                 sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000005"
                 sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
                 destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000007"
-                tokenReceiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
+                tokenReceiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiver
                 extraData = "")
             messageData = ""
     submit ccipOwner do
-        createCmd CCIP.CoreV1.ExecutingMessage.ExecutingMessage with
+        createCmd CCIP.CoreV2.ExecutingMessage.ExecutingMessage with
             ccipOwner = ccipOwner
             message = message
-            messageId = keccak256 (CCIP.CodecV1.MessageCodecV1.encodeMessageV1 message)
+            messageId = keccak256 (CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message)
             receiver = receiver
             tokenReceiver = Some receiver
             executor = receiver
@@ -596,15 +596,15 @@ mkExecutingMessage ccipOwner receiver sourceDefaultCCVs = do
             requiredCCVs = []
             optionalCCVs = []
             optionalCCVThreshold = 0
-            receiverFinalityConfig = CCIP.CodecV1.FinalityConfig.WaitForFinality
+            receiverFinalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
             sourceDefaultCCVs = sourceDefaultCCVs
             inboundPoolVerification = None
-            deps = CCIP.CoreV1.ExecutingMessage.ExecutingMessageDeps with
+            deps = CCIP.CoreV2.ExecutingMessage.ExecutingMessageDeps with
                 offRamp = Chainlink.InstanceAddress.make "offramp-inbound-pool-bounds" ccipOwner
                 globalConfig = Chainlink.InstanceAddress.make "globalconfig-inbound-pool-bounds" ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make "rmn-inbound-pool-bounds" ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-inbound-pool-bounds" ccipOwner
-            state = CCIP.CoreV1.ExecutingMessage.ExecutingMessageState_RequirePoolCCVs
+            state = CCIP.CoreV2.ExecutingMessage.ExecutingMessageState_RequirePoolCCVs
 
 testSetInboundPoolCCVsRejectsTooManyAndExpandedCCVs : Script ()
 testSetInboundPoolCCVsRejectsTooManyAndExpandedCCVs = script do
@@ -614,14 +614,14 @@ testSetInboundPoolCCVsRejectsTooManyAndExpandedCCVs = script do
 
     msgTooMany <- mkExecutingMessage ccipOwner receiver []
     submitMustFail (actAs ccipOwner) do
-        exerciseCmd msgTooMany CCIP.CoreV1.ExecutingMessage.SetInboundPoolCCVs with
+        exerciseCmd msgTooMany CCIP.CoreV2.ExecutingMessage.SetInboundPoolCCVs with
             poolInstanceId = "pool-inbound-pool-bounds-too-many"
             poolOwner = ccipOwner
             poolCCVs = mkRawCCVs "inbound-pool-ccv-" ccvOwner overMaxCCVCount
 
     msgExpanded <- mkExecutingMessage ccipOwner receiver (mkRawCCVs "inbound-default-ccv-" ccvOwner overMaxCCVCount)
     submitMustFail (actAs ccipOwner) do
-        exerciseCmd msgExpanded CCIP.CoreV1.ExecutingMessage.SetInboundPoolCCVs with
+        exerciseCmd msgExpanded CCIP.CoreV2.ExecutingMessage.SetInboundPoolCCVs with
             poolInstanceId = "pool-inbound-pool-bounds-expanded"
             poolOwner = ccipOwner
-            poolCCVs = [CCIP.CodecV1.CCVCodec.useDefaultCCVs]
+            poolCCVs = [CCIP.CodecV2.CCVCodec.useDefaultCCVs]

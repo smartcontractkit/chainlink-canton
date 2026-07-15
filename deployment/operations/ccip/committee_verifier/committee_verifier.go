@@ -19,7 +19,7 @@ var ContractType = deployment.ContractType("CommitteeVerifier")
 
 var Version = semver.MustParse("2.0.0")
 
-var ccvsEncoder = committeeverifier.NewContract("", "CCIP.CommitteeVerifier", "CommitteeVerifier").Encoder()
+var ccvsEncoder = committeeverifier.NewContract("", "CCIP.CommitteeVerifierV2", "CommitteeVerifier").Encoder()
 
 var Deploy = contract.NewDeploy(contract.DeployParams[committeeverifier.CommitteeVerifier]{
 	Name:           "canton/ccip/committee_verifier/deploy",
@@ -52,7 +52,7 @@ var Deploy = contract.NewDeploy(contract.DeployParams[committeeverifier.Committe
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPCommitteeVerifier),
+	PackageName: string(contracts.CCIPCommitteeVerifierV2),
 	Prefix:      "committeeverifier",
 })
 

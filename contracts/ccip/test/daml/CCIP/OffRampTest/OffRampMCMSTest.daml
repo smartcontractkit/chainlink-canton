@@ -10,8 +10,8 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.RuntimeV1.OffRamp
-import qualified CCIP.RuntimeV1.OffRampCodecGen
+import qualified CCIP.RuntimeV2.OffRamp
+import qualified CCIP.RuntimeV2.OffRampCodecGen
 
 -- ===========================================================================
 -- MCMS ENTRYPOINT TESTS - SET DEPS
@@ -23,13 +23,13 @@ testOffRampMCMSEntrypoint_SetDeps = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "offramp-test"
-      initialDeps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+      initialDeps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc-old@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn-old@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar-old@owner"
 
   offRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OffRamp.OffRamp with
+    createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
       instanceId
       ccipOwner
       deps = initialDeps
@@ -37,12 +37,12 @@ testOffRampMCMSEntrypoint_SetDeps = script do
   let instAddr = Chainlink.InstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
 
-  let newDeps = CCIP.RuntimeV1.OffRamp.SetDepsParams with
+  let newDeps = CCIP.RuntimeV2.OffRamp.SetDepsParams with
         globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc-new@owner")
         rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn-new@owner")
         tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar-new@owner")
 
-      encoded = CCIP.RuntimeV1.OffRampCodecGen.encodeSetDepsParams newDeps
+      encoded = CCIP.RuntimeV2.OffRampCodecGen.encodeSetDepsParams newDeps
 
   newContractIds <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -50,7 +50,7 @@ testOffRampMCMSEntrypoint_SetDeps = script do
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId offRampCid)]
 
-  contracts <- query @CCIP.RuntimeV1.OffRamp.OffRamp ccipOwner
+  contracts <- query @CCIP.RuntimeV2.OffRamp.OffRamp ccipOwner
   case filter (\(_, offRamp) -> offRamp.instanceId == instanceId) contracts of
     [(_, offRamp)] -> do
       offRamp.deps.globalConfig === Chainlink.InstanceAddress.RawInstanceAddress "gc-new@owner"
@@ -66,13 +66,13 @@ testOffRampMCMSEntrypoint_SetDeps_Partial = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "offramp-partial-test"
-      initialDeps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+      initialDeps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc-old@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn-old@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar-old@owner"
 
   offRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OffRamp.OffRamp with
+    createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
       instanceId
       ccipOwner
       deps = initialDeps
@@ -80,12 +80,12 @@ testOffRampMCMSEntrypoint_SetDeps_Partial = script do
   let instAddr = Chainlink.InstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
 
-  let partialDeps = CCIP.RuntimeV1.OffRamp.SetDepsParams with
+  let partialDeps = CCIP.RuntimeV2.OffRamp.SetDepsParams with
         globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc-new@owner")
         rmnRemote = None
         tokenAdminRegistry = None
 
-      encoded = CCIP.RuntimeV1.OffRampCodecGen.encodeSetDepsParams partialDeps
+      encoded = CCIP.RuntimeV2.OffRampCodecGen.encodeSetDepsParams partialDeps
 
   submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -93,7 +93,7 @@ testOffRampMCMSEntrypoint_SetDeps_Partial = script do
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId offRampCid)]
 
-  contracts <- query @CCIP.RuntimeV1.OffRamp.OffRamp ccipOwner
+  contracts <- query @CCIP.RuntimeV2.OffRamp.OffRamp ccipOwner
   case filter (\(_, offRamp) -> offRamp.instanceId == instanceId) contracts of
     [(_, offRamp)] -> do
       offRamp.deps.globalConfig === Chainlink.InstanceAddress.RawInstanceAddress "gc-new@owner"
@@ -109,13 +109,13 @@ testOffRampMCMSEntrypoint_SetDeps_Replace = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "offramp-replace-test"
-      initialDeps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+      initialDeps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc1@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn1@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar1@owner"
 
   offRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OffRamp.OffRamp with
+    createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
       instanceId
       ccipOwner
       deps = initialDeps
@@ -123,11 +123,11 @@ testOffRampMCMSEntrypoint_SetDeps_Replace = script do
   let instAddr = Chainlink.InstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
 
-  let deps2 = CCIP.RuntimeV1.OffRamp.SetDepsParams with
+  let deps2 = CCIP.RuntimeV2.OffRamp.SetDepsParams with
         globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc2@owner")
         rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn2@owner")
         tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar2@owner")
-      encoded1 = CCIP.RuntimeV1.OffRampCodecGen.encodeSetDepsParams deps2
+      encoded1 = CCIP.RuntimeV2.OffRampCodecGen.encodeSetDepsParams deps2
 
   newContractIds1 <- submit ccipOwner do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -135,17 +135,17 @@ testOffRampMCMSEntrypoint_SetDeps_Replace = script do
       operationData = encoded1
       contractIds = Map.fromList [(instAddr, toAnyContractId offRampCid)]
 
-  contracts1 <- query @CCIP.RuntimeV1.OffRamp.OffRamp ccipOwner
+  contracts1 <- query @CCIP.RuntimeV2.OffRamp.OffRamp ccipOwner
   case filter (\(_, offRamp) -> offRamp.instanceId == instanceId) contracts1 of
     [(newCid, offRamp1)] -> do
       offRamp1.deps.globalConfig === Chainlink.InstanceAddress.RawInstanceAddress "gc2@owner"
 
       let targetAsMcmsReceiver2 = toInterfaceContractId @MCMSReceiver newCid
-      let deps3 = CCIP.RuntimeV1.OffRamp.SetDepsParams with
+      let deps3 = CCIP.RuntimeV2.OffRamp.SetDepsParams with
             globalConfig = Some (Chainlink.InstanceAddress.RawInstanceAddress "gc3@owner")
             rmnRemote = Some (Chainlink.InstanceAddress.RawInstanceAddress "rmn3@owner")
             tokenAdminRegistry = Some (Chainlink.InstanceAddress.RawInstanceAddress "tar3@owner")
-          encoded2 = CCIP.RuntimeV1.OffRampCodecGen.encodeSetDepsParams deps3
+          encoded2 = CCIP.RuntimeV2.OffRampCodecGen.encodeSetDepsParams deps3
 
       newContractIds2 <- submit ccipOwner do
         exerciseCmd targetAsMcmsReceiver2 MCMSReceiver_Entrypoint with
@@ -153,7 +153,7 @@ testOffRampMCMSEntrypoint_SetDeps_Replace = script do
           operationData = encoded2
           contractIds = Map.fromList [(instAddr, toAnyContractId newCid)]
 
-      contracts2 <- query @CCIP.RuntimeV1.OffRamp.OffRamp ccipOwner
+      contracts2 <- query @CCIP.RuntimeV2.OffRamp.OffRamp ccipOwner
       case filter (\(_, offRamp) -> offRamp.instanceId == instanceId) contracts2 of
         [(_, offRamp2)] -> do
           offRamp2.deps.globalConfig === Chainlink.InstanceAddress.RawInstanceAddress "gc3@owner"
@@ -174,13 +174,13 @@ testOffRampMCMSEntrypoint_UnknownFunction = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "offramp-error-test"
-      deps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+      deps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
 
   offRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OffRamp.OffRamp with
+    createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
       instanceId
       ccipOwner
       deps
@@ -202,13 +202,13 @@ testOffRampMCMSEntrypoint_InvalidParams = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "offramp-invalid-test"
-      deps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+      deps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
 
   offRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OffRamp.OffRamp with
+    createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
       instanceId
       ccipOwner
       deps
@@ -230,20 +230,20 @@ testOffRampMCMSEntrypoint_MissingSelfCid = script do
   ccipOwner <- allocateParty "ccip_owner"
 
   let instanceId = "offramp-missing-cid-test"
-      deps = CCIP.RuntimeV1.OffRamp.OffRampDeps with
+      deps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
         globalConfig = Chainlink.InstanceAddress.RawInstanceAddress "gc@owner"
         rmnRemote = Chainlink.InstanceAddress.RawInstanceAddress "rmn@owner"
         tokenAdminRegistry = Chainlink.InstanceAddress.RawInstanceAddress "tar@owner"
 
   offRampCid <- submit ccipOwner do
-    createCmd CCIP.RuntimeV1.OffRamp.OffRamp with
+    createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
       instanceId
       ccipOwner
       deps
 
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver offRampCid
 
-  let encoded = CCIP.RuntimeV1.OffRampCodecGen.encodeSetDepsParams (CCIP.RuntimeV1.OffRamp.SetDepsParams with
+  let encoded = CCIP.RuntimeV2.OffRampCodecGen.encodeSetDepsParams (CCIP.RuntimeV2.OffRamp.SetDepsParams with
         globalConfig = Some deps.globalConfig
         rmnRemote = Some deps.rmnRemote
         tokenAdminRegistry = Some deps.tokenAdminRegistry)

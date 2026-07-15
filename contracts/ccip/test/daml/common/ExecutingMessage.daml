@@ -9,28 +9,28 @@ import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.APIV1.ExecutingMessage
-import qualified CCIP.CodecV1.CCVCodec
-import qualified CCIP.CodecV1.FinalityConfig
-import qualified CCIP.CodecV1.MessageCodecV1
-import qualified CCIP.CoreV1.ExecutingMessage
+import qualified CCIP.APIV2.ExecutingMessage
+import qualified CCIP.CodecV2.CCVCodec
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CodecV2.MessageCodecV1
+import qualified CCIP.CoreV2.ExecutingMessage
 
 finalityConfig n =
     if n == 0
-    then CCIP.CodecV1.FinalityConfig.WaitForFinality
-    else CCIP.CodecV1.FinalityConfig.BlockDepth n
+    then CCIP.CodecV2.FinalityConfig.WaitForFinality
+    else CCIP.CodecV2.FinalityConfig.BlockDepth n
 
 rawFinalityConfig n =
     if n == 0
-    then CCIP.CodecV1.FinalityConfig.waitForFinalityFlag
+    then CCIP.CodecV2.FinalityConfig.waitForFinalityFlag
     else fromSome do
-        flagsHex <- CCIP.CodecV1.MessageCodecV1.encodeUint16 0
-        blockConfirmationsHex <- CCIP.CodecV1.MessageCodecV1.encodeUint16 n
+        flagsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 n
         pure (flagsHex <> blockConfirmationsHex)
 
 unsafeDecodeRequestedFinality finalityConfig =
     fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
-        (CCIP.CodecV1.FinalityConfig.decodeRequestedFinality finalityConfig)
+        (CCIP.CodecV2.FinalityConfig.decodeRequestedFinality finalityConfig)
 
 messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
 
@@ -44,7 +44,7 @@ testAddCCVVerification = do
     receiver <- allocateParty "Receiver"
     executor <- allocateParty "Executor"
 
-    let message = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    let message = CCIP.CodecV2.MessageCodecV1.MessageV1 with
             sourceChainSelector = 123.0
             destChainSelector = 456.0
             sequenceNumber = 1.0
@@ -55,14 +55,14 @@ testAddCCVVerification = do
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
-            receiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
+            receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
             tokenTransfer = None
             messageData = "48656c6c6f20576f726c64"
 
     -- Create ExecutingMessage
-    executingMessageCid <- coerceContractId @_ @CCIP.APIV1.ExecutingMessage.IExecutingMessage <$> submit ccipOwner do
-        createCmd CCIP.CoreV1.ExecutingMessage.ExecutingMessage with
+    executingMessageCid <- coerceContractId @_ @CCIP.APIV2.ExecutingMessage.IExecutingMessage <$> submit ccipOwner do
+        createCmd CCIP.CoreV2.ExecutingMessage.ExecutingMessage with
             ccipOwner = ccipOwner
             message = message
             messageId = "0x1234"
@@ -81,16 +81,16 @@ testAddCCVVerification = do
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
             inboundPoolVerification = None
-            deps = CCIP.CoreV1.ExecutingMessage.ExecutingMessageDeps with
+            deps = CCIP.CoreV2.ExecutingMessage.ExecutingMessageDeps with
                 offRamp = Chainlink.InstanceAddress.make "test-offramp" ccipOwner
                 globalConfig = Chainlink.InstanceAddress.make "test-globalConfig" ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make "test-rmnRemote" ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make "test-tokenAdminRegistry" ccipOwner
-            state = CCIP.CoreV1.ExecutingMessage.ExecutingMessageState_Prepared
+            state = CCIP.CoreV2.ExecutingMessage.ExecutingMessageState_Prepared
 
     -- Add first CCV verification
     executingMessageCid <- submit [ccipOwner, ccvOwner1] do
-        exerciseCmd executingMessageCid CCIP.APIV1.ExecutingMessage.ExecutingMessage_AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.APIV2.ExecutingMessage.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV1"
             versionTag = "0x01"
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -99,7 +99,7 @@ testAddCCVVerification = do
     -- Try to add a verification with the same party, but different instance ID, must succeed
     -- This is to prevent CCV poisoning where a malicious CCV owner could prevent other CCVs from adding their verification
     executingMessageCid <- submit  [ccipOwner, ccvOwner1] do
-        exerciseCmd executingMessageCid CCIP.APIV1.ExecutingMessage.ExecutingMessage_AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.APIV2.ExecutingMessage.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV2"
             versionTag = "0x02"
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -108,7 +108,7 @@ testAddCCVVerification = do
     -- Add second CCV verification, must succeed
     -- The previous step already added a verification for this instance ID, but with a different party, so this should not be considered a duplicate
     executingMessageCid <- submit [ccipOwner, ccvOwner2] do
-        exerciseCmd executingMessageCid CCIP.APIV1.ExecutingMessage.ExecutingMessage_AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.APIV2.ExecutingMessage.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV2"
             versionTag = "0x02"
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -116,7 +116,7 @@ testAddCCVVerification = do
 
     -- Try to add the same verification again, must fail
     submitMustFail [ccipOwner, ccvOwner2] do
-        exerciseCmd executingMessageCid CCIP.APIV1.ExecutingMessage.ExecutingMessage_AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.APIV2.ExecutingMessage.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV2"
             versionTag = "0x02"
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -124,20 +124,20 @@ testAddCCVVerification = do
 
     -- Try to add a verification with an unauthorized caller party, must fail
     submitMustFail [ccipOwner, ccvOwner2] do
-        exerciseCmd executingMessageCid CCIP.APIV1.ExecutingMessage.ExecutingMessage_AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.APIV2.ExecutingMessage.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV3"
             versionTag = "0x03"
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner3 -- not part of the authorizing parties for this submit
 
     -- Fetch final state and assert both CCV verifications are recorded
-    Some finalMessage <- queryContractId ccipOwner (coerceContractId @_ @CCIP.CoreV1.ExecutingMessage.ExecutingMessage executingMessageCid)
+    Some finalMessage <- queryContractId ccipOwner (coerceContractId @_ @CCIP.CoreV2.ExecutingMessage.ExecutingMessage executingMessageCid)
     length finalMessage.ccvVerifications === 3
     finalMessage.ccvOwners === [ccvOwner1, ccvOwner2]
     finalMessage.ccvVerifications ===
-        [ CCIP.CoreV1.ExecutingMessage.CCVVerification with ccvInstanceId = "0xCCV1", ccvOwner = ccvOwner1, versionTag = "0x01"
-        , CCIP.CoreV1.ExecutingMessage.CCVVerification with ccvInstanceId = "0xCCV2", ccvOwner = ccvOwner1, versionTag = "0x02"
-        , CCIP.CoreV1.ExecutingMessage.CCVVerification with ccvInstanceId = "0xCCV2", ccvOwner = ccvOwner2, versionTag = "0x02"]
+        [ CCIP.CoreV2.ExecutingMessage.CCVVerification with ccvInstanceId = "0xCCV1", ccvOwner = ccvOwner1, versionTag = "0x01"
+        , CCIP.CoreV2.ExecutingMessage.CCVVerification with ccvInstanceId = "0xCCV2", ccvOwner = ccvOwner1, versionTag = "0x02"
+        , CCIP.CoreV2.ExecutingMessage.CCVVerification with ccvInstanceId = "0xCCV2", ccvOwner = ccvOwner2, versionTag = "0x02"]
 
 testAddCCVVerificationRequiresPoolFirstForTokenTransfer : Script ()
 testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
@@ -147,7 +147,7 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
     executor <- allocateParty "Executor Token"
     poolOwner <- allocateParty "Pool Owner Token"
 
-    let message = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    let message = CCIP.CodecV2.MessageCodecV1.MessageV1 with
             sourceChainSelector = 123.0
             destChainSelector = 456.0
             sequenceNumber = 1.0
@@ -158,19 +158,19 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
-            receiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
+            receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
-            tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
+            tokenTransfer = Some (CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
                 sourcePoolAddress = "0000000000000000000000000000000000000000000000000000000000000004"
                 sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000005"
                 destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
-                tokenReceiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
-                amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 1.0)
+                tokenReceiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiver
+                amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 1.0)
                 extraData = "")
             messageData = ""
 
-    executingMessageCid <- coerceContractId @_ @CCIP.APIV1.ExecutingMessage.IExecutingMessage <$> submit ccipOwner do
-        createCmd CCIP.CoreV1.ExecutingMessage.ExecutingMessage with
+    executingMessageCid <- coerceContractId @_ @CCIP.APIV2.ExecutingMessage.IExecutingMessage <$> submit ccipOwner do
+        createCmd CCIP.CoreV2.ExecutingMessage.ExecutingMessage with
             ccipOwner = ccipOwner
             message = message
             messageId = "0x5678"
@@ -186,34 +186,34 @@ testAddCCVVerificationRequiresPoolFirstForTokenTransfer = do
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
             inboundPoolVerification = None
-            deps = CCIP.CoreV1.ExecutingMessage.ExecutingMessageDeps with
+            deps = CCIP.CoreV2.ExecutingMessage.ExecutingMessageDeps with
                 offRamp = Chainlink.InstanceAddress.make "test-offramp" ccipOwner
                 globalConfig = Chainlink.InstanceAddress.make "test-globalConfig" ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make "test-rmnRemote" ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make "test-tokenAdminRegistry" ccipOwner
-            state = CCIP.CoreV1.ExecutingMessage.ExecutingMessageState_RequirePoolCCVs
+            state = CCIP.CoreV2.ExecutingMessage.ExecutingMessageState_RequirePoolCCVs
 
     submitMustFail [ccipOwner, ccvOwner] do
-        exerciseCmd executingMessageCid CCIP.APIV1.ExecutingMessage.ExecutingMessage_AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.APIV2.ExecutingMessage.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV1"
             versionTag = "0x01"
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
-    executingMessageCid <- coerceContractId @_ @CCIP.APIV1.ExecutingMessage.IExecutingMessage <$> submit (actAs ccipOwner <> actAs poolOwner) do
-        exerciseCmd (coerceContractId @_ @CCIP.CoreV1.ExecutingMessage.ExecutingMessage executingMessageCid) CCIP.CoreV1.ExecutingMessage.SetInboundPoolCCVs with
+    executingMessageCid <- coerceContractId @_ @CCIP.APIV2.ExecutingMessage.IExecutingMessage <$> submit (actAs ccipOwner <> actAs poolOwner) do
+        exerciseCmd (coerceContractId @_ @CCIP.CoreV2.ExecutingMessage.ExecutingMessage executingMessageCid) CCIP.CoreV2.ExecutingMessage.SetInboundPoolCCVs with
             poolInstanceId = "test-pool"
             poolOwner = poolOwner
             poolCCVs = []
 
     executingMessageCid <- submit (actAs ccipOwner <> actAs ccvOwner) do
-        exerciseCmd executingMessageCid CCIP.APIV1.ExecutingMessage.ExecutingMessage_AddCCVVerification with
+        exerciseCmd executingMessageCid CCIP.APIV2.ExecutingMessage.ExecutingMessage_AddCCVVerification with
             ccvInstanceId = "0xCCV1"
             versionTag = "0x01"
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             caller = ccvOwner
 
-    Some finalMessage <- queryContractId ccipOwner (coerceContractId @_ @CCIP.CoreV1.ExecutingMessage.ExecutingMessage executingMessageCid)
+    Some finalMessage <- queryContractId ccipOwner (coerceContractId @_ @CCIP.CoreV2.ExecutingMessage.ExecutingMessage executingMessageCid)
     length finalMessage.ccvVerifications === 1
 
 testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs : Script ()
@@ -231,7 +231,7 @@ testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
     let sourceTokenAddress = "0000000000000000000000000000000000000000000000000000000000000005"
     let destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
 
-    let message = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    let message = CCIP.CodecV2.MessageCodecV1.MessageV1 with
             sourceChainSelector = 123.0
             destChainSelector = 456.0
             sequenceNumber = 1.0
@@ -242,19 +242,19 @@ testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
-            receiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
+            receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
-            tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
+            tokenTransfer = Some (CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
                 sourcePoolAddress = sourcePoolAddress
                 sourceTokenAddress = sourceTokenAddress
                 destTokenAddress = destTokenAddress
-                tokenReceiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
-                amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 10.0)
+                tokenReceiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiver
+                amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 10.0)
                 extraData = "")
             messageData = ""
 
     executingMessageCid <- submit (actAs ccipOwner <> actAs poolOwner) do
-        createCmd CCIP.CoreV1.ExecutingMessage.ExecutingMessage with
+        createCmd CCIP.CoreV2.ExecutingMessage.ExecutingMessage with
             ccipOwner = ccipOwner
             message = message
             messageId = "0x9abc"
@@ -269,35 +269,35 @@ testFinalizeExecuteSnapshotsResolvedInboundPoolCCVs = do
             optionalCCVThreshold = 0
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = [defaultCCV]
-            inboundPoolVerification = Some (CCIP.CoreV1.ExecutingMessage.InboundPoolVerification with
+            inboundPoolVerification = Some (CCIP.CoreV2.ExecutingMessage.InboundPoolVerification with
                 poolInstanceId = "snapshot-pool"
                 poolOwner = poolOwner
-                poolCCVs = [CCIP.CodecV1.CCVCodec.useDefaultCCVs, explicitCCV])
-            deps = CCIP.CoreV1.ExecutingMessage.ExecutingMessageDeps with
+                poolCCVs = [CCIP.CodecV2.CCVCodec.useDefaultCCVs, explicitCCV])
+            deps = CCIP.CoreV2.ExecutingMessage.ExecutingMessageDeps with
                 offRamp = Chainlink.InstanceAddress.make "test-offramp-snapshot" ccipOwner
                 globalConfig = Chainlink.InstanceAddress.make "test-globalConfig-snapshot" ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make "test-rmnRemote-snapshot" ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make "test-tokenAdminRegistry-snapshot" ccipOwner
-            state = CCIP.CoreV1.ExecutingMessage.ExecutingMessageState_Prepared
+            state = CCIP.CoreV2.ExecutingMessage.ExecutingMessageState_Prepared
 
     submitMustFail [ccipOwner] do
-        exerciseCmd executingMessageCid CCIP.CoreV1.ExecutingMessage.FinalizeExecute with
+        exerciseCmd executingMessageCid CCIP.CoreV2.ExecutingMessage.FinalizeExecute with
             tokenAdminRegistryInstanceId = "test-tokenAdminRegistry-snapshot"
             maybePoolAddress = Some (Chainlink.InstanceAddress.make "wrong-snapshot-pool" poolOwner)
             maybeTicketReceiver = Some receiver
             maybeTokenReceiver = Some receiver
             maybeInstrumentId = Some (Splice.Api.Token.HoldingV1.InstrumentId with admin = ccipOwner, id = "TEST")
-            maybeAmount = Some (fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 10.0))
+            maybeAmount = Some (fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 10.0))
             returnData = ""
 
     finalizeResult <- submit ccipOwner do
-        exerciseCmd executingMessageCid CCIP.CoreV1.ExecutingMessage.FinalizeExecute with
+        exerciseCmd executingMessageCid CCIP.CoreV2.ExecutingMessage.FinalizeExecute with
             tokenAdminRegistryInstanceId = "test-tokenAdminRegistry-snapshot"
             maybePoolAddress = Some (Chainlink.InstanceAddress.make "snapshot-pool" poolOwner)
             maybeTicketReceiver = Some receiver
             maybeTokenReceiver = Some receiver
             maybeInstrumentId = Some (Splice.Api.Token.HoldingV1.InstrumentId with admin = ccipOwner, id = "TEST")
-            maybeAmount = Some (fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 10.0))
+            maybeAmount = Some (fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 10.0))
             returnData = ""
 
     ticketCid <- case finalizeResult.tokenReceiveTicket of
@@ -319,7 +319,7 @@ testFinalizeExecuteFailsWithoutInboundPoolCCVsForTokenTicket = do
     let destTokenAddress = "0000000000000000000000000000000000000000000000000000000000000006"
     let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId with admin = ccipOwner, id = "TEST"
 
-    let message = CCIP.CodecV1.MessageCodecV1.MessageV1 with
+    let message = CCIP.CodecV2.MessageCodecV1.MessageV1 with
             sourceChainSelector = 123.0
             destChainSelector = 456.0
             sequenceNumber = 1.0
@@ -330,19 +330,19 @@ testFinalizeExecuteFailsWithoutInboundPoolCCVsForTokenTicket = do
             onRampAddress = "0000000000000000000000000000000000000000000000000000000000000001"
             offRampAddress = "0000000000000000000000000000000000000000000000000000000000000002"
             sender = "0000000000000000000000000000000000000000000000000000000000000003"
-            receiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
+            receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiver
             destBlob = ""
-            tokenTransfer = Some (CCIP.CodecV1.MessageCodecV1.TokenTransferV1 with
+            tokenTransfer = Some (CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
                 sourcePoolAddress = sourcePoolAddress
                 sourceTokenAddress = sourceTokenAddress
                 destTokenAddress = destTokenAddress
-                tokenReceiver = CCIP.CodecV1.MessageCodecV1.encodePartyAddress receiver
-                amount = fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 10.0)
+                tokenReceiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiver
+                amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 10.0)
                 extraData = "")
             messageData = ""
 
     executingMessageCid <- submit ccipOwner do
-        createCmd CCIP.CoreV1.ExecutingMessage.ExecutingMessage with
+        createCmd CCIP.CoreV2.ExecutingMessage.ExecutingMessage with
             ccipOwner = ccipOwner
             message = message
             messageId = "0xdef0"
@@ -358,19 +358,19 @@ testFinalizeExecuteFailsWithoutInboundPoolCCVsForTokenTicket = do
             receiverFinalityConfig = finalityConfig 2000
             sourceDefaultCCVs = []
             inboundPoolVerification = None
-            deps = CCIP.CoreV1.ExecutingMessage.ExecutingMessageDeps with
+            deps = CCIP.CoreV2.ExecutingMessage.ExecutingMessageDeps with
                 offRamp = Chainlink.InstanceAddress.make "test-offramp-missing-inbound" ccipOwner
                 globalConfig = Chainlink.InstanceAddress.make "test-globalConfig-missing-inbound" ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make "test-rmnRemote-missing-inbound" ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make "test-tokenAdminRegistry-missing-inbound" ccipOwner
-            state = CCIP.CoreV1.ExecutingMessage.ExecutingMessageState_Prepared
+            state = CCIP.CoreV2.ExecutingMessage.ExecutingMessageState_Prepared
 
     submitMustFail [ccipOwner] do
-        exerciseCmd executingMessageCid CCIP.CoreV1.ExecutingMessage.FinalizeExecute with
+        exerciseCmd executingMessageCid CCIP.CoreV2.ExecutingMessage.FinalizeExecute with
             tokenAdminRegistryInstanceId = "test-tokenAdminRegistry-missing-inbound"
             maybePoolAddress = Some (Chainlink.InstanceAddress.make "missing-inbound-pool" poolOwner)
             maybeTicketReceiver = Some receiver
             maybeTokenReceiver = Some receiver
             maybeInstrumentId = Some instrumentId
-            maybeAmount = Some (fromSome (CCIP.CodecV1.MessageCodecV1.encodeUint256 10.0))
+            maybeAmount = Some (fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 10.0))
             returnData = ""

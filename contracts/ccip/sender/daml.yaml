@@ -1,5 +1,5 @@
 sdk-version: 3.4.11
-name: ccip-sender
+name: ccip-sender-v2
 source: daml
 version: 2.0.0
 build-options:
@@ -12,11 +12,11 @@ data-dependencies:
   - ../../dependencies/splice/splice-api-token-transfer-instruction-v1-1.0.0.dar
   - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
   - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
-  - ../codec/.daml/dist/ccip-codec-2.0.0.dar
-  - ../api/.daml/dist/ccip-api-2.0.0.dar
-  - ../extension-api/.daml/dist/ccip-extension-api-2.0.0.dar
-  - ../client-api/.daml/dist/ccip-client-api-2.0.0.dar
-  - ../utils/.daml/dist/ccip-utils-2.0.0.dar
+  - ../codec/.daml/dist/ccip-codec-v2-2.0.0.dar
+  - ../api/.daml/dist/ccip-api-v2-2.0.0.dar
+  - ../extension-api/.daml/dist/ccip-extension-api-v2-2.0.0.dar
+  - ../client-api/.daml/dist/ccip-client-api-v2-2.0.0.dar
+  - ../utils/.daml/dist/ccip-utils-v2-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

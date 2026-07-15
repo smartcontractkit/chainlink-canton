@@ -1,7 +1,8 @@
 name: Run CCIP load test
 description: >-
-  Shared setup and execution for CCIP WASP load tests against local devenv or
-  prod-testnet infrastructure.
+  Shared execution for CCIP WASP load tests against local devenv or prod-testnet
+  infrastructure. Call setup-ccip-devenv and upload-ccip-devenv-logs separately
+  when you want distinct workflow steps (see ccip-load-tests.yml).
 
 inputs:
   ccip_env:
@@ -142,7 +143,7 @@ runs:
           evm2canton-token) TEST_RUN='^TestEVM2Canton_TokenLoad$' ;;
           *) echo "unknown direction: ${{ inputs.direction }}" >&2; exit 1 ;;
         esac
-        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -ccip-env=devenv -run "$TEST_RUN"
+        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -run "$TEST_RUN"
 
     - name: Run load tests (prod-testnet)
       if: inputs.ccip_env == 'prod-testnet'

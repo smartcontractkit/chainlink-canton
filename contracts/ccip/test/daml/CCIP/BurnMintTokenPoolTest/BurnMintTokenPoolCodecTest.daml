@@ -10,16 +10,16 @@ import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
 
-import qualified CCIP.UtilsV1.Context
-import qualified CCIP.CodecV1.FinalityConfig
+import qualified CCIP.UtilsV2.Context
+import qualified CCIP.CodecV2.FinalityConfig
 
-import qualified CCIP.BurnMintTokenPoolV1
-import qualified CCIP.BurnMintTokenPoolV1CodecGen
+import qualified CCIP.BurnMintTokenPoolV2
+import qualified CCIP.BurnMintTokenPoolV2CodecGen
 
 mkFinalityConfig n =
     if n == 0
-    then CCIP.CodecV1.FinalityConfig.WaitForFinality
-    else CCIP.CodecV1.FinalityConfig.BlockDepth n
+    then CCIP.CodecV2.FinalityConfig.WaitForFinality
+    else CCIP.CodecV2.FinalityConfig.BlockDepth n
 
 -- ===============================================
 -- |              SetDynamicConfig               |
@@ -29,13 +29,13 @@ testSetDynamicConfigParamsRoundtrip : Script ()
 testSetDynamicConfigParamsRoundtrip = do
     -- Test with rateLimitAdmin set
     rateLimitAdmin <- allocateParty "admin"
-    let args = CCIP.BurnMintTokenPoolV1.SetDynamicConfigParams with rateLimitAdmin = Some rateLimitAdmin
-        encoded = CCIP.BurnMintTokenPoolV1CodecGen.encodeSetDynamicConfigParams args
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeSetDynamicConfigParamsAt encoded 0)) === args
+    let args = CCIP.BurnMintTokenPoolV2.SetDynamicConfigParams with rateLimitAdmin = Some rateLimitAdmin
+        encoded = CCIP.BurnMintTokenPoolV2CodecGen.encodeSetDynamicConfigParams args
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeSetDynamicConfigParamsAt encoded 0)) === args
     -- Test with rateLimitAdmin not set
-    let argsNone = CCIP.BurnMintTokenPoolV1.SetDynamicConfigParams with rateLimitAdmin = None
-        encodedNone = CCIP.BurnMintTokenPoolV1CodecGen.encodeSetDynamicConfigParams argsNone
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeSetDynamicConfigParamsAt encodedNone 0)) === argsNone
+    let argsNone = CCIP.BurnMintTokenPoolV2.SetDynamicConfigParams with rateLimitAdmin = None
+        encodedNone = CCIP.BurnMintTokenPoolV2CodecGen.encodeSetDynamicConfigParams argsNone
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeSetDynamicConfigParamsAt encodedNone 0)) === argsNone
 
 
 -- ===============================================
@@ -45,7 +45,7 @@ testSetDynamicConfigParamsRoundtrip = do
 testApplyChainUpdatesParamsRoundtrip : Script ()
 testApplyChainUpdatesParamsRoundtrip = do
     let chainsToAdd = [
-            CCIP.BurnMintTokenPoolV1.ChainUpdate with
+            CCIP.BurnMintTokenPoolV2.ChainUpdate with
                 remoteChainSelector = 1.0
                 remotePools = ["1234567890abcdef", "fedcba0987654321"]
                 remoteTokenAddress = "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
@@ -55,7 +55,7 @@ testApplyChainUpdatesParamsRoundtrip = do
                 inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
                 inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
                 outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
-            , CCIP.BurnMintTokenPoolV1.ChainUpdate with
+            , CCIP.BurnMintTokenPoolV2.ChainUpdate with
                 remoteChainSelector = 18446744073709551615.0 -- max uint64
                 remotePools = []
                 remoteTokenAddress = ""
@@ -65,7 +65,7 @@ testApplyChainUpdatesParamsRoundtrip = do
                 inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
                 inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
                 outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
-            , CCIP.BurnMintTokenPoolV1.ChainUpdate with
+            , CCIP.BurnMintTokenPoolV2.ChainUpdate with
                 remoteChainSelector = 0.0
                 remotePools = []
                 remoteTokenAddress = "c44879cc487d6ed2fdda5dfbebace4d430bd3f5a"
@@ -76,11 +76,11 @@ testApplyChainUpdatesParamsRoundtrip = do
                 inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
                 outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
             ]
-        args = CCIP.BurnMintTokenPoolV1.ApplyChainUpdatesParams with
+        args = CCIP.BurnMintTokenPoolV2.ApplyChainUpdatesParams with
             remoteChainSelectorsToRemove = [2.0, 3.0]
             chainsToAdd
-    let encoded = CCIP.BurnMintTokenPoolV1CodecGen.encodeApplyChainUpdatesParams args
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeApplyChainUpdatesParamsAt encoded 0)) === args
+    let encoded = CCIP.BurnMintTokenPoolV2CodecGen.encodeApplyChainUpdatesParams args
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeApplyChainUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |     ApplyTokenTransferFeeConfigUpdates      |
@@ -89,14 +89,14 @@ testApplyChainUpdatesParamsRoundtrip = do
 testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip : Script ()
 testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
     let feeConfigArgs = [
-            CCIP.BurnMintTokenPoolV1.TokenTransferFeeConfigArgs with
+            CCIP.BurnMintTokenPoolV2.TokenTransferFeeConfigArgs with
                 destChainSelector = 1.0
                 isEnabled = True
                 destGasOverhead = 21000
                 destBytesOverhead = 100
                 feeUSDCents = 50.0
                 feeBps = 25.0
-            , CCIP.BurnMintTokenPoolV1.TokenTransferFeeConfigArgs with
+            , CCIP.BurnMintTokenPoolV2.TokenTransferFeeConfigArgs with
                 destChainSelector = 18446744073709551615.0 -- max uint64
                 isEnabled = False
                 destGasOverhead = 30000
@@ -104,11 +104,11 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
                 feeUSDCents = 100.0
                 feeBps = 50.0
             ]
-        args = CCIP.BurnMintTokenPoolV1.ApplyTokenTransferFeeConfigUpdatesParams with
+        args = CCIP.BurnMintTokenPoolV2.ApplyTokenTransferFeeConfigUpdatesParams with
             tokenTransferFeeConfigArgs = feeConfigArgs
             disableTokenTransferFeeConfigArgs = [2.0, 3.0]
-    let encoded = CCIP.BurnMintTokenPoolV1CodecGen.encodeApplyTokenTransferFeeConfigUpdatesParams args
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeApplyTokenTransferFeeConfigUpdatesParamsAt encoded 0)) === args
+    let encoded = CCIP.BurnMintTokenPoolV2CodecGen.encodeApplyTokenTransferFeeConfigUpdatesParams args
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeApplyTokenTransferFeeConfigUpdatesParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |          SetRateLimiterReferences           |
@@ -117,26 +117,26 @@ testApplyTokenTransferFeeConfigUpdatesParamsRoundtrip = do
 testSetRateLimiterReferencesParamsRoundtrip : Script ()
 testSetRateLimiterReferencesParamsRoundtrip = do
     let rateLimitConfigs = [
-            CCIP.BurnMintTokenPoolV1.RateLimitConfigArgs with
+            CCIP.BurnMintTokenPoolV2.RateLimitConfigArgs with
                 remoteChainSelector = 1.0
                 inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in@party1"
                 inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party1"
                 outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@party1"
-            , CCIP.BurnMintTokenPoolV1.RateLimitConfigArgs with
+            , CCIP.BurnMintTokenPoolV2.RateLimitConfigArgs with
                 remoteChainSelector = 18446744073709551615.0 -- max uint64
                 inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in@party2"
                 inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party2"
                 outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@party2"
-            , CCIP.BurnMintTokenPoolV1.RateLimitConfigArgs with
+            , CCIP.BurnMintTokenPoolV2.RateLimitConfigArgs with
                 remoteChainSelector = 0.0
                 inboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in@party3"
                 inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-in-custom@party3"
                 outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@party3"
             ]
-        args = CCIP.BurnMintTokenPoolV1.SetRateLimiterReferencesParams with
+        args = CCIP.BurnMintTokenPoolV2.SetRateLimiterReferencesParams with
             rateLimitConfigArgs = rateLimitConfigs
-    let encoded = CCIP.BurnMintTokenPoolV1CodecGen.encodeSetRateLimiterReferencesParams args
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeSetRateLimiterReferencesParamsAt encoded 0)) === args
+    let encoded = CCIP.BurnMintTokenPoolV2CodecGen.encodeSetRateLimiterReferencesParams args
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeSetRateLimiterReferencesParamsAt encoded 0)) === args
     pure ()
 
 -- ===============================================
@@ -147,14 +147,14 @@ testSetRateLimitConfigParamsRoundtrip : Script ()
 testSetRateLimitConfigParamsRoundtrip = script do
     admin <- allocateParty "rate_limit_admin"
     poolOwner <- allocateParty "pool_owner"
-    let args = CCIP.BurnMintTokenPoolV1.SetRateLimitConfigParams with
+    let args = CCIP.BurnMintTokenPoolV2.SetRateLimitConfigParams with
             caller = admin
             rateLimiterInstanceAddress = Chainlink.InstanceAddress.make "rl-in" poolOwner
             newIsEnabled = True
             newCapacity = 42.0
             newRate = 3.0
-    let encoded = CCIP.BurnMintTokenPoolV1CodecGen.encodeSetRateLimitConfigParams args
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeSetRateLimitConfigParamsAt encoded 0)) === args
+    let encoded = CCIP.BurnMintTokenPoolV2CodecGen.encodeSetRateLimitConfigParams args
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeSetRateLimitConfigParamsAt encoded 0)) === args
     pure ()
 
 -- ===============================================
@@ -164,22 +164,22 @@ testSetRateLimitConfigParamsRoundtrip = script do
 testTransferTimeoutRoundtrip : Script ()
 testTransferTimeoutRoundtrip = do
     -- Test Indefinite
-    let indefinite = CCIP.BurnMintTokenPoolV1.Indefinite
-        encodedIndefinite = CCIP.BurnMintTokenPoolV1CodecGen.encodeTransferTimeout indefinite
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeTransferTimeoutAt encodedIndefinite 0)) === indefinite
+    let indefinite = CCIP.BurnMintTokenPoolV2.Indefinite
+        encodedIndefinite = CCIP.BurnMintTokenPoolV2CodecGen.encodeTransferTimeout indefinite
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeTransferTimeoutAt encodedIndefinite 0)) === indefinite
 
     -- Test RelativeHours with various values
-    let relHours24 = CCIP.BurnMintTokenPoolV1.RelativeHours 24
-        encodedRelHours24 = CCIP.BurnMintTokenPoolV1CodecGen.encodeTransferTimeout relHours24
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeTransferTimeoutAt encodedRelHours24 0)) === relHours24
+    let relHours24 = CCIP.BurnMintTokenPoolV2.RelativeHours 24
+        encodedRelHours24 = CCIP.BurnMintTokenPoolV2CodecGen.encodeTransferTimeout relHours24
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeTransferTimeoutAt encodedRelHours24 0)) === relHours24
 
-    let relHours0 = CCIP.BurnMintTokenPoolV1.RelativeHours 0
-        encodedRelHours0 = CCIP.BurnMintTokenPoolV1CodecGen.encodeTransferTimeout relHours0
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeTransferTimeoutAt encodedRelHours0 0)) === relHours0
+    let relHours0 = CCIP.BurnMintTokenPoolV2.RelativeHours 0
+        encodedRelHours0 = CCIP.BurnMintTokenPoolV2CodecGen.encodeTransferTimeout relHours0
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeTransferTimeoutAt encodedRelHours0 0)) === relHours0
 
-    let relHoursLarge = CCIP.BurnMintTokenPoolV1.RelativeHours 8760  -- 1 year in hours
-        encodedRelHoursLarge = CCIP.BurnMintTokenPoolV1CodecGen.encodeTransferTimeout relHoursLarge
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeTransferTimeoutAt encodedRelHoursLarge 0)) === relHoursLarge
+    let relHoursLarge = CCIP.BurnMintTokenPoolV2.RelativeHours 8760  -- 1 year in hours
+        encodedRelHoursLarge = CCIP.BurnMintTokenPoolV2CodecGen.encodeTransferTimeout relHoursLarge
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeTransferTimeoutAt encodedRelHoursLarge 0)) === relHoursLarge
 
 -- ===============================================
 -- |   Pool receive context MCMS param codecs    |
@@ -187,24 +187,24 @@ testTransferTimeoutRoundtrip = do
 
 testAddPoolReceiveContextNonContractValueParamsRoundtrip : Script ()
 testAddPoolReceiveContextNonContractValueParamsRoundtrip = do
-    let inner = CCIP.UtilsV1.Context.encodeAnyValue (Splice.Api.Token.MetadataV1.AV_Text "hello")
-        args = CCIP.BurnMintTokenPoolV1.AddPoolReceiveContextNonContractValueParams with contextKey = "myKey", valuePayload = inner
-        encoded = CCIP.BurnMintTokenPoolV1CodecGen.encodeAddPoolReceiveContextNonContractValueParams args
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeAddPoolReceiveContextNonContractValueParamsAt encoded 0)) === args
+    let inner = CCIP.UtilsV2.Context.encodeAnyValue (Splice.Api.Token.MetadataV1.AV_Text "hello")
+        args = CCIP.BurnMintTokenPoolV2.AddPoolReceiveContextNonContractValueParams with contextKey = "myKey", valuePayload = inner
+        encoded = CCIP.BurnMintTokenPoolV2CodecGen.encodeAddPoolReceiveContextNonContractValueParams args
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeAddPoolReceiveContextNonContractValueParamsAt encoded 0)) === args
 
 testAddPoolReceiveContextContractValueParamsRoundtrip : Script ()
 testAddPoolReceiveContextContractValueParamsRoundtrip = script do
     p <- allocateParty "p"
     let ria = Chainlink.InstanceAddress.make "other-inst" p
-        args = CCIP.BurnMintTokenPoolV1.AddPoolReceiveContextContractValueParams with contextKey = "refKey", referentInstanceAddress = ria
-        encoded = CCIP.BurnMintTokenPoolV1CodecGen.encodeAddPoolReceiveContextContractValueParams args
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeAddPoolReceiveContextContractValueParamsAt encoded 0)) === args
+        args = CCIP.BurnMintTokenPoolV2.AddPoolReceiveContextContractValueParams with contextKey = "refKey", referentInstanceAddress = ria
+        encoded = CCIP.BurnMintTokenPoolV2CodecGen.encodeAddPoolReceiveContextContractValueParams args
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeAddPoolReceiveContextContractValueParamsAt encoded 0)) === args
 
 testRemovePoolReceiveContextValueParamsRoundtrip : Script ()
 testRemovePoolReceiveContextValueParamsRoundtrip = do
-    let args = CCIP.BurnMintTokenPoolV1.RemovePoolReceiveContextValueParams with contextKey = "toRemove"
-        encoded = CCIP.BurnMintTokenPoolV1CodecGen.encodeRemovePoolReceiveContextValueParams args
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeRemovePoolReceiveContextValueParamsAt encoded 0)) === args
+    let args = CCIP.BurnMintTokenPoolV2.RemovePoolReceiveContextValueParams with contextKey = "toRemove"
+        encoded = CCIP.BurnMintTokenPoolV2CodecGen.encodeRemovePoolReceiveContextValueParams args
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeRemovePoolReceiveContextValueParamsAt encoded 0)) === args
 
 -- ===============================================
 -- |           ChoiceContext (ContextCodec)      |
@@ -214,23 +214,23 @@ testChoiceContextCodecRoundtrip : Script ()
 testChoiceContextCodecRoundtrip = do
     -- Test empty context
     let emptyCtx = Splice.Api.Token.MetadataV1.emptyChoiceContext
-        encodedEmpty = CCIP.UtilsV1.Context.encodeChoiceContext emptyCtx
-    fst (fromSome (CCIP.UtilsV1.Context.decodeChoiceContextAt encodedEmpty 0)) === emptyCtx
+        encodedEmpty = CCIP.UtilsV2.Context.encodeChoiceContext emptyCtx
+    fst (fromSome (CCIP.UtilsV2.Context.decodeChoiceContextAt encodedEmpty 0)) === emptyCtx
 
     -- Test context with simple text values
     let ctxWithText = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.fromList [("key1", Splice.Api.Token.MetadataV1.AV_Text "value1"), ("key2", Splice.Api.Token.MetadataV1.AV_Text "value2")])
-        encodedWithText = CCIP.UtilsV1.Context.encodeChoiceContext ctxWithText
-    fst (fromSome (CCIP.UtilsV1.Context.decodeChoiceContextAt encodedWithText 0)) === ctxWithText
+        encodedWithText = CCIP.UtilsV2.Context.encodeChoiceContext ctxWithText
+    fst (fromSome (CCIP.UtilsV2.Context.decodeChoiceContextAt encodedWithText 0)) === ctxWithText
 
     -- Test context with int values
     let ctxWithInt = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.fromList [("count", Splice.Api.Token.MetadataV1.AV_Int 42)])
-        encodedWithInt = CCIP.UtilsV1.Context.encodeChoiceContext ctxWithInt
-    fst (fromSome (CCIP.UtilsV1.Context.decodeChoiceContextAt encodedWithInt 0)) === ctxWithInt
+        encodedWithInt = CCIP.UtilsV2.Context.encodeChoiceContext ctxWithInt
+    fst (fromSome (CCIP.UtilsV2.Context.decodeChoiceContextAt encodedWithInt 0)) === ctxWithInt
 
     -- Test context with bool values
     let ctxWithBool = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.fromList [("enabled", Splice.Api.Token.MetadataV1.AV_Bool True), ("disabled", Splice.Api.Token.MetadataV1.AV_Bool False)])
-        encodedWithBool = CCIP.UtilsV1.Context.encodeChoiceContext ctxWithBool
-    fst (fromSome (CCIP.UtilsV1.Context.decodeChoiceContextAt encodedWithBool 0)) === ctxWithBool
+        encodedWithBool = CCIP.UtilsV2.Context.encodeChoiceContext ctxWithBool
+    fst (fromSome (CCIP.UtilsV2.Context.decodeChoiceContextAt encodedWithBool 0)) === ctxWithBool
 
 -- ===============================================
 -- |             SetTransferTimeout              |
@@ -239,9 +239,9 @@ testChoiceContextCodecRoundtrip = do
 testSetTransferTimeoutRoundtrip : Script ()
 testSetTransferTimeoutRoundtrip = do
     -- Test using the params wrapper
-    let args = CCIP.BurnMintTokenPoolV1.SetTransferTimeoutParams with transferTimeout = CCIP.BurnMintTokenPoolV1.RelativeHours 48
-        encoded = CCIP.BurnMintTokenPoolV1CodecGen.encodeSetTransferTimeoutParams args
-    fst (fromSome (CCIP.BurnMintTokenPoolV1CodecGen.decodeSetTransferTimeoutParamsAt encoded 0)) === args
+    let args = CCIP.BurnMintTokenPoolV2.SetTransferTimeoutParams with transferTimeout = CCIP.BurnMintTokenPoolV2.RelativeHours 48
+        encoded = CCIP.BurnMintTokenPoolV2CodecGen.encodeSetTransferTimeoutParams args
+    fst (fromSome (CCIP.BurnMintTokenPoolV2CodecGen.decodeSetTransferTimeoutParamsAt encoded 0)) === args
 
 -- ===========================================================================
 -- INVALID DATA REJECTION TESTS
@@ -250,12 +250,12 @@ testSetTransferTimeoutRoundtrip = do
 testInvalidDataRejection : Script ()
 testInvalidDataRejection = do
   -- Empty data should fail
-  case CCIP.BurnMintTokenPoolV1CodecGen.decodeApplyChainUpdatesParamsAt "" 0 of
+  case CCIP.BurnMintTokenPoolV2CodecGen.decodeApplyChainUpdatesParamsAt "" 0 of
     None -> pure ()  -- Expected
     Some _ -> abort "Expected decodeApplyChainUpdatesParams to fail on empty data"
 
   -- Invalid tag for TransferTimeout should fail
-  case CCIP.BurnMintTokenPoolV1CodecGen.decodeTransferTimeoutAt "ff" 0 of
+  case CCIP.BurnMintTokenPoolV2CodecGen.decodeTransferTimeoutAt "ff" 0 of
     None -> pure ()  -- Expected
     Some _ -> abort "Expected decodeTransferTimeoutAt to fail on invalid tag"
 

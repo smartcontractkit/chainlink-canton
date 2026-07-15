@@ -27,8 +27,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-tickets"
-	PackageID   = "f3de2e6d1e0f662a0ecd957ec9d3d9cb249e2ba86e7e6794822482be2a070c46"
+	PackageName = "ccip-tickets-v2"
+	PackageID   = "506234a38fffe1945e3b5ff3a5e444a237fa9592b249b0f7444c194207df2c2d"
 	SDKVersion  = "3.4.11"
 )
 
@@ -110,12 +110,12 @@ type TokenReceiveTicket struct {
 
 // GetTemplateID returns the template ID for this template using the package name
 func (t TokenReceiveTicket) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TicketsV1", "TokenReceiveTicket")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TicketsV2", "TokenReceiveTicket")
 }
 
 // GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
 func (t TokenReceiveTicket) GetTemplateIDWithPackageID(packageID string) string {
-	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.TicketsV1", "TokenReceiveTicket")
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.TicketsV2", "TokenReceiveTicket")
 }
 
 // CreateCommand returns a CreateCommand for this template using the package name
@@ -300,7 +300,7 @@ func (t *TokenReceiveTicket) UnmarshalHex(data string) error {
 // This method uses the package name in the template ID
 func (t TokenReceiveTicket) Consume(contractID string, args ccipapi.Consume) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TicketsV1", "TokenReceiveTicket"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TicketsV2", "TokenReceiveTicket"),
 		ContractID: contractID,
 		Choice:     "Consume",
 		Arguments:  argsToMap(args),
@@ -310,7 +310,7 @@ func (t TokenReceiveTicket) Consume(contractID string, args ccipapi.Consume) *mo
 // ConsumeWithPackageID exercises the Consume choice using the provided package ID instead of package name
 func (t TokenReceiveTicket) ConsumeWithPackageID(contractID string, packageID string, args ccipapi.Consume) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TicketsV1", "TokenReceiveTicket"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TicketsV2", "TokenReceiveTicket"),
 		ContractID: contractID,
 		Choice:     "Consume",
 		Arguments:  argsToMap(args),
@@ -321,7 +321,7 @@ func (t TokenReceiveTicket) ConsumeWithPackageID(contractID string, packageID st
 // This method uses the package name in the template ID
 func (t TokenReceiveTicket) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TicketsV1", "TokenReceiveTicket"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.TicketsV2", "TokenReceiveTicket"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -331,7 +331,7 @@ func (t TokenReceiveTicket) Archive(contractID string) *model.ExerciseCommand {
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t TokenReceiveTicket) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TicketsV1", "TokenReceiveTicket"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.TicketsV2", "TokenReceiveTicket"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},

@@ -1,0 +1,67 @@
+module CCIP.APIV2.ExecutingMessage where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.CodecV2.MessageCodecV1
+
+data MessageExecutionState
+  = UNTOUCHED
+  | IN_PROGRESS
+  | SUCCESS
+  | FAILURE
+  deriving (Eq, Show)
+
+interface IExecutingMessage where
+    viewtype ExecutingMessageView
+
+    executingMessage_cancelExecuteImpl : ContractId IExecutingMessage -> ExecutingMessage_CancelExecute -> Update ()
+    executingMessage_addCCVVerificationImpl : ContractId IExecutingMessage -> ExecutingMessage_AddCCVVerification -> Update (ContractId IExecutingMessage)
+
+    nonconsuming choice ExecutingMessage_CancelExecute : ()
+        with
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do executingMessage_cancelExecuteImpl this self arg
+
+    nonconsuming choice ExecutingMessage_AddCCVVerification : ContractId IExecutingMessage
+        with
+            ccvInstanceId : Text
+            versionTag : BytesHex
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do executingMessage_addCCVVerificationImpl this self arg
+
+data ExecutingMessageView = ExecutingMessageView
+    with
+        ccipOwner : Party
+
+        message : CCIP.CodecV2.MessageCodecV1.MessageV1
+
+        offRamp : Chainlink.InstanceAddress.RawInstanceAddress
+        globalConfig : Chainlink.InstanceAddress.RawInstanceAddress
+        rmnRemote : Chainlink.InstanceAddress.RawInstanceAddress
+        tokenAdminRegistry : Chainlink.InstanceAddress.RawInstanceAddress
+
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+interface ITokenReceiveTicket where
+    viewtype TokenReceiveTicketView
+
+    choice Consume : ()
+        controller (view this).ccipOwner, (view this).poolOwner
+        do pure ()
+
+data TokenReceiveTicketView = TokenReceiveTicketView
+    with
+        ccipOwner : Party
+        poolOwner : Party
+        ccvOwners : [Party]
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)

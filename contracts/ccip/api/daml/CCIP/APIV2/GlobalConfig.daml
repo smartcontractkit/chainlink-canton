@@ -1,0 +1,71 @@
+module CCIP.APIV2.GlobalConfig where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+globalConfigContextKey : Text
+globalConfigContextKey = "global-config"
+
+interface IGlobalConfig where
+    viewtype GlobalConfigView
+
+    globalConfig_publicFetchImpl : ContractId IGlobalConfig -> GlobalConfig_PublicFetch -> Update GlobalConfigView
+    globalConfig_getDestChainConfigImpl : ContractId IGlobalConfig -> GlobalConfig_GetDestChainConfig -> Update (Optional DestChainConfig)
+    globalConfig_getSourceChainConfigImpl : ContractId IGlobalConfig -> GlobalConfig_GetSourceChainConfig -> Update (Optional SourceChainConfig)
+
+    nonconsuming choice GlobalConfig_PublicFetch : GlobalConfigView
+        with
+            expectedAddress : Chainlink.InstanceAddress.RawInstanceAddress
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do globalConfig_publicFetchImpl this self arg
+
+    nonconsuming choice GlobalConfig_GetDestChainConfig : Optional DestChainConfig
+        with
+            destChainSelector : Numeric 0
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do globalConfig_getDestChainConfigImpl this self arg
+
+    nonconsuming choice GlobalConfig_GetSourceChainConfig : Optional SourceChainConfig
+        with
+            sourceChainSelector : Numeric 0
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+            caller : Party
+        controller caller
+        do globalConfig_getSourceChainConfigImpl this self arg
+
+data GlobalConfigView = GlobalConfigView
+    with
+        ccipOwner : Party
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+data DestChainConfig = DestChainConfig
+    with
+        isEnabled : Bool                                                            -- Flag whether this destination chain is enabled or not.
+        addressBytesLength : Int                                                    -- The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+        tokenReceiverAllowed : Bool                                                 -- Whether specifying `tokenReceiver` in extraArgs is allowed. Must be set to false for all EVM chains.
+        baseExecutionGasCost : Int                                                  -- Base destination-chain gas cost added to ccipReceiveGasLimit for execution pricing.
+        offRampAddress : BytesHex                                                   -- OffRamp address on the destination chain.
+        defaultExecutor : Optional Chainlink.InstanceAddress.RawInstanceAddress     -- Default executor to use for messages to this destination chain. `None` means no executor.
+        laneMandatedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]           -- Required CCVs to use for all messages to this destination chain.
+        defaultCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]                -- Default CCVs to use for messages to this destination chain.
+        messageNetworkFeeUSDCents : Numeric 0                                       -- Network fee in USD cents for messages without token transfers.
+        tokenNetworkFeeUSDCents : Numeric 0                                         -- Network fee in USD cents for messages with token transfers.
+        context : Splice.Api.Token.MetadataV1.ChoiceContext                         -- Additional return context for future use.
+    deriving (Eq, Show)
+
+data SourceChainConfig = SourceChainConfig
+    with
+        isEnabled : Bool                                                    -- Flag whether the source chain is enabled or not.
+        onRampAddresses : [BytesHex]                                        -- OnRamp addresses on the source chain.
+        defaultCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]        -- Default CCVs to use for messages from this source chain.
+        laneMandatedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]   -- Required CCVs to use for all messages from this source chain.
+        context : Splice.Api.Token.MetadataV1.ChoiceContext                 -- Additional return context for future use.
+    deriving (Eq, Show)
