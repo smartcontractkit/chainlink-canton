@@ -167,6 +167,7 @@ runs:
         CANTON_CONFIRM_EXEC_TIMEOUT: ${{ inputs.confirm_exec_timeout }}
         CANTON_LOAD_SKIP_EXEC_CONFIRM: ${{ inputs.skip_exec_confirm }}
         PRIVATE_KEY: ${{ inputs.CCIP_PROD_TESTNET_PRIVATE_KEY }}
+        TEST_TIMEOUT: ${{ inputs.test_timeout }}
       run: |
         case "${{ inputs.direction }}" in
           canton2evm) TEST_RUN='^TestCanton2EVM_Load$' ;;
@@ -175,7 +176,7 @@ runs:
           evm2canton-token) TEST_RUN='^TestEVM2Canton_TokenLoad$' ;;
           *) echo "unknown direction: ${{ inputs.direction }}" >&2; exit 1 ;;
         esac
-        go test -tags=prodledger -timeout "${{ inputs.test_timeout }}" -v -count 1 -ccip-env=prod-testnet -run "$TEST_RUN"
+        go test -tags=prodledger -timeout "$TEST_TIMEOUT" -v -count 1 -ccip-env=prod-testnet -run "$TEST_RUN"
 
     - name: Upload devenv logs
       if: always() && inputs.ccip_env == 'devenv'
