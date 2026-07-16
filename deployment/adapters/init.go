@@ -9,6 +9,7 @@ import (
 	tokenscore "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	mcmsreaderapi "github.com/smartcontractkit/chainlink-ccip/deployment/utils/changesets"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
+	ccipshared "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/offchain/shared"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
 	ccvshared "github.com/smartcontractkit/chainlink-ccv/deployment/shared"
 	nodev1 "github.com/smartcontractkit/chainlink-protos/job-distributor/v1/node"
@@ -27,6 +28,13 @@ func init() {
 	// instead of skipping them as an unsupported type. Without this, canton NOPs never
 	// reach state inference and on-chain canton signers fail to resolve to a NOP.
 	ccvshared.RegisterChainTypeFamily(nodev1.ChainType_CHAIN_TYPE_CANTON, chainsel.FamilyCanton)
+
+	// Canton's signer identity is the raw secp256k1 public key (OnchainSigningPubKey),
+	// not the EVM-derived address (OnchainSigningAddress). Register a reader in both
+	// CCV's and CCIP's shared packages so fetch_signing_keys indexes Canton NOPs under
+	// the canton family with the pubkey.
+	ccvshared.RegisterSigningIdentityReader(chainsel.FamilyCanton, cantonSigningIdentityReader{})
+	ccipshared.RegisterSigningIdentityReader(chainsel.FamilyCanton, cantonSigningIdentityReader{})
 
 	// Canonicalise canton committee signer addresses (raw secp256k1 pubkey ->
 	// derived 20-byte ECDSA address) so ccv state inference can match on-chain
