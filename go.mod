@@ -34,11 +34,11 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/smartcontractkit/chain-selectors v1.0.106
-	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260715043322-e1793fb1a7e1
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260715043322-e1793fb1a7e1
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260715044934-94e5aba91e2a
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260715044934-94e5aba91e2a
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260715044934-94e5aba91e2a
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260715230542-c08e039d74ca
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260715230542-c08e039d74ca
+	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260716181938-b654f20972d8
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260716181938-b654f20972d8
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260716181938-b654f20972d8
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260518100439-9564f35fd264
 	github.com/smartcontractkit/chainlink-deployments-framework v0.116.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260708113039-95f97b2d25e9
@@ -160,7 +160,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/sercand/kuberesolver/v6 v6.0.0 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.2-0.20260715042953-27a8f0cccbf5 // indirect
+	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.2-0.20260716181938-b654f20972d8 // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20260709082627-78ab5315e367 // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260709082627-78ab5315e367 // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20260521164805-26d78d5e1243 // indirect

@@ -11,7 +11,7 @@ inputs:
     # builds the verifier/devenv Docker images, while go.mod pins the `ccv up` tooling
     # that generates their configs. A mismatch across config-format changes (e.g. #1193
     # bootstrap monitoring.Config) makes the verifier container exit on startup.
-    default: 94e5aba91e2ad7c3c520becae45f76605723a57a
+    default: b654f20972d84ff0e40544ceab32a4b871df05a9
   canton-ref:
     description: >-
       chainlink-canton git ref. Leave empty to use the ref that triggered the workflow.
