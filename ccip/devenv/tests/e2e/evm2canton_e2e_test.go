@@ -4,20 +4,17 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/operations/proxy"
-	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/sequences"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/versioned_verifier_resolver"
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
 	ccldf "github.com/smartcontractkit/chainlink-ccv/build/devenv/cldf"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	_ "github.com/smartcontractkit/chainlink-ccv/build/devenv/evm" // register EVM ImplFactory
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register Canton ImplFactory
+	cantondevenv "github.com/smartcontractkit/chainlink-canton/ccip/devenv"
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
@@ -54,13 +51,6 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		common.DefaultCommitteeVerifierQualifier,
 		"source committee verifier",
 	)
-	executorAddress := devenvtests.GetContractAddress(
-		t, ds, srcSelector,
-		datastore.ContractType(sequences.ExecutorProxyType),
-		proxy.Deploy.Version(),
-		common.DefaultExecutorQualifier,
-		"source executor",
-	)
 
 	t.Run("message transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
@@ -70,7 +60,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		sendMessageResult, err := boot.EVM.SendMessage(subtestCtx, dstSelector, cciptestinterfaces.MessageFields{
 			Receiver: receiver,
 			Data:     []byte("Hello message transfer from EVM!"),
-		}, devenvtests.EVMToCantonMessageOptions(200_000, executorAddress, ccvAddr), 3)
+		}, devenvtests.EVMToCantonMessageOptions(200_000, cantondevenv.EVMToCantonFinalityConfig, ccvAddr), 3)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
 
@@ -119,18 +109,7 @@ func TestEVM2Canton_Basic(t *testing.T) {
 				Amount:       lane.TransferAmount,
 				TokenAddress: srcToken,
 			},
-		}, cciptestinterfaces.MessageOptions{
-			ExecutionGasLimit: lane.ExecutionGasLimit,
-			FinalityConfig:    lane.FinalityConfig,
-			Executor:          executorAddress,
-			CCVs: []protocol.CCV{
-				{
-					CCVAddress: ccvAddr,
-					Args:       []byte{},
-					ArgsLen:    0,
-				},
-			},
-		}, 3)
+		}, devenvtests.EVMToCantonMessageOptions(lane.ExecutionGasLimit, lane.FinalityConfig, ccvAddr), 3)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
 		require.NotNil(t, sendMessageResult.Message.TokenTransfer)

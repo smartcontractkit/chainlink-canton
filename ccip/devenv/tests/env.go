@@ -55,7 +55,7 @@ func (e CCIPEnv) ConfigPath() string {
 	case EnvDevenv:
 		return "env-canton-evm-out.toml"
 	case EnvProdTestnet:
-		return "env-prod-testnet-out.toml"
+		return "env-prod-testnet.ci.toml"
 	default:
 		return ""
 	}
