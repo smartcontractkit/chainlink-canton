@@ -53,6 +53,8 @@ func EnsureERC20Allowance(
 	fmt.Println("⏳ Approving...")
 	opts := *b.EthAuth
 	opts.Context = ctx
+	opts.Value = big.NewInt(0)
+	opts.GasLimit = 0
 	tx, err := erc20.Approve(&opts, spender, amount)
 	if err != nil {
 		return fmt.Errorf("approve ERC20: %w", err)
@@ -66,6 +68,9 @@ func EnsureERC20Allowance(
 		return fmt.Errorf("wait mined: %w", err)
 	}
 	fmt.Printf("Transaction mined in block: %d\n", receipt.BlockNumber.Uint64())
+	if receipt.Status != 1 {
+		return fmt.Errorf("approve transaction reverted (status=0): %s", tx.Hash().Hex())
+	}
 
 	return nil
 }

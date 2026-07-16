@@ -207,9 +207,8 @@ func evmSend(
 	}
 
 	auth := b.EthAuth
-	if feeToken == b.Profile.EthEmptyAddress {
-		auth.Value = fee
-	} else {
+
+	if feeToken != b.Profile.EthEmptyAddress {
 		allowance := requiredAllowances[feeToken]
 		if allowance == nil {
 			allowance = big.NewInt(0)
@@ -228,11 +227,16 @@ func evmSend(
 		}
 	}
 
+	if feeToken == b.Profile.EthEmptyAddress {
+		auth.Value = fee
+	}
+
 	// Ask for confirmation
 	fmt.Println("About to send message:")
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleLight)
 	tw.AppendHeader(table.Row{"Field", "Value"})
+	tw.AppendRow(table.Row{"Sender", b.ETHAddress.Hex()})
 	tw.AppendRow(table.Row{"Receiver", "0x" + common.Bytes2Hex(msg.Receiver)})
 	tw.AppendRow(table.Row{"Data", "0x" + common.Bytes2Hex(msg.Data)})
 	tw.AppendRow(table.Row{"Finality", fin.Label})
@@ -249,6 +253,7 @@ func evmSend(
 	}
 
 	fmt.Println("⏳ Sending message...")
+	auth.GasLimit = 500_000
 	tx, err := router.CcipSend(auth, b.Profile.CantonSelector, msg)
 	if err != nil {
 		return fmt.Errorf("ccip send: %w", err)
