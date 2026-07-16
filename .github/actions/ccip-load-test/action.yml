@@ -16,7 +16,7 @@ inputs:
   message_rate:
     description: "CANTON_LOAD_MESSAGE_RATE"
     required: false
-    default: "1/45s"
+    default: "1/10s"
   load_duration:
     description: "CANTON_LOAD_DURATION"
     required: false
@@ -33,10 +33,6 @@ inputs:
     description: "Checkout path for chainlink-canton (`.` for PR root, `chainlink-canton` for nested devenv checkout)"
     required: false
     default: .
-  canton_ref:
-    description: "chainlink-canton git ref for devenv setup (empty = workflow SHA)"
-    required: false
-    default: ""
   skip_exec_confirm:
     description: "CANTON_LOAD_SKIP_EXEC_CONFIRM"
     required: false
@@ -49,10 +45,26 @@ inputs:
     description: "CANTON_PARTY_ID"
     required: false
     default: "u_d53a15c42af6::1220c250c23c55120f7c758bccc5cbc739629015ab921594e1c29656981f985bffa7"
+  user_id:
+    description: "CANTON_USER_ID"
+    required: false
+    default: "0oau1l03xrG9NQw9z5d7"
   grpc_url:
     description: "CANTON_GRPC_URL"
     required: false
     default: "testnet.cv1.bcy-v.metalhosts.com:443"
+  router_instance_id:
+    description: "CANTON_ROUTER_INSTANCE_ID (prod-testnet)"
+    required: false
+    default: "gha-load-router"
+  sender_instance_id:
+    description: "CANTON_SENDER_INSTANCE_ID (prod-testnet)"
+    required: false
+    default: "gha-load-sender"
+  receiver_instance_id:
+    description: "CANTON_RECEIVER_INSTANCE_ID (prod-testnet)"
+    required: false
+    default: "gha-load-receiver"
   CANTON_OKTA_AUTHORIZER_TESTNET:
     description: "GitHub secret CANTON_OKTA_AUTHORIZER_TESTNET"
     required: false
@@ -64,6 +76,12 @@ inputs:
     required: false
   CCIP_PROD_TESTNET_PRIVATE_KEY:
     description: "GitHub secret CCIP_PROD_TESTNET_PRIVATE_KEY"
+    required: false
+  TS_OAUTH_CLIENT_ID_CANTON:
+    description: "GitHub secret TS_OAUTH_CLIENT_ID_CANTON (prod-testnet Tailscale)"
+    required: false
+  TS_AUDIENCE_CANTON:
+    description: "GitHub secret TS_AUDIENCE_CANTON (prod-testnet Tailscale)"
     required: false
   ccv-iam-role:
     description: "AWS IAM role for CCV ECR authentication (devenv only)"
@@ -78,6 +96,23 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Setup CCIP devenv
+      if: inputs.ccip_env == 'devenv'
+      uses: ./.github/actions/setup-ccip-devenv
+      with:
+        canton-path: ${{ inputs.canton_path }}
+        ccv-iam-role: ${{ inputs.ccv-iam-role }}
+        jd-registry: ${{ inputs.jd-registry }}
+        jd-image: ${{ inputs.jd-image }}
+
+    - name: Connect to Tailscale (prod-testnet)
+      if: inputs.ccip_env == 'prod-testnet'
+      uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
+      with:
+        oauth-client-id: ${{ inputs.TS_OAUTH_CLIENT_ID_CANTON }}
+        audience: ${{ inputs.TS_AUDIENCE_CANTON }}
+        tags: tag:bcy-validators-gha
+
     - name: Install Go (prod-testnet)
       if: inputs.ccip_env == 'prod-testnet'
       uses: actions/setup-go@v6
@@ -99,6 +134,7 @@ runs:
       env:
         CANTON_LOAD_MESSAGE_RATE: ${{ inputs.message_rate }}
         CANTON_LOAD_DURATION: ${{ inputs.load_duration }}
+        CANTON_LOAD_SKIP_EXEC_CONFIRM: ${{ inputs.skip_exec_confirm }}
       run: |
         case "${{ inputs.direction }}" in
           canton2evm) TEST_RUN='^TestCanton2EVM_Load$' ;;
@@ -121,12 +157,17 @@ runs:
         CANTON_CLIENT_ID: ${{ inputs.CANTON_OKTA_CLIENT_ID_TESTNET }}
         CANTON_CLIENT_SECRET: ${{ inputs.CANTON_OKTA_CLIENT_SECRET_TESTNET }}
         CANTON_PARTY_ID: ${{ inputs.party_id }}
+        CANTON_USER_ID: ${{ inputs.user_id }}
         CANTON_GRPC_URL: ${{ inputs.grpc_url }}
+        CANTON_ROUTER_INSTANCE_ID: ${{ inputs.router_instance_id }}
+        CANTON_SENDER_INSTANCE_ID: ${{ inputs.sender_instance_id }}
+        CANTON_RECEIVER_INSTANCE_ID: ${{ inputs.receiver_instance_id }}
         CANTON_LOAD_MESSAGE_RATE: ${{ inputs.message_rate }}
         CANTON_LOAD_DURATION: ${{ inputs.load_duration }}
         CANTON_CONFIRM_EXEC_TIMEOUT: ${{ inputs.confirm_exec_timeout }}
         CANTON_LOAD_SKIP_EXEC_CONFIRM: ${{ inputs.skip_exec_confirm }}
         PRIVATE_KEY: ${{ inputs.CCIP_PROD_TESTNET_PRIVATE_KEY }}
+        TEST_TIMEOUT: ${{ inputs.test_timeout }}
       run: |
         case "${{ inputs.direction }}" in
           canton2evm) TEST_RUN='^TestCanton2EVM_Load$' ;;
@@ -135,4 +176,13 @@ runs:
           evm2canton-token) TEST_RUN='^TestEVM2Canton_TokenLoad$' ;;
           *) echo "unknown direction: ${{ inputs.direction }}" >&2; exit 1 ;;
         esac
-        go test -timeout "${{ inputs.test_timeout }}" -v -count 1 -run "$TEST_RUN"
+        go test -tags=prodledger -timeout "$TEST_TIMEOUT" -v -count 1 -ccip-env=prod-testnet -run "$TEST_RUN"
+
+    - name: Upload devenv logs
+      if: always() && inputs.ccip_env == 'devenv'
+      uses: ./.github/actions/upload-ccip-devenv-logs
+      with:
+        canton-path: ${{ inputs.canton_path }}
+        test-package-dir: load
+        log-dump-suffix: ccip-load-tests
+        artifact-name: container-logs-ccip-load-tests

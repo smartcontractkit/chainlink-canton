@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       ccip_env:
-        description: 'Target environment'
+        description: "Target environment"
         required: true
         default: devenv
         type: choice
@@ -12,7 +12,7 @@ on:
           - devenv
           - prod-testnet
       direction:
-        description: 'Load test direction'
+        description: "Load test direction"
         required: true
         default: canton2evm
         type: choice
@@ -22,39 +22,34 @@ on:
           - canton2evm-token
           - evm2canton-token
       message_rate:
-        description: 'CANTON_LOAD_MESSAGE_RATE (e.g. 1/1s, 1/45s)'
+        description: "CANTON_LOAD_MESSAGE_RATE (e.g. 1/45s)"
         required: false
-        default: '1/1s'
+        default: "1/10s"
         type: string
       load_duration:
-        description: 'CANTON_LOAD_DURATION (Go duration, e.g. 90s, 2m)'
+        description: "CANTON_LOAD_DURATION (e.g. 90s, 2m)"
         required: false
-        default: '90s'
+        default: "90s"
         type: string
       test_timeout:
-        description: 'go test -timeout value (must exceed load duration + teardown)'
+        description: "go test -timeout value (must exceed load duration + teardown)"
         required: false
-        default: '40m'
-        type: string
-      canton_ref:
-        description: 'chainlink-canton git ref (empty = workflow ref; devenv only)'
-        required: false
-        default: ''
+        default: "40m"
         type: string
       config_file:
-        description: 'CCIP_CONFIG_FILE basename under ccip/devenv (prod-testnet only)'
+        description: "CCIP_CONFIG_FILE basename under ccip/devenv (prod-testnet only)"
         required: false
         default: env-prod-testnet.ci.toml
         type: string
       skip_exec_confirm:
-        description: 'CANTON_LOAD_SKIP_EXEC_CONFIRM (prod-testnet only)'
+        description: "CANTON_LOAD_SKIP_EXEC_CONFIRM"
         required: false
-        default: 'true'
+        default: "false"
         type: string
       confirm_exec_timeout:
-        description: 'CANTON_CONFIRM_EXEC_TIMEOUT (prod-testnet only)'
+        description: "CANTON_CONFIRM_EXEC_TIMEOUT (prod-testnet only)"
         required: false
-        default: '10m'
+        default: "10m"
         type: string
 
 concurrency:
@@ -78,24 +73,26 @@ jobs:
         run: |
           if [ "${{ inputs.ccip_env }}" = "prod-testnet" ]; then
             echo "canton_path=." >> "$GITHUB_OUTPUT"
-            if [ "${{ inputs.message_rate }}" = "1/1s" ]; then
-              echo "message_rate=1/45s" >> "$GITHUB_OUTPUT"
-            else
-              echo "message_rate=${{ inputs.message_rate }}" >> "$GITHUB_OUTPUT"
-            fi
+            echo "message_rate=${{ inputs.message_rate }}" >> "$GITHUB_OUTPUT"
             if [ "${{ inputs.load_duration }}" = "90s" ]; then
               echo "load_duration=2m" >> "$GITHUB_OUTPUT"
             else
               echo "load_duration=${{ inputs.load_duration }}" >> "$GITHUB_OUTPUT"
             fi
             if [ "${{ inputs.test_timeout }}" = "40m" ]; then
-              if [ "${{ inputs.direction }}" = "evm2canton" ]; then
+              if [ "${{ inputs.direction }}" = "evm2canton" ] || [ "${{ inputs.direction }}" = "evm2canton-token" ]; then
                 echo "test_timeout=45m" >> "$GITHUB_OUTPUT"
               else
                 echo "test_timeout=30m" >> "$GITHUB_OUTPUT"
               fi
             else
               echo "test_timeout=${{ inputs.test_timeout }}" >> "$GITHUB_OUTPUT"
+            fi
+            direction="${{ inputs.direction }}"
+            if [ "$direction" = "canton2evm" ]; then
+              echo "skip_exec_confirm=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "skip_exec_confirm=false" >> "$GITHUB_OUTPUT"
             fi
           else
             echo "canton_path=chainlink-canton" >> "$GITHUB_OUTPUT"
@@ -108,8 +105,21 @@ jobs:
         if: inputs.ccip_env == 'devenv'
         uses: ./.github/actions/setup-ccip-devenv
         with:
-          canton-ref: ${{ inputs.canton_ref }}
-          canton-path: ${{ steps.prod_defaults.outputs.canton_path }}
+          ccip_env: ${{ inputs.ccip_env }}
+          direction: ${{ inputs.direction }}
+          message_rate: ${{ steps.prod_defaults.outputs.message_rate }}
+          load_duration: ${{ steps.prod_defaults.outputs.load_duration }}
+          test_timeout: ${{ steps.prod_defaults.outputs.test_timeout }}
+          config_file: ${{ inputs.config_file }}
+          canton_path: ${{ steps.prod_defaults.outputs.canton_path }}
+          skip_exec_confirm: ${{ inputs.ccip_env == 'prod-testnet' && steps.prod_defaults.outputs.skip_exec_confirm || inputs.skip_exec_confirm }}
+          confirm_exec_timeout: ${{ inputs.confirm_exec_timeout }}
+          CANTON_OKTA_AUTHORIZER_TESTNET: ${{ secrets.CANTON_OKTA_AUTHORIZER_TESTNET }}
+          CANTON_OKTA_CLIENT_ID_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_ID_TESTNET }}
+          CANTON_OKTA_CLIENT_SECRET_TESTNET: ${{ secrets.CANTON_OKTA_CLIENT_SECRET_TESTNET }}
+          CCIP_PROD_TESTNET_PRIVATE_KEY: ${{ secrets.CCIP_PROD_TESTNET_PRIVATE_KEY }}
+          TS_OAUTH_CLIENT_ID_CANTON: ${{ secrets.TS_OAUTH_CLIENT_ID_CANTON }}
+          TS_AUDIENCE_CANTON: ${{ secrets.TS_AUDIENCE_CANTON }}
           ccv-iam-role: ${{ secrets.CCV_IAM_ROLE }}
           jd-registry: ${{ secrets.JD_REGISTRY }}
           jd-image: ${{ secrets.JD_IMAGE }}
@@ -133,7 +143,7 @@ jobs:
           CANTON_LOAD_MESSAGE_RATE: ${{ steps.prod_defaults.outputs.message_rate }}
           CANTON_LOAD_DURATION: ${{ steps.prod_defaults.outputs.load_duration }}
           CCIP_ENV: ${{ inputs.ccip_env == 'prod-testnet' && 'prod-testnet' || '' }}
-          CCIP_CONFIG_FILE: ${{ inputs.config_file }}
+          CCIP_CONFIG_FILE: ${{ inputs.ccip_env == 'prod-testnet' && inputs.config_file || '' }}
           CANTON_AUTH_TYPE: ${{ inputs.ccip_env == 'prod-testnet' && 'clientCredentials' || '' }}
           CANTON_AUTH_URL: ${{ inputs.ccip_env == 'prod-testnet' && secrets.CANTON_OKTA_AUTHORIZER_TESTNET || '' }}
           CANTON_CLIENT_ID: ${{ inputs.ccip_env == 'prod-testnet' && secrets.CANTON_OKTA_CLIENT_ID_TESTNET || '' }}

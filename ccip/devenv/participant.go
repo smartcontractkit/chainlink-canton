@@ -42,3 +42,10 @@ func (c *Chain) clientParticipantIndex() int {
 
 	return OwnerParticipantIndex
 }
+
+// isRemote reports whether this chain targets live testnet infrastructure with
+// only a client party. Remote callers lack FeeQuoter ACS visibility; limits
+// must come from EDS disclosures or on-chain validation instead.
+func (c *Chain) isRemote() bool {
+	return len(c.chain.Participants) <= 1
+}

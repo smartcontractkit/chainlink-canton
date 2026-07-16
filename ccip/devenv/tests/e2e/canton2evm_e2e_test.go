@@ -1,10 +1,8 @@
 package canton
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
-	"time"
 
 	ccv "github.com/smartcontractkit/chainlink-ccv/build/devenv"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/cciptestinterfaces"
@@ -13,8 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/utils/tests"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework"
-	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -30,53 +26,26 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		t.Skip("skipping Canton2EVM_Basic test in short mode")
 	}
 
-	configPath := "../../env-canton-evm-out.toml"
-	in, err := ccv.LoadOutput[ccv.Cfg](configPath)
-	require.NoError(t, err)
-
-	lib, err := ccv.NewLibFromCCVEnv(&ccv.Plog, configPath)
-	require.NoError(t, err)
+	boot := devenvtests.BootstrapE2E(t, devenvtests.ParseEnvFromFlag(t))
 	ctx := ccv.Plog.WithContext(t.Context())
-
-	chainMap, err := lib.ChainsMap(ctx)
-	require.NoError(t, err)
-	require.NoError(t, devenvtests.WireVerifierObservationFromLib(lib, chainMap))
-
-	evmChain := devenvtests.GetChainFromMap(t, blockchain.TypeAnvil, in, chainMap)
-	cantonChain := devenvtests.GetChainFromMap(t, blockchain.TypeCanton, in, chainMap)
-	cantonImpl, ok := cantonChain.(*cantondevenv.Chain)
-	require.True(t, ok, "Canton chain cantonImpl must be *devenv.Chain")
-
-	t.Cleanup(func() {
-		_, err := framework.SaveContainerLogs(fmt.Sprintf("%s-%s", framework.DefaultCTFLogsDir, t.Name()))
-		require.NoError(t, err)
-	})
-
-	// TODO: currently minting 2 holdings of 2k for all the e2e tests. Otherwise one holding might conflict with the other.
-	// the tests need to be hardened to not rely on this and instead correctly pick the holding that suffices.
-	require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(uint64(cantondevenv.CantonToEVMFeeAmount)*10000)))
-	require.NoError(t, cantonImpl.MintTokens(ctx, new(big.Rat).SetUint64(uint64(cantondevenv.CantonToEVMFeeAmount)*10000)))
 
 	t.Run("EOA receiver and default committee verifier", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		// Setup message send
-		cantonImpl.SetSequentialSends(1)
-		require.NoError(t, cantonImpl.SetupSend(ctx, uint64(cantondevenv.CantonToEVMFeeAmount), nil))
+		boot.SetupCantonSend(t, ctx, 0)
+		receiver := boot.ResolveEVMReceiver(t)
 
-		ds, err := lib.DataStore()
-		require.NoError(t, err)
-		receiver, err := evmChain.GetEOAReceiverAddress()
+		ds, err := boot.Lib.DataStore()
 		require.NoError(t, err)
 		ccvAddr := devenvtests.GetContractAddress(
-			t, ds, cantonChain.ChainSelector(),
+			t, ds, boot.Canton.ChainSelector(),
 			datastore.ContractType(canton_committee_verifier.ContractType),
 			canton_committee_verifier.Version.String(),
 			devenvcommon.DefaultCommitteeVerifierQualifier,
 			"canton committee verifier",
 		)
 		executorAddr := devenvtests.GetContractAddress(
-			t, ds, cantonChain.ChainSelector(),
+			t, ds, boot.Canton.ChainSelector(),
 			datastore.ContractType(executor.ContractType),
 			executor.Version.String(),
 			devenvcommon.DefaultExecutorQualifier,
@@ -87,14 +56,14 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			receiver,
 			ccvAddr,
 			executorAddr,
-			cantonChain.ChainSelector(),
-			evmChain.ChainSelector(),
+			boot.Canton.ChainSelector(),
+			boot.EVM.ChainSelector(),
 		)
 
 		t.Logf("Sending Canton -> EVM message")
-		sendMessageResult, err := cantonChain.SendMessage(
+		sendMessageResult, err := boot.Canton.SendMessage(
 			subtestCtx,
-			evmChain.ChainSelector(),
+			boot.EVM.ChainSelector(),
 			cciptestinterfaces.MessageFields{
 				Receiver: receiver,
 				Data:     []byte("canton2evm tcapi test"),
@@ -115,29 +84,24 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, sendMessageResult.Message)
-		// require.NotEmpty(t, sendMessageResult.ReceiptIssuers)
 		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
-		t.Logf(
-			"SendMessage accepted: seqNo=%d",
-			seqNo,
-			// len(sendMessageResult.ReceiptIssuers),
-		)
+		t.Logf("SendMessage accepted: seqNo=%d", seqNo)
 
-		t.Logf("Waiting for CCIPMessageSent event: from=%d to=%d seq=%d", cantonChain.ChainSelector(), evmChain.ChainSelector(), seqNo)
-		sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, 30*time.Second)
+		t.Logf("Waiting for CCIPMessageSent event: from=%d to=%d seq=%d", boot.Canton.ChainSelector(), boot.EVM.ChainSelector(), seqNo)
+		sentEvent, err := boot.Canton.ConfirmSendOnSource(subtestCtx, boot.EVM.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, devenvtests.ConfirmSendTimeout(t, boot.Env))
 		require.NoError(t, err)
 
 		t.Logf("CCIPMessageSent event: %+v", sentEvent)
 
 		t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID[:])
-		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, lib, sentEvent.MessageID)
+		result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, boot.Lib, sentEvent.MessageID)
 		t.Logf(
 			"Message assertion succeeded: aggregated=true indexerResults=%+v",
 			result.IndexedVerifications.Results,
 		)
 
-		t.Logf("Waiting for execution event on EVM: from=%d seq=%d", cantonChain.ChainSelector(), seqNo)
-		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+		t.Logf("Waiting for execution event on EVM: from=%d seq=%d", boot.Canton.ChainSelector(), seqNo)
+		ev, err := boot.EVM.ConfirmExecOnDest(subtestCtx, boot.Canton.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
 		require.NoError(t, err)
 		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
 		t.Logf("Execution event: %+v", ev)
@@ -146,48 +110,37 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("EOA receiver and default committee verifier token transfer", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		// Send params (transfer amount, gas limit, finality) come from token_transfer_config.toml.
-		lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
+		lane := devenvtests.ResolveTokenLane(t, boot.Env, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), []uint64{boot.EVM.ChainSelector()})
+		boot.SetupCantonTokenSend(t, ctx, lane, cantondevenv.CantonToEVMTokenSequentialSends)
 
-		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
-		sends := cantondevenv.CantonToEVMTokenSequentialSends
-		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
-		cantonImpl.SetSequentialSends(sends)
-		if lane.TransferInstrument.Admin != "" {
-			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
-		} else {
-			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
-		}
+		receiver := boot.ResolveEVMReceiver(t)
 
-		ds, err := lib.DataStore()
-		require.NoError(t, err)
-		receiver, err := evmChain.GetEOAReceiverAddress()
+		ds, err := boot.Lib.DataStore()
 		require.NoError(t, err)
 		ccvAddr := devenvtests.GetContractAddress(
-			t, ds, cantonChain.ChainSelector(),
+			t, ds, boot.Canton.ChainSelector(),
 			datastore.ContractType(canton_committee_verifier.ContractType),
 			canton_committee_verifier.Version.String(),
 			devenvcommon.DefaultCommitteeVerifierQualifier,
 			"canton committee verifier",
 		)
 		executorAddr := devenvtests.GetContractAddress(
-			t, ds, cantonChain.ChainSelector(),
+			t, ds, boot.Canton.ChainSelector(),
 			datastore.ContractType(executor.ContractType),
 			executor.Version.String(),
 			devenvcommon.DefaultExecutorQualifier,
 			"source executor",
 		)
-		require.NoError(t, err)
-		destTokenAddress := lane.DestTokenBySelector[evmChain.ChainSelector()]
-		receiverBalanceBefore, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
+		destTokenAddress := lane.DestTokenBySelector[boot.EVM.ChainSelector()]
+		receiverBalanceBefore, err := boot.EVM.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceBefore)
 
 		for sendIdx := range cantondevenv.CantonToEVMTokenSequentialSends {
 			t.Logf("Token transfer send %d/%d", sendIdx+1, cantondevenv.CantonToEVMTokenSequentialSends)
-			sendMessageResult, err := cantonChain.SendMessage(
+			sendMessageResult, err := boot.Canton.SendMessage(
 				subtestCtx,
-				evmChain.ChainSelector(),
+				boot.EVM.ChainSelector(),
 				cciptestinterfaces.MessageFields{
 					Receiver: receiver,
 					Data:     []byte("canton2evm token transfer"),
@@ -214,17 +167,24 @@ func TestCanton2EVM_Basic(t *testing.T) {
 			require.NotNil(t, sendMessageResult.Message.TokenTransfer)
 			seqNo := uint64(sendMessageResult.Message.SequenceNumber)
 
-			sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+			sentEvent, err := boot.Canton.ConfirmSendOnSource(subtestCtx, boot.EVM.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, devenvtests.ConfirmSendTimeout(t, boot.Env))
 			require.NoError(t, err)
 			require.NotNil(t, sentEvent.Message)
 			require.NotNil(t, sentEvent.Message.TokenTransfer)
 
-			ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+			t.Logf("Asserting message propagated through aggregator/indexer: messageID=%x", sentEvent.MessageID[:])
+			result := devenvtests.AssertSingleVerifierResult(t, subtestCtx, boot.Lib, sentEvent.MessageID)
+			t.Logf(
+				"Message assertion succeeded: aggregated=true indexerResults=%+v",
+				result.IndexedVerifications.Results,
+			)
+
+			ev, err := boot.EVM.ConfirmExecOnDest(subtestCtx, boot.Canton.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
 			require.NoError(t, err)
 			require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
 		}
 
-		receiverBalanceAfter, err := evmChain.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
+		receiverBalanceAfter, err := boot.EVM.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
 		require.NoError(t, err)
 		require.NotNil(t, receiverBalanceAfter)
 
@@ -239,23 +199,14 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("token transfer with default extraArgs", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
+		lane := devenvtests.ResolveTokenLane(t, boot.Env, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), []uint64{boot.EVM.ChainSelector()})
+		boot.SetupCantonTokenSend(t, ctx, lane, 1)
 
-		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
-		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
-		cantonImpl.SetSequentialSends(1)
-		if lane.TransferInstrument.Admin != "" {
-			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
-		} else {
-			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
-		}
+		receiver := boot.ResolveEVMReceiver(t)
 
-		receiver, err := evmChain.GetEOAReceiverAddress()
-		require.NoError(t, err)
-
-		sendMessageResult, err := cantonChain.SendMessage(
+		sendMessageResult, err := boot.Canton.SendMessage(
 			subtestCtx,
-			evmChain.ChainSelector(),
+			boot.EVM.ChainSelector(),
 			cciptestinterfaces.MessageFields{
 				Receiver: receiver,
 				Data:     []byte("canton2evm token transfer default extraArgs"),
@@ -274,10 +225,10 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NotNil(t, sendMessageResult.Message.TokenTransfer)
 
 		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
-		sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+		sentEvent, err := boot.Canton.ConfirmSendOnSource(subtestCtx, boot.EVM.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, devenvtests.ConfirmSendTimeout(t, boot.Env))
 		require.NoError(t, err)
 
-		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}, tests.WaitTimeout(t))
+		ev, err := boot.EVM.ConfirmExecOnDest(subtestCtx, boot.Canton.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}, tests.WaitTimeout(t))
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
 	})
@@ -287,39 +238,31 @@ func TestCanton2EVM_Basic(t *testing.T) {
 	t.Run("token transfer with zero gas limit", func(t *testing.T) {
 		subtestCtx := ccv.Plog.WithContext(t.Context())
 
-		lane := devenvtests.ResolveTokenLane(t, devenvtests.EnvDevenv, in, lib, chainMap, cantonChain.ChainSelector(), []uint64{evmChain.ChainSelector()})
+		lane := devenvtests.ResolveTokenLane(t, boot.Env, boot.Cfg, boot.Lib, boot.ChainMap, boot.Canton.ChainSelector(), []uint64{boot.EVM.ChainSelector()})
+		boot.SetupCantonTokenSend(t, ctx, lane, 1)
 
-		fee := uint64(cantondevenv.CantonToEVMTokenTransferFeeAmount)
-		transferPerSend := new(big.Rat).SetFrac(lane.TransferAmount, big.NewInt(cantondevenv.CantonFixedPointScale))
-		cantonImpl.SetSequentialSends(1)
-		if lane.TransferInstrument.Admin != "" {
-			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend, lane.TransferInstrument))
-		} else {
-			require.NoError(t, cantonImpl.SetupSend(ctx, fee, transferPerSend))
-		}
+		receiver := boot.ResolveEVMReceiver(t)
 
-		ds, err := lib.DataStore()
-		require.NoError(t, err)
-		receiver, err := evmChain.GetEOAReceiverAddress()
+		ds, err := boot.Lib.DataStore()
 		require.NoError(t, err)
 		ccvAddr := devenvtests.GetContractAddress(
-			t, ds, cantonChain.ChainSelector(),
+			t, ds, boot.Canton.ChainSelector(),
 			datastore.ContractType(canton_committee_verifier.ContractType),
 			canton_committee_verifier.Version.String(),
 			devenvcommon.DefaultCommitteeVerifierQualifier,
 			"canton committee verifier",
 		)
 		executorAddr := devenvtests.GetContractAddress(
-			t, ds, cantonChain.ChainSelector(),
+			t, ds, boot.Canton.ChainSelector(),
 			datastore.ContractType(executor.ContractType),
 			executor.Version.String(),
 			devenvcommon.DefaultExecutorQualifier,
 			"source executor",
 		)
 
-		sendMessageResult, err := cantonChain.SendMessage(
+		sendMessageResult, err := boot.Canton.SendMessage(
 			subtestCtx,
-			evmChain.ChainSelector(),
+			boot.EVM.ChainSelector(),
 			cciptestinterfaces.MessageFields{
 				Receiver: receiver,
 				Data:     []byte("canton2evm token transfer zero gas"),
@@ -345,10 +288,10 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		require.NotNil(t, sendMessageResult.Message)
 
 		seqNo := uint64(sendMessageResult.Message.SequenceNumber)
-		sentEvent, err := cantonChain.ConfirmSendOnSource(subtestCtx, evmChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
+		sentEvent, err := boot.Canton.ConfirmSendOnSource(subtestCtx, boot.EVM.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, devenvtests.ConfirmSendTimeout(t, boot.Env))
 		require.NoError(t, err)
 
-		ev, err := evmChain.ConfirmExecOnDest(subtestCtx, cantonChain.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}, tests.WaitTimeout(t))
+		ev, err := boot.EVM.ConfirmExecOnDest(subtestCtx, boot.Canton.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}, tests.WaitTimeout(t))
 		require.NoError(t, err)
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
 	})
