@@ -18,5 +18,6 @@ func (cantonSigningIdentityReader) FromBundle(b *nodev1.OCR2Config_OCRKeyBundle)
 	if b.OnchainSigningPubKey == "" {
 		return "", fmt.Errorf("OnchainSigningPubKey is empty")
 	}
+
 	return b.OnchainSigningPubKey, nil
 }
