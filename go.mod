@@ -33,7 +33,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.1
-	github.com/smartcontractkit/chain-selectors v1.0.106
+	github.com/smartcontractkit/chain-selectors v1.0.107
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260715230542-c08e039d74ca
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260715230542-c08e039d74ca
 	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260716181938-b654f20972d8
