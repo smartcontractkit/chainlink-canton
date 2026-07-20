@@ -131,11 +131,14 @@ type TransferFactory struct {
 }
 
 type BurnMintFactory struct {
-	Type FactoryType `toml:"type" validate:"oneof='' address"`
+	Type FactoryType `toml:"type" validate:"oneof='' address url"`
 
 	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
 	Party           *string                    `toml:"party" validate:"required_if=Type address"`
 	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
+
+	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"excluded_unless=Type url,required_if=Type url,omitnil,url"`
+	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url"`
 }
 
 type TokenPool struct {
