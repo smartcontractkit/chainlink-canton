@@ -11,33 +11,25 @@ import (
 )
 
 // VerifierObservation holds off-chain clients used to wait for CCIP verifier
-// results (aggregator + indexer). ConfirmExecOnDest needs these; it does not
-// need ChainsMap or other Lib methods.
+// results (indexer required; aggregator optional). ConfirmExecOnDest needs these;
+// it does not need ChainsMap or other Lib methods.
 //
 // Build from a CCV env Lib via [VerifierObservationFromLib] (requires
-// [ccv.NewLibFromCCVEnv] — CLDF-only Lib backends cannot provide aggregator/indexer).
+// [ccv.NewLibFromCCVEnv] — CLDF-only Lib backends cannot provide indexer).
 type VerifierObservation struct {
 	AggregatorClient *ccv.AggregatorClient
 	IndexerMonitor   *ccv.IndexerMonitor
 }
 
 func (o VerifierObservation) wired() bool {
-	return o.AggregatorClient != nil && o.IndexerMonitor != nil
+	return o.IndexerMonitor != nil
 }
 
-// VerifierObservationFromLib extracts aggregator and indexer clients from lib.
+// VerifierObservationFromLib extracts indexer (required) and optional aggregator
+// clients from lib.
 func VerifierObservationFromLib(lib ccv.Lib) (VerifierObservation, error) {
 	if lib == nil {
 		return VerifierObservation{}, fmt.Errorf("VerifierObservationFromLib: lib is nil")
-	}
-
-	aggregatorClients, err := lib.AllAggregators()
-	if err != nil {
-		return VerifierObservation{}, fmt.Errorf("all aggregators: %w", err)
-	}
-	aggregatorClient, ok := aggregatorClients[devenvcommon.DefaultCommitteeVerifierQualifier]
-	if !ok || aggregatorClient == nil {
-		return VerifierObservation{}, fmt.Errorf("no aggregator client for qualifier %q", devenvcommon.DefaultCommitteeVerifierQualifier)
 	}
 
 	indexerMonitor, err := lib.IndexerMonitor()
@@ -45,22 +37,31 @@ func VerifierObservationFromLib(lib ccv.Lib) (VerifierObservation, error) {
 		return VerifierObservation{}, fmt.Errorf("indexer monitor: %w", err)
 	}
 
-	return VerifierObservation{
-		AggregatorClient: aggregatorClient,
-		IndexerMonitor:   indexerMonitor,
-	}, nil
+	obs := VerifierObservation{
+		IndexerMonitor: indexerMonitor,
+	}
+
+	aggregatorClients, aggErr := lib.AllAggregators()
+	if aggErr == nil {
+		aggregatorClient, ok := aggregatorClients[devenvcommon.DefaultCommitteeVerifierQualifier]
+		if ok && aggregatorClient != nil {
+			obs.AggregatorClient = aggregatorClient
+		}
+	}
+
+	return obs, nil
 }
 
 // AssertMessageWithVerifierObservation waits for verifier results for messageID
-// using aggregator and indexer only (no chain map).
+// using indexer (and aggregator when configured).
 func AssertMessageWithVerifierObservation(
 	ctx context.Context,
 	obs VerifierObservation,
 	messageID protocol.Bytes32,
 	opts tcapi.AssertMessageOptions,
 ) (tcapi.AssertionResult, error) {
-	if !obs.wired() {
-		return tcapi.AssertionResult{}, fmt.Errorf("verifier observation not wired (aggregator and indexer required)")
+	if obs.IndexerMonitor == nil {
+		return tcapi.AssertionResult{}, fmt.Errorf("verifier observation not wired (indexer required)")
 	}
 
 	testCtx, cleanupFn := tcapi.NewTestingContext(ctx, nil, obs.AggregatorClient, obs.IndexerMonitor)
