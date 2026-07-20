@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 	"strconv"
@@ -97,7 +98,7 @@ func NewServer(
 				PartyID:    tokenPool.PartyID,
 			})
 			if tokenPool.BurnMintFactory != nil {
-				getFactoryFunc, err := getBurnMintFactory(activeContractStore, *tokenPool.BurnMintFactory)
+				getFactoryFunc, err := getBurnMintFactory(ctx, activeContractStore, *tokenPool.BurnMintFactory)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get burn mint factory for token pool with address %s: %w", tokenPool.InstanceAddress, err)
 				}
@@ -353,16 +354,18 @@ func (s Server) burnMintTokenPoolSend(
 	// Get BurnMintFactory (if enabled)
 	var factoryDisclosures []oapiCommon.DisclosedContract
 	if cfg.burnMintFactory != nil {
-		burnMintFactory, disclosedFactoryContracts, err := cfg.burnMintFactory(c)
+		factoryId, factoryCtx, disclosedFactoryContracts, err := cfg.burnMintFactory(c, burnMintTokenPool.InstrumentId)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("burn mint factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
 		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(burnMintFactory)),
+			AVContractId: new(types.CONTRACT_ID(factoryId)),
 		}
 		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
+		// Merge factory-returned context (e.g. issuer credentials) into the extra-args context
+		maps.Copy(burnMintFactoryContext.Values, factoryCtx.Values)
 	}
 
 	// Get TransferPreapproval (if enabled)
@@ -656,16 +659,18 @@ func (s Server) burnMintTokenPoolExecute(
 	// Get BurnMintFactory (if enabled)
 	var factoryDisclosures []oapiCommon.DisclosedContract
 	if cfg.burnMintFactory != nil {
-		burnMintFactory, disclosedFactoryContracts, err := cfg.burnMintFactory(c)
+		factoryId, factoryCtx, disclosedFactoryContracts, err := cfg.burnMintFactory(c, burnMintTokenPool.InstrumentId)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("burn mint factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
 		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(burnMintFactory)),
+			AVContractId: new(types.CONTRACT_ID(factoryId)),
 		}
 		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
+		// Merge factory-returned context (e.g. issuer credentials) into the extra-args context
+		maps.Copy(burnMintFactoryContext.Values, factoryCtx.Values)
 	}
 
 	// If the BurnMintFactory context contains any values, set it as part of the choiceContext
