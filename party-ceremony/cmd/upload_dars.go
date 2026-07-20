@@ -87,5 +87,6 @@ func runUploadDars(cmd *cobra.Command, _ []string) error {
 	}
 
 	fmt.Fprintln(os.Stdout, "Done.")
+
 	return nil
 }
