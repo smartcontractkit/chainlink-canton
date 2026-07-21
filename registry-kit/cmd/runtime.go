@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/config"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
@@ -57,8 +56,4 @@ func (rt *Runtime) connect(ctx context.Context, partyRole string) (ledger.Client
 
 func (rt *Runtime) operatorClient() *operator.Client {
 	return operator.NewClient(rt.Config.Operator.BaseURL)
-}
-
-func (rt *Runtime) waitTimeout() time.Duration {
-	return 15 * time.Minute
 }

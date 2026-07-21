@@ -64,7 +64,7 @@ func ParseReleaseOrMintResult(tx *apiv2.Transaction) (extensionapi.ReleaseOrMint
 		return result.Output, nil
 	}
 
-	return extensionapi.ReleaseOrMintResultOutput{}, fmt.Errorf("ReleaseFromTicket not found in transaction")
+	return extensionapi.ReleaseOrMintResultOutput{}, fmt.Errorf("releaseFromTicket not found in transaction")
 }
 
 // ParseLockOrBurnResult extracts LockOrBurn exercise output when present.
@@ -85,7 +85,7 @@ func ParseLockOrBurnResult(tx *apiv2.Transaction) (extensionapi.LockOrBurnResult
 		return result, nil
 	}
 
-	return extensionapi.LockOrBurnResult{}, fmt.Errorf("LockOrBurn not found in transaction")
+	return extensionapi.LockOrBurnResult{}, fmt.Errorf("lockOrBurn not found in transaction")
 }
 
 // CreatedHoldingsForOwner returns all Holding contract IDs created for owner in the transaction.

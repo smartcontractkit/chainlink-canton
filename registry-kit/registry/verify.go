@@ -6,11 +6,11 @@ import (
 	"math/big"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	registryholding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_holding_v0"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
-	registryholding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_holding_v0"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
@@ -34,7 +34,7 @@ func VerifyHolding(ctx context.Context, client ledger.Client, owner, registrar, 
 		}
 	}
 	if found == nil {
-		return fmt.Errorf("Registry Holding %s not in ACS", holdingCID)
+		return fmt.Errorf("registry Holding %s not in ACS", holdingCID)
 	}
 	if types.PARTY(owner) != found.Owner {
 		return fmt.Errorf("owner: expected %s got %s", owner, found.Owner)

@@ -63,5 +63,6 @@ func ConnectDevnetWithStaticJWT(ctx context.Context, cfg config.Config, actAsPar
 		Type: commonconfig.AuthTypeInsecureStatic,
 		JWT:  jwt,
 	}
+
 	return ConnectDevnet(ctx, cfgCopy, actAsParty)
 }

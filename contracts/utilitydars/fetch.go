@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -223,7 +224,7 @@ func extractPackages(tarball []byte, m *Manifest, dir string) error {
 	found := make(map[string]struct{}, len(want))
 	for {
 		hdr, err := tr.Next()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
@@ -244,7 +245,7 @@ func extractPackages(tarball []byte, m *Manifest, dir string) error {
 			return fmt.Errorf("create %s: %w", dest, err)
 		}
 
-		if _, err := io.Copy(out, tr); err != nil {
+		if _, err := io.CopyN(out, tr, hdr.Size); err != nil {
 			_ = out.Close()
 			return fmt.Errorf("extract %s: %w", dest, err)
 		}

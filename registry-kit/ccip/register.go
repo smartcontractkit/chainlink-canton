@@ -170,5 +170,5 @@ func findTokenConfigCID(ctx context.Context, client ledger.Client, ccipParty str
 		return "", false, err
 	}
 
-	return string(cid), true, nil
+	return cid, true, nil
 }

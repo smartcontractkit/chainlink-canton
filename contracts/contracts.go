@@ -220,7 +220,7 @@ func darPath(packageName Package, version string) string {
 }
 
 func isUtilityPackage(packageName Package) bool {
-	switch packageName {
+	switch packageName { //nolint:exhaustive
 	case UtilityCommercialsV0,
 		UtilityCredentialV0,
 		UtilityCredentialAppV0,

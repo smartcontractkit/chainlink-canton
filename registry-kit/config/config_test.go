@@ -10,6 +10,7 @@ import (
 )
 
 func TestLoadAndStateRoundTrip(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "registry-kit.toml")
 	require.NoError(t, os.WriteFile(cfgPath, []byte(`
@@ -52,6 +53,7 @@ burn_mint_pool_instance_id = "pool-1"
 }
 
 func TestLoadAppliesOperatorBackendDefault(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "registry-kit.toml")
 	require.NoError(t, os.WriteFile(cfgPath, []byte(`

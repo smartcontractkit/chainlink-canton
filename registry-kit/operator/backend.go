@@ -48,8 +48,8 @@ type mintRequestBody struct {
 
 type mintContextResponse struct {
 	ChoiceContext *struct {
-		ChoiceContextData    splice_api_token_metadata_v1.ChoiceContext `json:"choiceContextData"`
-		DisclosedContracts   json.RawMessage                          `json:"disclosedContracts"`
+		ChoiceContextData  splice_api_token_metadata_v1.ChoiceContext `json:"choiceContextData"`
+		DisclosedContracts json.RawMessage                            `json:"disclosedContracts"`
 	} `json:"choiceContext"`
 	ChoiceContextData  splice_api_token_metadata_v1.ChoiceContext `json:"choiceContextData"`
 	DisclosedContracts json.RawMessage                            `json:"disclosedContracts"`
@@ -200,7 +200,7 @@ func parseTemplateID(raw string) *apiv2.Identifier {
 func splitTemplateID(raw string) []string {
 	out := make([]string, 0, 3)
 	start := 0
-	for i := 0; i < len(raw); i++ {
+	for i := range len(raw) {
 		if raw[i] == ':' {
 			out = append(out, raw[start:i])
 			start = i + 1

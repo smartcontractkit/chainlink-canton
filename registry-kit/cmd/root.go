@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/config"
@@ -34,8 +31,4 @@ func init() {
 	rootCmd.AddCommand(onboardingCmd)
 	rootCmd.AddCommand(issuerCmd)
 	rootCmd.AddCommand(operatorCmd)
-}
-
-func printErr(err error) {
-	fmt.Fprintln(os.Stderr, "error:", err)
 }

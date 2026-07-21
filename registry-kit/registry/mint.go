@@ -7,11 +7,11 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
-	"github.com/smartcontractkit/chainlink-canton/testhelpers"
-	registryapp "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_app_v0"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
+	registryapp "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_app_v0"
+	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
+	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
@@ -92,7 +92,7 @@ func acceptMintRequest(
 	}
 	cid, ok := ledger.CreatedContractID(res.GetTransaction(), "Holding")
 	if !ok {
-		return "", fmt.Errorf("Registry Holding not created")
+		return "", fmt.Errorf("registry Holding not created")
 	}
 
 	return cid, nil

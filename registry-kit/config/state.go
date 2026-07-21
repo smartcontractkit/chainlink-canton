@@ -56,7 +56,7 @@ func (s State) Save(path string) error {
 	data = append(data, '\n')
 
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		return fmt.Errorf("write state temp: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
