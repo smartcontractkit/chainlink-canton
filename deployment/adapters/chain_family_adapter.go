@@ -46,6 +46,7 @@ func isEVMRemote(remoteChainSelector uint64) bool {
 	if err != nil {
 		return false
 	}
+
 	return family == chainsel.FamilyEVM
 }
 
@@ -565,6 +566,7 @@ func resolveDefaultInboundCCVs(
 	if err != nil {
 		return nil, fmt.Errorf("resolve default invalid-ccv inbound qualifier: %w", err)
 	}
+
 	return []datastore.AddressRef{ref}, nil
 }
 
