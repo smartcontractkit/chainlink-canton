@@ -54,10 +54,10 @@ func DefaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 	return lanes.FeeQuoterDestChainConfig{
 		OverrideExistingConfig:      false,
 		IsEnabled:                   true,
-		MaxDataBytes:                30_000,
-		MaxPerMsgGasLimit:           3_000_000,
-		DestGasOverhead:             300_000,
-		DestGasPerPayloadByteBase:   16,
+		MaxDataBytes:                32_000,
+		MaxPerMsgGasLimit:           15_000_000,
+		DestGasOverhead:             0,
+		DestGasPerPayloadByteBase:   20,
 		ChainFamilySelector:         binary.BigEndian.Uint32(CantonFamilySelector[:]),
 		DefaultTokenFeeUSDCents:     0,
 		DefaultTokenDestGasOverhead: 90_000,
@@ -75,10 +75,10 @@ func defaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 	return lanes.FeeQuoterDestChainConfig{
 		OverrideExistingConfig:      false,
 		IsEnabled:                   true,
-		MaxDataBytes:                30_000,
-		MaxPerMsgGasLimit:           3_000_000,
-		DestGasOverhead:             300_000,
-		DestGasPerPayloadByteBase:   16,
+		MaxDataBytes:                32_000,
+		MaxPerMsgGasLimit:           15_000_000,
+		DestGasOverhead:             0,
+		DestGasPerPayloadByteBase:   20,
 		ChainFamilySelector:         binary.BigEndian.Uint32(CantonFamilySelector[:]),
 		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
@@ -87,7 +87,7 @@ func defaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 		V1Params:                    nil,
 		V2Params: &lanes.FeeQuoterV2Params{
 			LinkFeeMultiplierPercent: 90,
-			USDPerUnitGas:            big.NewInt(1e6),
+			USDPerUnitGas:            big.NewInt(38),
 		},
 	}
 }
@@ -479,8 +479,8 @@ func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(_, remoteChainSel
 	if isEVMRemote(remoteChainSelector) {
 		return ccipadapters.RemoteChainDefaults{
 			AllowTrafficFrom:          true,
-			BaseExecutionGasCost:      50_000,
-			TokenReceiverAllowed:      true,
+			BaseExecutionGasCost:      200_000,
+			TokenReceiverAllowed:      false,
 			MessageNetworkFeeUSDCents: 50,
 			TokenNetworkFeeUSDCents:   50,
 		}
@@ -496,8 +496,12 @@ func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(_, remoteChainSel
 }
 
 // GetDefaultExecutorDestChainConfig implements [adapters.ChainFamily].
+//
+// Canton lanes are executor-less: messages are sent from EVM to Canton with the
+// no-executor flag, so the EVM executor must not charge or require a config for
+// Canton destination chains. Keeping it disabled lets ccipSend bypass executor fees.
 func (a *CantonChainFamilyAdapter) GetDefaultExecutorDestChainConfig(_, _ uint64) ccipadapters.ExecutorDestChainConfig {
-	return ccipadapters.ExecutorDestChainConfig{USDCentsFee: 0, Enabled: true}
+	return ccipadapters.ExecutorDestChainConfig{USDCentsFee: 0, Enabled: false}
 }
 
 func findContractRef(ds datastore.DataStore, chainSelector uint64, contractType datastore.ContractType, version *semver.Version, qualifier string) (datastore.AddressRef, error) {
