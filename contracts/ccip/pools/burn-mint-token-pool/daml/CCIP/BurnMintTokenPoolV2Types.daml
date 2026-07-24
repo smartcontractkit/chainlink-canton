@@ -60,11 +60,11 @@ data RateLimitConfigArgs = RateLimitConfigArgs
     deriving (Eq, Show)
 
 -- | Transfer timeout configuration for pending TransferInstructions.
--- Some tokens (e.g., Amulet) have expiry constraints and reject transfers with
--- executeBefore times beyond the token's expiry. Use RelativeHours for such tokens.
--- Tokens without expiry (e.g., TestToken) can use Indefinite.
+-- Splice 0.6.11 enforces tokenStandardMaxTTL (default 90 days) on transfer
+-- lifetimes, so executeBefore cannot be unbounded. Use RelativeHours for tokens
+-- with stricter expiry constraints. Indefinite caps at the Splice default max.
 data TransferTimeout
-    = Indefinite          -- Use maxTime (year 9999) - for tokens without expiry
+    = Indefinite          -- Use now + 90 days - capped by Splice tokenStandardMaxTTL
     | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
     deriving (Eq, Show)
 

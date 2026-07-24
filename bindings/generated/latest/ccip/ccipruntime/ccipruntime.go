@@ -32,7 +32,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime-v2"
-	PackageID   = "2235ebbb5f722d88a0e21aba9ced9abd0b637762768b8d38e17a4777fb8a3238"
+	PackageID   = "f3aaab9f9f098d85c3569bdb57847865355e06cc75021e715c11f1cb43dba2ef"
 	SDKVersion  = "3.4.11"
 )
 
@@ -536,8 +536,9 @@ func (t *CCIPSendResult2) UnmarshalHex(data string) error {
 
 // CreateRouter is a Record type
 type CreateRouter struct {
-	PartyOwner types.PARTY `json:"partyOwner"`
-	InstanceId types.TEXT  `json:"instanceId"`
+	PartyOwner          types.PARTY    `json:"partyOwner"`
+	InstanceId          types.TEXT     `json:"instanceId"`
+	FeeTransferLifetime *types.RELTIME `json:"feeTransferLifetime" hex:"optional"`
 }
 
 // ToMap converts CreateRouter to a map for DAML arguments
@@ -547,6 +548,18 @@ func (t CreateRouter) ToMap() map[string]any {
 	m["partyOwner"] = t.PartyOwner.ToMap()
 
 	m["instanceId"] = string(t.InstanceId)
+
+	if t.FeeTransferLifetime != nil {
+		m["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
+		}
+	} else {
+		m["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	return m
 }
@@ -2280,6 +2293,7 @@ type PerPartyRouter struct {
 	CcipOwner                    types.PARTY                     `json:"ccipOwner"`
 	PartyOwner                   types.PARTY                     `json:"partyOwner"`
 	Deps                         PerPartyRouterDeps              `json:"deps"`
+	FeeTransferLifetime          *types.RELTIME                  `json:"feeTransferLifetime" hex:"optional"`
 	OutboundSequenceNumbers      map[types.NUMERIC]types.NUMERIC `json:"outboundSequenceNumbers"`
 	ExecutedMessages             types.SET                       `json:"executedMessages"`
 	ArchivedExecutionContractIds []types.CONTRACT_ID             `json:"archivedExecutionContractIds"`
@@ -2311,6 +2325,18 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = model.NestedToDAMLValue(t.Deps)
+
+	if t.FeeTransferLifetime != nil {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
+		}
+	} else {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["outboundSequenceNumbers"] = func() any {
@@ -2362,6 +2388,18 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = model.NestedToDAMLValue(t.Deps)
+
+	if t.FeeTransferLifetime != nil {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
+		}
+	} else {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["outboundSequenceNumbers"] = func() any {

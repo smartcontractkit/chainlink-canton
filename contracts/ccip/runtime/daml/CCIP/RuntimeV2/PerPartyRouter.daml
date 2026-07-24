@@ -10,9 +10,8 @@ import DA.Map qualified as Map
 import DA.Set (Set)
 import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
-import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional, isNone)
-import DA.Time (time)
+import DA.Time (RelTime, addRelTime, hours)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -48,11 +47,6 @@ import qualified CCIP.UtilsV2.Context
 
 import CCIP.RuntimeV2.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..), AddCustomObserversParams(..), RemoveCustomObserversParams(..))
 import CCIP.RuntimeV2.PerPartyRouterCodecGen (decodeSetDepsParamsAt, decodeAddCustomObserversParamsAt, decodeRemoveCustomObserversParamsAt)
-
--- | Far-future time used as "never expires" for pending transfers.
--- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
-maxTime : Time
-maxTime = time (date 9999 Dec 31) 23 59 59
 
 maxExecutedMessagesSize : Int
 -- Conservatively sized based on Daml Script test validation. Larger values passed locally
@@ -203,6 +197,7 @@ template PerPartyRouterFactory
             with
                 partyOwner : Party
                 instanceId : Text  -- user specifies their desired instanceId
+                feeTransferLifetime : Optional RelTime
             controller partyOwner
             do
                 -- Check party doesn't already have a router.
@@ -218,6 +213,7 @@ template PerPartyRouterFactory
                     partyOwner = partyOwner
                     instanceId = instanceId
                     deps = deps
+                    feeTransferLifetime = feeTransferLifetime
                     outboundSequenceNumbers = Map.empty
                     executedMessages = Set.empty
                     archivedExecutionContractIds = []
@@ -296,6 +292,7 @@ template PerPartyRouter
         ccipOwner : Party
         partyOwner : Party
         deps : PerPartyRouterDeps
+        feeTransferLifetime : Optional RelTime
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
         executedMessages : Set BytesHex
         archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]
@@ -659,6 +656,8 @@ template PerPartyRouter
                                 (\entry -> fst entry /= ccipOwner && snd entry > 0.0)
                                 (Map.toList recipientFees)
 
+                        let feeTransferLifetimeValue = fromOptional (hours 2160) feeTransferLifetime
+
                         let executeFeeTransfer sender receiver inputHoldingCids amount = do
                                 now <- getTime
                                 let feeTransfer =
@@ -668,7 +667,10 @@ template PerPartyRouter
                                             amount = amount
                                             instrumentId = sendingMsg.feeToken
                                             requestedAt = now
-                                            executeBefore = maxTime
+                                            -- Bounded lifetime keeps the fee transfer under the Splice
+                                            -- tokenStandardMaxTTL limit (90 days). Optional on the router,
+                                            -- defaults to 90 days if not set.
+                                            executeBefore = addRelTime now feeTransferLifetimeValue
                                             inputHoldingCids = inputHoldingCids
                                             meta = Splice.Api.Token.MetadataV1.emptyMetadata
                                 feeResult <- exercise
