@@ -32,7 +32,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime-v2"
-	PackageID   = "f3aaab9f9f098d85c3569bdb57847865355e06cc75021e715c11f1cb43dba2ef"
+	PackageID   = "1ef96304949f00d7babbb6177c8c60d1135bcbb4493e46014ee7054dbae6a94d"
 	SDKVersion  = "3.4.11"
 )
 
@@ -2293,11 +2293,11 @@ type PerPartyRouter struct {
 	CcipOwner                    types.PARTY                     `json:"ccipOwner"`
 	PartyOwner                   types.PARTY                     `json:"partyOwner"`
 	Deps                         PerPartyRouterDeps              `json:"deps"`
-	FeeTransferLifetime          *types.RELTIME                  `json:"feeTransferLifetime" hex:"optional"`
 	OutboundSequenceNumbers      map[types.NUMERIC]types.NUMERIC `json:"outboundSequenceNumbers"`
 	ExecutedMessages             types.SET                       `json:"executedMessages"`
 	ArchivedExecutionContractIds []types.CONTRACT_ID             `json:"archivedExecutionContractIds"`
 	CustomObservers              []types.PARTY                   `json:"customObservers"`
+	FeeTransferLifetime          *types.RELTIME                  `json:"feeTransferLifetime" hex:"optional"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -2326,18 +2326,6 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = model.NestedToDAMLValue(t.Deps)
 
-	if t.FeeTransferLifetime != nil {
-		args["feeTransferLifetime"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
-		}
-	} else {
-		args["feeTransferLifetime"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
-
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["outboundSequenceNumbers"] = func() any {
 		if t.OutboundSequenceNumbers == nil {
@@ -2366,6 +2354,18 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 		}
 		return res
 	}()
+
+	if t.FeeTransferLifetime != nil {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
+		}
+	} else {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -2389,18 +2389,6 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = model.NestedToDAMLValue(t.Deps)
 
-	if t.FeeTransferLifetime != nil {
-		args["feeTransferLifetime"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
-		}
-	} else {
-		args["feeTransferLifetime"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
-
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["outboundSequenceNumbers"] = func() any {
 		if t.OutboundSequenceNumbers == nil {
@@ -2429,6 +2417,18 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 		}
 		return res
 	}()
+
+	if t.FeeTransferLifetime != nil {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
+		}
+	} else {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),

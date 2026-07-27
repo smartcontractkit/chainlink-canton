@@ -292,11 +292,11 @@ template PerPartyRouter
         ccipOwner : Party
         partyOwner : Party
         deps : PerPartyRouterDeps
-        feeTransferLifetime : Optional RelTime
         outboundSequenceNumbers : Map.Map (Numeric 0) (Numeric 0)
         executedMessages : Set BytesHex
         archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]
         customObservers : [Party]
+        feeTransferLifetime : Optional RelTime
     where
         signatory ccipOwner
         observer partyOwner :: customObservers
