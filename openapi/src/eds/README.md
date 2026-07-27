@@ -56,7 +56,7 @@ This endpoint allows the user to query the necessary disclosures for executing a
 
 ### Canton Token Pool API
 
-The Canton Token Pool API is provided and ran by the operator of a token pool, and provides endpoints for users to query
+The Canton Token Pool API is provided and run by the operator of a token pool, and provides endpoints for users to query
 explicit disclosures for a specific token pool contract.
 
 #### Send
