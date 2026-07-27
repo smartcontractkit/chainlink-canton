@@ -14,7 +14,7 @@ import (
 
 var ContractType = deployment.ContractType("CantonGlobalConfig")
 
-var Version = semver.MustParse("2.1.0")
+var Version = semver.MustParse("2.0.0")
 
 var globalConfigEncoder = core.NewContract("", "CCIP.CoreV2.GlobalConfig", "GlobalConfig").Encoder()
 

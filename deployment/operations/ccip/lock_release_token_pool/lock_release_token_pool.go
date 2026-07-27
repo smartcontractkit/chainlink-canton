@@ -15,7 +15,7 @@ import (
 
 var ContractType = deployment.ContractType("CantonLockReleaseTokenPool")
 
-var Version = semver.MustParse("2.1.0")
+var Version = semver.MustParse("2.0.0")
 
 var lrtpEncoder = lockreleasetokenpool.NewContract("", "CCIP.LockReleaseTokenPoolV2", "LockReleaseTokenPool").Encoder()
 

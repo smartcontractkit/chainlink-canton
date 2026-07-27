@@ -14,7 +14,7 @@ import (
 
 var ContractType = deployment.ContractType("CantonPerPartyRouterFactory")
 
-var Version = semver.MustParse("2.1.0")
+var Version = semver.MustParse("2.0.0")
 
 var pprfEncoder = ccipruntime.NewContract("", "CCIP.RuntimeV2.PerPartyRouter", "PerPartyRouterFactory").Encoder()
 

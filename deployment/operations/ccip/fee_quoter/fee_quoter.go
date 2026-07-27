@@ -16,7 +16,7 @@ import (
 
 var ContractType = deployment.ContractType("FeeQuoter")
 
-var Version = semver.MustParse("2.1.0")
+var Version = semver.MustParse("2.0.0")
 
 var feeQuoterEncoder = core.NewContract("", "CCIP.CoreV2.FeeQuoter", "FeeQuoter").Encoder()
 

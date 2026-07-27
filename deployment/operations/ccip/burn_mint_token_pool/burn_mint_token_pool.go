@@ -16,7 +16,7 @@ import (
 
 var ContractType = deployment.ContractType("CantonBurnMintTokenPool")
 
-var Version = semver.MustParse("2.1.0")
+var Version = semver.MustParse("2.0.0")
 
 var lrtpEncoder = burnminttokenpool.NewContract("", "CCIP.BurnMintTokenPoolV2", "BurnMintTokenPool").Encoder()
 
