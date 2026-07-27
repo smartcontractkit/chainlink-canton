@@ -78,7 +78,7 @@ It returns the necessary disclosures and input for the token pool.
 
 ### Canton CCV API
 
-The Canton CCV API is provided and ran by the operator of a CCV, and provides endpoints for users to query explicit disclosures
+The Canton CCV API is provided and run by the operator of a CCV, and provides endpoints for users to query explicit disclosures
 for a specific CCV contract.
 
 #### Send
@@ -100,7 +100,7 @@ It returns the necessary disclosures and inputs for the CCV.
 
 ### Canton Executor API
 
-The Canton Executor API is provided and ran by the operator of an Executor, and provides endpoints for users to query explicit
+The Canton Executor API is provided and run by the operator of an Executor, and provides endpoints for users to query explicit
 disclosures for a specific Executor contract.
 
 #### Send
@@ -160,7 +160,7 @@ config:
 
 sequenceDiagram
     actor User
-    participant TP as Token Pool API
+    participant TP as Canton Token Pool API
     participant CCIP as Canton CCIP API
     participant Executor as Canton Executor API
     participant CCV as Canton CCV API
