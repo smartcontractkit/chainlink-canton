@@ -161,7 +161,7 @@ config:
 sequenceDiagram
     actor User
     participant TP as Canton Token Pool API
-    participant CCIP as Canton CCIP API
+    participant CCIP as Global Canton CCIP API
     participant Executor as Canton Executor API
     participant CCV as Canton CCV API
     participant Canton as Canton Participant
@@ -215,7 +215,7 @@ Executing a message on Canton requires the following API calls:
 2. The user needs to query the Canton Token Pool API for the token pool of the transferred token, providing the encoded
    message.
 3. The user needs to query the Canton CCV API for each CCV that verified this message to get the disclosures for execution,
-   providing the encoded message to each Canton CCV API.
+   providing the encoded message to each CCV's Canton CCV API.
 4. The user submits the transaction to their Canton participant, which includes the message and all required disclosures
    from the previous steps, along with the necessary inputs for each of the TP and CCV contracts which have been
    returned by their corresponding APIs.
@@ -234,7 +234,7 @@ config:
 
 sequenceDiagram
     actor User
-    participant CCIP as Canton CCIP API
+    participant CCIP as Global Canton CCIP API
     participant TP as Canton Token Pool API
     participant CCV as Canton CCV API
     participant Canton as Canton Participant
