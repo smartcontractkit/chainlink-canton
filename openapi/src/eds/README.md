@@ -123,7 +123,7 @@ destination chain.
 
 Sending a message from Canton requires the following API calls:
 
-1. (If the message includes as token transfer) The user needs to query the Canton Token Pool API for the token's token pool to
+1. (If the message includes a token transfer) The user needs to query the Canton Token Pool API for the token's token pool to
    get the token pool disclosures along with a list of required CCVs for this token transfer.
     1. If the token pool is unknown, the user needs to query the global Canton CCIP API to look up the token pool for the
        token from the Token Admin Registry.
