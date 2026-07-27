@@ -372,7 +372,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err, "failed to parse outbound rate limiter raw address")
 
 	// Pool EDS looks up TransferPreapproval for PoolOwner on the pool participant's ledger.
-	poolOwnerHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100")
+	poolOwnerHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "100.0")
 	require.NoError(t, err, "failed to mint AMT for pool owner")
 	t.Logf("Minted 100 Amulet to poolOwner, Holding CID: %s", poolOwnerHoldingCid)
 	preapprovalCid, err := testhelpers.CreateTransferPreapproval(t.Context(), senderParticipant, scanProxyClient, partySender, poolOwnerHoldingCid)
@@ -685,11 +685,10 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	receiverHex := hex.EncodeToString(receiver)
 
 	// Fund separate holdings for fee payment and token transfer input.
-	// The mint amount here follows the existing test's usd8-sized quantity setup.
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "1000.0")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted fee-token Amulet holding to sender, Holding CID: %s", feeTokenHoldingCid)
-	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, strconv.Itoa(100*int(tokenPriceExponentUSD)))
+	tokenTransferHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "1000.0")
 	require.NoError(t, err, "failed to mint Amulet tokens for token transfer")
 	t.Logf("Minted token-transfer Amulet holding, CID: %s", tokenTransferHoldingCid)
 

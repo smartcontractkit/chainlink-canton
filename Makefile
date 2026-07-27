@@ -109,6 +109,15 @@ run-canton2evm-load: ## Canton→EVM WASP load (requires running devenv + env-ca
 run-evm2canton-load: ## EVM→Canton WASP load (requires running devenv + env-canton-evm-out.toml).
 	cd ccip/devenv/tests/load && go test -timeout 15m -v -count 1 -run '^TestEVM2Canton_Load$$'
 
+.PHONY: run-evm2canton-load-prod
+run-evm2canton-load-prod: ## EVM→Canton WASP load on prod-testnet (Canton TestNet + Sepolia; set CANTON_* and PRIVATE_KEY).
+	cd ccip/devenv/tests/load && CCIP_CONFIG_FILE=env-prod-testnet.ci.toml go test -tags=prodledger -timeout 45m -v -count 1 -ccip-env=prod-testnet -run '^TestEVM2Canton_Load$$'
+
+.PHONY: run-canton2evm-load-prod
+run-canton2evm-load-prod: ## Canton→EVM WASP load on prod-testnet (send-only; set CANTON_* and PRIVATE_KEY).
+	cd ccip/devenv/tests/load && CCIP_CONFIG_FILE=env-prod-testnet.ci.toml CANTON_LOAD_SKIP_EXEC_CONFIRM=true go test -tags=prodledger -timeout 30m -v -count=1 \
+	  -ccip-env=prod-testnet -run '^TestCanton2EVM_Load$$'
+
 .PHONY: run-canton2evm-token-load
 run-canton2evm-token-load: ## Canton→EVM token WASP load (requires running devenv + env-canton-evm-out.toml).
 	cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestCanton2EVM_TokenLoad$$'
@@ -116,6 +125,28 @@ run-canton2evm-token-load: ## Canton→EVM token WASP load (requires running dev
 .PHONY: run-evm2canton-token-load
 run-evm2canton-token-load: ## EVM→Canton token WASP load (requires running devenv + env-canton-evm-out.toml).
 	cd ccip/devenv/tests/load && go test -timeout 20m -v -count 1 -run '^TestEVM2Canton_TokenLoad$$'
+
+.PHONY: run-canton2evm-token-load-prod
+run-canton2evm-token-load-prod: ## Canton→EVM token WASP load on prod-testnet (set CANTON_* and PRIVATE_KEY).
+	cd ccip/devenv/tests/load && CCIP_CONFIG_FILE=env-prod-testnet.ci.toml go test -tags=prodledger -timeout 30m -v -count=1 \
+	  -ccip-env=prod-testnet -run '^TestCanton2EVM_TokenLoad$$'
+
+.PHONY: run-evm2canton-token-load-prod
+run-evm2canton-token-load-prod: ## EVM→Canton token WASP load on prod-testnet (set CANTON_* and PRIVATE_KEY).
+	cd ccip/devenv/tests/load && CCIP_CONFIG_FILE=env-prod-testnet.ci.toml go test -tags=prodledger -timeout 45m -v -count=1 \
+	  -ccip-env=prod-testnet -run '^TestEVM2Canton_TokenLoad$$'
+
+.PHONY: run-evm2canton-token-e2e-prod
+run-evm2canton-token-e2e-prod: ## EVM→Canton token e2e on prod-testnet.
+	cd ccip/devenv/tests/e2e && CCIP_CONFIG_FILE=env-prod-testnet.ci.toml go test -tags=prodledger -timeout 15m -v -count=1 \
+	  -ccip-env=prod-testnet \
+	  -run '^TestEVM2Canton_Basic$/^token_transfer$$'
+
+.PHONY: run-canton2evm-token-e2e-prod
+run-canton2evm-token-e2e-prod: ## Canton→EVM token e2e on prod-testnet.
+	cd ccip/devenv/tests/e2e && CCIP_CONFIG_FILE=env-prod-testnet.ci.toml go test -tags=prodledger -timeout 15m -v -count=1 \
+	  -ccip-env=prod-testnet \
+	  -run '^TestCanton2EVM_Basic$/^EOA receiver and default committee verifier token transfer$$'
 
 .PHONY: build-run-e2e-tests
 build-run-e2e-tests: start-devenv run-e2e-tests

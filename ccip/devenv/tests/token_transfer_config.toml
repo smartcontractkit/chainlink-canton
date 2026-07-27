@@ -1,24 +1,49 @@
-# Token lane inputs for devenv e2e/load tests.
+# Token lane inputs for CCIP e2e/load tests.
 #
+# Env selection uses CCIP_ENV (prod-testnet) or defaults to devenv in tests.
 # Token identity (pool_type / pool_version / pool_qualifier) is REQUIRED and is
 # matched against the source chain's GetTokenTransferConfigs to discover the lane.
 # Numeric send params (transfer_amount / execution_gas_limit / finality_config)
 # are optional; when omitted, code-level per-direction defaults are used.
 #
-# Override the file path with the CANTON_TOKEN_TEST_CONFIG env var.
+# Override the entire file path with CANTON_TOKEN_TEST_CONFIG.
 
-[evm_to_canton]
-pool_type      = "BurnMintTokenPool"
-pool_version   = "2.0.0"
+[devenv.evm_to_canton]
+pool_type = "BurnMintTokenPool"
+pool_version = "2.0.0"
 pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::BurnMintTokenPool 2.0.0 [default]"
-transfer_amount     = "100000000000"
-execution_gas_limit = 200000
-finality_config     = 0
+transfer_amount = "100000000001"
+execution_gas_limit = 200001
+# Per-message FTF (1-block depth); requires Canton pool remoteChainCfg BlockDepth >= 1 (see impl.go).
+finality_config = 1
 
-[canton_to_evm]
-pool_type      = "LockReleaseTokenPool"
-pool_version   = "2.0.0"
+[devenv.canton_to_evm]
+pool_type = "LockReleaseTokenPool"
+pool_version = "2.0.0"
 pool_qualifier = "TEST (BurnMintTokenPool 2.0.0 [default], LockReleaseTokenPool 2.0.0 [default])::LockReleaseTokenPool 2.0.0 [default]"
-transfer_amount     = "1000"
+transfer_amount = "10000000001"
 execution_gas_limit = 500000
-finality_config     = 1
+finality_config = 1
+
+[prod-testnet.evm_to_canton]
+pool_type = "BurnMintTokenPool"
+pool_version = "2.0.0"
+pool_qualifier = "TEST"
+transfer_amount = "1000000000000001"
+execution_gas_limit = 200001
+finality_config = 1
+remote_pool_type = "BurnMintTokenPool"
+remote_pool_version = "2.0.0"
+remote_pool_qualifier = "LINK"
+
+[prod-testnet.canton_to_evm]
+pool_type = "BurnMintTokenPool"
+pool_version = "2.0.0"
+pool_qualifier = "LINK"
+transfer_amount = "100"
+execution_gas_limit = 500000
+finality_config = 1
+remote_pool_type = "BurnMintTokenPool"
+remote_pool_version = "2.0.0"
+remote_pool_qualifier = "TEST"
+transfer_instrument_id = "link-token"
