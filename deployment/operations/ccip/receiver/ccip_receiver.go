@@ -13,7 +13,7 @@ import (
 
 var ContractType = deployment.ContractType("CantonCCIPReceiver")
 
-var Version = semver.MustParse("2.0.0")
+var Version = semver.MustParse("2.1.0")
 
 var receiverEncoder = ccipreceiver.NewContract("", "CCIP.CCIPReceiver", "CCIPReceiver").Encoder()
 
