@@ -637,7 +637,6 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-router-receiver"}}},
 						{Label: "feeTransferLifetime", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
 					}}}},
-
 				}},
 			}},
 			ActAs:              []string{partySender},
