@@ -198,6 +198,20 @@ func TestConfigValidation(t *testing.T) {
 						InstanceAddress: nil, // missing
 					},
 					wantErr: true,
+				}, {
+					name: "Type url valid",
+					s: BurnMintFactory{
+						Type:             FactoryTypeURL,
+						TokenStandardURL: new("https://registry.example.com"),
+					},
+					wantErr: false,
+				}, {
+					name: "Type url invalid missing URL",
+					s: BurnMintFactory{
+						Type:             FactoryTypeURL,
+						TokenStandardURL: nil, // missing
+					},
+					wantErr: true,
 				},
 			},
 		}, {
