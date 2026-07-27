@@ -693,7 +693,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	receiverHex := hex.EncodeToString(receiver)
 
 	// Fund separate holdings for fee payment and token transfer input.
-	// The mint amount here follows the existing test's usd8-sized quantity setup.
 	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "1000.0")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted fee-token Amulet holding to sender, Holding CID: %s", feeTokenHoldingCid)
