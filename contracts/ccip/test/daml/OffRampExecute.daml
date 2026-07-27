@@ -188,6 +188,7 @@ testExecuteWithCCVVerification = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-receiver"
+            feeTransferLifetime = None
     let router = createResult.router
 
     -- Build test message with correct receiver (using party address hash)
@@ -337,6 +338,7 @@ testExecuteTokenOnlyIgnoresReceiverCCVs = script do
                 tokenAdminRegistry = tokenAdminRegistryAddr
                 feeQuoter = Chainlink.InstanceAddress.make "unused-feequoter-token-only" ccipOwner
                 rmnRemote = rmnRemoteAddr
+            feeTransferLifetime = None
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.empty
             archivedExecutionContractIds = []
@@ -630,6 +632,7 @@ testExecuteWithDefaultCCVs_EmptyReceiverCCVs = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-receiver"
+            feeTransferLifetime = None
     let router = createResult.router
 
     -- Build test message with correct receiver (using party address hash)
@@ -810,6 +813,7 @@ testExecuteWithDefaultCCVs_SentinelUseDefaultCCVs = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-receiver"
+            feeTransferLifetime = None
     let router = createResult.router
 
     -- Build test message with correct receiver (using party address hash)
@@ -996,6 +1000,7 @@ testExecuteWithDefaultCCVs_OptionalReceiverCCVs = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-receiver"
+            feeTransferLifetime = None
     let router = createResult.router
 
     -- Build test message with correct receiver (using party address hash)
@@ -1183,6 +1188,7 @@ testExecuteMessageOnlyRequiresReceiverCCVs = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-m3"
+            feeTransferLifetime = None
     let router = createResult.router
 
     -- Message-only (NOT token-only): has data, no token transfer.
@@ -1307,6 +1313,7 @@ testPrepareExecuteAllowsSafeFinalityConfig = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-safe"
+            feeTransferLifetime = None
     let router = createResult.router
 
     let safeFinality = CCIP.CodecV2.FinalityConfig.WaitForSafe
@@ -1432,6 +1439,7 @@ testExecuteFailsMissingCCV = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-missing"
+            feeTransferLifetime = None
     let router = createResult.router
 
     -- Build test message with correct receiver (using party address hash)
@@ -1567,6 +1575,7 @@ testExecuteWrongReceiver = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-wrongrecv"
+            feeTransferLifetime = None
     let router = createResult.router
 
     -- Build message for OTHER PARTY (not receiver) using party address hash
@@ -1689,6 +1698,7 @@ testExecuteAllowsMultipleOnRamps = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-multionramp"
+            feeTransferLifetime = None
     let router = createResult.router
 
     let message = CCIP.CodecV2.MessageCodecV1.MessageV1 with
@@ -1823,6 +1833,7 @@ testExecuteRejectsUnconfiguredOnRamp = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-badonramp"
+            feeTransferLifetime = None
     let router = createResult.router
 
     let message = CCIP.CodecV2.MessageCodecV1.MessageV1 with
