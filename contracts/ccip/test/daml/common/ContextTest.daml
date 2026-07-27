@@ -1,0 +1,23 @@
+module ContextTest where
+
+import Daml.Script
+import DA.Exception (GeneralError(..))
+import DA.TextMap qualified as TextMap
+import DA.Text qualified as Text
+
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified CCIP.UtilsV2.Context
+
+-- encodeChoiceContext must reject maps over 255 entries
+testEncodeChoiceContextRejectsOversizedMap : Script ()
+testEncodeChoiceContextRejectsOversizedMap = do
+  let ctx = Splice.Api.Token.MetadataV1.ChoiceContext
+        (TextMap.fromList [(show i, Splice.Api.Token.MetadataV1.AV_Int i) | i <- [1 .. 256]])
+
+  msg <- try do
+      pure (CCIP.UtilsV2.Context.encodeChoiceContext ctx)
+    catch
+      GeneralError m -> pure m
+
+  assertMsg ("unexpected error message: " <> msg) (Text.isInfixOf "255 entries" msg)

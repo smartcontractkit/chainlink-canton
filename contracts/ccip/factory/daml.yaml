@@ -22,8 +22,8 @@ data-dependencies:
   - ../client-api/.daml/dist/ccip-client-api-v2-2.0.0.dar
   - ../events/.daml/dist/ccip-events-v2-2.0.0.dar
   - ../tickets/.daml/dist/ccip-tickets-v2-2.0.0.dar
-  - ../core/.daml/dist/ccip-core-v2-2.0.0.dar
-  - ../utils/.daml/dist/ccip-utils-v2-2.0.0.dar
+  - ../core/.daml/dist/ccip-core-v2-2.1.0.dar
+  - ../utils/.daml/dist/ccip-utils-v2-2.1.0.dar
   - ../runtime/.daml/dist/ccip-runtime-v2-2.1.0.dar
 
   - ../executor/.daml/dist/ccip-executor-v2-2.0.0.dar
