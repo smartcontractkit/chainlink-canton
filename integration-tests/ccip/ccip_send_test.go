@@ -494,7 +494,7 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("partySender=%q", partySender)
 
 	// Mint Amulet so the sender can cover non-zero fees (amount in holdings Numeric units per env).
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "1000.0")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 
