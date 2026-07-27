@@ -208,6 +208,14 @@ template PerPartyRouterFactory
                 assertMsg "instanceId already in use"
                     (instanceId `notElem` Map.values registeredRouters)
 
+                case feeTransferLifetime of
+                    None -> pure ()
+                    Some lifetime -> do
+                        assertMsg "feeTransferLifetime must be positive"
+                            (lifetime > hours 0)
+                        assertMsg "feeTransferLifetime must not exceed 90 days"
+                            (lifetime <= hours 2160)
+
                 routerCid <- create PerPartyRouter with
                     ccipOwner = ccipOwner
                     partyOwner = partyOwner
