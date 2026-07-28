@@ -61,13 +61,17 @@ func makeRegistries(size int) map[string]config.Registry {
 	registries := make(map[string]config.Registry, size)
 	for i := range size {
 		id := fmt.Sprintf("Token%v", i+1)
+		name := fmt.Sprintf("Token Name %v", i+1)
+		symbol := fmt.Sprintf("TKN%v", i+1)
 		registries[id] = config.Registry{
 			ContractIdentifier: config.ContractIdentifier{
 				PartyID:         "owner",
 				InstanceAddress: contracts.HexToInstanceAddress(fmt.Sprintf("0x%v", i+1)),
 			},
-			TokenType: config.TokenTypeLINK,
-			TokenId:   id,
+			TokenType:   config.TokenTypeLINK,
+			TokenId:     id,
+			TokenName:   name,
+			TokenSymbol: symbol,
 		}
 	}
 
@@ -79,7 +83,28 @@ func TestServer_ListInstruments(t *testing.T) {
 
 	mockActiveContractStore := mocks.NewMockActiveContractStore(t)
 	mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything)
-	server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, config.TokenStandardAPIConfig{
+	mockActiveContractStore.EXPECT().GetByTemplateId(types.PARTY("admin"), contracts.TemplateIDFromBinding(link.LockedLinkHolding{})).
+		Return([]*apiv2.ActiveContract{
+			{
+				CreatedEvent: &apiv2.CreatedEvent{
+					CreateArguments: bindings.MarshalTemplateToRecord(link.LockedLinkHolding{LockedAmount: "1.0"}),
+				},
+			}, {
+				CreatedEvent: &apiv2.CreatedEvent{
+					CreateArguments: bindings.MarshalTemplateToRecord(link.LockedLinkHolding{LockedAmount: "2.0"}),
+				},
+			},
+		}, true)
+	mockInstrumentHoldingStore := mocks.NewMockInstrumentHoldingStore(t)
+	mockInstrumentHoldingStore.EXPECT().RegisterParty([]string{"admin"})
+	mockInstrumentHoldingStore.EXPECT().ListHoldings(mock.Anything).Return([]*apiv2.ActiveContract{
+		{
+			CreatedEvent: &apiv2.CreatedEvent{
+				CreateArguments: bindings.MarshalTemplateToRecord(link.LinkHolding{HoldingAmount: "100"}),
+			},
+		},
+	}, nil)
+	server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, mockInstrumentHoldingStore, config.TokenStandardAPIConfig{
 		Enabled:    true,
 		Admin:      "admin",
 		Registries: makeRegistries(30),
@@ -119,6 +144,11 @@ func TestServer_ListInstruments(t *testing.T) {
 		require.Equalf(t, http.StatusOK, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		require.Len(t, resp.JSON200.Instruments, 30)
 		require.Nil(t, resp.JSON200.NextPageToken)
+		for _, instrument := range resp.JSON200.Instruments {
+			// Validate that TotalSupply is calculated for each instrument (mocked to be 100+1+2)
+			require.NotNil(t, instrument.TotalSupply)
+			require.Equal(t, "103", *instrument.TotalSupply)
+		}
 	})
 	t.Run("Failure cases", func(t *testing.T) {
 		t.Parallel()
@@ -168,7 +198,9 @@ func TestServer_GetInstrument(t *testing.T) {
 
 	mockActiveContractStore := mocks.NewMockActiveContractStore(t)
 	mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything)
-	server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, config.TokenStandardAPIConfig{
+	mockInstrumentHoldingStore := mocks.NewMockInstrumentHoldingStore(t)
+	mockInstrumentHoldingStore.EXPECT().RegisterParty([]string{"admin"})
+	server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, mockInstrumentHoldingStore, config.TokenStandardAPIConfig{
 		Enabled: true,
 		Admin:   "admin",
 		Registries: map[string]config.Registry{
@@ -180,19 +212,76 @@ func TestServer_GetInstrument(t *testing.T) {
 				TokenType: config.TokenTypeLINK,
 				TokenId:   "LINK",
 			},
+			"link2": {
+				ContractIdentifier: config.ContractIdentifier{
+					PartyID:         "admin",
+					InstanceAddress: contracts.HexToInstanceAddress("0x2"),
+				},
+				TokenType:   config.TokenTypeLINK,
+				TokenId:     "link2",
+				TokenName:   "Link Token 2",
+				TokenSymbol: "LINK2",
+			},
 		},
+		SupplyCacheTimeout: time.Second,
 	})
 	require.NoError(t, err)
 	client := makeMetadataClient(t, server)
 
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
+
+		mockInstrumentHoldingStore.EXPECT().ListHoldings(splice_api_token_holding_v1.InstrumentId{
+			Admin: "admin",
+			Id:    "LINK",
+		}).Return([]*apiv2.ActiveContract{
+			{
+				CreatedEvent: &apiv2.CreatedEvent{
+					CreateArguments: bindings.MarshalTemplateToRecord(link.LinkHolding{HoldingAmount: "100"}),
+				},
+			}, {
+				CreatedEvent: &apiv2.CreatedEvent{
+					CreateArguments: bindings.MarshalTemplateToRecord(link.LinkHolding{HoldingAmount: "23.456"}),
+				},
+			},
+		}, nil).Once()
+		mockActiveContractStore.EXPECT().GetByTemplateId(types.PARTY("admin"), contracts.TemplateIDFromBinding(link.LockedLinkHolding{})).
+			Return([]*apiv2.ActiveContract{
+				{
+					CreatedEvent: &apiv2.CreatedEvent{
+						CreateArguments: bindings.MarshalTemplateToRecord(link.LockedLinkHolding{LockedAmount: "0.000789"}),
+					},
+				},
+			}, true).Once()
 		resp, err := client.GetInstrumentWithResponse(t.Context(), "LINK")
 		require.NoError(t, err)
 		require.Equalf(t, http.StatusOK, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
 		require.Equal(t, "LINK", resp.JSON200.Id)
 		require.Equal(t, "LINK", resp.JSON200.Name)
 		require.Equal(t, "LINK", resp.JSON200.Symbol)
+		require.Equal(t, int8(10), resp.JSON200.Decimals)
+		// Validate that the TotalSupply is calculated correctly
+		require.NotNil(t, resp.JSON200.TotalSupply)
+		require.Equal(t, "123.456789", *resp.JSON200.TotalSupply)
+		require.NotNil(t, resp.JSON200.TotalSupplyAsOf)
+		require.WithinDuration(t, time.Now(), *resp.JSON200.TotalSupplyAsOf, time.Second*5)
+
+		// Validate that calling the same endpoint again doesn't cause the totalSupply to be re-calculated
+		_, err = client.GetInstrumentWithResponse(t.Context(), "LINK")
+		require.NoError(t, err)
+
+		mockInstrumentHoldingStore.EXPECT().ListHoldings(splice_api_token_holding_v1.InstrumentId{
+			Admin: "admin",
+			Id:    "link2",
+		}).Return([]*apiv2.ActiveContract{}, nil)
+		mockActiveContractStore.EXPECT().GetByTemplateId(types.PARTY("admin"), contracts.TemplateIDFromBinding(link.LockedLinkHolding{})).
+			Return([]*apiv2.ActiveContract{}, true)
+		resp, err = client.GetInstrumentWithResponse(t.Context(), "link2")
+		require.NoError(t, err)
+		require.Equalf(t, http.StatusOK, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+		require.Equal(t, "link2", resp.JSON200.Id)
+		require.Equal(t, "Link Token 2", resp.JSON200.Name)
+		require.Equal(t, "LINK2", resp.JSON200.Symbol)
 		require.Equal(t, int8(10), resp.JSON200.Decimals)
 	})
 	t.Run("Not found", func(t *testing.T) {
@@ -209,7 +298,9 @@ func TestServer_GetTransferFactory(t *testing.T) {
 	setup := func(t *testing.T) (*mocks.MockActiveContractStore, oapiTransferInstruction.ClientWithResponsesInterface) {
 		mockActiveContractStore := mocks.NewMockActiveContractStore(t)
 		mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything)
-		server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, config.TokenStandardAPIConfig{
+		mockInstrumentHoldingStore := mocks.NewMockInstrumentHoldingStore(t)
+		mockInstrumentHoldingStore.EXPECT().RegisterParty([]string{"admin"})
+		server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, mockInstrumentHoldingStore, config.TokenStandardAPIConfig{
 			Enabled: true,
 			Admin:   "admin",
 			Registries: map[string]config.Registry{
@@ -392,13 +483,15 @@ func TestServer_GetTransferFactory(t *testing.T) {
 	})
 }
 
-func TestServer_GetTransferInstructionAcceptContect(t *testing.T) {
+func TestServer_GetTransferInstructionAcceptContext(t *testing.T) {
 	t.Parallel()
 
 	setup := func(t *testing.T) (*mocks.MockActiveContractStore, oapiTransferInstruction.ClientWithResponsesInterface) {
 		mockActiveContractStore := mocks.NewMockActiveContractStore(t)
 		mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything)
-		server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, config.TokenStandardAPIConfig{
+		mockInstrumentHoldingStore := mocks.NewMockInstrumentHoldingStore(t)
+		mockInstrumentHoldingStore.EXPECT().RegisterParty([]string{"admin"})
+		server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, mockInstrumentHoldingStore, config.TokenStandardAPIConfig{
 			Enabled: true,
 			Admin:   "admin",
 			Registries: map[string]config.Registry{
@@ -611,6 +704,7 @@ func TestServer_FilterContracts(t *testing.T) {
 	t.Parallel()
 
 	cfg := config.TokenStandardAPIConfig{
+		Admin: "admin",
 		Registries: map[string]config.Registry{
 			"Token1": {TokenId: "1", TokenType: config.TokenTypeLINK, ContractIdentifier: config.ContractIdentifier{InstanceAddress: contracts.HexToInstanceAddress("0x1")}},
 			"Token2": {TokenId: "2", TokenType: config.TokenTypeLINK, ContractIdentifier: config.ContractIdentifier{InstanceAddress: contracts.HexToInstanceAddress("0x2")}},
@@ -619,7 +713,9 @@ func TestServer_FilterContracts(t *testing.T) {
 	}
 	mockActiveContractStore := mocks.NewMockActiveContractStore(t)
 	mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything).Times(len(cfg.Registries))
-	server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, cfg)
+	mockInstrumentHoldingStore := mocks.NewMockInstrumentHoldingStore(t)
+	mockInstrumentHoldingStore.EXPECT().RegisterParty([]string{cfg.Admin})
+	server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, mockInstrumentHoldingStore, cfg)
 	require.NoError(t, err)
 
 	t.Run("All filters", func(t *testing.T) {

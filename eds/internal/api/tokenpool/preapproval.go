@@ -25,11 +25,11 @@ func getPreapprovalFactory(acs store.ActiveContractStoreInterface, contextKey st
 	})
 
 	return func(ctx context.Context) (string, *apiv2.ActiveContract, error) {
-		activePreapproval, ok := acs.GetByTemplateId(party, templateId)
-		if !ok {
+		activePreapprovals, ok := acs.GetByTemplateId(party, templateId)
+		if !ok || len(activePreapprovals) == 0 {
 			return "", nil, fmt.Errorf("no preapproval found for user %s and template %s", party, templateId.String())
 		}
 
-		return contextKey, activePreapproval, nil
+		return contextKey, activePreapprovals[0], nil
 	}, nil
 }
