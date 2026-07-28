@@ -36,7 +36,7 @@ func loadConfig(path string) (*ccip.Config, error) {
 	return &cfg, nil
 }
 
-func CreateCantonAccessorFactory(lggr logger.Logger, genericConfig chainaccess.GenericConfig) (chainaccess.AccessorFactory, error) { //nolint:staticcheck // registry still decodes GenericConfig until local config is supported
+func CreateCantonAccessorFactory(lggr logger.Logger, genericConfig chainaccess.GenericConfig) (chainaccess.AccessorFactory, error) {
 	configPath, ok := os.LookupEnv(CantonConfigPathEnv)
 	if !ok {
 		configPath = ccip.DefaultCantonConfigPath
