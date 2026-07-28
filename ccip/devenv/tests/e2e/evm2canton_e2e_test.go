@@ -70,12 +70,14 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.Nil(t, sentEvent.Message.TokenTransfer)
 
 		execKey := cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}
-		executionStateChangedEvent, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, devenvtests.ConfirmExecTimeout(t))
+		execEnvelope, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, devenvtests.ConfirmExecTimeout(t))
 		require.NoError(t, err)
+		executionStateChangedEvent := execEnvelope.Event
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
 
-		idempotentEvent, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, devenvtests.ConfirmExecTimeout(t))
+		idempotentEnvelope, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, devenvtests.ConfirmExecTimeout(t))
 		require.NoError(t, err)
+		idempotentEvent := idempotentEnvelope.Event
 		require.Equal(t, executionStateChangedEvent.State, idempotentEvent.State)
 		require.Equal(t, executionStateChangedEvent.MessageNumber, idempotentEvent.MessageNumber)
 		require.Equal(t, executionStateChangedEvent.SourceChainSelector, idempotentEvent.SourceChainSelector)
@@ -127,8 +129,9 @@ func TestEVM2Canton_Basic(t *testing.T) {
 		require.Positive(t, vr.Message.TokenTransfer.Amount.Cmp(big.NewInt(0)), "token transfer amount must be positive")
 
 		execKey := cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}
-		executionStateChangedEvent, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, devenvtests.ConfirmExecTimeout(t))
+		execEnvelope, err := boot.Canton.ConfirmExecOnDest(subtestCtx, srcSelector, execKey, devenvtests.ConfirmExecTimeout(t))
 		require.NoError(t, err)
+		executionStateChangedEvent := execEnvelope.Event
 		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, executionStateChangedEvent.State)
 
 		totalHoldingsRat, err := testhelpers.GetHoldingsBalance(subtestCtx, receiverParticipant, nil)

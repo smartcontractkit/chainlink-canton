@@ -103,7 +103,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 		t.Logf("Waiting for execution event on EVM: from=%d seq=%d", boot.Canton.ChainSelector(), seqNo)
 		ev, err := boot.EVM.ConfirmExecOnDest(subtestCtx, boot.Canton.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
 		require.NoError(t, err)
-		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		assert.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.Event.State)
 		t.Logf("Execution event: %+v", ev)
 	})
 
@@ -181,7 +181,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 			ev, err := boot.EVM.ConfirmExecOnDest(subtestCtx, boot.Canton.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo}, tests.WaitTimeout(t))
 			require.NoError(t, err)
-			require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+			require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.Event.State)
 		}
 
 		receiverBalanceAfter, err := boot.EVM.GetTokenBalance(subtestCtx, receiver, destTokenAddress)
@@ -230,7 +230,7 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 		ev, err := boot.EVM.ConfirmExecOnDest(subtestCtx, boot.Canton.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}, tests.WaitTimeout(t))
 		require.NoError(t, err)
-		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.Event.State)
 	})
 
 	// Token transfer with gasLimit=0 should succeed — the EVM receiver gets the tokens
@@ -293,6 +293,6 @@ func TestCanton2EVM_Basic(t *testing.T) {
 
 		ev, err := boot.EVM.ConfirmExecOnDest(subtestCtx, boot.Canton.ChainSelector(), cciptestinterfaces.MessageEventKey{SeqNum: seqNo, MessageID: sentEvent.MessageID}, tests.WaitTimeout(t))
 		require.NoError(t, err)
-		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.State)
+		require.Equal(t, cciptestinterfaces.ExecutionStateSuccess, ev.Event.State)
 	})
 }
