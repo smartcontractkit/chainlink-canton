@@ -92,11 +92,11 @@ func quoteCCIPSenderFee(
 	return quote
 }
 
-// evmFeeQuoterDestChainConfigForLane returns the FeeQuoter dest-chain defaults the EVM 2.0
-// chain-family adapter used to expose via the lanes.LaneAdapter registry. That adapter no
-// longer registers as a LaneAdapter — CCIP 2.0 lanes are configured through
-// ConfigureChainsForLanesFromTopology — so the values are pinned here for the Canton lane
-// tests, which build lanes.UpdateLanesInput by hand.
+// evmFeeQuoterDestChainConfigForLane returns the FeeQuoter dest-chain defaults that the EVM 2.0
+// chain-family adapter used to expose through the lanes.LaneAdapter registry. It no longer
+// registers there, because CCIP 2.0 lanes are configured through
+// ConfigureChainsForLanesFromTopology. The Canton lane tests still build lanes.UpdateLanesInput
+// by hand, so the values are pinned here.
 func evmFeeQuoterDestChainConfigForLane() lanes.FeeQuoterDestChainConfig {
 	// bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c
 	const evmChainFamilySelector uint32 = 0x2812d52c
