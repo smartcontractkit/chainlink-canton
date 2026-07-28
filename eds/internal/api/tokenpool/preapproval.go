@@ -29,6 +29,9 @@ func getPreapprovalFactory(acs store.ActiveContractStoreInterface, contextKey st
 		if !ok || len(activePreapprovals) == 0 {
 			return "", nil, fmt.Errorf("no preapproval found for user %s and template %s", party, templateId.String())
 		}
+		if len(activePreapprovals) > 1 {
+			return "", nil, fmt.Errorf("more than one preapproval found for user %s and template %s", party, templateId.String())
+		}
 
 		return contextKey, activePreapprovals[0], nil
 	}, nil

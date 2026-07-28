@@ -155,6 +155,7 @@ func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContra
 			contractsForParty = make(map[contracts.TemplateID]map[types.CONTRACT_ID]*apiv2.ActiveContract)
 			s.contractsByTemplateId[party] = contractsForParty
 		}
+
 		// Add by PackageId
 		templateIdPackageId := contracts.TemplateID{
 			PackageID:  activeContract.GetCreatedEvent().GetTemplateId().GetPackageId(),
@@ -167,6 +168,8 @@ func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContra
 			contractsForParty[templateIdPackageId] = contractsByPackageId
 		}
 		contractsByPackageId[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
+		contractsForParty[templateIdPackageId] = contractsByPackageId
+
 		// Add by PackageName
 		templateIdPackageName := contracts.TemplateID{
 			PackageID:  fmt.Sprintf("#%s", activeContract.GetCreatedEvent().GetPackageName()),
@@ -178,6 +181,7 @@ func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContra
 			contractsByPackageName = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
 			contractsForParty[templateIdPackageName] = contractsByPackageName
 		}
+		contractsByPackageName[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
 		contractsForParty[templateIdPackageName] = contractsByPackageName
 	}
 	s.mux.Unlock()
@@ -207,6 +211,7 @@ func (s *ActiveContractStore) onCreatedEvent(ctx context.Context, transaction *a
 			contractsForParty = make(map[contracts.TemplateID]map[types.CONTRACT_ID]*apiv2.ActiveContract)
 			s.contractsByTemplateId[party] = contractsForParty
 		}
+
 		// Add by PackageId
 		templateIdPackageId := contracts.TemplateID{
 			PackageID:  activeContract.GetCreatedEvent().GetTemplateId().GetPackageId(),
@@ -219,6 +224,8 @@ func (s *ActiveContractStore) onCreatedEvent(ctx context.Context, transaction *a
 			contractsForParty[templateIdPackageId] = contractsByPackageId
 		}
 		contractsByPackageId[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
+		contractsForParty[templateIdPackageId] = contractsByPackageId
+
 		// Add by PackageName
 		templateIdPackageName := contracts.TemplateID{
 			PackageID:  fmt.Sprintf("#%s", activeContract.GetCreatedEvent().GetPackageName()),
@@ -230,6 +237,7 @@ func (s *ActiveContractStore) onCreatedEvent(ctx context.Context, transaction *a
 			contractsByPackageName = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
 			contractsForParty[templateIdPackageName] = contractsByPackageName
 		}
+		contractsByPackageName[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
 		contractsForParty[templateIdPackageName] = contractsByPackageName
 	}
 	s.mux.Unlock()
@@ -260,17 +268,19 @@ func (s *ActiveContractStore) onArchivedEvent(ctx context.Context, _ *apiv2.Tran
 			continue
 		}
 		// Delete by PackageId
-		delete(contractsForParty, contracts.TemplateID{
+		contractsByPackageId := contractsForParty[contracts.TemplateID{
 			PackageID:  archivedEvent.GetTemplateId().GetPackageId(),
 			ModuleName: archivedEvent.GetTemplateId().GetModuleName(),
 			EntityName: archivedEvent.GetTemplateId().GetEntityName(),
-		})
+		}]
+		delete(contractsByPackageId, types.CONTRACT_ID(archivedEvent.GetContractId()))
 		// Delete by PackageName
-		delete(contractsForParty, contracts.TemplateID{
+		contractsByPackageName := contractsForParty[contracts.TemplateID{
 			PackageID:  fmt.Sprintf("#%s", archivedEvent.GetPackageName()),
 			ModuleName: archivedEvent.GetTemplateId().GetModuleName(),
 			EntityName: archivedEvent.GetTemplateId().GetEntityName(),
-		})
+		}]
+		delete(contractsByPackageName, types.CONTRACT_ID(archivedEvent.GetContractId()))
 	}
 
 	return nil

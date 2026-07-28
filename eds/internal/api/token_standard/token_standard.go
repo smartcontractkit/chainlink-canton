@@ -285,7 +285,7 @@ func (s Server) getTotalSupplyForInstrument(instrumentId string) (tokenSupply, e
 			}
 			parsedAmount, ok := new(big.Float).SetString(string(parsedHolding.HoldingAmount))
 			if !ok {
-				return tokenSupply{}, fmt.Errorf("failed to parse HoldingAmount as big.Rat at index %d: %s", i, parsedHolding.HoldingAmount)
+				return tokenSupply{}, fmt.Errorf("failed to parse HoldingAmount as big.Float at index %d: %s", i, parsedHolding.HoldingAmount)
 			}
 			totalSupply.Add(totalSupply, parsedAmount)
 		}
@@ -299,7 +299,7 @@ func (s Server) getTotalSupplyForInstrument(instrumentId string) (tokenSupply, e
 			}
 			parsedAmount, ok := new(big.Float).SetString(string(parsedLockedHolding.LockedAmount))
 			if !ok {
-				return tokenSupply{}, fmt.Errorf("failed to parse LockedAmount as big.Rat: %s", parsedLockedHolding.LockedAmount)
+				return tokenSupply{}, fmt.Errorf("failed to parse LockedAmount as big.Float: %s", parsedLockedHolding.LockedAmount)
 			}
 			totalSupply.Add(totalSupply, parsedAmount)
 		}

@@ -113,7 +113,7 @@ func (s *InstrumentHoldingStore) ListHoldings(instrumentId splice_api_token_hold
 
 	instrumentHoldings, ok := s.holdings[instrumentId]
 	if !ok {
-		return nil, fmt.Errorf("no holdings found for instrument %v", instrumentId)
+		return []*apiv2.ActiveContract{}, nil
 	}
 
 	holdings := make([]*apiv2.ActiveContract, 0)
