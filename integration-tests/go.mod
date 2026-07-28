@@ -29,7 +29,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260728180354-4f966ecacc23
 	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260728185140-e41659e2b739
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260728185140-e41659e2b739
-	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260518100439-9564f35fd264
+	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260715145851-8219609496a4
 	github.com/smartcontractkit/chainlink-deployments-framework v0.116.1
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
@@ -269,15 +269,15 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260728185140-e41659e2b739 // indirect
 	github.com/smartcontractkit/chainlink-common/keystore v1.2.1-0.20260623104656-f39eba3e2bc6 // indirect
-	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.10 // indirect
-	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260710181111-6417709a55ee // indirect
+	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.11-0.20260626151909-052e55e62e62 // indirect
+	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260722105404-d3fb34ccc58b // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260710181111-6417709a55ee // indirect
 	github.com/smartcontractkit/chainlink-protos/chainlink-ccv/committee-verifier v0.0.0-20251211142334-5c3421fe2c8d // indirect
 	github.com/smartcontractkit/chainlink-protos/chainlink-ccv/verifier v0.0.0-20251211142334-5c3421fe2c8d // indirect
-	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260602131523-5168ac1ba014 // indirect
+	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260622152157-c8e129347b8b // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20260512230622-65f10f4cd305 // indirect
-	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260512230622-65f10f4cd305 // indirect
+	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260709145319-7782fb89eb16 // indirect
 	github.com/smartcontractkit/chainlink-protos/op-catalog v0.1.0 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260630144638-b69f16bdddd8 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6 // indirect
@@ -318,11 +318,10 @@ require (
 	github.com/xssnick/tonutils-go v1.14.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zksync-sdk/zksync2-go v1.1.1-0.20250620124214-2c742ee399c6 // indirect
-	go.dedis.ch/fixbuf v1.0.3 // indirect
-	go.dedis.ch/kyber/v3 v3.1.0 // indirect
 	go.mongodb.org/mongo-driver v1.17.9 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.5.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
+	go.opentelemetry.io/contrib/bridges/prometheus v0.68.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.65.0 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
