@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -227,6 +228,7 @@ chain_selector = "8706591216959472610"
 							TokenId:   "ChainLink",
 						},
 					},
+					SupplyCacheTimeout: time.Second * 10, // Default
 				},
 				Node: NodeConfig{
 					URL: "localhost:8545",
