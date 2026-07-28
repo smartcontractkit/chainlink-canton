@@ -321,6 +321,7 @@ testCCIPSendAllFeePayouts = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = user
             instanceId = "test-router-user-all-fees"
+            feeTransferLifetime = None
     let router = createResult.router
 
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
@@ -649,6 +650,7 @@ testCCIPSend = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = user
             instanceId = "test-router-user"
+            feeTransferLifetime = None
     let router = createResult.router
     let factory = createResult.factory
 
@@ -903,6 +905,7 @@ testCCIPExecute = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = receiver
             instanceId = "test-router-receiver"
+            feeTransferLifetime = None
     let router = createResult.router
 
     -- Build a test message (wire format uses finality)
@@ -1102,6 +1105,7 @@ testPrepareSendExtraArgs = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = user
             instanceId = "test-router-user"
+            feeTransferLifetime = None
     let router = createResult.router
 
     customVerifier <- submit user do
@@ -1349,6 +1353,7 @@ testPrepareSendRejectsOversizedPayload = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = user
             instanceId = "router-payload"
+            feeTransferLifetime = None
     let router = createRouterResult.router
 
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
@@ -1418,6 +1423,7 @@ testGetExecutionStateUsesActiveAndArchivedMessages = script do
             ccipOwner
             partyOwner
             deps
+            feeTransferLifetime = None
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.fromList [activeMessage]
             archivedExecutionContractIds = [olderArchive, newerArchive]
@@ -1543,6 +1549,7 @@ testExecuteRollsOverExecutedMessages = script do
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = Chainlink.InstanceAddress.make "unused-feequoter-rollover" ccipOwner
                 rmnRemote = rmnRemoteInstanceAddress
+            feeTransferLifetime = None
             outboundSequenceNumbers = Map.empty
             executedMessages = seededMessagesSet
             archivedExecutionContractIds = [olderArchive]
@@ -1778,6 +1785,7 @@ testPrepareSendRejectsDuplicateSenderRequiredCCVs = script do
         exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
             partyOwner = user
             instanceId = "test-router-dup-ccvs"
+            feeTransferLifetime = None
     let router = createResult.router
 
     disclosedOnRamp <- fromSome <$> queryDisclosure ccipOwner onRamp
@@ -1939,6 +1947,7 @@ testPrepareSendRejectsSequenceNumberOverflow = script do
                 tokenAdminRegistry = tokenAdminRegistryInstanceAddress
                 feeQuoter = feeQuoterInstanceAddress
                 rmnRemote = rmnRemoteInstanceAddress
+            feeTransferLifetime = None
             outboundSequenceNumbers = Map.fromList [(destChainSelector, maxUint64)]
             executedMessages = Set.empty
             archivedExecutionContractIds = []

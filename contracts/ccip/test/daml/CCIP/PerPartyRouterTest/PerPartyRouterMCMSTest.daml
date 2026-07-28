@@ -39,6 +39,7 @@ testPerPartyRouterMCMSEntrypoint_SetDeps = script do
       ccipOwner
       partyOwner
       deps = initialDeps
+      feeTransferLifetime = None
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
@@ -97,6 +98,7 @@ testPerPartyRouterMCMSEntrypoint_SetDeps_Partial = script do
       ccipOwner
       partyOwner
       deps = initialDeps
+      feeTransferLifetime = None
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
@@ -155,6 +157,7 @@ testPerPartyRouterMCMSEntrypoint_UnknownFunction = script do
       ccipOwner
       partyOwner
       deps
+      feeTransferLifetime = None
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
@@ -191,6 +194,7 @@ testPerPartyRouterMCMSEntrypoint_InvalidParams = script do
       ccipOwner
       partyOwner
       deps
+      feeTransferLifetime = None
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []
@@ -227,6 +231,7 @@ testPerPartyRouterMCMSEntrypoint_MissingSelfCid = script do
       ccipOwner
       partyOwner
       deps
+      feeTransferLifetime = None
       outboundSequenceNumbers = Map.empty
       executedMessages = Set.empty
       archivedExecutionContractIds = []

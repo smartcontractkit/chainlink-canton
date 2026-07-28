@@ -194,7 +194,10 @@ encodeTextMapAnyValue m =
   let entries = TextMap.toList m
       count = length entries
       encodeEntry (k, v) = encodeText k <> encodeAnyValue v
-  in fromSome (encodeUint8 count) <> foldl (\acc entry -> acc <> encodeEntry entry) "" entries
+  in
+    if count > 255
+    then error "encodeTextMapAnyValue: map exceeds 255 entries"
+    else fromSome (encodeUint8 count) <> foldl (\acc entry -> acc <> encodeEntry entry) "" entries
 
 -- | Decode TextMap AnyValue
 decodeTextMapAnyValueAt : BytesHex -> Int -> Optional (TextMap.TextMap AnyValue, Int)

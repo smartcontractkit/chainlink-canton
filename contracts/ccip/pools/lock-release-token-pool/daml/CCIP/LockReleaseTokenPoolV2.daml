@@ -17,8 +17,7 @@ import DA.List (dedup)
 import qualified DA.Map as Map
 import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.TextMap as TextMap
-import DA.Date (date, Month(Dec))
-import DA.Time (time, addRelTime, hours)
+import DA.Time (addRelTime, hours)
 import DA.Foldable (forA_)
 
 import qualified Splice.Api.Token.HoldingV1
@@ -72,11 +71,6 @@ import CCIP.LockReleaseTokenPoolV2Types (
     AddPoolReceiveContextContractValueParams(..),
     RemovePoolReceiveContextValueParams(..),
     )
-
--- | Far-future time used as "never expires" for pending transfers.
--- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
-maxTime : Time
-maxTime = time (date 9999 Dec 31) 23 59 59
 
 transferFactoryContextKey : Text
 transferFactoryContextKey = "transfer-factory"
@@ -854,7 +848,8 @@ template LockReleaseTokenPool
                 -- TransferInstruction that receiver must accept.
                 now <- getTime
                 let executeBefore = case transferTimeout of
-                        Indefinite -> maxTime
+                        -- Indefinite is bounded by Splice's tokenStandardMaxTTL default (90 days).
+                        Indefinite -> addRelTime now (hours 2160)
                         RelativeHours h -> addRelTime now (hours h)
                 let amountDecimal = CCIP.CodecV2.Math.numeric0ToDecimal localAmount
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
@@ -1172,7 +1167,8 @@ template LockReleaseTokenPool
                             values = extraArgsMetaValues
                 now <- getTime
                 let executeBefore = case transferTimeout of
-                        Indefinite -> maxTime
+                        -- Indefinite is bounded by Splice's tokenStandardMaxTTL default (90 days).
+                        Indefinite -> addRelTime now (hours 2160)
                         RelativeHours h -> addRelTime now (hours h)
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller

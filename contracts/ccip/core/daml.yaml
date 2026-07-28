@@ -1,7 +1,8 @@
 sdk-version: 3.4.11
 name: ccip-core-v2
 source: daml
-version: 2.0.0
+version: 2.1.0
+upgrades: ../../dars/released/ccip-core-v2-2.0.0.dar
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
