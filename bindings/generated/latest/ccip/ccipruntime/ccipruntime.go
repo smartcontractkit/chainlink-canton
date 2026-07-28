@@ -32,7 +32,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime-v2"
-	PackageID   = "2235ebbb5f722d88a0e21aba9ced9abd0b637762768b8d38e17a4777fb8a3238"
+	PackageID   = "b43a9896a3d6753fa23d25f42b6021a20984d807ca73f0dc08be71b582451e1c"
 	SDKVersion  = "3.4.11"
 )
 
@@ -536,8 +536,9 @@ func (t *CCIPSendResult2) UnmarshalHex(data string) error {
 
 // CreateRouter is a Record type
 type CreateRouter struct {
-	PartyOwner types.PARTY `json:"partyOwner"`
-	InstanceId types.TEXT  `json:"instanceId"`
+	PartyOwner          types.PARTY    `json:"partyOwner"`
+	InstanceId          types.TEXT     `json:"instanceId"`
+	FeeTransferLifetime *types.RELTIME `json:"feeTransferLifetime" hex:"optional"`
 }
 
 // ToMap converts CreateRouter to a map for DAML arguments
@@ -547,6 +548,18 @@ func (t CreateRouter) ToMap() map[string]any {
 	m["partyOwner"] = t.PartyOwner.ToMap()
 
 	m["instanceId"] = string(t.InstanceId)
+
+	if t.FeeTransferLifetime != nil {
+		m["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
+		}
+	} else {
+		m["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	return m
 }
@@ -2284,6 +2297,7 @@ type PerPartyRouter struct {
 	ExecutedMessages             types.SET                       `json:"executedMessages"`
 	ArchivedExecutionContractIds []types.CONTRACT_ID             `json:"archivedExecutionContractIds"`
 	CustomObservers              []types.PARTY                   `json:"customObservers"`
+	FeeTransferLifetime          *types.RELTIME                  `json:"feeTransferLifetime" hex:"optional"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -2341,6 +2355,18 @@ func (t PerPartyRouter) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
+	if t.FeeTransferLifetime != nil {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
+		}
+	} else {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -2391,6 +2417,18 @@ func (t PerPartyRouter) CreateCommandWithPackageID(packageID string) *model.Crea
 		}
 		return res
 	}()
+
+	if t.FeeTransferLifetime != nil {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.FeeTransferLifetime),
+		}
+	} else {
+		args["feeTransferLifetime"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
