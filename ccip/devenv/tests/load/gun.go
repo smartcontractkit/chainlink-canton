@@ -267,11 +267,11 @@ func (g *CCIPLoadGun) Call(gen *wasp.Generator) *wasp.Response {
 		g.metricsCollector.incrementConfirmExecFailure()
 		return &wasp.Response{Failed: true, Error: fmt.Sprintf("ConfirmExecOnDest (dest=%d): %v", destSelector, err), Duration: time.Since(start)}
 	}
-	if ev.State != cciptestinterfaces.ExecutionStateSuccess {
+	if ev.Event.State != cciptestinterfaces.ExecutionStateSuccess {
 		g.metricsCollector.incrementConfirmExecFailure()
 		return &wasp.Response{
 			Failed:     true,
-			Error:      fmt.Sprintf("execution state=%s (dest=%d)", ev.State.String(), destSelector),
+			Error:      fmt.Sprintf("execution state=%s (dest=%d)", ev.Event.State.String(), destSelector),
 			Duration:   time.Since(start),
 			StatusCode: "500",
 		}
