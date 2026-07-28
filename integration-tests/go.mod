@@ -22,7 +22,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.1
-	github.com/smartcontractkit/chain-selectors v1.0.106
+	github.com/smartcontractkit/chain-selectors v1.0.107
 	github.com/smartcontractkit/chainlink-canton v0.0.0-20260615233851-4e78e7c23a58
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260715230542-c08e039d74ca
@@ -33,7 +33,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.116.1
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
-	github.com/smartcontractkit/mcms v0.51.0
+	github.com/smartcontractkit/mcms v0.52.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/protobuf v1.36.11
 )
@@ -226,7 +226,7 @@ require (
 	github.com/mr-tron/base58 v1.3.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/oapi-codegen/runtime v1.4.2 // indirect
+	github.com/oapi-codegen/runtime v1.6.0 // indirect
 	github.com/oklog/run v1.2.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
@@ -280,9 +280,10 @@ require (
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260512230622-65f10f4cd305 // indirect
 	github.com/smartcontractkit/chainlink-protos/op-catalog v0.1.0 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260630144638-b69f16bdddd8 // indirect
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6-0.20260708113039-95f97b2d25e9 // indirect
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
-	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260514223130-48bc90aca745 // indirect
+	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260713162202-124316cd10ff // indirect
+	github.com/smartcontractkit/chainlink-ton/cciplib v0.1.0 // indirect
 	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20260529134643-c101335a64cd // indirect
@@ -351,7 +352,7 @@ require (
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/exp v0.0.0-20260508232706-74f9aab9d74a // indirect
-	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
@@ -361,7 +362,7 @@ require (
 	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
-	google.golang.org/grpc v1.82.0 // indirect
+	google.golang.org/grpc v1.82.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
