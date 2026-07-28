@@ -1,7 +1,8 @@
 sdk-version: 3.4.11
 name: ccip-burn-mint-token-pool-v2
 source: daml
-version: 2.0.0
+version: 2.1.0
+upgrades: ../../../dars/released/ccip-burn-mint-token-pool-v2-2.0.0.dar
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
@@ -17,7 +18,7 @@ data-dependencies:
   - ../../extension-api/.daml/dist/ccip-extension-api-v2-2.0.0.dar
   - ../../events/.daml/dist/ccip-events-v2-2.0.0.dar
   - ../../tickets/.daml/dist/ccip-tickets-v2-2.0.0.dar
-  - ../../utils/.daml/dist/ccip-utils-v2-2.0.0.dar
+  - ../../utils/.daml/dist/ccip-utils-v2-2.1.0.dar
   - ../../rate-limiter/.daml/dist/ccip-rate-limiter-v2-2.0.0.dar
 dependencies:
   - daml-prim

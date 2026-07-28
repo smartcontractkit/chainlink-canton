@@ -11,6 +11,7 @@ import qualified Splice.Api.Token.TransferInstructionV1
 
 import qualified Chainlink.InstanceAddress
 
+import qualified CCIP.APIV2.TokenAdminRegistry
 import qualified CCIP.CoreV2.ExecutingMessage
 import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.CodecV2.MessageCodecV1
@@ -348,3 +349,39 @@ testConsumeReceiveTicketRejectsPoolAddressMismatch = script do
       instrumentId
       poolInstanceId = registeredPool.poolInstanceId
       caller = poolOwner
+
+-- PublicFetch must validate the caller-supplied expectedAddress.
+testTokenAdminRegistryPublicFetchRejectsAddressMismatch : Script ()
+testTokenAdminRegistryPublicFetchRejectsAddressMismatch = script do
+  owner <- allocateParty "tar-public-fetch-owner"
+  wrongOwner <- allocateParty "tar-public-fetch-wrong-owner"
+
+  let instanceId = "tar-public-fetch-mismatch-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "USDC"
+
+  (tarCid, _) <- createRegistryWithAdmin owner instanceId instrumentId
+  let tarIfaceCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry tarCid
+
+  submitMustFail owner do
+    exerciseCmd tarIfaceCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_PublicFetch with
+      expectedAddress = Chainlink.InstanceAddress.make instanceId wrongOwner
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+      caller = owner
+
+-- PublicFetch must validate the caller-supplied expectedAddress.
+testTokenConfigPublicFetchRejectsAddressMismatch : Script ()
+testTokenConfigPublicFetchRejectsAddressMismatch = script do
+  owner <- allocateParty "tc-public-fetch-owner"
+  wrongOwner <- allocateParty "tc-public-fetch-wrong-owner"
+
+  let instanceId = "tc-public-fetch-mismatch-test"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "USDC"
+
+  (_, configCid) <- createRegistryWithAdmin owner instanceId instrumentId
+  let configIfaceCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenConfig configCid
+
+  submitMustFail owner do
+    exerciseCmd configIfaceCid CCIP.APIV2.TokenAdminRegistry.TokenConfig_PublicFetch with
+      expectedAddress = Chainlink.InstanceAddress.make (CCIP.CoreV2.TokenAdminRegistry.tokenConfigInstanceId instrumentId) wrongOwner
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+      caller = owner

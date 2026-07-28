@@ -198,6 +198,7 @@ setupFeeFixture suffix useDefaultExecutor = do
                 tokenAdminRegistry = Chainlink.InstanceAddress.make ("tar-unused-" <> suffix) ccipOwner
                 feeQuoter = Chainlink.InstanceAddress.make feeQuoterInstanceId ccipOwner
                 rmnRemote = Chainlink.InstanceAddress.make ("rmn-unused-" <> suffix) ccipOwner
+            feeTransferLifetime = None
             outboundSequenceNumbers = Map.empty
             executedMessages = Set.empty
             archivedExecutionContractIds = []

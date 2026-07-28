@@ -17,8 +17,6 @@ import DA.List (dedup)
 import qualified DA.Map as Map
 import DA.Optional (fromOptional, fromSomeNote)
 import qualified DA.TextMap as TextMap
-import DA.Date (date, Month(Dec))
-import DA.Time (time)
 import DA.Foldable (forA_)
 
 import qualified Splice.Api.Token.BurnMintV1
@@ -72,11 +70,6 @@ import CCIP.BurnMintTokenPoolV2Types (
     AddPoolReceiveContextContractValueParams(..),
     RemovePoolReceiveContextValueParams(..),
     )
-
--- | Far-future time used as "never expires" for pending transfers.
--- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
-maxTime : Time
-maxTime = time (date 9999 Dec 31) 23 59 59
 
 burnMintFactoryContextKey : Text
 burnMintFactoryContextKey = "burn-mint-factory"
