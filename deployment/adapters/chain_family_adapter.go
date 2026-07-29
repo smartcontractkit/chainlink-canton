@@ -217,10 +217,7 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		if err != nil {
 			return out, fmt.Errorf("resolve executor for remote chain %d: %w", remoteSelector, err)
 		}
-		defaultInboundCCVs, err := resolveDefaultInboundCCVs(ds, input.ChainSelector)
-		if err != nil {
-			return out, fmt.Errorf("resolve default inbound ccvs for remote chain %d: %w", remoteSelector, err)
-		}
+		defaultInboundCCVs := []datastore.AddressRef{invalidCCVAddressRef(input.ChainSelector)}
 		laneMandatedInboundCCVs, err := resolveContractRefsByAddresses(
 			ds,
 			input.ChainSelector,
@@ -538,23 +535,21 @@ func resolveContractRefsByAddresses(ds datastore.DataStore, chainSelector uint64
 	return refs, nil
 }
 
-func resolveDefaultInboundCCVs(
-	ds datastore.DataStore,
-	chainSelector uint64,
-) ([]datastore.AddressRef, error) {
-	// Hardening: default inbound CCV is always invalid-ccv (fail-closed). Real traffic
-	// should rely on lane-mandated CCVs; the default must not implicitly trust a live CCV.
-	ref, err := findContractRef(
-		ds,
-		chainSelector,
-		datastore.ContractType(committeeverifierop.ContractType),
-		committeeverifierop.Version,
-		"invalid-ccv",
-	)
-	if err != nil {
-		return nil, fmt.Errorf("resolve default invalid-ccv inbound qualifier: %w", err)
+// invalidCCVRawInstanceAddress is the fail-closed sentinel used as the default inbound
+// CCV for every Canton lane. It is intentionally not environment-specific so it can be
+// hardcoded in the adapter instead of maintained in per-environment address books.
+const invalidCCVRawInstanceAddress = "invalid-ccv@ccvOwner::1220000000000000000000000000000000000000000000000000000000000000000000"
+
+func invalidCCVAddressRef(chainSelector uint64) datastore.AddressRef {
+	raw := contracts.RawInstanceAddress(invalidCCVRawInstanceAddress)
+	return datastore.AddressRef{
+		Address:       raw.InstanceAddress().Hex(),
+		ChainSelector: chainSelector,
+		Labels:        datastore.NewLabelSet(string(raw)),
+		Qualifier:     "invalid-ccv",
+		Type:          datastore.ContractType(committeeverifierop.ContractType),
+		Version:       committeeverifierop.Version,
 	}
-	return []datastore.AddressRef{ref}, nil
 }
 
 func convertCommitteeVerifierConfigs(configs []ccipadapters.CommitteeVerifierConfig[datastore.AddressRef]) []lanes.CommitteeVerifierConfig[datastore.AddressRef] {
