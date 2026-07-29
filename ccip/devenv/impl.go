@@ -941,16 +941,22 @@ func (c *Chain) ConfirmSendOnSource(ctx context.Context, to uint64, key cciptest
 // the verifier-result fetch respectively. EVM-side ConfirmExecOnDest is permissive
 // and accepts either; Canton requires both. Test runners must wire verifier
 // observation (see WireVerifierObservationFromLib) before calling this method.
-func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptestinterfaces.MessageEventKey, timeout time.Duration) (cciptestinterfaces.ExecutionStateChangedEvent, error) {
+//
+// The returned envelope leaves TxID unset. Canton reaches this state either by
+// executing (where the identifier is a ledger update ID, not a transaction hash) or
+// by finding an existing ExecutionStateChanged contract on the ledger, which carries
+// no update ID at all. Rather than populate the field on one path and not the other,
+// Canton reports neither.
+func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptestinterfaces.MessageEventKey, timeout time.Duration) (cciptestinterfaces.ExecEnvelope, error) {
 	if key.MessageID == (protocol.Bytes32{}) || key.SeqNum == 0 {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("MessageEventKey must have both MessageID and SeqNum")
+		return cciptestinterfaces.ExecEnvelope{}, fmt.Errorf("MessageEventKey must have both MessageID and SeqNum")
 	}
 	if !c.verifierObs.wired() {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("verifier observation not wired (test runner must call WireVerifierObservationFromLib)")
+		return cciptestinterfaces.ExecEnvelope{}, fmt.Errorf("verifier observation not wired (test runner must call WireVerifierObservationFromLib)")
 	}
 	participant, _, err := c.ClientParticipant()
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("no participants on chain: %w", err)
+		return cciptestinterfaces.ExecEnvelope{}, fmt.Errorf("no participants on chain: %w", err)
 	}
 
 	if timeout > 0 {
@@ -964,7 +970,7 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 	defer unlock()
 
 	if ev, found, err := c.findExistingExecutionState(ctx, from, key.SeqNum, key.MessageID); err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("idempotency lookup: %w", err)
+		return cciptestinterfaces.ExecEnvelope{}, fmt.Errorf("idempotency lookup: %w", err)
 	} else if found {
 		c.logger.Info().
 			Uint64("from", from).
@@ -973,19 +979,24 @@ func (c *Chain) ConfirmExecOnDest(ctx context.Context, from uint64, key cciptest
 			Str("state", ev.State.String()).
 			Msg("ConfirmExecOnDest idempotent return: ExecutionStateChanged already present")
 
-		return ev, nil
+		return cciptestinterfaces.ExecEnvelope{Event: ev}, nil
 	}
 
 	vr, err := c.fetchVerifierResult(ctx, key.MessageID, timeout)
 	if err != nil {
-		return cciptestinterfaces.ExecutionStateChangedEvent{}, fmt.Errorf("fetch verifier result: %w", err)
+		return cciptestinterfaces.ExecEnvelope{}, fmt.Errorf("fetch verifier result: %w", err)
 	}
 
-	return c.ManuallyExecuteMessage(
+	ev, err := c.ManuallyExecuteMessage(
 		ctx, vr.Message, 0,
 		[]protocol.UnknownAddress{vr.HashedVerifierDestAddr},
 		[][]byte{vr.CCVData},
 	)
+	if err != nil {
+		return cciptestinterfaces.ExecEnvelope{}, err
+	}
+
+	return cciptestinterfaces.ExecEnvelope{Event: ev}, nil
 }
 
 // SetupReceive deploys the client party's PerPartyRouter before inbound messages arrive.
