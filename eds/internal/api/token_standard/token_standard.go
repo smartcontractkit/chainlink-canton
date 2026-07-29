@@ -297,6 +297,11 @@ func (s Server) getTotalSupplyForInstrument(instrumentId string) (tokenSupply, e
 			if err != nil {
 				return tokenSupply{}, fmt.Errorf("failed to unmarshal LockedLinkHolding: %w", err)
 			}
+			// Skipped holdings that might be for another instrument
+			if parsedLockedHolding.LockedInstrumentId.Admin != s.admin ||
+				parsedLockedHolding.LockedInstrumentId.Id != types.TEXT(instrumentId) {
+				continue
+			}
 			parsedAmount, ok := new(big.Rat).SetString(string(parsedLockedHolding.LockedAmount))
 			if !ok {
 				return tokenSupply{}, fmt.Errorf("failed to parse LockedAmount as big.Rat: %s", parsedLockedHolding.LockedAmount)

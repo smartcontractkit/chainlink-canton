@@ -87,11 +87,13 @@ func TestServer_ListInstruments(t *testing.T) {
 		Return([]*apiv2.ActiveContract{
 			{
 				CreatedEvent: &apiv2.CreatedEvent{
-					CreateArguments: bindings.MarshalTemplateToRecord(link.LockedLinkHolding{LockedAmount: "1.0"}),
-				},
-			}, {
-				CreatedEvent: &apiv2.CreatedEvent{
-					CreateArguments: bindings.MarshalTemplateToRecord(link.LockedLinkHolding{LockedAmount: "2.0"}),
+					CreateArguments: bindings.MarshalTemplateToRecord(link.LockedLinkHolding{
+						LockedInstrumentId: splice_api_token_holding_v1.InstrumentId{
+							Admin: "admin",
+							Id:    "LINK", // Should be ignored, as it doesn't match any of the configured tokens
+						},
+						LockedAmount: "1.0",
+					}),
 				},
 			},
 		}, true)
@@ -147,7 +149,7 @@ func TestServer_ListInstruments(t *testing.T) {
 		for _, instrument := range resp.JSON200.Instruments {
 			// Validate that TotalSupply is calculated for each instrument (mocked to be 100+1+2)
 			require.NotNil(t, instrument.TotalSupply)
-			require.Equal(t, "103.0000000000", *instrument.TotalSupply)
+			require.Equal(t, "100.0000000000", *instrument.TotalSupply)
 		}
 	})
 	t.Run("Failure cases", func(t *testing.T) {
@@ -249,7 +251,13 @@ func TestServer_GetInstrument(t *testing.T) {
 			Return([]*apiv2.ActiveContract{
 				{
 					CreatedEvent: &apiv2.CreatedEvent{
-						CreateArguments: bindings.MarshalTemplateToRecord(link.LockedLinkHolding{LockedAmount: "0.000789"}),
+						CreateArguments: bindings.MarshalTemplateToRecord(link.LockedLinkHolding{
+							LockedInstrumentId: splice_api_token_holding_v1.InstrumentId{
+								Admin: "admin",
+								Id:    "LINK",
+							},
+							LockedAmount: "0.000789",
+						}),
 					},
 				},
 			}, true).Once()
