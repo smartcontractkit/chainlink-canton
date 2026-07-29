@@ -147,7 +147,7 @@ func TestServer_ListInstruments(t *testing.T) {
 		require.Len(t, resp.JSON200.Instruments, 30)
 		require.Nil(t, resp.JSON200.NextPageToken)
 		for _, instrument := range resp.JSON200.Instruments {
-			// Validate that TotalSupply is calculated for each instrument (mocked to be 100+1+2)
+			// Validate that TotalSupply is calculated for each instrument (mocked to be 100, the LockedHolding must be ignored since it's for another instrument ID)
 			require.NotNil(t, instrument.TotalSupply)
 			require.Equal(t, "100.0000000000", *instrument.TotalSupply)
 		}
