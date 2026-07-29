@@ -147,7 +147,7 @@ func TestServer_ListInstruments(t *testing.T) {
 		for _, instrument := range resp.JSON200.Instruments {
 			// Validate that TotalSupply is calculated for each instrument (mocked to be 100+1+2)
 			require.NotNil(t, instrument.TotalSupply)
-			require.Equal(t, "103", *instrument.TotalSupply)
+			require.Equal(t, "103.0000000000", *instrument.TotalSupply)
 		}
 	})
 	t.Run("Failure cases", func(t *testing.T) {
@@ -262,7 +262,7 @@ func TestServer_GetInstrument(t *testing.T) {
 		require.Equal(t, int8(10), resp.JSON200.Decimals)
 		// Validate that the TotalSupply is calculated correctly
 		require.NotNil(t, resp.JSON200.TotalSupply)
-		require.Equal(t, "123.456789", *resp.JSON200.TotalSupply)
+		require.Equal(t, "123.4567890000", *resp.JSON200.TotalSupply)
 		require.NotNil(t, resp.JSON200.TotalSupplyAsOf)
 		require.WithinDuration(t, time.Now(), *resp.JSON200.TotalSupplyAsOf, time.Second*5)
 

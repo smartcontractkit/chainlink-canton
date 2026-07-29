@@ -274,7 +274,7 @@ func (s Server) getTotalSupplyForInstrument(instrumentId string) (tokenSupply, e
 		Id:    types.TEXT(instrumentId),
 	})
 
-	totalSupply := new(big.Float)
+	totalSupply := new(big.Rat)
 	switch tokenConfig.Type {
 	case config.TokenTypeLINK:
 		// Iterate over all LINK holdings and sum them up
@@ -283,9 +283,9 @@ func (s Server) getTotalSupplyForInstrument(instrumentId string) (tokenSupply, e
 			if err != nil {
 				return tokenSupply{}, fmt.Errorf("failed to unmarshal LinkHolding at index %d: %w", i, err)
 			}
-			parsedAmount, ok := new(big.Float).SetString(string(parsedHolding.HoldingAmount))
+			parsedAmount, ok := new(big.Rat).SetString(string(parsedHolding.HoldingAmount))
 			if !ok {
-				return tokenSupply{}, fmt.Errorf("failed to parse HoldingAmount as big.Float at index %d: %s", i, parsedHolding.HoldingAmount)
+				return tokenSupply{}, fmt.Errorf("failed to parse HoldingAmount as big.Rat at index %d: %s", i, parsedHolding.HoldingAmount)
 			}
 			totalSupply.Add(totalSupply, parsedAmount)
 		}
@@ -297,9 +297,9 @@ func (s Server) getTotalSupplyForInstrument(instrumentId string) (tokenSupply, e
 			if err != nil {
 				return tokenSupply{}, fmt.Errorf("failed to unmarshal LockedLinkHolding: %w", err)
 			}
-			parsedAmount, ok := new(big.Float).SetString(string(parsedLockedHolding.LockedAmount))
+			parsedAmount, ok := new(big.Rat).SetString(string(parsedLockedHolding.LockedAmount))
 			if !ok {
-				return tokenSupply{}, fmt.Errorf("failed to parse LockedAmount as big.Float: %s", parsedLockedHolding.LockedAmount)
+				return tokenSupply{}, fmt.Errorf("failed to parse LockedAmount as big.Rat: %s", parsedLockedHolding.LockedAmount)
 			}
 			totalSupply.Add(totalSupply, parsedAmount)
 		}
@@ -308,7 +308,7 @@ func (s Server) getTotalSupplyForInstrument(instrumentId string) (tokenSupply, e
 	// Cache totalSupply
 	tokenSupply := tokenSupply{
 		UpdatedAt:   snapshotTime,
-		TotalSupply: totalSupply.Text('f', -1),
+		TotalSupply: totalSupply.FloatString(10), // 10 decimal places
 	}
 	s.tokenSupplies[instrumentId] = tokenSupply
 

@@ -768,6 +768,9 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	linkMetadata, err := tokenMetadataAPIClient.GetInstrumentWithResponse(t.Context(), string(linkInstrumentId.Id))
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, linkMetadata.StatusCode(), "expected 200 OK from TokenMetadata API for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200, "expected non-nil JSON200 response from TokenMetadata API for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200.TotalSupply, "expected non-nil TotalSupply in TokenMetadata API response for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200.TotalSupplyAsOf, "expected non-nil TotalSupplyAsOf in TokenMetadata API response for LINK instrument")
 	t.Logf("Queried Token Metadata: id: %v, symbol: %v, name: %v, totalSupply: %v, totalSupplyAsOf: %v",
 		linkMetadata.JSON200.Id,
 		linkMetadata.JSON200.Symbol,
@@ -775,7 +778,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		*linkMetadata.JSON200.TotalSupply,
 		*linkMetadata.JSON200.TotalSupplyAsOf,
 	)
-	require.Equal(t, "50", *linkMetadata.JSON200.TotalSupply)
+	require.Equal(t, "50.0000000000", *linkMetadata.JSON200.TotalSupply)
 	require.WithinDuration(t, time.Now(), *linkMetadata.JSON200.TotalSupplyAsOf, time.Second, "expected LastUpdated to be recent")
 
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
@@ -1077,6 +1080,9 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	linkMetadata, err = tokenMetadataAPIClient.GetInstrumentWithResponse(t.Context(), string(linkInstrumentId.Id))
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, linkMetadata.StatusCode(), "expected 200 OK from TokenMetadata API for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200, "expected non-nil JSON200 response from TokenMetadata API for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200.TotalSupply, "expected TotalSupply to be non-nil after token transfer")
+	require.NotNil(t, linkMetadata.JSON200.TotalSupplyAsOf, "expected TotalSupplyAsOf to be non-nil after token transfer")
 	t.Logf("Queried Token Metadata: id: %v, symbol: %v, name: %v, totalSupply: %v, totalSupplyAsOf: %v",
 		linkMetadata.JSON200.Id,
 		linkMetadata.JSON200.Symbol,
@@ -1088,7 +1094,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// - 1 LINK bridged
 	// + 0.05 LINK pool feeBps retained by sender's pool (poolOwner == sender)
 	// = 49.05 LINK remaining in total supply
-	require.Equal(t, "49.05", *linkMetadata.JSON200.TotalSupply)
+	require.Equal(t, "49.0500000000", *linkMetadata.JSON200.TotalSupply)
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", ccipMessageSent.Event.MessageId)

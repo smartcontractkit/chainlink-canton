@@ -116,6 +116,10 @@ func (s *ActiveContractStore) GetByTemplateId(party types.PARTY, templateId cont
 		return nil, false
 	}
 
+	if len(contractsByContractId) == 0 {
+		return nil, false
+	}
+
 	activeContracts := make([]*apiv2.ActiveContract, 0, len(contractsByContractId))
 	for _, activeContract := range contractsByContractId {
 		// Create a copy of the ActiveContract before returning it
