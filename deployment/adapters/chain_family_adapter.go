@@ -495,15 +495,6 @@ func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(_, remoteChainSel
 	}
 }
 
-// GetDefaultExecutorDestChainConfig implements [adapters.ChainFamily].
-//
-// Canton lanes are executor-less: messages are sent from EVM to Canton with the
-// no-executor flag, so the EVM executor must not charge or require a config for
-// Canton destination chains. Keeping it disabled lets ccipSend bypass executor fees.
-func (a *CantonChainFamilyAdapter) GetDefaultExecutorDestChainConfig(_, _ uint64) ccipadapters.ExecutorDestChainConfig {
-	return ccipadapters.ExecutorDestChainConfig{USDCentsFee: 0, Enabled: false}
-}
-
 func findContractRef(ds datastore.DataStore, chainSelector uint64, contractType datastore.ContractType, version *semver.Version, qualifier string) (datastore.AddressRef, error) {
 	return ds.Addresses().Get(datastore.NewAddressRefKey(chainSelector, contractType, version, qualifier))
 }
