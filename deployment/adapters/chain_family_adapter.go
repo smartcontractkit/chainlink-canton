@@ -41,14 +41,43 @@ type CantonChainFamilyAdapter struct{}
 
 var CantonFamilySelector = [4]byte{0xdf, 0xaf, 0xaf, 0x4b}
 
+func isEVMRemote(remoteChainSelector uint64) bool {
+	family, err := chainsel.GetSelectorFamily(remoteChainSelector)
+	if err != nil {
+		return false
+	}
+	return family == chainsel.FamilyEVM
+}
+
 func DefaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 	return lanes.FeeQuoterDestChainConfig{
 		OverrideExistingConfig:      false,
 		IsEnabled:                   true,
-		MaxDataBytes:                30_000,
-		MaxPerMsgGasLimit:           3_000_000,
-		DestGasOverhead:             300_000,
-		DestGasPerPayloadByteBase:   16,
+		MaxDataBytes:                32_000,
+		MaxPerMsgGasLimit:           15_000_000,
+		DestGasOverhead:             0,
+		DestGasPerPayloadByteBase:   20,
+		ChainFamilySelector:         binary.BigEndian.Uint32(CantonFamilySelector[:]),
+		DefaultTokenFeeUSDCents:     0,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          50,
+		V1Params:                    nil,
+		V2Params: &lanes.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(38),
+		},
+	}
+}
+
+func defaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
+	return lanes.FeeQuoterDestChainConfig{
+		OverrideExistingConfig:      false,
+		IsEnabled:                   true,
+		MaxDataBytes:                32_000,
+		MaxPerMsgGasLimit:           15_000_000,
+		DestGasOverhead:             0,
+		DestGasPerPayloadByteBase:   20,
 		ChainFamilySelector:         binary.BigEndian.Uint32(CantonFamilySelector[:]),
 		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
@@ -188,13 +217,7 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		if err != nil {
 			return out, fmt.Errorf("resolve executor for remote chain %d: %w", remoteSelector, err)
 		}
-		defaultInboundCCVs, err := resolveContractRefsByAddresses(
-			ds,
-			input.ChainSelector,
-			datastore.ContractType(committeeverifierop.ContractType),
-			committeeverifierop.Version,
-			remoteCfg.DefaultInboundCCVs,
-		)
+		defaultInboundCCVs, err := resolveDefaultInboundCCVs(ds, input.ChainSelector, remoteCfg)
 		if err != nil {
 			return out, fmt.Errorf("resolve default inbound ccvs for remote chain %d: %w", remoteSelector, err)
 		}
@@ -413,8 +436,11 @@ func (a *CantonChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig(
 }
 
 // GetDefaultFeeQuoterDestChainConfig implements [adapters.ChainFamily].
-func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(_, _ uint64, chainFamilySelector [4]byte) ccipadapters.FeeQuoterDestChainConfigOverrides {
+func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(_, remoteChainSelector uint64, chainFamilySelector [4]byte) ccipadapters.FeeQuoterDestChainConfigOverrides {
 	defaults := DefaultCantonFeeQuoterDestChainConfig()
+	if !isEVMRemote(remoteChainSelector) {
+		defaults = defaultCantonFeeQuoterDestChainConfig()
+	}
 	linkFeeMultiplier := uint8(0)
 	if defaults.V2Params != nil {
 		linkFeeMultiplier = defaults.V2Params.LinkFeeMultiplierPercent
@@ -448,17 +474,23 @@ func (a *CantonChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 }
 
 // GetDefaultRemoteChainConfig implements [adapters.ChainFamily].
-func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(_, _ uint64) ccipadapters.RemoteChainDefaults {
+func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(_, remoteChainSelector uint64) ccipadapters.RemoteChainDefaults {
+	if isEVMRemote(remoteChainSelector) {
+		return ccipadapters.RemoteChainDefaults{
+			AllowTrafficFrom:          true,
+			BaseExecutionGasCost:      200_000,
+			TokenReceiverAllowed:      false,
+			MessageNetworkFeeUSDCents: 50,
+			TokenNetworkFeeUSDCents:   50,
+		}
+	}
+
 	return ccipadapters.RemoteChainDefaults{
-		AllowTrafficFrom: true, // TODO: check what this does?
-		ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
-			USDCentsFee: 0,
-			Enabled:     true,
-		},
+		AllowTrafficFrom:          true,
 		BaseExecutionGasCost:      50_000,
 		TokenReceiverAllowed:      true,
-		MessageNetworkFeeUSDCents: 0,
-		TokenNetworkFeeUSDCents:   0,
+		MessageNetworkFeeUSDCents: 10,
+		TokenNetworkFeeUSDCents:   25,
 	}
 }
 
@@ -500,6 +532,35 @@ func resolveContractRefsByAddresses(ds datastore.DataStore, chainSelector uint64
 	}
 
 	return refs, nil
+}
+
+func resolveDefaultInboundCCVs(
+	ds datastore.DataStore,
+	chainSelector uint64,
+	remoteCfg ccipadapters.RemoteChainConfig[[]byte, string],
+) ([]datastore.AddressRef, error) {
+	if len(remoteCfg.DefaultInboundCCVs) > 0 {
+		return resolveContractRefsByAddresses(
+			ds,
+			chainSelector,
+			datastore.ContractType(committeeverifierop.ContractType),
+			committeeverifierop.Version,
+			remoteCfg.DefaultInboundCCVs,
+		)
+	}
+
+	// Hardening: default inbound CCV is invalid-ccv (fail-closed) when not explicitly configured.
+	ref, err := findContractRef(
+		ds,
+		chainSelector,
+		datastore.ContractType(committeeverifierop.ContractType),
+		committeeverifierop.Version,
+		"invalid-ccv",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("resolve default invalid-ccv inbound qualifier: %w", err)
+	}
+	return []datastore.AddressRef{ref}, nil
 }
 
 func convertCommitteeVerifierConfigs(configs []ccipadapters.CommitteeVerifierConfig[datastore.AddressRef]) []lanes.CommitteeVerifierConfig[datastore.AddressRef] {
