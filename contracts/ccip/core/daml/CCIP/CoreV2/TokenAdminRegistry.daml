@@ -218,7 +218,8 @@ template TokenConfig
                             poolInstanceId = pr.poolInstanceId
                     context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
-            tokenConfig_publicFetchImpl self _ = do
+            tokenConfig_publicFetchImpl self arg = do
+                Chainlink.InstanceAddress.assertEqual "TokenConfig: expectedAddress mismatch" instanceId registryOwner arg.expectedAddress
                 pure CCIP.APIV2.TokenAdminRegistry.TokenConfigView
                     with
                         ccipOwner = registryOwner
@@ -256,7 +257,8 @@ template TokenAdminRegistry
                     ccipOwner = ccipOwner
                     instanceId = instanceId
 
-            tokenAdminRegistry_publicFetchImpl self _ = do
+            tokenAdminRegistry_publicFetchImpl self arg = do
+                Chainlink.InstanceAddress.assertEqual "TokenAdminRegistry: expectedAddress mismatch" instanceId ccipOwner arg.expectedAddress
                 pure CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistryView
                     with
                         ccipOwner = ccipOwner

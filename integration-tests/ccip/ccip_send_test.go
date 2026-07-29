@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -251,10 +250,7 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err, "failed to get Executor address")
 
 	// Deploy and configure lane for outbound sends
-	evmAdapter, ok := lanes.GetLaneAdapterRegistry().GetLaneAdapter(chainsel.FamilyEVM, semver.MustParse("2.0.0"))
-	require.Truef(t, ok, "failed to get EVM adapter")
-	feeQuoterDestChainConfig := evmAdapter.GetFeeQuoterDestChainConfig()
-	feeQuoterDestChainConfig.IsEnabled = true
+	feeQuoterDestChainConfig := evmFeeQuoterDestChainConfigForLane()
 	feeQuoterDestChainConfig.V2Params.USDPerUnitGas = big.NewInt(38)
 
 	deployLaneLegReport, err := cld_ops.ExecuteSequence(cldfEnv.OperationsBundle, sequences.ConfigureLaneLegAsSourceWithInput, cldfEnv.BlockChains, sequences.ConfigureLaneLegInput{
@@ -494,7 +490,7 @@ func TestCCIPSend(t *testing.T) {
 	t.Logf("partySender=%q", partySender)
 
 	// Mint Amulet so the sender can cover non-zero fees (amount in holdings Numeric units per env).
-	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "10000000000")
+	feeTokenHoldingCid, err := testhelpers.MintAMT(t.Context(), senderParticipant, tokenMetadataClient, transferInstructionClient, scanProxyClient, partySender, "1000.0")
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 

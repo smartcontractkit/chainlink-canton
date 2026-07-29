@@ -64,7 +64,7 @@ func AssertMessageWithVerifierObservation(
 		return tcapi.AssertionResult{}, fmt.Errorf("verifier observation not wired (indexer required)")
 	}
 
-	testCtx, cleanupFn := tcapi.NewTestingContext(ctx, nil, obs.AggregatorClient, obs.IndexerMonitor)
+	testCtx, cleanupFn := tcapi.NewTestingContext(ctx, obs.AggregatorClient, obs.IndexerMonitor)
 	defer cleanupFn()
 
 	return testCtx.AssertMessage([32]byte(messageID), opts)
