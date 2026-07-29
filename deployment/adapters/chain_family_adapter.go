@@ -217,7 +217,7 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		if err != nil {
 			return out, fmt.Errorf("resolve executor for remote chain %d: %w", remoteSelector, err)
 		}
-		defaultInboundCCVs, err := resolveDefaultInboundCCVs(ds, input.ChainSelector, remoteCfg)
+		defaultInboundCCVs, err := resolveDefaultInboundCCVs(ds, input.ChainSelector)
 		if err != nil {
 			return out, fmt.Errorf("resolve default inbound ccvs for remote chain %d: %w", remoteSelector, err)
 		}
@@ -477,7 +477,11 @@ func (a *CantonChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(_, remoteChainSelector uint64) ccipadapters.RemoteChainDefaults {
 	if isEVMRemote(remoteChainSelector) {
 		return ccipadapters.RemoteChainDefaults{
-			AllowTrafficFrom:          true,
+			AllowTrafficFrom: true,
+			ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
+				USDCentsFee: 0,
+				Enabled:     true,
+			},
 			BaseExecutionGasCost:      200_000,
 			TokenReceiverAllowed:      false,
 			MessageNetworkFeeUSDCents: 50,
@@ -537,19 +541,9 @@ func resolveContractRefsByAddresses(ds datastore.DataStore, chainSelector uint64
 func resolveDefaultInboundCCVs(
 	ds datastore.DataStore,
 	chainSelector uint64,
-	remoteCfg ccipadapters.RemoteChainConfig[[]byte, string],
 ) ([]datastore.AddressRef, error) {
-	if len(remoteCfg.DefaultInboundCCVs) > 0 {
-		return resolveContractRefsByAddresses(
-			ds,
-			chainSelector,
-			datastore.ContractType(committeeverifierop.ContractType),
-			committeeverifierop.Version,
-			remoteCfg.DefaultInboundCCVs,
-		)
-	}
-
-	// Hardening: default inbound CCV is invalid-ccv (fail-closed) when not explicitly configured.
+	// Hardening: default inbound CCV is always invalid-ccv (fail-closed). Real traffic
+	// should rely on lane-mandated CCVs; the default must not implicitly trust a live CCV.
 	ref, err := findContractRef(
 		ds,
 		chainSelector,
