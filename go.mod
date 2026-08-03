@@ -30,15 +30,15 @@ require (
 	github.com/moby/moby/api v1.55.0
 	github.com/nao1215/markdown v0.7.1
 	github.com/oapi-codegen/runtime v1.6.0
-	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_golang v1.24.1
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/smartcontractkit/chain-selectors v1.0.107
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260728180354-4f966ecacc23
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260728180354-4f966ecacc23
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260728185140-e41659e2b739
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260728185140-e41659e2b739
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.0.2-0.20260728185140-e41659e2b739
+	github.com/smartcontractkit/chainlink-ccv v0.2.1-0.20260803114202-18539d60fc1d
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.3.1-0.20260803114202-18539d60fc1d
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.1.1-0.20260803114202-18539d60fc1d
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260715145851-8219609496a4
 	github.com/smartcontractkit/chainlink-deployments-framework v0.117.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6
@@ -361,7 +361,7 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/karalabe/hid v1.0.1-0.20260315100226-f5d04adeffeb // indirect
-	github.com/klauspost/compress v1.18.6 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -415,7 +415,7 @@ require (
 	github.com/pressly/goose/v3 v3.26.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v1.20.99 // indirect
-	github.com/prometheus/procfs v0.20.1 // indirect
+	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.1 // indirect
 	github.com/redis/go-redis/v9 v9.14.0 // indirect

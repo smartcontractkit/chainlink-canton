@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: CCV Explicit Disclosure API
   description: Provides access to explicit disclosures required to interact with CCVs on Canton.
-  version: 0.0.1
+  version: 1.0.0
 
 paths:
   /ccip/v1/external/ccv/{address}/send:
