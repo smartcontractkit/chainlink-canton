@@ -9,9 +9,9 @@ operator of these is required to run their own API and make it available to user
 
 ## Available APIs
 
-### Global CCIP API
+### Global Canton CCIP API
 
-The Global CCIP API provides endpoints for users to query explicit disclosures for the global CCIP contracts, such as:
+The Global Canton CCIP API provides endpoints for users to query explicit disclosures for the global CCIP contracts, such as:
 
 - FeeQuoter
 - OnRamp
@@ -54,9 +54,9 @@ This endpoint allows the user to query the necessary disclosures for sending a m
 
 This endpoint allows the user to query the necessary disclosures for executing a message via CCIP.
 
-### Token Pool API
+### Canton Token Pool API
 
-The Token Pool API is provided and ran by the operator of a token pool, and provides endpoints for users to query
+The Canton Token Pool API is provided and run by the operator of a token pool, and provides endpoints for users to query
 explicit disclosures for a specific token pool contract.
 
 #### Send
@@ -76,9 +76,9 @@ Execute accepts the encoded message that is to-be-executed on Canton.
 
 It returns the necessary disclosures and input for the token pool.
 
-### CCV API
+### Canton CCV API
 
-The CCV API is provided and ran by the operator of a CCV, and provides endpoints for users to query explicit disclosures
+The Canton CCV API is provided and run by the operator of a CCV, and provides endpoints for users to query explicit disclosures
 for a specific CCV contract.
 
 #### Send
@@ -98,9 +98,9 @@ Execute accepts the encoded message that is to-be-executed on Canton.
 
 It returns the necessary disclosures and inputs for the CCV.
 
-### Executor API
+### Canton Executor API
 
-The Executor API is provided and ran by the operator of an Executor, and provides endpoints for users to query explicit
+The Canton Executor API is provided and run by the operator of an Executor, and provides endpoints for users to query explicit
 disclosures for a specific Executor contract.
 
 #### Send
@@ -123,24 +123,24 @@ destination chain.
 
 Sending a message from Canton requires the following API calls:
 
-1. (If the message includes as token transfer) The user needs to query the token pool API for the token's token pool to
+1. (If the message includes a token transfer) The user needs to query the Canton Token Pool API for the token's token pool to
    get the token pool disclosures along with a list of required CCVs for this token transfer.
-    1. If the token pool is unknown, the user needs to query the global CCIP API to look up the token pool for the
+    1. If the token pool is unknown, the user needs to query the global Canton CCIP API to look up the token pool for the
        token from the Token Admin Registry.
-2. The user needs to query the global CCIP API to get the disclosures for sending a message, providing the list of
+2. The user needs to query the global Canton CCIP API to get the disclosures for sending a message, providing the list of
    required CCVs from the previous step along with any sender-required CCVs that the sender-contract might require.
-    1. The global CCIP API will return the disclosures for sending a message
+    1. The global Canton CCIP API will return the disclosures for sending a message
     2. Along with an aggregated list of all CCVs that are required for this message (this includes the sender-required
-       CCVs, token-pool-required CCVs, and any default/lane-mandates CCVs that the global CCIP API determines are
+       CCVs, token-pool-required CCVs, and any default/lane-mandates CCVs that the global Canton CCIP API determines are
        required for this message based on the message content and the provided lists of required CCVs).
-    3. If an Executor has been requested/specified for the message, then the global CCIP API will also return the
+    3. If an Executor has been requested/specified for the message, then the global Canton CCIP API will also return the
        address of the Executor contract.
-3. The user needs to query the Executor API to get the disclosures for the Executor, providing the list of all CCVs that
+3. The user needs to query the Canton Executor API to get the disclosures for the Executor, providing the list of all CCVs that
    were returned by the previous step.
-    1. The Executor API accepts a list of CCVs along with the message, as an Executor can limit the CCVs that can be
+    1. The Canton Executor API accepts a list of CCVs along with the message, as an Executor can limit the CCVs that can be
        used with it. This allows the Executor to provide disclosures based on the specific CCVs that will be used with
        this message or reject the request if the provided CCVs are not compatible with this Executor.
-4. The user needs to query the CCV API for each CCV that was returned by the global CCIP API.
+4. The user needs to query the Canton CCV API for each CCV that was returned by the global Canton CCIP API.
 5. The user submits the transaction to the Canton participant, which includes the message and all required disclosures
    from the previous steps, along with the necessary inputs for each of the TP,CCV, and Executor contracts which have
    been returned by their corresponding APIs.
@@ -160,10 +160,10 @@ config:
 
 sequenceDiagram
     actor User
-    participant TP as Token Pool API
-    participant CCIP as CCIP API
-    participant Executor as Executor API
-    participant CCV as CCV API
+    participant TP as Canton Token Pool API
+    participant CCIP as Global Canton CCIP API
+    participant Executor as Canton Executor API
+    participant CCV as Canton CCV API
     participant Canton as Canton Participant
 
     opt If token transfer
@@ -182,7 +182,7 @@ sequenceDiagram
     User ->>+ CCIP: POST /ccip/v1/global/message/send
     note over User, CCIP: Provide: <br/> - message: the message to be sent <br/> - senderRequiredCCVs: List of CCVs that the sender requires <br/> - tokenPoolRequiredCCVs: List of CCVs that the token pool requires
     CCIP -->>- User: Return
-    note over User, CCIP: Returns: <br/> - ccvs[]: <br/> ---- instanceAddress: <br/> ---- rawInstanceAddress: <br/> ---- baseURL: URL of the CCV API <br/> - disclosedContracts[]
+    note over User, CCIP: Returns: <br/> - ccvs[]: <br/> ---- instanceAddress: <br/> ---- rawInstanceAddress: <br/> ---- baseURL: URL of the Canton CCV API <br/> - disclosedContracts[]
 
     User ->>+ Executor: POST /ccip/v1/external/executor/{address}/send
     note over User, Executor: Provide: <br/> - message: the message to be sent <br/> - ccvs[]: List of all CCVs that will be used for this message
@@ -207,15 +207,15 @@ sequenceDiagram
 
 Executing a message on Canton requires the following API calls:
 
-1. The user queries the global CCIP API, providing the encoded message itself and a list of addresses of all CCVs that
+1. The user queries the global Canton CCIP API, providing the encoded message itself and a list of addresses of all CCVs that
    have verified this message.
-    1. The global CCIP API will return the disclosures for all global CCIP contracts that are relevant for execution
+    1. The global Canton CCIP API will return the disclosures for all global CCIP contracts that are relevant for execution
     2. If the message contains a token transfer, it will also return the Token Pool that's registered for the token
        being transferred.
-2. The user needs to query the token pool API for the token pool of the transferred token, providing the encoded
+2. The user needs to query the Canton Token Pool API for the token pool of the transferred token, providing the encoded
    message.
-3. The user needs to query the CCV API for each CCV that verified this message to get the disclosures for execution,
-   providing the encoded message to each CCV API.
+3. The user needs to query the Canton CCV API for each CCV that verified this message to get the disclosures for execution,
+   providing the encoded message to each CCV's Canton CCV API.
 4. The user submits the transaction to their Canton participant, which includes the message and all required disclosures
    from the previous steps, along with the necessary inputs for each of the TP and CCV contracts which have been
    returned by their corresponding APIs.
@@ -234,9 +234,9 @@ config:
 
 sequenceDiagram
     actor User
-    participant CCIP as CCIP API
-    participant TP as Token Pool API
-    participant CCV as CCV API
+    participant CCIP as Global Canton CCIP API
+    participant TP as Canton Token Pool API
+    participant CCV as Canton CCV API
     participant Canton as Canton Participant
 
     User ->>+ CCIP: POST /ccip/v1/global/message/execute
