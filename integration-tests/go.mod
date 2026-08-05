@@ -25,7 +25,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.1
 	github.com/smartcontractkit/chain-selectors v1.0.107
-	github.com/smartcontractkit/chainlink-canton v0.0.0-20260615233851-4e78e7c23a58
+	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-canton/registry-kit v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260811072549-2a0dec67e6be
