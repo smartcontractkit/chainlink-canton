@@ -1005,6 +1005,166 @@ testReleaseFromTicket = script do
 
     debug "testReleaseFromTicket: PASSED"
 
+testReleaseFromTicketRejectsStaleFinalityAfterPolicyTightened : Script ()
+testReleaseFromTicketRejectsStaleFinalityAfterPolicyTightened = script do
+    ccipOwner <- allocateParty "ccip-owner-release-stale-finality"
+    rmnOwner <- allocateParty "rmn-owner-release-stale-finality"
+    poolOwner <- allocateParty "pool-owner-release-stale-finality"
+    receiver <- allocateParty "receiver-release-stale-finality"
+
+    let tokenAdminRegistryInstanceId = "test-tar-release-stale-finality"
+    let tokenPoolInstanceId = "test-lock-release-pool-stale-finality"
+    let sourceChainSelector : Numeric 0 = 123.0
+
+    let testInstrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "TestToken"
+
+    poolHolding <- submit (actAs poolOwner <> actAs ccipOwner) do
+        createCmd TestToken.TestHolding with
+            owner = poolOwner
+            admin = ccipOwner
+            instrumentId = testInstrumentId
+            amount = 10.0
+
+    receiverPreapproval <- submit (actAs receiver <> actAs ccipOwner) do
+        createCmd TestToken.TestTransferPreapproval with
+            admin = ccipOwner
+            receiver = receiver
+
+    transferFactory <- submit ccipOwner do
+        createCmd TestToken.TestTransferFactory with
+            admin = ccipOwner
+
+    (tokenAdminRegistry, tokenConfigCid) <- setupTokenAdminRegistryWithPool
+        ccipOwner
+        poolOwner
+        tokenAdminRegistryInstanceId
+        testInstrumentId
+        tokenPoolInstanceId
+
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.CoreV2.RMNRemote.RMNRemote with
+            instanceId = "test-rmn-release-stale-finality"
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    (defaultRateLimiter, defaultRateLimiterAddr) <- createRateLimiter
+        poolOwner
+        tokenPoolInstanceId
+        sourceChainSelector
+        CCIP.RateLimiterV2.RateLimitDirection_Inbound
+        100000000000.0
+        0.0
+
+    now <- getTime
+    let customRateLimiterInstanceId = tokenPoolInstanceId <> "-custom-inbound-" <> show sourceChainSelector
+    customRateLimiter <- submit poolOwner do
+        createCmd CCIP.RateLimiterV2.RateLimiter with
+            instanceId = customRateLimiterInstanceId
+            poolInstanceId = tokenPoolInstanceId
+            poolOwner = poolOwner
+            remoteChainSelector = sourceChainSelector
+            direction = CCIP.RateLimiterV2.RateLimitDirection_Inbound
+            mode = CCIP.RateLimiterV2.RateLimitMode_CustomFinality
+            isEnabled = True
+            capacity = 20000000000.0
+            rate = 0.0
+            tokens = 20000000000.0
+            lastUpdated = now
+    let customRateLimiterAddr = Chainlink.InstanceAddress.make customRateLimiterInstanceId poolOwner
+
+    let remotePools = ["d2ff32a3f0bb7b9b5afcfbaaa9ae629449ef2ff0"]
+    let remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+    let weakConfig = CCIP.LockReleaseTokenPoolV2.RemoteChainConfig with
+            remotePools = remotePools
+            remoteTokenAddress = remoteTokenAddress
+            inboundCCVs = []
+            outboundCCVs = []
+            finalityConfig = finalityConfig 5
+            inboundRateLimiter = defaultRateLimiterAddr
+            inboundCustomBlockConfirmationsRateLimiter = customRateLimiterAddr
+            outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+
+    tokenPool <- submit poolOwner do
+        createCmd CCIP.LockReleaseTokenPoolV2.LockReleaseTokenPool with
+            poolOwner = poolOwner
+            ccipOwner = ccipOwner
+            instanceId = tokenPoolInstanceId
+            instrumentId = testInstrumentId
+            decimals = 10
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(sourceChainSelector, weakConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            transferTimeout = CCIP.LockReleaseTokenPoolV2.Indefinite
+            deps = mkPoolDeps tokenAdminRegistryInstanceId "test-rmn-release-stale-finality" "test-feequoter-release-stale-finality" ccipOwner rmnOwner
+
+    -- Ticket minted while the pool still permits BlockDepth 5 (weak) finality.
+    tokenReceiveTicket <- submit (actAs ccipOwner <> actAs poolOwner) do
+        createCmd CCIP.TicketsV2.TokenReceiveTicket with
+            tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+            ccipOwner = ccipOwner
+            ccvOwners = []
+            verifiedCCVs = []
+            requiredInboundPoolCCVs = []
+            poolAddress = Chainlink.InstanceAddress.make tokenPoolInstanceId poolOwner
+            poolOwner = poolOwner
+            receiver = receiver
+            tokenReceiver = receiver
+            instrumentId = testInstrumentId
+            amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 30000000000.0)
+            sourcePoolData = ""
+            messageId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            sourceChainSelector = sourceChainSelector
+            finality = finalityConfig 5
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+    -- Pool owner tightens policy to finalized-only before the ticket is redeemed.
+    let tightUpdate = CCIP.LockReleaseTokenPoolV2.ChainUpdate with
+            remoteChainSelector = sourceChainSelector
+            remotePools = remotePools
+            remoteTokenAddress = remoteTokenAddress
+            inboundCCVs = []
+            outboundCCVs = []
+            finalityConfig = finalityConfig 0
+            inboundRateLimiter = defaultRateLimiterAddr
+            inboundCustomBlockConfirmationsRateLimiter = customRateLimiterAddr
+            outboundRateLimiter = Chainlink.InstanceAddress.RawInstanceAddress "rate-limiter-out@owner"
+    tokenPool <- submit poolOwner do
+        exerciseCmd tokenPool CCIP.LockReleaseTokenPoolV2.ApplyChainUpdates with
+            remoteChainSelectorsToRemove = [sourceChainSelector]
+            chainsToAdd = [tightUpdate]
+
+    disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPool
+    disclosedPoolHolding <- fromSome <$> queryDisclosure poolOwner poolHolding
+    disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistry
+    disclosedTokenConfig <- fromSome <$> queryDisclosure ccipOwner tokenConfigCid
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner transferFactory
+    disclosedPreapproval <- fromSome <$> queryDisclosure receiver receiverPreapproval
+    disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemote
+    disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner defaultRateLimiter
+    disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicket
+
+    -- The ticket's BlockDepth 5 finality is no longer permitted under the pool's
+    -- current WaitForFinality policy, so the release must fail even though the
+    -- default limiter (100B cap) has plenty of spare capacity.
+    submitMustFail (actAs receiver
+                    <> disclose disclosedPool <> disclose disclosedPoolHolding <> disclose disclosedTar <> disclose disclosedTokenConfig <> disclose disclosedFactory
+                    <> disclose disclosedPreapproval <> disclose disclosedRmn
+                    <> disclose disclosedRateLimiter <> disclose disclosedTicket) do
+        exerciseCmd tokenPool CCIP.LockReleaseTokenPoolV2.ReleaseFromTicket with
+            tokenReceiveTicketCid = coerceContractId tokenReceiveTicket
+            tokenAdminRegistryCid = coerceContractId tokenAdminRegistry
+            tokenConfigCid = coerceContractId tokenConfigCid
+            rmnRemoteCid = toInterfaceContractId rmnRemote
+            context = mkPoolContext defaultRateLimiter (toInterfaceContractId transferFactory) [toInterfaceContractId poolHolding] [(receiver, receiverPreapproval)]
+            caller = receiver
+
+    debug "testReleaseFromTicketRejectsStaleFinalityAfterPolicyTightened: PASSED"
+
 testReleaseFromTicketRejectsBadTransferFactoryResults : Script ()
 testReleaseFromTicketRejectsBadTransferFactoryResults = script do
     ccipOwner <- allocateParty "ccip-owner-bad-release"

@@ -621,6 +621,135 @@ testBurnMintPoolReleaseFromTicketMintsReceiver = script do
       receiverHolding.holdingAmount === 3.0
     _ -> abort "expected completed release result"
 
+testBurnMintPoolReleaseFromTicketRejectsStaleFinalityAfterPolicyTightened : Script ()
+testBurnMintPoolReleaseFromTicketRejectsStaleFinalityAfterPolicyTightened = script do
+  ccipOwner <- allocateParty "ccip-owner-bm-stale-finality"
+  rmnOwner <- allocateParty "rmn-owner-bm-stale-finality"
+  poolOwner <- allocateParty "pool-owner-bm-stale-finality"
+  receiver <- allocateParty "receiver-bm-stale-finality"
+
+  let tokenAdminRegistryInstanceId = "tar-bm-stale-finality"
+  let rmnInstanceId = "rmn-bm-stale-finality"
+  let feeQuoterInstanceId = "fq-bm-stale-finality"
+  let tokenPoolInstanceId = "burn-mint-pool-stale-finality"
+  let registryInstanceId = "link-registry-bm-stale-finality"
+  let sourceChainSelector = 123.0
+  let remoteTokenAddress = "c8481ffd74cf5648c48ed4cebabf6c6006d8bffe"
+  let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId with
+        admin = poolOwner
+        id = "LINK"
+
+  registryCid <- createLinkRegistry poolOwner instrumentId registryInstanceId
+  (tokenAdminRegistryCid, tokenConfigCid) <- setupTokenAdminRegistry ccipOwner poolOwner tokenAdminRegistryInstanceId instrumentId tokenPoolInstanceId
+
+  rmnRemoteCid <- submit rmnOwner do
+    createCmd CCIP.CoreV2.RMNRemote.RMNRemote with
+      instanceId = rmnInstanceId
+      rmnOwner = rmnOwner
+      ccipOwner = ccipOwner
+      customObservers = []
+      cursedSubjects = []
+
+  (defaultRateLimiterCid, defaultRateLimiterAddr) <- createRateLimiter
+    poolOwner
+    "rl-bm-stale-finality-default"
+    tokenPoolInstanceId
+    sourceChainSelector
+    CCIP.RateLimiterV2.RateLimitDirection_Inbound
+    CCIP.RateLimiterV2.RateLimitMode_DefaultFinality
+    100000000000.0
+    0.0
+
+  (_, customRateLimiterAddr) <- createRateLimiter
+    poolOwner
+    "rl-bm-stale-finality-custom"
+    tokenPoolInstanceId
+    sourceChainSelector
+    CCIP.RateLimiterV2.RateLimitDirection_Inbound
+    CCIP.RateLimiterV2.RateLimitMode_CustomFinality
+    20000000000.0
+    0.0
+
+  let weakConfig = CCIP.BurnMintTokenPoolV2.RemoteChainConfig with
+        remotePools = []
+        remoteTokenAddress = remoteTokenAddress
+        inboundCCVs = []
+        outboundCCVs = []
+        finalityConfig = CCIP.CodecV2.FinalityConfig.BlockDepth 5
+        inboundRateLimiter = defaultRateLimiterAddr
+        inboundCustomBlockConfirmationsRateLimiter = customRateLimiterAddr
+        outboundRateLimiter = defaultRateLimiterAddr
+
+  tokenPoolCid <- submit poolOwner do
+    createCmd CCIP.BurnMintTokenPoolV2.BurnMintTokenPool with
+      instanceId = tokenPoolInstanceId
+      poolOwner = poolOwner
+      ccipOwner = ccipOwner
+      instrumentId
+      decimals = 10
+      rateLimitAdmin = None
+      remoteChainConfigs = Map.fromList [(sourceChainSelector, weakConfig)]
+      tokenTransferFeeConfigs = Map.empty
+      poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+      transferTimeout = CCIP.BurnMintTokenPoolV2.Indefinite
+      deps = mkPoolDeps tokenAdminRegistryInstanceId rmnInstanceId feeQuoterInstanceId ccipOwner rmnOwner
+
+  -- Ticket minted while the pool still permits BlockDepth 5 (weak) finality.
+  tokenReceiveTicketCid <- submit (actAs ccipOwner <> actAs poolOwner) do
+    createCmd CCIP.TicketsV2.TokenReceiveTicket with
+      ccipOwner = ccipOwner
+      ccvOwners = []
+      verifiedCCVs = []
+      requiredInboundPoolCCVs = []
+      tokenAdminRegistryInstanceId = tokenAdminRegistryInstanceId
+      poolAddress = Chainlink.InstanceAddress.make tokenPoolInstanceId poolOwner
+      poolOwner = poolOwner
+      receiver = receiver
+      tokenReceiver = receiver
+      instrumentId
+      amount = fromSome (CCIP.CodecV2.MessageCodecV1.encodeUint256 30000000000.0)
+      sourcePoolData = ""
+      messageId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      sourceChainSelector = sourceChainSelector
+      finality = CCIP.CodecV2.FinalityConfig.BlockDepth 5
+      context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+  -- Pool owner tightens policy to finalized-only before the ticket is redeemed.
+  tokenPoolCid <- submit poolOwner do
+    exerciseCmd tokenPoolCid CCIP.BurnMintTokenPoolV2.ApplyChainUpdates with
+      remoteChainSelectorsToRemove = [sourceChainSelector]
+      chainsToAdd =
+        [ CCIP.BurnMintTokenPoolV2.ChainUpdate with
+            remoteChainSelector = sourceChainSelector
+            remotePools = []
+            remoteTokenAddress = remoteTokenAddress
+            inboundCCVs = []
+            outboundCCVs = []
+            finalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
+            inboundRateLimiter = defaultRateLimiterAddr
+            inboundCustomBlockConfirmationsRateLimiter = customRateLimiterAddr
+            outboundRateLimiter = Chainlink.InstanceAddress.make "rl-bm-stale-finality-outbound-new" poolOwner
+        ]
+
+  disclosedPool <- fromSome <$> queryDisclosure poolOwner tokenPoolCid
+  disclosedTar <- fromSome <$> queryDisclosure ccipOwner tokenAdminRegistryCid
+  disclosedRmn <- fromSome <$> queryDisclosure rmnOwner rmnRemoteCid
+  disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner defaultRateLimiterCid
+  disclosedTicket <- fromSome <$> queryDisclosure ccipOwner tokenReceiveTicketCid
+  disclosedRegistry <- fromSome <$> queryDisclosure poolOwner registryCid
+
+  -- The ticket's BlockDepth 5 finality is no longer permitted under the pool's
+  -- current WaitForFinality policy, so the release must fail even though the
+  -- default limiter (100B cap) has plenty of spare capacity.
+  submitMustFail (actAs receiver <> actAs poolOwner <> disclose disclosedPool <> disclose disclosedTar <> disclose disclosedRmn <> disclose disclosedRateLimiter <> disclose disclosedTicket <> disclose disclosedRegistry) do
+    exerciseCmd tokenPoolCid CCIP.BurnMintTokenPoolV2.ReleaseFromTicket with
+      tokenAdminRegistryCid = coerceContractId tokenAdminRegistryCid
+      tokenConfigCid = coerceContractId tokenConfigCid
+      rmnRemoteCid = toInterfaceContractId rmnRemoteCid
+      context = mkPoolContext defaultRateLimiterCid (toInterfaceContractId registryCid)
+      tokenReceiveTicketCid = coerceContractId tokenReceiveTicketCid
+      caller = receiver
+
 testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs : Script ()
 testBurnMintPoolReleaseFromTicketRejectsBadMintOutputs = script do
   ccipOwner <- allocateParty "ccip-owner-bm-bad-mint"

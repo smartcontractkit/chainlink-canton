@@ -808,6 +808,9 @@ template BurnMintTokenPool
                     assertMsg ("ReleaseFromTicket: missing required pool CCV " <> show requiredCCV)
                         (requiredCCV `elem` ticket.verifiedCCVs)
 
+                assertMsg "ReleaseFromTicket: ticket finality no longer permitted by current policy"
+                    (CCIP.CodecV2.FinalityConfig.requestedFinalityAllowed ticket.finality remoteChainCfg.finalityConfig)
+
                 let useCustomFinalityRateLimiter =
                         ticket.finality /= CCIP.CodecV2.FinalityConfig.WaitForFinality
                         && CCIP.CodecV2.FinalityConfig.customFinalityRateLimiterRequired remoteChainCfg.finalityConfig
