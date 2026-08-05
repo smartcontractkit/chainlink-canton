@@ -109,6 +109,13 @@ const (
 
 const DevVersion = "dev"
 
+// CurrentVersion is the sentinel version used for utility DARs whose actual
+// semver is pinned at runtime via the embedded utility manifest (see
+// utilitydars.SemverForPackage). It is the sole "available version" advertised
+// in the Versions map for utility packages and the only version GetDar accepts
+// for them.
+const CurrentVersion = "current"
+
 // ReleasedVersions contains all Dars that should be placed in the `dars/released` directory.
 // To release a new version of a package:
 //  1. Bump the version in the package's daml.yaml file.
