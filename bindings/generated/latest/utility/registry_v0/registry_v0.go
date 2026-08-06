@@ -11350,9 +11350,9 @@ func (t *TransferRuleAcceptTransferOfferResult) UnmarshalHex(data string) error 
 // TransferRuleDirectTransfer is a Record type
 type TransferRuleDirectTransfer struct {
 	Transfer         splice_api_token_transfer_instruction_v1.Transfer `json:"transfer"`
-	ExtraArgs        splice_api_token_metadata_v1.ExtraArgs             `json:"extraArgs"`
-	ExpectedOperator types.PARTY                                        `json:"expectedOperator"`
-	ExpectedProvider *types.PARTY                                       `json:"expectedProvider" hex:"optional"`
+	ExtraArgs        splice_api_token_metadata_v1.ExtraArgs            `json:"extraArgs"`
+	ExpectedOperator types.PARTY                                       `json:"expectedOperator"`
+	ExpectedProvider *types.PARTY                                      `json:"expectedProvider" hex:"optional"`
 }
 
 // ToMap converts TransferRuleDirectTransfer to a map for DAML arguments
@@ -11548,11 +11548,11 @@ func (t *TransferRuleExecuteAllocationResult) UnmarshalHex(data string) error {
 // TransferRuleTransfer is a Record type
 type TransferRuleTransfer struct {
 	Transfer                   splice_api_token_transfer_instruction_v1.Transfer `json:"transfer"`
-	InstrumentConfigurationCid types.CONTRACT_ID                                  `json:"instrumentConfigurationCid"`
-	SenderCredentialCids       []types.CONTRACT_ID                                `json:"senderCredentialCids"`
-	ReceiverCredentialCids     []types.CONTRACT_ID                                `json:"receiverCredentialCids"`
-	AppRewardConfigurationCid  *types.CONTRACT_ID                                 `json:"appRewardConfigurationCid" hex:"optional"`
-	FeaturedAppRightCid        *types.CONTRACT_ID                                 `json:"featuredAppRightCid" hex:"optional"`
+	InstrumentConfigurationCid types.CONTRACT_ID                                 `json:"instrumentConfigurationCid"`
+	SenderCredentialCids       []types.CONTRACT_ID                               `json:"senderCredentialCids"`
+	ReceiverCredentialCids     []types.CONTRACT_ID                               `json:"receiverCredentialCids"`
+	AppRewardConfigurationCid  *types.CONTRACT_ID                                `json:"appRewardConfigurationCid" hex:"optional"`
+	FeaturedAppRightCid        *types.CONTRACT_ID                                `json:"featuredAppRightCid" hex:"optional"`
 }
 
 // ToMap converts TransferRuleTransfer to a map for DAML arguments
@@ -11680,9 +11680,9 @@ func (t *TransferRuleTransferResult) UnmarshalHex(data string) error {
 // TransferRuleTwoStepTransfer is a Record type
 type TransferRuleTwoStepTransfer struct {
 	Transfer         splice_api_token_transfer_instruction_v1.Transfer `json:"transfer"`
-	ExtraArgs        splice_api_token_metadata_v1.ExtraArgs             `json:"extraArgs"`
-	ExpectedOperator types.PARTY                                        `json:"expectedOperator"`
-	ExpectedProvider types.PARTY                                        `json:"expectedProvider"`
+	ExtraArgs        splice_api_token_metadata_v1.ExtraArgs            `json:"extraArgs"`
+	ExpectedOperator types.PARTY                                       `json:"expectedOperator"`
+	ExpectedProvider types.PARTY                                       `json:"expectedProvider"`
 }
 
 // ToMap converts TransferRuleTwoStepTransfer to a map for DAML arguments
