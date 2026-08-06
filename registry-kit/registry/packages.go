@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 // UtilityPackages lists vendored Canton Network Utility DARs for upload (dependency order).
@@ -46,10 +47,10 @@ var RequiredRegistryPackages = map[string]string{
 
 // PackageCheckResult is one required package presence check.
 type PackageCheckResult struct {
-	Name      string
-	Expected  string
-	Found     bool
-	FoundID   string
+	Name     string
+	Expected string
+	Found    bool
+	FoundID  string
 }
 
 // CheckPackages verifies pinned Registry utility package IDs exist on the participant.

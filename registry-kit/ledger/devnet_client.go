@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
-	"github.com/smartcontractkit/chainlink-canton/registry-kit/config"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
+
+	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	"github.com/smartcontractkit/chainlink-canton/registry-kit/config"
 )
 
 // DevnetClient is a ledger.Client backed by a devnet/RPC Canton participant (JWT auth).

@@ -59,6 +59,7 @@ var createInstrumentCmd = &cobra.Command{
 		}
 		fmt.Println("InstrumentConfiguration CID:", instCfgCID)
 		fmt.Printf("Next: issuer mint --amount <n>  (instrument %s)\n", instrumentID)
+
 		return nil
 	},
 }
@@ -102,6 +103,7 @@ var mintCmd = &cobra.Command{
 		}
 		fmt.Println("MintRequest CID:", mintReqCID)
 		fmt.Println("Next: issuer accept-mint")
+
 		return nil
 	},
 }
@@ -137,6 +139,7 @@ var acceptMintCmd = &cobra.Command{
 			return err
 		}
 		fmt.Println("Registry Holding CID:", holdingCID)
+
 		return nil
 	},
 }
@@ -167,6 +170,7 @@ var querySupplyCmd = &cobra.Command{
 		if total.IsZero() && len(rows) == 0 {
 			fmt.Println("(no holdings found)")
 		}
+
 		return nil
 	},
 }

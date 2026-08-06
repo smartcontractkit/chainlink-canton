@@ -7,17 +7,18 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-canton/bindings"
 	burnminttokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
 	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
-	"github.com/smartcontractkit/chainlink-canton/bindings"
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/registry"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // LockOrBurnInput identifies contracts for a pool LockOrBurn exercise.
@@ -53,7 +54,7 @@ func LockOrBurn(ctx context.Context, client ledger.Client, input LockOrBurnInput
 		TokenAdminRegistryCid: types.CONTRACT_ID(input.TokenAdminRegistryCID),
 		TokenConfigCid:        types.CONTRACT_ID(input.TokenConfigCID),
 		RmnRemoteCid:          types.CONTRACT_ID(input.RMNRemoteCID),
-		ExtraContext:          input.ExtraContext,
+		Context:               input.ExtraContext,
 		SendingMessageCid:     types.CONTRACT_ID(input.SendingMessageCID),
 		SenderInputCids:       senderInputs,
 		Amount:                types.NUMERIC(input.Amount),
@@ -78,6 +79,7 @@ func LockOrBurn(ctx context.Context, client ledger.Client, input LockOrBurnInput
 		for _, cid := range parsed.PoolChangeCids {
 			result.PoolChangeCids = append(result.PoolChangeCids, string(cid))
 		}
+
 		return result, nil
 	}
 
@@ -92,7 +94,7 @@ func lockOrBurnResultFromCreatedHoldings(tx *apiv2.Transaction, input LockOrBurn
 	}
 
 	sendingMessageCID := input.SendingMessageCID
-	if cid, ok := ledger.CreatedContractID(tx, "SendingMessageV1"); ok {
+	if cid, ok := ledger.CreatedContractID(tx, "SendingMessage"); ok {
 		sendingMessageCID = cid
 	}
 
@@ -103,7 +105,7 @@ func lockOrBurnResultFromCreatedHoldings(tx *apiv2.Transaction, input LockOrBurn
 	}, nil
 }
 
-// CreateSendingMessageInput identifies fields for a FeeFinalized SendingMessageV1 used in LockOrBurn tests.
+// CreateSendingMessageInput identifies fields for a FeeFinalized SendingMessage used in LockOrBurn tests.
 type CreateSendingMessageInput struct {
 	CcipParty           string
 	Sender              string
@@ -117,7 +119,7 @@ type CreateSendingMessageInput struct {
 	FeeQuoter           contracts.RawInstanceAddress
 }
 
-// CreateSendingMessage creates a FeeFinalized SendingMessageV1 on the CCIP party for outbound pool tests.
+// CreateSendingMessage creates a FeeFinalized SendingMessage on the CCIP party for outbound pool tests.
 func CreateSendingMessage(ctx context.Context, client ledger.Client, input CreateSendingMessageInput) (string, error) {
 	sourceChainSelector := input.SourceChainSelector
 	if sourceChainSelector == "" {
@@ -135,7 +137,7 @@ func CreateSendingMessage(ctx context.Context, client ledger.Client, input Creat
 		DestBytesOverhead: types.INT64(64),
 	}
 
-	msg := ccipcore.SendingMessageV1{
+	msg := ccipcore.SendingMessage{
 		CcipOwner: types.PARTY(input.CcipParty),
 		Sender:    types.PARTY(input.Sender),
 		Deps: ccipcore.SendingMessageDeps{
@@ -146,71 +148,78 @@ func CreateSendingMessage(ctx context.Context, client ledger.Client, input Creat
 			TokenAdminRegistry: bindRawInstanceAddress(input.TokenAdminRegistry),
 			FeeQuoter:          bindRawInstanceAddress(input.FeeQuoter),
 		},
-		DestChainSelector:         types.NUMERIC(input.DestChainSelector),
-		SequenceNumber:            types.NUMERIC("1"),
-		DestDefaultCCVs:           nil,
-		RequiredCCVs:              nil,
-		ExecutorAddress:           types.TEXT(instanceAddressHex("default-executor", input.CcipParty)),
-		ExecutionMode:             &executionMode,
-		SourceChainSelector:       types.NUMERIC(sourceChainSelector),
-		SenderAddress:             types.TEXT("0000000000000000000000000000000000000001"),
-		Receiver:                  types.TEXT("0000000000000000000000000000000000000001"),
-		Payload:                   types.TEXT(""),
-		ExecutionGasLimit:         types.INT64(0),
-		CcipReceiveGasLimit:       types.INT64(100000),
-		CcvAndExecutorHash:        types.TEXT(""),
-		OnRampAddress:             types.TEXT("0000000000000000000000000000000000000001"),
-		OffRampAddress:            types.TEXT("0000000000000000000000000000000000000002"),
-		TokenReceiver:             types.TEXT("0000000000000000000000000000000000000003"),
-		TokenArgs:                 types.TEXT(""),
-		FeeToken:                  input.InstrumentId,
-		NetworkFeeUSDCents:        types.NUMERIC("0"),
-		ExpectedTokenInstrumentId: &expectedInstrument,
-		OutboundPoolCCVs:          &emptyOutboundCCVs,
-		ExecutorArgs:              types.TEXT(""),
-		ExecutorDestGasLimit:      types.INT64(0),
-		ExecutorDestBytesOverhead: types.INT64(0),
-		ExecutorFeeTokenAmount:    types.NUMERIC("0"),
-		ObservingParties:          []types.PARTY{types.PARTY(input.Sender)},
-		TokenSendFee:              &tokenSendFee,
-		TokenSendFeeTokenAmount:   types.NUMERIC("0"),
-		NetworkFeeTokenAmount:     types.NUMERIC("0"),
-		EncodedMessage:            types.TEXT(""),
-		MessageId:                 types.TEXT(""),
-		State:                     ccipcore.SendingMessageStateSendingMessageState_FeeFinalized,
+		DestChainSelector:              types.NUMERIC(input.DestChainSelector),
+		DestAddressBytesLength:         types.INT64(20),
+		SequenceNumber:                 types.NUMERIC("1"),
+		DestDefaultCCVs:                nil,
+		RequiredCCVs:                   nil,
+		ExecutorAddress:                types.TEXT(instanceAddressHex("default-executor", input.CcipParty)),
+		ExecutionMode:                  &executionMode,
+		SourceChainSelector:            types.NUMERIC(sourceChainSelector),
+		SenderAddress:                  types.TEXT("0000000000000000000000000000000000000001"),
+		Receiver:                       types.TEXT("0000000000000000000000000000000000000001"),
+		Payload:                        types.TEXT(""),
+		ExecutionGasLimit:              types.INT64(0),
+		CcipReceiveGasLimit:            types.INT64(100000),
+		CcvAndExecutorHash:             types.TEXT(""),
+		OnRampAddress:                  types.TEXT("0000000000000000000000000000000000000001"),
+		OffRampAddress:                 types.TEXT("0000000000000000000000000000000000000002"),
+		TokenReceiver:                  types.TEXT("0000000000000000000000000000000000000003"),
+		TokenArgs:                      types.TEXT(""),
+		FeeToken:                       input.InstrumentId,
+		NetworkFeeUSDCents:             types.NUMERIC("0"),
+		ExpectedTokenInstrumentId:      &expectedInstrument,
+		TokenAmountBeforeTokenPoolFees: types.NUMERIC("0"),
+		OutboundPoolCCVs:               &emptyOutboundCCVs,
+		ExecutorArgs:                   types.TEXT(""),
+		ExecutorDestGasLimit:           types.INT64(0),
+		ExecutorDestBytesOverhead:      types.INT64(0),
+		ExecutorFeeTokenAmount:         types.NUMERIC("0"),
+		ObservingParties:               []types.PARTY{types.PARTY(input.Sender)},
+		CcvFees:                        nil,
+		TokenSendFee:                   &tokenSendFee,
+		CcvFeeTokenAmounts:             nil,
+		TokenSendFeeTokenAmount:        types.NUMERIC("0"),
+		NetworkFeeTokenAmount:          types.NUMERIC("0"),
+		VerifierData:                   nil,
+		CcvOwners:                      nil,
+		EncodedMessage:                 types.TEXT(""),
+		MessageId:                      types.TEXT(""),
+		State:                          ccipcore.SendingMessageStateSendingMessageState_FeeFinalized,
 	}
 
 	res, err := client.SubmitCreate(ctx, input.CcipParty, msg)
 	if err != nil {
-		return "", fmt.Errorf("create SendingMessageV1: %w", err)
+		return "", fmt.Errorf("create SendingMessage: %w", err)
 	}
-	cid, ok := ledger.CreatedContractID(res.GetTransaction(), "SendingMessageV1")
+	cid, ok := ledger.CreatedContractID(res.GetTransaction(), "SendingMessage")
 	if !ok {
-		return "", fmt.Errorf("SendingMessageV1 not created")
+		return "", fmt.Errorf("SendingMessage not created")
 	}
 
 	return cid, nil
 }
 
-// FetchSendingMessage loads an active SendingMessageV1 by contract ID.
-func FetchSendingMessage(ctx context.Context, client ledger.Client, ccipParty, contractID string) (ccipcore.SendingMessageV1, error) {
-	tpl := contracts.IdentifierFromBinding(ccipcore.SendingMessageV1{})
+// FetchSendingMessage loads an active SendingMessage by contract ID.
+func FetchSendingMessage(ctx context.Context, client ledger.Client, ccipParty, contractID string) (ccipcore.SendingMessage, error) {
+	tpl := contracts.IdentifierFromBinding(ccipcore.SendingMessage{})
 	active, err := testhelpers.ListActiveContractsByTemplateId(ctx, client.ForParty(ccipParty), tpl)
 	if err != nil {
-		return ccipcore.SendingMessageV1{}, fmt.Errorf("list SendingMessageV1: %w", err)
+		return ccipcore.SendingMessage{}, fmt.Errorf("list SendingMessage: %w", err)
 	}
 	for _, ac := range active {
 		if ac.GetCreatedEvent().GetContractId() != contractID {
 			continue
 		}
-		msg, err := bindings.UnmarshalCreatedEvent[ccipcore.SendingMessageV1](ac.GetCreatedEvent())
+		msg, err := bindings.UnmarshalCreatedEvent[ccipcore.SendingMessage](ac.GetCreatedEvent())
 		if err != nil {
-			return ccipcore.SendingMessageV1{}, fmt.Errorf("unmarshal SendingMessageV1: %w", err)
+			return ccipcore.SendingMessage{}, fmt.Errorf("unmarshal SendingMessage: %w", err)
 		}
+
 		return *msg, nil
 	}
 
-	return ccipcore.SendingMessageV1{}, fmt.Errorf("SendingMessageV1 %s not in ACS", contractID)
+	return ccipcore.SendingMessage{}, fmt.Errorf("SendingMessage %s not in ACS", contractID)
 }
 
 // SetBurnMintFactoryInput identifies contracts for pointing TokenConfig at a burn-mint factory.
@@ -268,6 +277,7 @@ func EncodeUint256Hex(decimalValue string) string {
 		panic("invalid decimal: " + decimalValue)
 	}
 	hexStr := n.Text(16)
+
 	return strings.Repeat("0", 64-len(hexStr)) + hexStr
 }
 
@@ -281,5 +291,6 @@ func bindRawInstanceAddress(raw contracts.RawInstanceAddress) chainlinkapi.RawIn
 
 func instanceAddressHex(instanceID, owner string) string {
 	raw := contracts.NewRawInstanceAddress(contracts.InstanceID(instanceID), types.PARTY(owner))
+
 	return strings.TrimPrefix(raw.InstanceAddress().Hex(), "0x")
 }

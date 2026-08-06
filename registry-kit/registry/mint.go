@@ -6,13 +6,16 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+
 	"github.com/google/uuid"
+
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	registryapp "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_app_v0"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // MintViaAllocationFactory runs AllocationFactory_RequestMint + MintRequest_Accept
@@ -30,6 +33,7 @@ func MintViaAllocationFactory(ctx context.Context, client ledger.Client, bootstr
 	}
 
 	acceptCtx := MintChoiceContext(bootstrap.InstrumentConfiguration, true)
+
 	return acceptMintRequest(ctx, client, bootstrap.Party, owner, mintReqCID, acceptCtx, instDisclosed)
 }
 
@@ -103,6 +107,7 @@ func mintActAs(registrar, owner string) []string {
 	if owner != "" && owner != registrar {
 		actAs = append(actAs, owner)
 	}
+
 	return actAs
 }
 

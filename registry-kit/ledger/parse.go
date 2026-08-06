@@ -5,8 +5,9 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+
+	extensionapi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/extensionapi"
 )
 
 // CreatedContractID returns the contract ID of the first created event matching entityName.
@@ -106,5 +107,6 @@ func CreatedHoldingsForOwner(tx *apiv2.Transaction, owner string) []string {
 			}
 		}
 	}
+
 	return cids
 }

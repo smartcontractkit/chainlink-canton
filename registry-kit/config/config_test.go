@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+
 	"github.com/stretchr/testify/require"
 )
 

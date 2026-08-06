@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	burnminttokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // ReleaseFromTicketInput identifies contracts for a pool release exercise.
@@ -29,7 +30,7 @@ func ReleaseFromTicket(ctx context.Context, client ledger.Client, input ReleaseF
 		TokenAdminRegistryCid: types.CONTRACT_ID(input.TokenAdminRegistryCID),
 		TokenConfigCid:        types.CONTRACT_ID(input.TokenConfigCID),
 		RmnRemoteCid:          types.CONTRACT_ID(input.RMNRemoteCID),
-		ExtraContext:          input.ExtraContext,
+		Context:               input.ExtraContext,
 		TokenReceiveTicketCid: types.CONTRACT_ID(input.TokenReceiveTicketCID),
 		Caller:                types.PARTY(input.Receiver),
 	}
@@ -46,7 +47,7 @@ func ReleaseFromTicket(ctx context.Context, client ledger.Client, input ReleaseF
 
 	holdingCID, ok := ledger.CreatedHoldingForOwner(res.GetTransaction(), input.Receiver)
 	if !ok {
-		return "", fmt.Errorf("Registry Holding for receiver not created")
+		return "", fmt.Errorf("registry Holding for receiver not created")
 	}
 
 	return holdingCID, nil

@@ -11,5 +11,6 @@ func parseDecimal(label, s string) (decimal.Decimal, error) {
 	if err != nil {
 		return decimal.Zero, fmt.Errorf("%s: parse %q: %w", label, s, err)
 	}
+
 	return d, nil
 }

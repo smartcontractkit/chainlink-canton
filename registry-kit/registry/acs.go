@@ -54,5 +54,6 @@ func FindFirstContractByEntity(ctx context.Context, client ledger.Client, party 
 	if len(refs) == 0 {
 		return "", nil
 	}
+
 	return refs[0].ContractID, nil
 }

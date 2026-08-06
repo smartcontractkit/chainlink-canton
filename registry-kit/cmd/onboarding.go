@@ -54,6 +54,7 @@ var checkPackagesCmd = &cobra.Command{
 			return err
 		}
 		fmt.Println("all required Registry packages present")
+
 		return nil
 	},
 }
@@ -83,6 +84,7 @@ var requestProviderServiceCmd = &cobra.Command{
 		}
 		fmt.Println("ProviderServiceRequest CID:", cid)
 		fmt.Println("Next: onboarding wait-provider-service")
+
 		return nil
 	},
 }
@@ -113,6 +115,7 @@ var waitProviderServiceCmd = &cobra.Command{
 		}
 		fmt.Println("ProviderService CID:", cid)
 		fmt.Println("Next: onboarding onboard-registrar")
+
 		return nil
 	},
 }
@@ -155,6 +158,7 @@ var onboardRegistrarCmd = &cobra.Command{
 			fmt.Println("TransferRule CID:", result.TransferRuleCID)
 		}
 		fmt.Println("Next: issuer create-instrument <id>")
+
 		return nil
 	},
 }
@@ -180,6 +184,7 @@ var discoverRegistryFactoriesCmd = &cobra.Command{
 		printDiscovery("AllocationFactory", disc.AllocationFactory)
 		printDiscovery("TransferRule", disc.TransferRule)
 		printDiscovery("InstrumentConfiguration", disc.InstrumentConfiguration)
+
 		return nil
 	},
 }
@@ -190,6 +195,7 @@ var requestCredentialServiceCmd = &cobra.Command{
 	RunE: func(_ *cobra.Command, _ []string) error {
 		fmt.Fprintln(os.Stderr, "Credential User Service onboarding is not automated in this release.")
 		fmt.Fprintln(os.Stderr, "Use empty holderRequirements/issuerRequirements on instruments, or follow DA credential utility docs.")
+
 		return fmt.Errorf("request-credential-service not implemented")
 	},
 }

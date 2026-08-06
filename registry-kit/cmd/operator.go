@@ -5,10 +5,11 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ccip"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
-	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var operatorCmd = &cobra.Command{
@@ -74,6 +75,7 @@ var linkTokenToPoolCmd = &cobra.Command{
 		fmt.Println("TokenConfig CID:", tokenConfigCID)
 		fmt.Println("TokenAdminRegistry CID:", tarCID)
 		fmt.Println("Next: operator validate")
+
 		return nil
 	},
 }
@@ -121,6 +123,7 @@ var validateCmd = &cobra.Command{
 		fmt.Println("validate: ok")
 		fmt.Printf("  instrument admin=%s id=%s\n", instrumentID.Admin, instrumentID.Id)
 		fmt.Printf("  pool instance=%s\n", rt.Config.CCIP.BurnMintPoolInstanceID)
+
 		return nil
 	},
 }

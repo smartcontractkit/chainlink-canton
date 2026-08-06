@@ -11,6 +11,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
@@ -104,7 +105,7 @@ func buildRegistryTokenPoolSendDisclosure(
 	poolAddressEDS, err := edsTesthelpers.GetTokenPoolForToken(ctx, ccipAPIClient, hashedInstrumentID)
 	require.NoError(t, err)
 
-	outboundRLCID, err := findContractCIDByInstanceID(ctx, deps.Client, deps.RegistrarParty, core.RateLimiter{}, deps.RateLimiterInstanceID)
+	outboundRLCID, err := findContractCIDByInstanceID(ctx, deps.Client, deps.RegistrarParty, ratelimiter.RateLimiter{}, deps.RateLimiterInstanceID)
 	require.NoError(t, err)
 
 	poolCID := contractCIDByInstance(t, ctx, registrarParticipant, deps.RegistrarParty, burnminttokenpool.BurnMintTokenPool{}, deps.PoolAddress.InstanceAddress())
@@ -179,7 +180,7 @@ func buildRegistryTokenPoolExecuteDisclosure(
 	if customFinality {
 		rlInstanceID = deps.CustomRateLimiterInstanceID
 	}
-	inboundRLCID, err := findContractCIDByInstanceID(ctx, deps.Client, deps.RegistrarParty, core.RateLimiter{}, rlInstanceID)
+	inboundRLCID, err := findContractCIDByInstanceID(ctx, deps.Client, deps.RegistrarParty, ratelimiter.RateLimiter{}, rlInstanceID)
 	require.NoError(t, err)
 
 	poolCID := contractCIDByInstance(t, ctx, registrarParticipant, deps.RegistrarParty, burnminttokenpool.BurnMintTokenPool{}, deps.PoolAddress.InstanceAddress())

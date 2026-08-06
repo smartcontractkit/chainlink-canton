@@ -37,10 +37,12 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -111,30 +113,20 @@ func runRegistryTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlo
 
 	uploadRegistryDARs(t, ccipParticipant, receiverParticipant, tokenPoolOwnerParticipant)
 
-	rmnDar, err := contracts.GetDar(contracts.CCIPRMN, contracts.CurrentVersion)
+	runtimeDar, err := contracts.GetDar(contracts.CCIPRuntimeV2, contracts.DevVersion)
 	require.NoError(t, err)
-	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
+	coreDar, err := contracts.GetDar(contracts.CCIPCoreV2, contracts.DevVersion)
 	require.NoError(t, err)
-	offRampDar, err := contracts.GetDar(contracts.CCIPOffRamp, contracts.CurrentVersion)
+	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifierV2, contracts.DevVersion)
 	require.NoError(t, err)
-	tokenAdminRegistryDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
+	tokenPoolDar, err := contracts.GetDar(contracts.CCIPBurnMintTokenPoolV2, contracts.DevVersion)
 	require.NoError(t, err)
-	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
+	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiverV2, contracts.DevVersion)
 	require.NoError(t, err)
-	tokenPoolDar, err := contracts.GetDar(contracts.CCIPBurnMintTokenPool, contracts.CurrentVersion)
-	require.NoError(t, err)
-	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
-	require.NoError(t, err)
-	ccipReceiverDar, err := contracts.GetDar(contracts.CCIPReceiver, contracts.CurrentVersion)
-	require.NoError(t, err)
-	onRampDar, err := contracts.GetDar(contracts.CCIPOnRamp, contracts.CurrentVersion)
-	require.NoError(t, err)
-	feeQuoterDar, err := contracts.GetDar(contracts.CCIPFeeQuoter, contracts.CurrentVersion)
-	require.NoError(t, err)
-	executorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
+	executorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
 
-	dars := [][]byte{rmnDar, commonDar, offRampDar, tokenAdminRegistryDar, committeeVerifierDar, tokenPoolDar, perPartyRouterDar, ccipReceiverDar, onRampDar, feeQuoterDar, executorDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, tokenPoolDar, ccipReceiverDar, executorDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant, tokenPoolOwnerParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded CCIP DARs to all participants: %v", packageIds)
@@ -227,7 +219,7 @@ func runRegistryTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlo
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
+								AllowedFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -320,13 +312,13 @@ func runRegistryTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlo
 	require.NoError(t, err)
 
 	now := time.Now()
-	inboundRateLimiterAddr, err := rkccip.DeployInboundRateLimiterForOwner(ctx, registrarClient, partyRegistrar, core.RateLimiter{
+	inboundRateLimiterAddr, err := rkccip.DeployInboundRateLimiterForOwner(ctx, registrarClient, partyRegistrar, ratelimiter.RateLimiter{
 		InstanceId:          types.TEXT(registryExecuteDefaultRLInstance),
 		PoolInstanceId:      types.TEXT(registryExecutePoolInstanceID),
 		PoolOwner:           types.PARTY(partyRegistrar),
 		RemoteChainSelector: types.NUMERIC(sourceChainSelector),
-		Direction:           core.RateLimitDirectionRateLimitDirection_Inbound,
-		Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
+		Direction:           ratelimiter.RateLimitDirectionRateLimitDirection_Inbound,
+		Mode:                ratelimiter.RateLimitModeRateLimitMode_DefaultFinality,
 		IsEnabled:           true,
 		Capacity:            types.NUMERIC(tc.defaultInboundLimiterCapacity),
 		Rate:                types.NUMERIC(tc.defaultInboundLimiterCapacity),
@@ -335,13 +327,13 @@ func runRegistryTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlo
 	})
 	require.NoError(t, err)
 
-	inboundCustomRateLimiterAddr, err := rkccip.DeployInboundRateLimiterForOwner(ctx, registrarClient, partyRegistrar, core.RateLimiter{
+	inboundCustomRateLimiterAddr, err := rkccip.DeployInboundRateLimiterForOwner(ctx, registrarClient, partyRegistrar, ratelimiter.RateLimiter{
 		InstanceId:          types.TEXT(registryExecuteCustomRLInstance),
 		PoolInstanceId:      types.TEXT(registryExecutePoolInstanceID),
 		PoolOwner:           types.PARTY(partyRegistrar),
 		RemoteChainSelector: types.NUMERIC(sourceChainSelector),
-		Direction:           core.RateLimitDirectionRateLimitDirection_Inbound,
-		Mode:                core.RateLimitModeRateLimitMode_CustomFinality,
+		Direction:           ratelimiter.RateLimitDirectionRateLimitDirection_Inbound,
+		Mode:                ratelimiter.RateLimitModeRateLimitMode_CustomFinality,
 		IsEnabled:           true,
 		Capacity:            types.NUMERIC(tc.customInboundLimiterCapacity),
 		Rate:                types.NUMERIC(tc.customInboundLimiterCapacity),
@@ -350,13 +342,13 @@ func runRegistryTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlo
 	})
 	require.NoError(t, err)
 
-	outboundRateLimiterAddr, err := rkccip.DeployOutboundRateLimiterForOwner(ctx, registrarClient, partyRegistrar, core.RateLimiter{
+	outboundRateLimiterAddr, err := rkccip.DeployOutboundRateLimiterForOwner(ctx, registrarClient, partyRegistrar, ratelimiter.RateLimiter{
 		InstanceId:          types.TEXT("ccip-registry-execute-rl-out"),
 		PoolInstanceId:      types.TEXT(registryExecutePoolInstanceID),
 		PoolOwner:           types.PARTY(partyRegistrar),
 		RemoteChainSelector: types.NUMERIC(sourceChainSelector),
-		Direction:           core.RateLimitDirectionRateLimitDirection_Outbound,
-		Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
+		Direction:           ratelimiter.RateLimitDirectionRateLimitDirection_Outbound,
+		Mode:                ratelimiter.RateLimitModeRateLimitMode_DefaultFinality,
 		IsEnabled:           false,
 		Capacity:            types.NUMERIC("0"),
 		Rate:                types.NUMERIC("0"),
@@ -380,7 +372,7 @@ func runRegistryTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlo
 				RemoteTokenAddress: types.TEXT(hex.EncodeToString(remoteTokenAddress)),
 				InboundCCVs:        []chainlinkapi.RawInstanceAddress{},
 				OutboundCCVs:       []chainlinkapi.RawInstanceAddress{},
-				FinalityConfig: core.FinalityConfig{
+				FinalityConfig: ccipcodec.FinalityConfig{
 					BlockDepth: new(types.INT64(2000)),
 				},
 				InboundRateLimiter:                         inboundRateLimiterAddr.Binding(),
@@ -619,13 +611,13 @@ func runRegistryTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlo
 		TokenTransfer: &receiver.TokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(partyReceiver),
-			PoolExtraContext:   tokenPoolDisclosure.ChoiceContext,
+			Context:            tokenPoolDisclosure.ChoiceContext,
 		},
 		CcvInputs: []receiver.CCVInput{
 			{
 				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 				VerifierResults: types.TEXT(verifierResultsHex),
-				CcvExtraContext: ccvExecuteDisclosure.ChoiceContext,
+				Context:         ccvExecuteDisclosure.ChoiceContext,
 			},
 		},
 	}

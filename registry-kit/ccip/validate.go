@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
@@ -13,7 +15,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // Validate performs read-only checks that TAR maps the instrument to the expected pool.
@@ -39,6 +40,7 @@ func Validate(
 		if strings.Contains(err.Error(), "no active contract found") {
 			return fmt.Errorf("token config not found for instrument %s/%s", instrumentID.Admin, instrumentID.Id)
 		}
+
 		return fmt.Errorf("fetch token config: %w", err)
 	}
 	cfg, err := bindings.UnmarshalCreatedEvent[ccipcore.TokenConfig](active.GetCreatedEvent())

@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/config"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/operator"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 )
 
 // Runtime holds loaded config, state, and live ledger connections for one command.
@@ -30,6 +31,7 @@ func loadRuntime(configPath, statePath string) (Runtime, error) {
 	if err != nil {
 		return Runtime{}, err
 	}
+
 	return Runtime{
 		ConfigPath: configPath,
 		StatePath:  statePath,
@@ -51,6 +53,7 @@ func (rt *Runtime) connect(ctx context.Context, partyRole string) (ledger.Client
 	if err != nil {
 		return nil, canton.Participant{}, fmt.Errorf("connect devnet as %s: %w", party, err)
 	}
+
 	return client, participant, nil
 }
 

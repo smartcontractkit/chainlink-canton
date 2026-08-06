@@ -5,12 +5,13 @@ import (
 	"fmt"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	burnminttokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/registry"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // PoolReleaseDisclosures holds disclosed contracts required for ReleaseFromTicket.
@@ -38,7 +39,7 @@ func (d PoolReleaseDisclosures) All() []*apiv2.DisclosedContract {
 
 // PoolReleaseInput identifies contracts needed for pool release disclosures.
 type PoolReleaseInput struct {
-	RegistrarParty          string
+	RegistrarParty string
 	// CcipParty discloses CCIP-owned contracts (TAR, RMN) when they differ from the registrar.
 	CcipParty               string
 	InstrumentConfiguration string
@@ -58,7 +59,7 @@ func registryPoolBurnMintExtraContext(
 
 	return splice_api_token_metadata_v1.ChoiceContext{
 		Values: map[string]splice_api_token_metadata_v1.AnyValue{
-			string(ccipcore.RateLimiterKey): {
+			string(ratelimiter.RateLimiterContextKey): {
 				AVContractId: new(types.CONTRACT_ID(rateLimiterCID)),
 			},
 			string(burnminttokenpool.BurnMintFactoryContextKey): {
@@ -112,15 +113,15 @@ func (d PoolSendDisclosures) All() []*apiv2.DisclosedContract {
 
 // PoolSendInput identifies contracts needed for pool send disclosures.
 type PoolSendInput struct {
-	RegistrarParty            string
-	CcipParty                 string
-	InstrumentConfiguration   string
-	AllocationFactory         string
-	PoolCID                   string
-	TokenAdminRegistryCID     string
-	OutboundRateLimiterCID    string
-	RMNRemoteCID              string
-	SendingMessageCID         string
+	RegistrarParty          string
+	CcipParty               string
+	InstrumentConfiguration string
+	AllocationFactory       string
+	PoolCID                 string
+	TokenAdminRegistryCID   string
+	OutboundRateLimiterCID  string
+	RMNRemoteCID            string
+	SendingMessageCID       string
 	// CcipClient optionally supplies the ledger client for CCIP-party disclosures when it
 	// differs from the client used for registrar-party disclosures (multi-participant CTF).
 	CcipClient ledger.Client
@@ -166,7 +167,7 @@ func DisclosePoolSendContracts(ctx context.Context, client ledger.Client, input 
 	if input.SendingMessageCID != "" {
 		msgDisclosed, err = registry.DiscloseByID(ctx, ccipClient, ccipParty, input.SendingMessageCID)
 		if err != nil {
-			return PoolSendDisclosures{}, fmt.Errorf("disclose SendingMessageV1: %w", err)
+			return PoolSendDisclosures{}, fmt.Errorf("disclose SendingMessage: %w", err)
 		}
 	}
 

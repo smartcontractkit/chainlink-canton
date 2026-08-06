@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
-	registryapp "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_app_v0"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	registryapp "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_app_v0"
+	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 )
 
 // OnboardingParties lists Registry role parties for devnet onboarding.
@@ -31,6 +32,7 @@ func RequestProviderService(ctx context.Context, client ledger.Client, parties O
 	if !ok {
 		return "", fmt.Errorf("ProviderServiceRequest not created")
 	}
+
 	return cid, nil
 }
 
@@ -104,6 +106,7 @@ func createDevnetProviderConfiguration(ctx context.Context, client ledger.Client
 	if !ok {
 		return "", fmt.Errorf("ProviderConfiguration not created")
 	}
+
 	return cid, nil
 }
 
@@ -125,6 +128,7 @@ func createRegistrarServiceRequestDevnet(ctx context.Context, client ledger.Clie
 	if !ok {
 		return "", fmt.Errorf("RegistrarServiceRequest not created")
 	}
+
 	return cid, nil
 }
 
@@ -170,5 +174,6 @@ func CreateInstrumentConfiguration(ctx context.Context, client ledger.Client, re
 	if !ok {
 		return "", fmt.Errorf("InstrumentConfiguration not created")
 	}
+
 	return cid, nil
 }

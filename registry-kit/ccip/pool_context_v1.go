@@ -1,11 +1,12 @@
 package ccip
 
 import (
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	burnminttokenpool "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/registry"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // RegistryPoolSendExtraContextV1 builds pool extraContext for LockOrBurn / ReleaseFromTicket
@@ -27,7 +28,7 @@ func RegistryPoolSendExtraContextV1(
 
 	return splice_api_token_metadata_v1.ChoiceContext{
 		Values: map[string]splice_api_token_metadata_v1.AnyValue{
-			string(ccipcore.RateLimiterKey): {
+			string(ratelimiter.RateLimiterContextKey): {
 				AVContractId: new(types.CONTRACT_ID(rateLimiterCID)),
 			},
 			string(burnminttokenpool.BurnMintFactoryContextKey): {

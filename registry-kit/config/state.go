@@ -32,6 +32,7 @@ func LoadState(path string) (State, error) {
 		if os.IsNotExist(err) {
 			return State{}, nil
 		}
+
 		return State{}, fmt.Errorf("read state %q: %w", path, err)
 	}
 
@@ -72,5 +73,6 @@ func StatePathNextTo(configPath string) string {
 	if dir == "" {
 		dir = "."
 	}
+
 	return filepath.Join(dir, DefaultStatePath)
 }

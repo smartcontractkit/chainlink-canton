@@ -13,22 +13,22 @@ const DefaultConfigPath = "registry-kit.toml"
 
 // Config is stable operator input for canton-registry-kit (devnet.cv1).
 type Config struct {
-	Network       string        `toml:"network"`
-	ChainSelector uint64        `toml:"chain_selector"`
-	Ledger        LedgerConfig  `toml:"ledger"`
-	Parties       PartiesConfig `toml:"parties"`
-	CCIP          CCIPConfig    `toml:"ccip"`
+	Network       string         `toml:"network"`
+	ChainSelector uint64         `toml:"chain_selector"`
+	Ledger        LedgerConfig   `toml:"ledger"`
+	Parties       PartiesConfig  `toml:"parties"`
+	CCIP          CCIPConfig     `toml:"ccip"`
 	Operator      OperatorConfig `toml:"operator_backend"`
 }
 
 // LedgerConfig holds Canton participant API endpoints and auth.
 type LedgerConfig struct {
-	JSONAPIURL       string               `toml:"json_api_url"`
-	GRPCLedgerAPIURL string               `toml:"grpc_ledger_api_url"`
-	AdminAPIURL      string               `toml:"admin_api_url"`
-	ValidatorAPIURL  string               `toml:"validator_api_url"`
-	UserID           string               `toml:"user_id"`
-	SynchronizerID   string               `toml:"synchronizer_id"`
+	JSONAPIURL       string                  `toml:"json_api_url"`
+	GRPCLedgerAPIURL string                  `toml:"grpc_ledger_api_url"`
+	AdminAPIURL      string                  `toml:"admin_api_url"`
+	ValidatorAPIURL  string                  `toml:"validator_api_url"`
+	UserID           string                  `toml:"user_id"`
+	SynchronizerID   string                  `toml:"synchronizer_id"`
 	Auth             commonconfig.AuthConfig `toml:"auth"`
 }
 
@@ -42,8 +42,8 @@ type PartiesConfig struct {
 
 // CCIPConfig references pre-deployed CCIP contracts on the participant.
 type CCIPConfig struct {
-	TokenAdminRegistryCID string `toml:"token_admin_registry_cid"`
-	CCIPParty             string `toml:"ccip_party"`
+	TokenAdminRegistryCID  string `toml:"token_admin_registry_cid"`
+	CCIPParty              string `toml:"ccip_party"`
 	BurnMintPoolInstanceID string `toml:"burn_mint_pool_instance_id"`
 }
 
@@ -121,6 +121,7 @@ func (c Config) ActingParty(role string) (string, error) {
 		if c.Parties.Holder != "" {
 			return c.Parties.Holder, nil
 		}
+
 		return c.Parties.Registrar, nil
 	default:
 		return "", fmt.Errorf("unknown party role %q", role)

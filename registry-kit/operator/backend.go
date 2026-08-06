@@ -11,6 +11,7 @@ import (
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 )
@@ -194,6 +195,7 @@ func parseTemplateID(raw string) *apiv2.Identifier {
 	if parts[0] != "" && parts[0][0] != '#' {
 		id.PackageId = parts[0]
 	}
+
 	return id
 }
 
@@ -207,5 +209,6 @@ func splitTemplateID(raw string) []string {
 		}
 	}
 	out = append(out, raw[start:])
+
 	return out
 }

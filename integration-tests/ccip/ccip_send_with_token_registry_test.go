@@ -35,10 +35,13 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
@@ -98,32 +101,22 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 
 	uploadRegistryDARs(t, ccipParticipant, senderParticipant)
 
-	commonDar, err := contracts.GetDar(contracts.CCIPCommon, contracts.CurrentVersion)
+	runtimeDar, err := contracts.GetDar(contracts.CCIPRuntimeV2, contracts.DevVersion)
 	require.NoError(t, err)
-	offRampDar, err := contracts.GetDar(contracts.CCIPOffRamp, contracts.CurrentVersion)
+	coreDar, err := contracts.GetDar(contracts.CCIPCoreV2, contracts.DevVersion)
 	require.NoError(t, err)
-	onRampDar, err := contracts.GetDar(contracts.CCIPOnRamp, contracts.CurrentVersion)
+	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifierV2, contracts.DevVersion)
 	require.NoError(t, err)
-	feeQuoterDar, err := contracts.GetDar(contracts.CCIPFeeQuoter, contracts.CurrentVersion)
+	ccipSenderDar, err := contracts.GetDar(contracts.CCIPSenderV2, contracts.DevVersion)
 	require.NoError(t, err)
-	tokenAdminRegistryDar, err := contracts.GetDar(contracts.CCIPTokenAdminRegistry, contracts.CurrentVersion)
+	ccipExecutorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
-	committeeVerifierDar, err := contracts.GetDar(contracts.CCIPCommitteeVerifier, contracts.CurrentVersion)
-	require.NoError(t, err)
-	perPartyRouterDar, err := contracts.GetDar(contracts.CCIPPerPartyRouter, contracts.CurrentVersion)
-	require.NoError(t, err)
-	rmnDar, err := contracts.GetDar(contracts.CCIPRMN, contracts.CurrentVersion)
-	require.NoError(t, err)
-	ccipSenderDar, err := contracts.GetDar(contracts.CCIPSender, contracts.CurrentVersion)
-	require.NoError(t, err)
-	ccipExecutorDar, err := contracts.GetDar(contracts.CCIPExecutor, contracts.CurrentVersion)
-	require.NoError(t, err)
-	tokenPoolDar, err := contracts.GetDar(contracts.CCIPBurnMintTokenPool, contracts.CurrentVersion)
+	tokenPoolDar, err := contracts.GetDar(contracts.CCIPBurnMintTokenPoolV2, contracts.DevVersion)
 	require.NoError(t, err)
 	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.CurrentVersion)
 	require.NoError(t, err)
 
-	dars := [][]byte{commonDar, offRampDar, onRampDar, feeQuoterDar, tokenAdminRegistryDar, committeeVerifierDar, perPartyRouterDar, rmnDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, ccipTestDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, ccipTestDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, senderParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded CCIP DARs to all participants: %v", packageIds)
@@ -209,7 +202,7 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 							MaxCCVsPerMsg: 10,
 							DynamicConfig: executorBinding.DynamicConfig{
 								FeeAggregator:         nil,
-								AllowedFinalityConfig: core.FinalityConfig{WaitForFinality: &types.UNIT{}},
+								AllowedFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
 								CcvAllowlistEnabled:   false,
 							},
 							AllowedCCVs: nil,
@@ -351,13 +344,13 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 	remoteTokenAddress := hexutil.MustDecode("0xacdafefb07bff5b120b7afa6ea777cf7eabacc0d")
 
 	now := time.Now()
-	outboundRLAddr, err := rkccip.DeployOutboundRateLimiterForOwner(ctx, senderClient, partyRegistrar, core.RateLimiter{
+	outboundRLAddr, err := rkccip.DeployOutboundRateLimiterForOwner(ctx, senderClient, partyRegistrar, ratelimiter.RateLimiter{
 		InstanceId:          types.TEXT(registrySendRLInstanceID),
 		PoolInstanceId:      types.TEXT(registrySendPoolInstanceID),
 		PoolOwner:           types.PARTY(partyRegistrar),
 		RemoteChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-		Direction:           core.RateLimitDirectionRateLimitDirection_Outbound,
-		Mode:                core.RateLimitModeRateLimitMode_DefaultFinality,
+		Direction:           ratelimiter.RateLimitDirectionRateLimitDirection_Outbound,
+		Mode:                ratelimiter.RateLimitModeRateLimitMode_DefaultFinality,
 		IsEnabled:           true,
 		Capacity:            types.NUMERIC("10000000000"),
 		Rate:                types.NUMERIC("10000000000"),
@@ -376,7 +369,7 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 			types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): {
 				RemotePools:         []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
 				RemoteTokenAddress:  types.TEXT(hex.EncodeToString(remoteTokenAddress)),
-				FinalityConfig:      core.FinalityConfig{WaitForFinality: &types.UNIT{}},
+				FinalityConfig:      ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
 				OutboundRateLimiter: outboundRLAddr.Binding(),
 			},
 		},
@@ -647,25 +640,25 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 			Context:                  ccipSendDisclosure.ChoiceContext,
 			RouterCid:                types.CONTRACT_ID(routerCid),
 			DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
-			Message: core.Canton2AnyMessage{
+			Message: clientapi.Canton2AnyMessage{
 				Receiver: types.TEXT(receiverHex),
 				Payload:  types.TEXT(testPayloadHex),
-				TokenTransfer: &core.TokenTransfer{
+				TokenTransfer: &clientapi.TokenTransfer{
 					Token:  registryInstrumentId,
 					Amount: types.NUMERIC(tokenTransferAmountDecimal),
 				},
 				FeeToken: nativeInstrumentId,
-				ExtraArgs: core.ExtraArgs{
-					V3: &core.GenericExtraArgsV3{
+				ExtraArgs: clientapi.ExtraArgs{
+					V3: &clientapi.GenericExtraArgsV3{
 						GasLimit: 0,
-						Ccvs: []core.CCVExtraArg{
+						Ccvs: []clientapi.CCVExtraArg{
 							{
 								CcvAddress: committeeVerifierAddress.Binding(),
 								CcvArgs:    types.TEXT(""),
 							},
 						},
-						Executor: core.ExecutorExtraArg{
-							ExecutorWithAddress: &core.ExecutorWithAddress{
+						Executor: clientapi.ExecutorExtraArg{
+							ExecutorWithAddress: &clientapi.ExecutorWithAddress{
 								ExecutorAddress: executorAddress.Binding(),
 								ExecutorArgs:    types.TEXT(""),
 							},
@@ -688,19 +681,19 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 			},
 			CcvSendInputs: []sender.CCVSendInput{
 				{
-					CcvAddress:      ccvSendDisclosure.Address.Binding(),
-					CcvCid:          types.CONTRACT_ID(ccvSendDisclosure.ContractId),
-					CcvExtraContext: ccvSendDisclosure.ChoiceContext,
+					CcvAddress: ccvSendDisclosure.Address.Binding(),
+					CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
+					Context:    ccvSendDisclosure.ChoiceContext,
 				},
 			},
 			TokenTransferInput: &sender.TokenTransferInput{
-				SenderInputCids:  senderHoldingCids,
-				TokenPoolCid:     types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
-				PoolExtraContext: tokenPoolSendDisclosure.ChoiceContext,
+				SenderInputCids: senderHoldingCids,
+				TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
+				Context:         tokenPoolSendDisclosure.ChoiceContext,
 			},
 			ExecutorInput: &sender.ExecutorInput{
-				ExecutorCid:          types.CONTRACT_ID(executorSendDisclosure.ContractId),
-				ExecutorExtraContext: executorSendDisclosure.ChoiceContext,
+				ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
+				Context:     executorSendDisclosure.ChoiceContext,
 			},
 		}
 
@@ -791,7 +784,7 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 	}
 	require.NotEmpty(t, returnedMessageId)
 	require.NotEmpty(t, returnedEncodedMessage)
-	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, returnedEncodedMessage))
+	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, types.TEXT(returnedEncodedMessage)))
 
 	senderBalanceAfter, err := testhelpers.GetHoldingsBalance(ctx, senderParticipant, &nativeInstrumentId)
 	require.NoError(t, err)

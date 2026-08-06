@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
-	registryapp "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_app_v0"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	registryapp "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_app_v0"
+	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 )
 
 // BootstrapResult holds CIDs produced by the LocalNet Registry bootstrap (operator=provider=registrar).
@@ -160,7 +161,7 @@ func acceptRegistrarServiceRequest(ctx context.Context, client ledger.Client, pa
 		Cid: types.CONTRACT_ID(registrarReqCID),
 		Payload: registryapp.RegistrarServiceRequestAccept{
 			ProviderConfigurationCid: types.CONTRACT_ID(providerCfgCID),
-			CredentialCids:         nil,
+			CredentialCids:           nil,
 		},
 	}
 	res, err := client.SubmitExercise(ctx, party, registryapp.ProviderService{}, providerSvcCID, "ProviderService_AcceptRegistrarServiceRequest", args)

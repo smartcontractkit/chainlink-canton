@@ -5,11 +5,12 @@ import (
 	"fmt"
 
 	"github.com/shopspring/decimal"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings"
+	registryholding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_holding_v0"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
-	registryholding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_holding_v0"
 )
 
 // HoldingRow is one Registry Holding contract for an instrument.

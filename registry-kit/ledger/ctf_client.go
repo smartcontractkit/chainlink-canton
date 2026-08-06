@@ -6,10 +6,11 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts"
 )
 
 // CTFClient wraps a CLDF LocalNet participant.

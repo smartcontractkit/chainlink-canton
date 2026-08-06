@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // PoolDeployDeps holds CCIP contract bindings required to create registrar-owned token pools.
@@ -25,7 +26,7 @@ func DeployInboundRateLimiterForOwner(
 	ctx context.Context,
 	client ledger.Client,
 	ownerParty string,
-	template ccipcore.RateLimiter,
+	template ratelimiter.RateLimiter,
 ) (contracts.RawInstanceAddress, error) {
 	res, err := client.SubmitCreate(ctx, ownerParty, template)
 	if err != nil {
@@ -48,7 +49,7 @@ func DeployOutboundRateLimiterForOwner(
 	ctx context.Context,
 	client ledger.Client,
 	ownerParty string,
-	template ccipcore.RateLimiter,
+	template ratelimiter.RateLimiter,
 ) (contracts.RawInstanceAddress, error) {
 	res, err := client.SubmitCreate(ctx, ownerParty, template)
 	if err != nil {

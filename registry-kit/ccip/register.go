@@ -7,6 +7,10 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
@@ -14,9 +18,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/registry"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // RegisterTokenPoolInput is the input for registering a token pool with the TokenAdminRegistry.
@@ -137,7 +138,7 @@ func RegisterTokenPoolViaClient(ctx context.Context, client ledger.Client, input
 		ccipcore.SetPool{
 			TokenConfigCid: types.CONTRACT_ID(tokenConfigCID),
 			InstrumentId:   input.InstrumentId,
-			TokenPool: &ccipcore.PoolRegistration{
+			TokenPool: &ccipcore.PoolRegistration2{
 				PoolOwner:      types.PARTY(input.PoolOwnerParty),
 				PoolInstanceId: types.TEXT(input.PoolInstanceID),
 			},
@@ -167,6 +168,7 @@ func findTokenConfigCID(ctx context.Context, client ledger.Client, ccipParty str
 		if strings.Contains(err.Error(), "no active contract found") {
 			return "", false, nil
 		}
+
 		return "", false, err
 	}
 

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	registryholding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/utility/registry_holding_v0"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // VerifyHolding checks the Registry Holding template and HoldingV1 interface view.
