@@ -122,7 +122,8 @@ func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapi
 	}
 	tokenTransfer := message.TokenTransfer
 	instrumentId := tokenTransfer.Token
-	var inputHoldingCids []string
+	// API expects empty arrays to be `[]`, not `null`
+	inputHoldingCids := []string{}
 	if tokenTransfer.HoldingContractIds != nil {
 		inputHoldingCids = append(inputHoldingCids, *tokenTransfer.HoldingContractIds...)
 	}
@@ -198,6 +199,10 @@ func (f URLTransferFactory) GetExecuteDisclosures(
 ) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	if message.TokenTransfer == nil {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no TokenTransfer in message")
+	}
+	// API expects empty arrays to be `[]`, not `null`
+	if inputHoldingCids == nil {
+		inputHoldingCids = []types.CONTRACT_ID{}
 	}
 
 	// TODO: for backward-compatibility, use poolOwner as receiver if not specified

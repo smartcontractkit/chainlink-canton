@@ -132,7 +132,8 @@ func (f URLBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapi
 	}
 	tokenTransfer := *message.TokenTransfer
 	instrumentId := tokenTransfer.Token
-	var inputHoldingCids []string
+	// API expects empty arrays to be `[]`, not `null`
+	inputHoldingCids := []string{}
 	if tokenTransfer.HoldingContractIds != nil {
 		inputHoldingCids = append(inputHoldingCids, *tokenTransfer.HoldingContractIds...)
 	}
@@ -248,7 +249,8 @@ func (f RequestBurnMintFactory) GetSendDisclosures(ctx context.Context, message 
 	}
 	tokenTransfer := *message.TokenTransfer
 	instrumentId := tokenTransfer.Token
-	var inputHoldingCids []string
+	// API expects empty arrays to be `[]`, not `null`
+	inputHoldingCids := []string{}
 	if tokenTransfer.HoldingContractIds != nil {
 		inputHoldingCids = append(inputHoldingCids, *tokenTransfer.HoldingContractIds...)
 	}
