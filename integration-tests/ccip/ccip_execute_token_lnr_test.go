@@ -545,7 +545,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 						},
 						PoolOwner: partyCCIP,
 						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
-						TransferFactory: &config.TransferFactory{
+						Factory: &config.Factory{
 							Type:             config.FactoryTypeURL,
 							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
 							TokenStandardAuthConfig: &commonconfig.AuthConfig{

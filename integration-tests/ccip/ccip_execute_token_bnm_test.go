@@ -530,7 +530,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 						},
 						PoolOwner: partyCCIP,
 						// By setting the TokenStandard info, the Token Pool API will return the necessary factory disclosures
-						BurnMintFactory: &config.BurnMintFactory{
+						Factory: &config.Factory{
 							Type:            config.FactoryTypeAddress,
 							TemplateId:      new(link.LinkRegistry{}.GetTemplateID()),
 							Party:           new(partyTokenPoolOwner),

@@ -579,7 +579,7 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
 						PoolOwner: partySender,
-						TransferFactory: &config.TransferFactory{
+						Factory: &config.Factory{
 							Type:             config.FactoryTypeURL,
 							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
 							TokenStandardAuthConfig: &commonconfig.AuthConfig{

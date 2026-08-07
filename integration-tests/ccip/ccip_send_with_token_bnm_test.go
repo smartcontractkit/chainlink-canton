@@ -593,7 +593,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
 						PoolOwner: partySender,
-						BurnMintFactory: &config.BurnMintFactory{
+						Factory: &config.Factory{
 							Type:            config.FactoryTypeAddress,
 							TemplateId:      new(link.LinkRegistry{}.GetTemplateID()),
 							Party:           new(partySender),
