@@ -7,45 +7,15 @@ import (
 	"strings"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	ccipcore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/registry"
 )
-
-// RegisterTokenPoolInput is the input for registering a token pool with the TokenAdminRegistry.
-type RegisterTokenPoolInput struct {
-	TokenAdminRegistryInstanceAddress    contracts.InstanceAddress
-	TokenAdminRegistryRawInstanceAddress contracts.RawInstanceAddress
-	InstrumentId                         splice_api_token_holding_v1.InstrumentId
-	PoolInstanceID                       string
-	CcipParty                            string
-	PoolOwnerParty                       string
-}
-
-// RegisterTokenPool runs ProposeAdministrator → AcceptAdminRole → SetPool on the TAR.
-func RegisterTokenPool(bundle cld_ops.Bundle, chain canton.Chain, input RegisterTokenPoolInput) error {
-	_, err := cld_ops.ExecuteSequence(bundle, sequences.RegisterTokenPool, chain, sequences.RegisterTokenPoolInput{
-		TokenAdminRegistryInstanceAddress:    input.TokenAdminRegistryInstanceAddress,
-		TokenAdminRegistryRawInstanceAddress: input.TokenAdminRegistryRawInstanceAddress,
-		InstrumentId:                         input.InstrumentId,
-		PoolInstanceID:                       input.PoolInstanceID,
-		CcipParty:                            input.CcipParty,
-		PoolOwnerParty:                       input.PoolOwnerParty,
-	})
-	if err != nil {
-		return fmt.Errorf("register token pool: %w", err)
-	}
-
-	return nil
-}
 
 // RegisterTokenPoolClientInput is the input for TAR registration via ledger client with per-step actAs parties.
 type RegisterTokenPoolClientInput struct {
