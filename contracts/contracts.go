@@ -65,19 +65,12 @@ const (
 	CCIPBurnMintTokenPool    = Package("ccip-burn-mint-token-pool")
 	CCIPFactory              = Package("ccip-factory")
 
-	// Token Standard
-
-	SpliceApiTokenBurnMintV1            = Package("splice-api-token-burn-mint-v1")
-	SpliceApiTokenHoldingV1             = Package("splice-api-token-holding-v1")
-	SpliceApiTokenMetadataV1            = Package("splice-api-token-metadata-v1")
-	SpliceApiTokenTransferInstructionV1 = Package("splice-api-token-transfer-instruction-v1")
-
 	// Tests
 
-	Coin         = Package("coin")
-	GlobalConfig = Package("globalconfig")
-	MCMSTest     = Package("mcms-test")
-	CCIPTest     = Package("ccip-test")
+	Coin                                  = Package("coin")
+	GlobalConfig                          = Package("globalconfig")
+	MCMSTest                              = Package("mcms-test")
+	CCIPTest                              = Package("ccip-test")
 	SpliceApiFeaturedAppV1                = Package("splice-api-featured-app-v1")
 	SpliceApiTokenAllocationV1            = Package("splice-api-token-allocation-v1")
 	SpliceApiTokenAllocationInstructionV1 = Package("splice-api-token-allocation-instruction-v1")
@@ -180,14 +173,9 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
 	CCIPFactoryV2:              append(ReleasedVersions[CCIPFactoryV2], DevVersion),
 
-	SpliceApiTokenBurnMintV1:            []string{"1.0.0"},
-	SpliceApiTokenHoldingV1:             []string{"1.0.0"},
-	SpliceApiTokenMetadataV1:            []string{"1.0.0"},
-	SpliceApiTokenTransferInstructionV1: []string{"1.0.0"},
-
-	Coin:         []string{DevVersion},
-	GlobalConfig: []string{DevVersion},
-	MCMSTest:     []string{DevVersion},
+	Coin:                                  []string{DevVersion},
+	GlobalConfig:                          []string{DevVersion},
+	MCMSTest:                              []string{DevVersion},
 	SpliceApiFeaturedAppV1:                []string{"1.0.0"},
 	SpliceApiTokenAllocationV1:            []string{"1.0.0"},
 	SpliceApiTokenAllocationInstructionV1: []string{"1.0.0"},
