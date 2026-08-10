@@ -58,8 +58,8 @@ github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.14 h1:SA43nf
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.14/go.mod h1:Du3llKcwbQvHsTXSLzTOGQz0DTDBMEzdg7DAGu7inrY=
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.32 h1:dWFHhQpbf7Yui4fsy+bJUy54JrmpJHIyAuUkcadqwMo=
 github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.32/go.mod h1:oN4Iix8rAbyTx6tFMP9mS8RFLJnDeZSbSsHwXYSs3tE=
-github.com/aws/aws-sdk-go-v2/service/kms v1.54.0 h1:XOfYhrscVxDr0fLbgA4lE5UbQh5w9t+eva8bZu4q6wY=
-github.com/aws/aws-sdk-go-v2/service/kms v1.54.0/go.mod h1:0RXNc6Yf3AvSMldGD6Lcch96Ojlw2TtGnHsqfD/L4u8=
+github.com/aws/aws-sdk-go-v2/service/kms v1.55.1 h1:QGzX/4alPQR0cud44yLFJi9JgPDq+Wr+L2hC1R2bu7E=
+github.com/aws/aws-sdk-go-v2/service/kms v1.55.1/go.mod h1:zWc1+cHJe8JLFcyilkebUUXmx0ukS2w+zOWjen80MCQ=
 github.com/aws/aws-sdk-go-v2/service/signin v1.5.1 h1:i7p1pinRrWxJp+sD+u2pCWYdcB9vL1VNIPKWssNOp4o=
 github.com/aws/aws-sdk-go-v2/service/signin v1.5.1/go.mod h1:gtQTy/o93W5Sx0IFdAkn7Usa+Qg7ydG2+9GC7MoKqPU=
 github.com/aws/aws-sdk-go-v2/service/sso v1.33.1 h1:GBLnqpnDEn/+vnBGlxAJ4+jopfzW7vVT0++jLPgWN9A=
@@ -618,8 +618,8 @@ github.com/sirupsen/logrus v1.9.4 h1:TsZE7l11zFCLZnZ+teH4Umoq5BhEIfIzfRDZ1Uzql2w
 github.com/sirupsen/logrus v1.9.4/go.mod h1:ftWc9WdOfJ0a92nsE2jF5u5ZwH8Bv2zdeOC42RjbV2g=
 github.com/smartcontractkit/ccip-owner-contracts v0.1.0 h1:GiBDtlx7539o7AKlDV+9LsA7vTMPv+0n7ClhSFnZFAk=
 github.com/smartcontractkit/ccip-owner-contracts v0.1.0/go.mod h1:NnT6w4Kj42OFFXhSx99LvJZWPpMjmo4+CpDEWfw61xY=
-github.com/smartcontractkit/chain-selectors v1.0.104 h1:/n9pPGM5W/+r1eHoWZv4VwX9LNS1af4+ICyhM8zKRNM=
-github.com/smartcontractkit/chain-selectors v1.0.104/go.mod h1:qy7whtgG5g+7z0jt0nRyii9bLND9m15NZTzuQPkMZ5w=
+github.com/smartcontractkit/chain-selectors v1.0.107 h1:LlQI72DqaFrJXWRmcv78H48MjUNhFzKm+xBOt+5ZXbg=
+github.com/smartcontractkit/chain-selectors v1.0.107/go.mod h1:qy7whtgG5g+7z0jt0nRyii9bLND9m15NZTzuQPkMZ5w=
 github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc h1:Um9FBcf0JNSFuGbxgccDG1vM3cNrMGy0SdJ7r6VbX0o=
 github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc/go.mod h1:zfE2R7887kiwXkGTHKPe5NBgwhFwIC3pnA2uAxrbvig=
 github.com/smartcontractkit/chainlink-canton v0.0.0-20260615233851-4e78e7c23a58 h1:QT9lFZBf3bFsp7oJWLTQuUXW4FU5QXyJx2a2qZ40G6Q=
@@ -644,8 +644,8 @@ github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625
 github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260211172625-dff40e83b3c9/go.mod h1:dkR2uYg9XYJuT1JASkPzWE51jjFkVb86P7a/yXe5/GM=
 github.com/smartcontractkit/chainlink-sui v0.0.0-20260630144638-b69f16bdddd8 h1:3exBy63KSpPPrJok93HmDzECh/iMtNv0cWyPPH8u1aw=
 github.com/smartcontractkit/chainlink-sui v0.0.0-20260630144638-b69f16bdddd8/go.mod h1:EhVSzBDITnheg03bg1TRdaoMDY5GkLjepmbuIq2+qPY=
-github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.5 h1:EiQx0LCPzxlfO9piSPeMCVSZAnp/BxAsPIGh/jBal18=
-github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.5/go.mod h1:nyOjn4ADJGqRMe3+4ZXSV+J/7nWb1H2Vx8Qk57eLRYA=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6 h1:2cW+w652PdfdxG2muvMS14pACeP3tfZXCaIkiYD8s7M=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6/go.mod h1:nyOjn4ADJGqRMe3+4ZXSV+J/7nWb1H2Vx8Qk57eLRYA=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 h1:RwZXxdIAOyjp6cwc9Quxgr38k8r7ACz+Lxh9o/A6oH0=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5/go.mod h1:kHYJnZUqiPF7/xN5273prV+srrLJkS77GbBXHLKQpx0=
 github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260514223130-48bc90aca745 h1:eieKLvYuzwBPh/FdbUS1gnIanI86zgWby1L10o90g4o=
