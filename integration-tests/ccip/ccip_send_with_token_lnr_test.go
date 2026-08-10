@@ -753,8 +753,9 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			Admin: oapiCommon.PartyId(nativeInstrumentId.Admin),
 			Id:    string(nativeInstrumentId.Id),
 		},
-		Payload:  "",
-		Receiver: "",
+		Payload:  testPayloadHex,
+		Sender:   partySender,
+		Receiver: receiverHex,
 		TokenTransfer: &oapiCommon.TokenTransfer{
 			Amount: tokenTransferAmountDecimal,
 			Token: oapiCommon.InstrumentId{
