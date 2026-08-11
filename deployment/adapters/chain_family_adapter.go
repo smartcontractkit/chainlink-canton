@@ -41,11 +41,6 @@ type CantonChainFamilyAdapter struct{}
 
 var CantonFamilySelector = [4]byte{0xdf, 0xaf, 0xaf, 0x4b}
 
-// CantonNoExecExecutor is Client.NO_EXECUTION_ADDRESS on EVM source chains. Canton messages
-// are executed manually, so no EVM Executor supports Canton as a destination; this sentinel
-// satisfies the OnRamp's default-executor field without naming a real Executor contract.
-const CantonNoExecExecutor = "0xEBa517d200000000000000000000000000000000"
-
 func isEVMSelector(chainSelector uint64) bool {
 	family, err := chainsel.GetSelectorFamily(chainSelector)
 	if err != nil {
@@ -507,9 +502,10 @@ func (a *CantonChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(sourceChainSelector, _ uint64) ccipadapters.RemoteChainDefaults {
 	if isEVMSelector(sourceChainSelector) {
 		// Canton messages are executed manually (ManuallyExecuteMessage), so no EVM Executor
-		// supports Canton as a destination. DefaultExecutor is a sentinel that satisfies the
-		// OnRamp's default-executor field, and SkipExecutorConfig keeps the EVM sequence from
-		// treating it as a real Executor contract.
+		// supports Canton as a destination. SkipExecutorConfig keeps the EVM sequence from
+		// reading or configuring an Executor contract for this lane; the EVM sequence writes
+		// its own no-execution sentinel into the OnRamp's default-executor field, so no
+		// family-specific address crosses this boundary.
 		return ccipadapters.RemoteChainDefaults{
 			AllowTrafficFrom: true,
 			ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
@@ -520,7 +516,6 @@ func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(sourceChainSelect
 			TokenReceiverAllowed:      false,
 			MessageNetworkFeeUSDCents: 50,
 			TokenNetworkFeeUSDCents:   50,
-			DefaultExecutor:           CantonNoExecExecutor,
 			SkipExecutorConfig:        true,
 		}
 	}
