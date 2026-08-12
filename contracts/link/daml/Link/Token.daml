@@ -23,6 +23,7 @@ template LinkHolding
     meta : MetadataV1.Metadata
   where
     signatory holdingOwner, holdingAdmin
+    ensure holdingInstrumentId.admin == holdingAdmin
 
     interface instance HoldingV1.Holding for LinkHolding where
       view = HoldingV1.HoldingView with
@@ -83,6 +84,7 @@ template LinkTransferInstruction
   where
     signatory instructionAdmin, instructionTransfer.sender
     observer instructionTransfer.receiver
+    ensure instructionTransfer.instrumentId.admin == instructionAdmin
 
     interface instance TransferV1.TransferInstruction for LinkTransferInstruction where
       view = TransferV1.TransferInstructionView with
@@ -96,6 +98,8 @@ template LinkTransferInstruction
         assertMsg "LinkTransferInstruction.TransferInstruction_Accept: transfer instruction expired"
           (instructionTransfer.executeBefore > now)
         lockedHolding <- fetch instructionLockedHoldingCid
+        assertMsg "LinkTransferInstruction.TransferInstruction_Accept: locked holding admin mismatch"
+          (lockedHolding.lockedAdmin == instructionAdmin)
         archive instructionLockedHoldingCid
         let mergedMeta = mergeAcceptMeta arg.extraArgs.meta lockedHolding.meta
 
@@ -132,6 +136,7 @@ template LockedLinkHolding
   where
     signatory lockedAdmin, lockedSender
     observer lockedReceiver
+    ensure lockedInstrumentId.admin == lockedAdmin
 
 template LinkRegistry
   with
@@ -192,6 +197,8 @@ template LinkRegistry
           holding <- fetch linkHoldingCid
           assertMsg "LinkRegistry.BurnMintFactory_BurnMint: input instrumentId mismatch"
             (holding.holdingInstrumentId == registryInstrumentId)
+          assertMsg "LinkRegistry.BurnMintFactory_BurnMint: input instrumentId admin mismatch"
+            (holding.holdingInstrumentId.admin == registryAdmin)
           assertAuthorizedOwner registryAdmin arg.extraActors holding.holdingOwner
           archive linkHoldingCid
 
@@ -245,6 +252,7 @@ sumAndArchiveInputs sender instrumentId cids =
       let linkHoldingCid = coerceContractId cid : ContractId LinkHolding
       holding <- fetch linkHoldingCid
       assertMsg "Link: input instrumentId mismatch" (holding.holdingInstrumentId == instrumentId)
+      assertMsg "Link: input instrumentId admin mismatch" (holding.holdingInstrumentId.admin == holding.holdingAdmin)
       assertMsg "Link: input owner mismatch" (holding.holdingOwner == sender)
       archive linkHoldingCid
       pure (acc + holding.holdingAmount))
@@ -349,6 +357,8 @@ validateTransferFactoryCall admin instrumentId arg = do
     (arg.expectedAdmin == admin)
   assertMsg "LinkRegistry.TransferFactory_Transfer: instrumentId mismatch"
     (transfer.instrumentId == instrumentId)
+  assertMsg "LinkRegistry.TransferFactory_Transfer: instrumentId admin mismatch"
+    (transfer.instrumentId.admin == admin)
   assertMsg "LinkRegistry.TransferFactory_Transfer: amount must be positive"
     (transfer.amount > 0.0)
   assertMsg "LinkRegistry.TransferFactory_Transfer: requestedAt must not be in the future"

@@ -14,7 +14,7 @@ data-dependencies:
 
   - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
   - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
-  - ../../link/.daml/dist/link-2.0.0.dar
+  - ../../link/.daml/dist/link-2.1.0.dar
 
   - ../codec/.daml/dist/ccip-codec-v2-2.0.0.dar
   - ../api/.daml/dist/ccip-api-v2-2.0.0.dar
@@ -34,7 +34,7 @@ data-dependencies:
 
   - ../sender/.daml/dist/ccip-sender-v2-2.1.0.dar
   - ../receiver/.daml/dist/ccip-receiver-v2-2.1.0.dar
-  - ../factory/.daml/dist/ccip-factory-v2-2.1.0.dar
+  - ../factory/.daml/dist/ccip-factory-v2-2.1.1.dar
 dependencies:
   - daml-prim
   - daml-stdlib
