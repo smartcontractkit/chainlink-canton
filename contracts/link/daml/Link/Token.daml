@@ -197,8 +197,8 @@ template LinkRegistry
           holding <- fetch linkHoldingCid
           assertMsg "LinkRegistry.BurnMintFactory_BurnMint: input instrumentId mismatch"
             (holding.holdingInstrumentId == registryInstrumentId)
-          assertMsg "LinkRegistry.BurnMintFactory_BurnMint: input instrumentId admin mismatch"
-            (holding.holdingInstrumentId.admin == registryAdmin)
+          assertMsg "LinkRegistry.BurnMintFactory_BurnMint: input holding admin mismatch"
+            (holding.holdingAdmin == registryAdmin)
           assertAuthorizedOwner registryAdmin arg.extraActors holding.holdingOwner
           archive linkHoldingCid
 
