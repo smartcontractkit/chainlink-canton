@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-canton
 
-go 1.26.2
+go 1.26.5
 
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
@@ -34,11 +34,11 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/smartcontractkit/chain-selectors v1.0.107
-	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260728180354-4f966ecacc23
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260728180354-4f966ecacc23
-	github.com/smartcontractkit/chainlink-ccv v0.2.1-0.20260803114202-18539d60fc1d
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.3.1-0.20260803114202-18539d60fc1d
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.1.1-0.20260803114202-18539d60fc1d
+	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260811072549-2a0dec67e6be
+	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260811072549-2a0dec67e6be
+	github.com/smartcontractkit/chainlink-ccv v0.2.1-0.20260811153216-3f3baa768540
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.3.1-0.20260811153216-3f3baa768540
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.1.1-0.20260811153216-3f3baa768540
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260715145851-8219609496a4
 	github.com/smartcontractkit/chainlink-deployments-framework v0.117.1
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.6
@@ -163,7 +163,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4 // indirect
 	github.com/sercand/kuberesolver/v6 v6.0.0 // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
-	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.2-0.20260728185140-e41659e2b739 // indirect
+	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.2-0.20260811153216-3f3baa768540 // indirect
 	github.com/smartcontractkit/chainlink-framework/chains v0.0.0-20260709082627-78ab5315e367 // indirect
 	github.com/smartcontractkit/chainlink-framework/metrics v0.0.0-20260709082627-78ab5315e367 // indirect
 	github.com/smartcontractkit/chainlink-framework/multinode v0.0.0-20260521164805-26d78d5e1243 // indirect
@@ -292,7 +292,7 @@ require (
 	github.com/ebitengine/purego v0.10.0 // indirect
 	github.com/emicklei/dot v1.6.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
-	github.com/ethereum/c-kzg-4844/v2 v2.1.7 // indirect
+	github.com/ethereum/c-kzg-4844/v2 v2.1.8 // indirect
 	github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab // indirect
 	github.com/failsafe-go/failsafe-go v0.9.0 // indirect
 	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
@@ -326,7 +326,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/golang/snappy v1.0.0 // indirect
+	github.com/golang/snappy v1.0.1-0.20260716114414-9ae09f520e93 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect

@@ -11,7 +11,7 @@ inputs:
     # builds the verifier/devenv Docker images, while go.mod pins the `ccv up` tooling
     # that generates their configs. A mismatch across config-format changes (e.g. #1193
     # bootstrap monitoring.Config) makes the verifier container exit on startup.
-    default: 18539d60fc1d090363c3b6cf95af64b2f1f998ef
+    default: 3f3baa768540206ff32b0aa58daab18b73d0fc62
   ccv-iam-role:
     description: AWS IAM role ARN for CCV ECR authentication
     required: true
