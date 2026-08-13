@@ -27,7 +27,7 @@ var (
 
 const (
 	PackageName = "link"
-	PackageID   = "f83b5db150d68564a63d9a5760a8a49323424f58ebbea0e089fe79643a8f29c2"
+	PackageID   = "fc1fcb7dbfd1959cafbd54bfa6f6cc88c1678607b0f95ee3f6ee8e9ee8eb2b60"
 	SDKVersion  = "3.4.11"
 )
 
