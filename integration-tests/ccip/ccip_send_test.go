@@ -477,7 +477,7 @@ func TestCCIPSend(t *testing.T) {
 	disclosedRouter, err := testhelpers.GetDisclosedContractByTemplateId(t.Context(), senderParticipant, contracts.IdentifierFromBinding(ccipruntime.PerPartyRouter{}))
 	require.NoError(t, err)
 
-	// Prepare receiver address (destination party encoded as keccak256)
+	// Prepare EVM receiver address
 	receiver := hexutil.MustDecode("0xcf8def9adfe3dd90b3dffe42c8eabbf7cd4ee6ca")
 	receiverHex := hex.EncodeToString(receiver)
 
@@ -564,8 +564,9 @@ func TestCCIPSend(t *testing.T) {
 			Admin: oapiCommon.PartyId(nativeInstrumentId.Admin),
 			Id:    string(nativeInstrumentId.Id),
 		},
-		Payload:       "",
-		Receiver:      "",
+		Payload:       testPayloadHex,
+		Sender:        partySender,
+		Receiver:      receiverHex,
 		GasLimit:      100_000,
 		TokenTransfer: nil,
 	}
