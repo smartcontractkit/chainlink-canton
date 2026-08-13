@@ -527,9 +527,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Get disclosures for CCIPReceiver.Execute. The execute submission itself stays
 	// receiver-only; ccip-owned dependencies are only provided via disclosure.
-	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(t.Context(), ccipAPIClient, encodedMessageHex)
+	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(t.Context(), ccipAPIClient, encodedMessageHex, types.PARTY(partyReceiver))
 	require.NoError(t, err)
-	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress())
+	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress(), types.PARTY(partyReceiver))
 	require.NoError(t, err)
 
 	executeArgs := receiver.Execute{

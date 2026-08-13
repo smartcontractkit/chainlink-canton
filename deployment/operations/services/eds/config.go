@@ -174,7 +174,7 @@ var BuildConfig = operations.NewOperation(
 				PoolOwner: participant.PartyID,
 			}
 			if tokenPoolType == edsConfig.TokenPoolTypeLockRelease {
-				pool.TransferFactory = &edsConfig.TransferFactory{
+				pool.Factory = &edsConfig.Factory{
 					Type:                    edsConfig.FactoryTypeURL,
 					TokenStandardURL:        tokenStandardURL,
 					TokenStandardAuthConfig: tokenStandardAuthConfig,
