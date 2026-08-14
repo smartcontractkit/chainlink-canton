@@ -5,6 +5,7 @@ import (
 	"io"
 	"maps"
 	"reflect"
+	"time"
 
 	"dario.cat/mergo"
 	"github.com/BurntSushi/toml"
@@ -29,6 +30,9 @@ func DefaultConfig() *Config {
 		CCVAPIConfig:       CCVAPIConfig{},
 		ExecutorAPIConfig:  ExecutorAPIConfig{},
 		TokenPoolAPIConfig: TokenPoolAPIConfig{},
+		TokenStandardAPIConfig: TokenStandardAPIConfig{
+			SupplyCacheTTL: time.Second * 10,
+		},
 	}
 }
 
@@ -163,14 +167,19 @@ const (
 
 type Registry struct {
 	ContractIdentifier
-	TokenType TokenType `toml:"token_type" validate:"required,oneof=LINK"`
-	TokenId   string    `toml:"token_id" validate:"required"`
+	TokenType   TokenType `toml:"token_type" validate:"required,oneof=LINK"`
+	TokenId     string    `toml:"token_id" validate:"required"`
+	TokenName   string    `toml:"token_name"`
+	TokenSymbol string    `toml:"token_symbol"`
 }
 
 type TokenStandardAPIConfig struct {
-	Enabled    bool                `toml:"enabled"`
-	Admin      string              `toml:"admin" validate:"required_if=Enabled true"`
-	Registries map[string]Registry `toml:"registries" validate:"required_if=Enabled true,dive"`
+	Enabled bool `toml:"enabled"`
+	// The duration for which to cache a token's totalSupply.
+	// Defaults to 10 seconds if not specified.
+	SupplyCacheTTL time.Duration       `toml:"supply_cache_ttl"`
+	Admin          string              `toml:"admin" validate:"required_if=Enabled true"`
+	Registries     map[string]Registry `toml:"registries" validate:"required_if=Enabled true,dive"`
 }
 
 // ContractIdentifier uniquely identifies a contract using an InstanceAddress.
