@@ -218,7 +218,7 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		if err != nil {
 			return out, fmt.Errorf("resolve executor for remote chain %d: %w", remoteSelector, err)
 		}
-		defaultInboundCCVs, err := resolveDefaultInboundCCVs(ds, input.ChainSelector, remoteCfg)
+		defaultInboundCCVs, err := resolveDefaultInboundCCVs(input.ChainSelector, remoteCfg)
 		if err != nil {
 			return out, fmt.Errorf("resolve default inbound ccvs for remote chain %d: %w", remoteSelector, err)
 		}
@@ -570,23 +570,23 @@ func resolveContractRefsByAddresses(ds datastore.DataStore, chainSelector uint64
 }
 
 func resolveDefaultInboundCCVs(
-	ds datastore.DataStore,
 	chainSelector uint64,
 	remoteCfg ccipadapters.RemoteChainConfig[[]byte, string],
 ) ([]datastore.AddressRef, error) {
-	if len(remoteCfg.DefaultInboundCCVs) > 0 {
-		return resolveContractRefsByAddresses(
-			ds,
-			chainSelector,
-			datastore.ContractType(committeeverifierop.ContractType),
-			committeeverifierop.Version,
-			remoteCfg.DefaultInboundCCVs,
-		)
-	}
+	// A Canton CommitteeVerifier verifies Canton-origin messages on the destination chain (it is
+	// the *outbound* CCV consumed by the remote EVM side). It cannot verify EVM-origin messages
+	// on Canton, so it is never a valid *inbound* CCV for a Canton chain. chainlink-ccip's
+	// resolveDefaultCCVs auto-resolves the "default"-qualifier CommitteeVerifier into
+	// DefaultInboundCCVs when the lane YAML leaves it unset; honoring that here would silently
+	// produce an inbound lane backed by a verifier that can never verify — the opposite of
+	// fail-closed. Force the invalid-ccv sentinel as the default inbound CCV regardless of what
+	// was auto-resolved. Explicit per-lane inbound CCVs set via laneMandatedInboundCCVs are
+	// resolved separately (see configureChainForLanes) and remain honored.
+	_ = remoteCfg.DefaultInboundCCVs // explicitly ignored; see comment above
 
-	// Hardening: default inbound CCV is invalid-ccv (fail-closed) when not explicitly configured.
-	// The sentinel is hardcoded rather than resolved from the datastore so lanes stay fail-closed
-	// even when no invalid-ccv qualifier was ever written to the address book.
+	// Hardening: default inbound CCV is invalid-ccv (fail-closed). The sentinel is hardcoded
+	// rather than resolved from the datastore so lanes stay fail-closed even when no invalid-ccv
+	// qualifier was ever written to the address book.
 	ref, err := invalidCCVAddressRef(chainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("build default invalid-ccv inbound ref: %w", err)
