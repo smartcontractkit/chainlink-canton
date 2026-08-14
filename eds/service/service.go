@@ -180,7 +180,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		}(errChan)
 	}
 	if cfg.TokenStandardAPIConfig.Enabled {
-		tokenStandardAPIServer, err := token_standard.NewServer(ctx, logger, activeContractStore, cfg.TokenStandardAPIConfig)
+		tokenStandardAPIServer, err := token_standard.NewServer(ctx, logger, activeContractStore, instrumentHoldingStore, cfg.TokenStandardAPIConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create TokenStandard API: %w", err)
 		}

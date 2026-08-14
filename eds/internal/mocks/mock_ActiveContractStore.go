@@ -165,23 +165,23 @@ func (_c *MockActiveContractStore_GetByContractId_Call) RunAndReturn(run func(co
 }
 
 // GetByTemplateId provides a mock function for the type MockActiveContractStore
-func (_mock *MockActiveContractStore) GetByTemplateId(party types.PARTY, templateId contracts.TemplateID) (*v2.ActiveContract, bool) {
+func (_mock *MockActiveContractStore) GetByTemplateId(party types.PARTY, templateId contracts.TemplateID) ([]*v2.ActiveContract, bool) {
 	ret := _mock.Called(party, templateId)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetByTemplateId")
 	}
 
-	var r0 *v2.ActiveContract
+	var r0 []*v2.ActiveContract
 	var r1 bool
-	if returnFunc, ok := ret.Get(0).(func(types.PARTY, contracts.TemplateID) (*v2.ActiveContract, bool)); ok {
+	if returnFunc, ok := ret.Get(0).(func(types.PARTY, contracts.TemplateID) ([]*v2.ActiveContract, bool)); ok {
 		return returnFunc(party, templateId)
 	}
-	if returnFunc, ok := ret.Get(0).(func(types.PARTY, contracts.TemplateID) *v2.ActiveContract); ok {
+	if returnFunc, ok := ret.Get(0).(func(types.PARTY, contracts.TemplateID) []*v2.ActiveContract); ok {
 		r0 = returnFunc(party, templateId)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*v2.ActiveContract)
+			r0 = ret.Get(0).([]*v2.ActiveContract)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(types.PARTY, contracts.TemplateID) bool); ok {
@@ -222,12 +222,12 @@ func (_c *MockActiveContractStore_GetByTemplateId_Call) Run(run func(party types
 	return _c
 }
 
-func (_c *MockActiveContractStore_GetByTemplateId_Call) Return(activeContract *v2.ActiveContract, b bool) *MockActiveContractStore_GetByTemplateId_Call {
-	_c.Call.Return(activeContract, b)
+func (_c *MockActiveContractStore_GetByTemplateId_Call) Return(activeContracts []*v2.ActiveContract, b bool) *MockActiveContractStore_GetByTemplateId_Call {
+	_c.Call.Return(activeContracts, b)
 	return _c
 }
 
-func (_c *MockActiveContractStore_GetByTemplateId_Call) RunAndReturn(run func(party types.PARTY, templateId contracts.TemplateID) (*v2.ActiveContract, bool)) *MockActiveContractStore_GetByTemplateId_Call {
+func (_c *MockActiveContractStore_GetByTemplateId_Call) RunAndReturn(run func(party types.PARTY, templateId contracts.TemplateID) ([]*v2.ActiveContract, bool)) *MockActiveContractStore_GetByTemplateId_Call {
 	_c.Call.Return(run)
 	return _c
 }
