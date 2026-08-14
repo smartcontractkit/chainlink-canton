@@ -595,7 +595,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 							InstanceAddress: tokenPoolAddress.InstanceAddress(),
 						},
 						PoolOwner: partySender,
-						BurnMintFactory: &config.BurnMintFactory{
+						Factory: &config.Factory{
 							Type:            config.FactoryTypeAddress,
 							TemplateId:      new(link.LinkRegistry{}.GetTemplateID()),
 							Party:           new(partySender),
@@ -707,7 +707,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	ccipSenderCid := extractCreatedContractId(res)
 	t.Logf("Deployed CCIPSender: %s", ccipSenderCid)
 
-	// Prepare receiver address (destination party encoded as keccak256)
+	// Prepare EVM receiver address
 	receiver := hexutil.MustDecode("0xcf8def9adfe3dd90b3dffe42c8eabbf7cd4ee6ca")
 	receiverHex := hex.EncodeToString(receiver)
 
@@ -841,8 +841,9 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			Admin: oapiCommon.PartyId(nativeInstrumentId.Admin),
 			Id:    string(nativeInstrumentId.Id),
 		},
-		Payload:  "",
-		Receiver: "",
+		Payload:  testPayloadHex,
+		Sender:   partySender,
+		Receiver: receiverHex,
 		TokenTransfer: &oapiCommon.TokenTransfer{
 			Amount: tokenTransferAmountDecimal,
 			Token: oapiCommon.InstrumentId{

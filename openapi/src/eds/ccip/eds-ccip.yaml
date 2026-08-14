@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: CCIP Explicit Disclosure API
   description: Provides access to explicit disclosures required to send/execute CCIP messages from/to Canton.
-  version: 0.0.1
+  version: 1.0.0
 
 paths:
   /ccip/v1/global/PerPartyRouter/factory:
@@ -209,10 +209,13 @@ components:
       type: object
       required:
         - encodedMessage
+        - receiver
       properties:
         encodedMessage:
           type: string
           description: The CCIP message to be executed, encoded as a hex string.
+        receiver:
+          $ref: "../common/eds-common.yaml#/components/schemas/PartyId"
     CCIPExecuteResponse:
       type: object
       required:

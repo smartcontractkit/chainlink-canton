@@ -118,31 +118,21 @@ const (
 type FactoryType string
 
 const (
-	FactoryTypeDisabled FactoryType = ""
-	FactoryTypeAddress  FactoryType = "address"
-	FactoryTypeURL      FactoryType = "url"
+	FactoryTypeDisabled    FactoryType = ""
+	FactoryTypeAddress     FactoryType = "address"
+	FactoryTypeURL         FactoryType = "url"
+	FactoryTypeURLRequests FactoryType = "urlRequests"
 )
 
-type TransferFactory struct {
-	Type FactoryType `toml:"type" validate:"oneof='' address url"`
+type Factory struct {
+	Type FactoryType `toml:"type" validate:"oneof='' address url urlRequests"`
 
 	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
 	Party           *string                    `toml:"party" validate:"required_if=Type address"`
 	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
 
-	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"excluded_unless=Type url,required_if=Type url,omitnil,url"`
-	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url"`
-}
-
-type BurnMintFactory struct {
-	Type FactoryType `toml:"type" validate:"oneof='' address url"`
-
-	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
-	Party           *string                    `toml:"party" validate:"required_if=Type address"`
-	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
-
-	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"excluded_unless=Type url,required_if=Type url,omitnil,url"`
-	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url"`
+	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests,required_if=Type url,required_if=Type urlRequests,omitnil,url"`
+	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests"`
 }
 
 type TokenPool struct {
@@ -152,8 +142,7 @@ type TokenPool struct {
 	// The owner party of the token pool.
 	PoolOwner string `toml:"pool_owner" validate:"required"`
 
-	TransferFactory     *TransferFactory     `toml:"transfer_factory" validate:"excluded_unless=Type lockRelease"`
-	BurnMintFactory     *BurnMintFactory     `toml:"burn_mint_factory" validate:"excluded_unless=Type burnMint"`
+	Factory             *Factory             `toml:"factory" validate:"omitnil"`
 	TransferPreapproval *TransferPreapproval `toml:"transfer_preapproval" validate:"omitnil"`
 }
 

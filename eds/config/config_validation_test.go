@@ -31,17 +31,17 @@ func TestConfigValidation(t *testing.T) {
 
 	tests := []structSuite{
 		{
-			structName: "TransferFactory",
+			structName: "Factory",
 			tests: []test{
 				{
 					name: "Type invalid type",
-					s: TransferFactory{
+					s: Factory{
 						Type: "invalidtype",
 					},
 					wantErr: true,
 				}, {
 					name: "Type URL valid",
-					s: TransferFactory{
+					s: Factory{
 						Type:                    FactoryTypeURL,
 						TokenStandardURL:        new("http://eds.chain.link"),
 						TokenStandardAuthConfig: nil,
@@ -49,7 +49,7 @@ func TestConfigValidation(t *testing.T) {
 					wantErr: false,
 				}, {
 					name: "Type URL valid",
-					s: TransferFactory{
+					s: Factory{
 						Type:             FactoryTypeURL,
 						TokenStandardURL: new("https://eds.chain.link"),
 						TokenStandardAuthConfig: &commonconfig.AuthConfig{
@@ -60,35 +60,65 @@ func TestConfigValidation(t *testing.T) {
 					wantErr: false,
 				}, {
 					name: "Type URL invalid",
-					s: TransferFactory{
+					s: Factory{
 						Type:             FactoryTypeURL,
-						TokenStandardURL: nil,
+						TokenStandardURL: nil, // Required if Type = url
 					},
 					wantErr: true,
 				}, {
 					name: "Type URL invalid",
-					s: TransferFactory{
+					s: Factory{
 						Type:             FactoryTypeURL,
+						TokenStandardURL: nil,
+						TokenStandardAuthConfig: &commonconfig.AuthConfig{ // Must not be specified, unless TokenStandardURL is specified as well
+							Type: commonconfig.AuthTypeInsecureStatic,
+							JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
+						},
+					},
+					wantErr: true,
+				}, {
+					name: "Type urlRequests valid",
+					s: Factory{
+						Type:             FactoryTypeURLRequests,
+						TokenStandardURL: new("https://eds.chain.link"),
+						TokenStandardAuthConfig: &commonconfig.AuthConfig{
+							Type: commonconfig.AuthTypeInsecureStatic,
+							JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
+						},
+					},
+					wantErr: false,
+				}, {
+					name: "Type urlRequests valid",
+					s: Factory{
+						Type:                    FactoryTypeURLRequests,
+						TokenStandardURL:        new("https://eds.chain.link"),
+						TokenStandardAuthConfig: nil,
+					},
+					wantErr: false,
+				}, {
+					name: "Type urlRequests invalid",
+					s: Factory{
+						Type:             FactoryTypeURLRequests,
 						TokenStandardURL: nil,
 					},
 					wantErr: true,
 				}, {
 					name: "Type Disabled valid",
-					s: TransferFactory{
+					s: Factory{
 						Type:             FactoryTypeDisabled,
 						TokenStandardURL: nil,
 					},
 					wantErr: false,
 				}, {
 					name: "Type Disabled invalid",
-					s: TransferFactory{
+					s: Factory{
 						Type:             FactoryTypeDisabled,
 						TokenStandardURL: new("https://eds.chain.link"),
 					},
 					wantErr: true,
 				}, {
 					name: "Type Address valid",
-					s: TransferFactory{
+					s: Factory{
 						Type:            FactoryTypeAddress,
 						TemplateId:      new("#package.module.entity"),
 						Party:           new("partyid"),
@@ -97,7 +127,7 @@ func TestConfigValidation(t *testing.T) {
 					wantErr: false,
 				}, {
 					name: "Type Address invalid",
-					s: TransferFactory{
+					s: Factory{
 						Type:            FactoryTypeAddress,
 						TemplateId:      nil, // missing
 						Party:           new("partyid"),
@@ -106,7 +136,7 @@ func TestConfigValidation(t *testing.T) {
 					wantErr: true,
 				}, {
 					name: "Type Address invalid",
-					s: TransferFactory{
+					s: Factory{
 						Type:            FactoryTypeAddress,
 						TemplateId:      new("#package.module.entity"),
 						Party:           nil, // missing
@@ -115,7 +145,7 @@ func TestConfigValidation(t *testing.T) {
 					wantErr: true,
 				}, {
 					name: "Type Address invalid",
-					s: TransferFactory{
+					s: Factory{
 						Type:            FactoryTypeAddress,
 						TemplateId:      new("#package.module.entity"),
 						Party:           new("partyid"),
@@ -124,7 +154,7 @@ func TestConfigValidation(t *testing.T) {
 					wantErr: true,
 				}, {
 					name: "Type Address invalid",
-					s: TransferFactory{
+					s: Factory{
 						Type:             FactoryTypeAddress,
 						TemplateId:       new("#package.module.entity"),
 						Party:            new("partyid"),
@@ -134,7 +164,7 @@ func TestConfigValidation(t *testing.T) {
 					wantErr: true,
 				}, {
 					name: "Type Address invalid",
-					s: TransferFactory{
+					s: Factory{
 						Type:            FactoryTypeAddress,
 						TemplateId:      new("#package.module.entity"),
 						Party:           new("partyid"),
@@ -143,73 +173,6 @@ func TestConfigValidation(t *testing.T) {
 							Type: commonconfig.AuthTypeInsecureStatic,
 							JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 						}, // must not be specified
-					},
-					wantErr: true,
-				},
-			},
-		}, {
-			structName: "BurnMintFactory",
-			tests: []test{
-				{
-					name: "Type invalid type",
-					s: BurnMintFactory{
-						Type: "invalidtype",
-					},
-					wantErr: true,
-				}, {
-					name: "Type disabled valid",
-					s: BurnMintFactory{
-						Type: FactoryTypeDisabled,
-					},
-					wantErr: false,
-				}, {
-					name: "Type address valid",
-					s: BurnMintFactory{
-						Type:            FactoryTypeAddress,
-						TemplateId:      new("#package.module.entity"),
-						Party:           new("partyid"),
-						InstanceAddress: new(contracts.HexToInstanceAddress("0x1234")),
-					},
-					wantErr: false,
-				}, {
-					name: "Type Address invalid",
-					s: BurnMintFactory{
-						Type:            FactoryTypeAddress,
-						TemplateId:      nil, // missing
-						Party:           new("partyid"),
-						InstanceAddress: new(contracts.HexToInstanceAddress("0x1234")),
-					},
-					wantErr: true,
-				}, {
-					name: "Type Address invalid",
-					s: BurnMintFactory{
-						Type:            FactoryTypeAddress,
-						TemplateId:      new("#package.module.entity"),
-						Party:           nil, // missing
-						InstanceAddress: new(contracts.HexToInstanceAddress("0x1234")),
-					},
-					wantErr: true,
-				}, {
-					name: "Type Address invalid",
-					s: BurnMintFactory{
-						Type:            FactoryTypeAddress,
-						TemplateId:      new("#package.module.entity"),
-						Party:           new("partyid"),
-						InstanceAddress: nil, // missing
-					},
-					wantErr: true,
-				}, {
-					name: "Type url valid",
-					s: BurnMintFactory{
-						Type:             FactoryTypeURL,
-						TokenStandardURL: new("https://registry.example.com"),
-					},
-					wantErr: false,
-				}, {
-					name: "Type url invalid missing URL",
-					s: BurnMintFactory{
-						Type:             FactoryTypeURL,
-						TokenStandardURL: nil, // missing
 					},
 					wantErr: true,
 				},
@@ -226,12 +189,12 @@ func TestConfigValidation(t *testing.T) {
 						},
 						Type:                TokenPoolTypeBurnMint,
 						PoolOwner:           "owner",
-						BurnMintFactory:     nil,
+						Factory:             nil,
 						TransferPreapproval: nil,
 					},
 					wantErr: false,
 				}, {
-					name: "valid BurnMintFactory",
+					name: "valid Factory",
 					s: TokenPool{
 						ContractIdentifier: ContractIdentifier{
 							PartyID:         "owner",
@@ -239,14 +202,14 @@ func TestConfigValidation(t *testing.T) {
 						},
 						Type:      TokenPoolTypeBurnMint,
 						PoolOwner: "owner",
-						BurnMintFactory: &BurnMintFactory{
+						Factory: &Factory{
 							Type: FactoryTypeDisabled,
 						},
 						TransferPreapproval: nil,
 					},
 					wantErr: false,
 				}, {
-					name: "valid TransferFactory",
+					name: "valid Factory",
 					s: TokenPool{
 						ContractIdentifier: ContractIdentifier{
 							PartyID:         "owner",
@@ -254,7 +217,7 @@ func TestConfigValidation(t *testing.T) {
 						},
 						Type:      TokenPoolTypeLockRelease,
 						PoolOwner: "owner",
-						TransferFactory: &TransferFactory{
+						Factory: &Factory{
 							Type: FactoryTypeDisabled,
 						},
 						TransferPreapproval: nil,
@@ -269,7 +232,7 @@ func TestConfigValidation(t *testing.T) {
 						},
 						Type:      TokenPoolTypeBurnMint,
 						PoolOwner: "owner",
-						BurnMintFactory: &BurnMintFactory{
+						Factory: &Factory{
 							Type: FactoryTypeDisabled,
 						},
 						TransferPreapproval: &TransferPreapproval{
@@ -287,7 +250,7 @@ func TestConfigValidation(t *testing.T) {
 						},
 						Type:      TokenPoolTypeBurnMint,
 						PoolOwner: "owner",
-						BurnMintFactory: &BurnMintFactory{
+						Factory: &Factory{
 							Type: FactoryTypeDisabled,
 						},
 						TransferPreapproval: &TransferPreapproval{
@@ -297,7 +260,7 @@ func TestConfigValidation(t *testing.T) {
 					},
 					wantErr: true,
 				}, {
-					name: "invalid BurnMintFactory",
+					name: "invalid Factory",
 					s: TokenPool{
 						ContractIdentifier: ContractIdentifier{
 							PartyID:         "owner",
@@ -305,56 +268,9 @@ func TestConfigValidation(t *testing.T) {
 						},
 						Type:      TokenPoolTypeBurnMint,
 						PoolOwner: "owner",
-						BurnMintFactory: &BurnMintFactory{
+						Factory: &Factory{
 							Type: FactoryTypeAddress,
-						},
-						TransferPreapproval: nil,
-					},
-					wantErr: true,
-				}, {
-					name: "invalid TransferFactory",
-					s: TokenPool{
-						ContractIdentifier: ContractIdentifier{
-							PartyID:         "owner",
-							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
-						},
-						Type:      TokenPoolTypeLockRelease,
-						PoolOwner: "owner",
-						TransferFactory: &TransferFactory{
-							Type: FactoryTypeAddress,
-						},
-						TransferPreapproval: nil,
-					},
-					wantErr: true,
-				}, {
-					name: "invalid TransferFactory for TokenPoolTypeBurnMint",
-					s: TokenPool{
-						ContractIdentifier: ContractIdentifier{
-							PartyID:         "owner",
-							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
-						},
-						Type:      TokenPoolTypeBurnMint,
-						PoolOwner: "owner",
-						TransferFactory: &TransferFactory{
-							Type: FactoryTypeDisabled,
-						},
-						TransferPreapproval: nil,
-					},
-					wantErr: true,
-				}, {
-					name: "invalid BurnMintFactory for TokenPoolTypeLockRelease",
-					s: TokenPool{
-						ContractIdentifier: ContractIdentifier{
-							PartyID:         "owner",
-							InstanceAddress: contracts.HexToInstanceAddress("0x1234"),
-						},
-						Type:      TokenPoolTypeLockRelease,
-						PoolOwner: "owner",
-						BurnMintFactory: &BurnMintFactory{
-							Type: FactoryTypeDisabled,
-						},
-						TransferFactory: &TransferFactory{
-							Type: FactoryTypeDisabled,
+							// Missing InstanceAddress
 						},
 						TransferPreapproval: nil,
 					},
@@ -491,7 +407,7 @@ func TestPoolOnlyEDSConfigValidate(t *testing.T) {
 						InstanceAddress: poolAddr,
 					},
 					PoolOwner: partySender,
-					BurnMintFactory: &BurnMintFactory{
+					Factory: &Factory{
 						Type:            FactoryTypeAddress,
 						TemplateId:      new("#link.module.entity"),
 						Party:           new(partySender),
