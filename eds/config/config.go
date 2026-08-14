@@ -31,7 +31,7 @@ func DefaultConfig() *Config {
 		ExecutorAPIConfig:  ExecutorAPIConfig{},
 		TokenPoolAPIConfig: TokenPoolAPIConfig{},
 		TokenStandardAPIConfig: TokenStandardAPIConfig{
-			SupplyCacheTimeout: time.Second * 10,
+			SupplyCacheTTL: time.Second * 10,
 		},
 	}
 }
@@ -177,9 +177,9 @@ type TokenStandardAPIConfig struct {
 	Enabled bool `toml:"enabled"`
 	// The duration for which to cache a token's totalSupply.
 	// Defaults to 10 seconds if not specified.
-	SupplyCacheTimeout time.Duration       `toml:"supply_cache_timeout"`
-	Admin              string              `toml:"admin" validate:"required_if=Enabled true"`
-	Registries         map[string]Registry `toml:"registries" validate:"required_if=Enabled true,dive"`
+	SupplyCacheTTL time.Duration       `toml:"supply_cache_ttl"`
+	Admin          string              `toml:"admin" validate:"required_if=Enabled true"`
+	Registries     map[string]Registry `toml:"registries" validate:"required_if=Enabled true,dive"`
 }
 
 // ContractIdentifier uniquely identifies a contract using an InstanceAddress.

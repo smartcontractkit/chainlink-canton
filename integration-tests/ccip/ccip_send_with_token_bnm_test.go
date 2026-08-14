@@ -619,7 +619,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 						TokenSymbol: "LINK",
 					},
 				},
-				SupplyCacheTimeout: time.Nanosecond, // lower possible value, to practically disable caching
+				SupplyCacheTTL: time.Nanosecond, // lower possible value, to practically disable caching
 			},
 		})
 		log.Info().Err(err).Msg("EDS-pool terminated")

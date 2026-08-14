@@ -85,7 +85,7 @@ func NewServer(
 		instrumentHoldingStore:  instrumentHoldingStore,
 		admin:                   types.PARTY(cfg.Admin),
 		tokens:                  make(map[types.TEXT]TokenConfig),
-		tokenSupplyCacheTimeout: cfg.SupplyCacheTimeout,
+		tokenSupplyCacheTimeout: cfg.SupplyCacheTTL,
 		tokenSupplies:           make(map[string]tokenSupply),
 		tokenSupplyMux:          new(sync.Mutex),
 	}
@@ -180,16 +180,17 @@ func (s Server) ListInstruments(c *gin.Context, params oapiTokenMetadataV1.ListI
 		pageToken = parsedIndex
 	}
 
+	// Ensure the provided pageToken is valid
+	if pageToken < 0 || pageToken >= len(s.tokens) {
+		c.AbortWithStatusJSON(http.StatusBadRequest, oapiTokenMetadataV1.ErrorResponse{Error: "invalid pageToken"})
+		return
+	}
+
 	// Sort all configured tokens by ID
 	sortedTokenConfigs := maps.Values(s.tokens)
 	slices.SortFunc(sortedTokenConfigs, func(a, b TokenConfig) int {
 		return strings.Compare(a.TokenID, b.TokenID)
 	})
-
-	if pageToken < 0 || pageToken >= len(sortedTokenConfigs) {
-		c.AbortWithStatusJSON(http.StatusBadRequest, oapiTokenMetadataV1.ErrorResponse{Error: "invalid pageToken"})
-		return
-	}
 
 	endIndex := min(pageToken+int(pageSize), len(sortedTokenConfigs))
 
@@ -269,10 +270,13 @@ func (s Server) getTotalSupplyForInstrument(instrumentId string) (tokenSupply, e
 	// If not in cache or cache is stale, calculate total supply
 	tokenConfig := s.tokens[types.TEXT(instrumentId)]
 	snapshotTime := time.Now()
-	holdings, _ := s.instrumentHoldingStore.ListHoldings(splice_api_token_holding_v1.InstrumentId{
+	holdings, err := s.instrumentHoldingStore.ListHoldings(splice_api_token_holding_v1.InstrumentId{
 		Admin: s.admin,
 		Id:    types.TEXT(instrumentId),
 	})
+	if err != nil {
+		return tokenSupply{}, fmt.Errorf("failed to list holdings for instrument %s: %w", instrumentId, err)
+	}
 
 	totalSupply := new(big.Rat)
 	switch tokenConfig.Type {

@@ -228,7 +228,7 @@ chain_selector = "8706591216959472610"
 							TokenId:   "ChainLink",
 						},
 					},
-					SupplyCacheTimeout: time.Second * 10, // Default
+					SupplyCacheTTL: time.Second * 10, // Default
 				},
 				Node: NodeConfig{
 					URL: "localhost:8545",

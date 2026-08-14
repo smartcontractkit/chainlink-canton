@@ -225,7 +225,7 @@ func TestServer_GetInstrument(t *testing.T) {
 				TokenSymbol: "LINK2",
 			},
 		},
-		SupplyCacheTimeout: time.Second,
+		SupplyCacheTTL: time.Second,
 	})
 	require.NoError(t, err)
 	client := makeMetadataClient(t, server)
