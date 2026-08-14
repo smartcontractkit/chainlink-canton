@@ -452,11 +452,12 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		return fmt.Errorf("parse VerifierDestAddress: %w", err)
 	}
 
-	ccipExecuteDisclosure, err := eds.GetCCIPExecuteDisclosure(ctx, b.CCIPEDS, encodedHex)
+	receiverParty := types.PARTY(b.Participant.PartyID)
+	ccipExecuteDisclosure, err := eds.GetCCIPExecuteDisclosure(ctx, b.CCIPEDS, encodedHex, receiverParty)
 	if err != nil {
 		return fmt.Errorf("CCIP execute disclosure: %w", err)
 	}
-	ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, b.CCVEDS, encodedHex, verifierRawAddress.InstanceAddress())
+	ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, b.CCVEDS, encodedHex, verifierRawAddress.InstanceAddress(), receiverParty)
 	if err != nil {
 		return fmt.Errorf("CCV execute disclosure: %w", err)
 	}
@@ -483,7 +484,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		if err != nil {
 			return fmt.Errorf("get token pool: %w", err)
 		}
-		tokenPoolExecuteDisclosure, err := eds.GetTokenPoolExecuteDisclosure(ctx, b.TokenPoolEDS, encodedHex, tokenPoolAddress.InstanceAddress())
+		tokenPoolExecuteDisclosure, err := eds.GetTokenPoolExecuteDisclosure(ctx, b.TokenPoolEDS, encodedHex, tokenPoolAddress.InstanceAddress(), receiverParty)
 		if err != nil {
 			return fmt.Errorf("token pool execute disclosure: %w", err)
 		}
@@ -522,7 +523,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 					ChoiceArgument: ledger.MapToValue(executeArgs),
 				}},
 			}},
-			ActAs:              []string{b.Participant.PartyID},
+			ActAs:              []string{string(receiverParty)},
 			DisclosedContracts: allDisclosures,
 		},
 	})
@@ -747,7 +748,12 @@ func cantonSend(
 		},
 		GasLimit: gasLimit,
 		Payload:  hex.EncodeToString(payload),
+		Sender:   b.Participant.PartyID,
 		Receiver: hex.EncodeToString(receiver.Bytes()),
+	}
+	tokenTransferHoldings := make([]string, len(tokenTransferInputCids))
+	for i, cid := range tokenTransferInputCids {
+		tokenTransferHoldings[i] = string(cid)
 	}
 	if withToken {
 		msg.TokenTransfer = &oapiCommon.TokenTransfer{
@@ -756,6 +762,7 @@ func cantonSend(
 				Admin: oapiCommon.PartyId(linkInstrumentId.Admin),
 				Id:    string(linkInstrumentId.Id),
 			},
+			HoldingContractIds: new(tokenTransferHoldings),
 		}
 	}
 

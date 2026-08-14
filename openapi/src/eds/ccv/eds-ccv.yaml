@@ -119,10 +119,13 @@ components:
       type: object
       required:
         - encodedMessage
+        - receiver
       properties:
         encodedMessage:
           type: string
           description: The CCIP message to be executed, encoded as a hex string.
+        receiver:
+          $ref: "../common/eds-common.yaml#/components/schemas/PartyId"
     CCVExecuteResponse:
       type: object
       required:

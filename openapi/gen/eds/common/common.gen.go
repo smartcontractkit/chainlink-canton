@@ -79,6 +79,9 @@ type Message struct {
 	// Receiver The receiver of the message on the remote chain, encoded as a hex string.
 	Receiver string `json:"receiver"`
 
+	// Sender The unique identifier of a party.
+	Sender PartyId `json:"sender"`
+
 	// TokenTransfer A token transfer to be included in the message, set to null if the message does not include a token transfer.
 	TokenTransfer *TokenTransfer `json:"tokenTransfer,omitempty"`
 }
@@ -105,7 +108,8 @@ type RawOrHashedInstrumentId struct {
 // TokenTransfer A token transfer to be included in the message, set to null if the message does not include a token transfer.
 type TokenTransfer struct {
 	// Amount The decimal amount of the token to be transferred.
-	Amount string `json:"amount"`
+	Amount             string        `json:"amount"`
+	HoldingContractIds *[]ContractId `json:"holdingContractIds,omitempty"`
 
 	// Token A globally unique identifier for instruments.
 	Token InstrumentId `json:"token"`
