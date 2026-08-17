@@ -27,20 +27,13 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.107
 	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0-00010101000000-000000000000
-	github.com/smartcontractkit/chainlink-canton/registry-kit v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-canton/registry-kit v0.0.0
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260811072549-2a0dec67e6be
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260811072549-2a0dec67e6be
 	github.com/smartcontractkit/chainlink-ccv v0.2.1-0.20260811153216-3f3baa768540
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.3.1-0.20260811153216-3f3baa768540
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260715145851-8219609496a4
 	github.com/smartcontractkit/chainlink-deployments-framework v0.118.1
-	github.com/smartcontractkit/chainlink-canton/registry-kit v0.0.0
-	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260629123053-9119c0d88425
-	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260629123053-9119c0d88425
-	github.com/smartcontractkit/chainlink-ccv v0.0.2-0.20260630070014-13227c2d12d0
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.0.2-0.20260630070014-13227c2d12d0
-	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260506120607-7f10be016c89
-	github.com/smartcontractkit/chainlink-deployments-framework v0.114.2
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/smartcontractkit/mcms v0.52.0
