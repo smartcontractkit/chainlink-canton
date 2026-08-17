@@ -584,9 +584,9 @@ func runRegistryTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlo
 	require.NoError(t, err)
 	receiverBalanceBefore, _ := new(big.Float).SetRat(receiverBalanceRatBefore).Float64()
 
-	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(ctx, ccipAPIClient, encodedMessageHex)
+	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(ctx, ccipAPIClient, encodedMessageHex, types.PARTY(partyReceiver))
 	require.NoError(t, err)
-	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(ctx, ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress())
+	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(ctx, ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress(), types.PARTY(partyReceiver))
 	require.NoError(t, err)
 
 	poolExecuteDeps := registryPoolExecuteDeps{
