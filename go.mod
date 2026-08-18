@@ -45,7 +45,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/spf13/viper v1.21.0
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 	github.com/testcontainers/testcontainers-go v0.44.0
 	go.opentelemetry.io/otel v1.45.0
 	go.opentelemetry.io/otel/metric v1.45.0
@@ -410,7 +410,6 @@ require (
 	github.com/pion/logging v0.2.4 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/term v1.2.0-beta.2 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/pressly/goose/v3 v3.26.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
