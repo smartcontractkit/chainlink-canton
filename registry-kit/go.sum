@@ -694,8 +694,8 @@ github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12i
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20260529134643-c101335a64cd h1:ksFjz3ytjK4kH5HFHpLKzDS0/9gmeSuvii1rs8FlxrI=
 github.com/smartcontractkit/libocr v0.0.0-20260529134643-c101335a64cd/go.mod h1:PLdNK6GlqfxIWXzziPkU7dCAVlVFeYkyyW7AQY0R+4Q=
-github.com/smartcontractkit/mcms v0.52.0 h1:Wd/gPEobbxp2i2//VH/bmirOa3BFCEqpkQyhN6RH6O8=
-github.com/smartcontractkit/mcms v0.52.0/go.mod h1:hhtJjnA7E0aHECAK8y+qN6Tdfu15K9MbdwmQLTiRRkM=
+github.com/smartcontractkit/mcms v0.52.1 h1:IJuRo+49XdDsdvtTIBapNcfpRB2CFs9YLh58dQvDkh0=
+github.com/smartcontractkit/mcms v0.52.1/go.mod h1:V5d1+cQgT2ekd/ukagHGnc81fD8oJLIxXJUYGJQaCbg=
 github.com/spf13/cast v1.10.0 h1:h2x0u2shc1QuLHfxi+cTJvs30+ZAHOGRic8uyGTDWxY=
 github.com/spf13/cast v1.10.0/go.mod h1:jNfB8QC9IA6ZuY2ZjDp0KtFO2LZZlg4S/7bzP6qqeHo=
 github.com/spf13/pflag v1.0.10 h1:4EBh2KAYBwaONj6b2Ye1GiHfwjqyROoF4RwYO+vPwFk=
