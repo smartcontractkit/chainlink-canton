@@ -444,7 +444,13 @@ func (a *CantonChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig(
 func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(sourceChainSelector, _ uint64, chainFamilySelector [4]byte) ccipadapters.FeeQuoterDestChainConfigOverrides {
 	if isEVMSelector(sourceChainSelector) {
 		// Canton has no gas market and execution is manual, so every gas-derived field is
-		// zeroed and the lane is priced by a flat network fee instead.
+		// zeroed and the lane is priced by a flat network fee instead. USDPerUnitGas is still
+		// required: the EVM FeeQuoter 2.0 unconditionally reverts NoGasPriceAvailable in
+		// quoteGasForExec for any enabled destination that has no gas-price entry, regardless of
+		// family, so an EVM source must seed a Canton gas price via FeeQuoter::UpdatePrices even
+		// though Canton is priced flat. The value mirrors the non-EVM branch
+		// (defaultCantonFeeQuoterDestChainConfig().V2Params.USDPerUnitGas = 38, i.e. 0.0000000038
+		// USD/gas) and the gas price the Canton-side configure sequence pushes for its EVM remote.
 		return ccipadapters.FeeQuoterDestChainConfigOverrides{
 			IsEnabled:                   new(true),
 			MaxDataBytes:                new(uint32(32_000)),
@@ -457,7 +463,7 @@ func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(sourceChai
 			DefaultTxGasLimit:           new(uint32(1)),
 			NetworkFeeUSDCents:          new(uint16(50)),
 			LinkFeeMultiplierPercent:    new(uint8(90)),
-			// USDPerUnitGas is left unset to avoid a gas price update by default.
+			USDPerUnitGas:               defaultCantonFeeQuoterDestChainConfig().V2Params.USDPerUnitGas,
 		}
 	}
 
