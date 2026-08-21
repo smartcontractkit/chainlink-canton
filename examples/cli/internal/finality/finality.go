@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/ccipcodec"
 )
 
 // Parsed holds the EVM extraArgs finality and matching Canton receiver config.

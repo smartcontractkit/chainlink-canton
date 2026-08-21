@@ -14,10 +14,10 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
-	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/mcmstest"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/mcms/api"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/mcms/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/mcms/mcmstest"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 

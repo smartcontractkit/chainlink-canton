@@ -1,10 +1,12 @@
 module github.com/smartcontractkit/chainlink-canton/registry-kit
 
-go 1.26.5
-
-replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
+go 1.27.0
 
 replace github.com/smartcontractkit/chainlink-canton => ../
+
+replace github.com/smartcontractkit/chainlink-canton/contracts => ../contracts
+
+replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
 
 replace (
 	github.com/smartcontractkit/chainlink-ccip => github.com/smartcontractkit/chainlink-ccip v0.0.0-20260416055149-75c017f534ca
@@ -15,6 +17,7 @@ require (
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/google/uuid v1.6.0
 	github.com/smartcontractkit/chainlink-canton v0.0.0
+	github.com/smartcontractkit/chainlink-canton/contracts v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-deployments-framework v0.118.1
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 )
@@ -73,7 +76,7 @@ require (
 	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.1 // indirect
 	github.com/ethereum/c-kzg-4844/v2 v2.1.8 // indirect
-	github.com/ethereum/go-ethereum v1.17.4 // indirect
+	github.com/ethereum/go-ethereum v1.17.5 // indirect
 	github.com/fatih/color v1.19.0 // indirect
 	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
@@ -209,7 +212,7 @@ require (
 	github.com/stephenlacy/go-ethereum-hdwallet v0.0.0-20230913225845-a4fa94429863 // indirect
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
-	github.com/stretchr/testify v1.12.0 // indirect
+	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
 	github.com/testcontainers/testcontainers-go v0.44.0 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
@@ -253,18 +256,19 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/ratelimit v0.3.1 // indirect
 	go.uber.org/zap v1.28.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
-	golang.org/x/exp v0.0.0-20260508232706-74f9aab9d74a // indirect
-	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/exp v0.0.0-20260820142414-ca536658362e // indirect
+	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.48.0 // indirect
+	golang.org/x/tools v0.49.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	google.golang.org/grpc v1.83.0 // indirect

@@ -13,13 +13,13 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	factorybindings "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/factory"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	factorybindings "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/factory"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/link"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/splice/splice_api_token_metadata_v1"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
-	linkregistry "github.com/smartcontractkit/chainlink-canton/deployment/operations/linkregistry"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/linkregistry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 

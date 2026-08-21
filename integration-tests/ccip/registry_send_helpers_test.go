@@ -9,10 +9,10 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/ratelimiter"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ccip"

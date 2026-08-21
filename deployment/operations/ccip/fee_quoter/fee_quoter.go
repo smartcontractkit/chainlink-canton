@@ -9,8 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 

@@ -9,8 +9,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
-	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/mcms/api"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 

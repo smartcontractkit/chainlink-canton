@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )

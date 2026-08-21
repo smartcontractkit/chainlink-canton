@@ -1,0 +1,108 @@
+name: Release Contract Artifacts
+on:
+  push:
+    tags:
+      - 'contracts/v*.*.*' # Trigger on all contracts tags ending with /vX.X.X
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release_contracts:
+    name: Release Contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Create contract artifacts
+        working-directory: contracts
+        run: |
+          zip -r -j dars-${{ env.VERSION }}.zip ./dars/released
+          ARTIFACTS_CHECKSUM=$(sha256 ./dars-${{ env.VERSION }}.zip)
+          echo "Checksum: $ARTIFACTS_CHECKSUM"
+          echo "ARTIFACTS_CHECKSUM=$ARTIFACTS_CHECKSUM" >> "$GITHUB_ENV"
+      - name: Extract Package Name from Tag
+        id: extract_package_name
+        run: |
+          TAG_REF="${GITHUB_REF#refs/tags/}"
+          PACKAGE_NAME="${TAG_REF%/*}"
+          VERSION="${TAG_REF##*/}"
+          echo "Tag Reference: $TAG_REF"
+          echo "Package Name: $PACKAGE_NAME"
+          echo "Version: $VERSION"
+
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Find Last Tag for Package and Generate Release Notes
+        id: generate_release_notes
+        working-directory: contracts
+        run: |
+          # Find the latest tag for the same package that is not the current tag
+          # shellcheck disable=SC2046
+          LAST_TAG=$(git describe --abbrev=0 --always --match "$PACKAGE_NAME/v*" --tags $(git rev-list --tags --skip=1 --max-count=1))
+          echo "Last tag: ${LAST_TAG}"
+
+          # If no previous tag is found, use the initial commit as the reference
+          if [ -z "$LAST_TAG" ]; then
+            LAST_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          # Extract the version part of the last tag
+          LAST_TAG_VERSION="${LAST_TAG##*/}"
+          echo "Last tag version: $LAST_TAG_VERSION"
+          echo "LAST_TAG_VERSION=${LAST_TAG_VERSION}" >> "$GITHUB_ENV"
+
+          # Get the commits between the last tag and the current tag that have updated released artifacts
+          COMMITS=$(git log "$LAST_TAG..$PACKAGE_NAME/$VERSION" --pretty=format:"- %s (%h)" -- contracts)
+
+          # Output the release notes
+          echo "Commits:"
+          echo "$COMMITS"
+
+          # Safely set the release notes as an environment variable using heredoc and EOF
+          # shellcheck disable=SC2129
+          echo "COMMITS<<EOF" >> "$GITHUB_ENV"
+          echo "$COMMITS" >> "$GITHUB_ENV"
+          echo "EOF" >> "$GITHUB_ENV"
+      - name: Read Additional Release Notes from File
+        if: always()
+        working-directory: contracts
+        id: read_additional_notes
+        run: |
+          
+          # Check if the .changeset directory exists and the file for the current version is present
+          if [ -f ".changeset/${{ env.VERSION }}.md" ]; then
+            # Read the content of the file
+            RELEASE_NOTES=$(cat ".changeset/${{ env.VERSION }}.md")
+
+            # Format the release notes into FULL_RELEASE_NOTES
+            # shellcheck disable=SC2129
+            echo "FULL_RELEASE_NOTES<<EOF" >> "$GITHUB_ENV"
+          
+            echo "## Release notes:" >> "$GITHUB_ENV"
+            echo "$RELEASE_NOTES" >> "$GITHUB_ENV"
+            echo "" >> "$GITHUB_ENV"
+            echo "## Commits:" >> "$GITHUB_ENV"
+            echo "${{ env.COMMITS }}" >> "$GITHUB_ENV"
+            echo "" >> "$GITHUB_ENV"
+            echo "## Checksum" >> "$GITHUB_ENV"
+            echo "${{ env.ARTIFACTS_CHECKSUM }}" >> "$GITHUB_ENV"
+          
+            echo "EOF" >> "$GITHUB_ENV"
+          else
+            # Print error message and fail the pipeline if the file is not found
+            echo "Error: Release notes file '.changeset/${{ env.VERSION }}.md' not found."
+            exit 1
+          fi
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          working_directory: contracts
+          body: ${{ env.FULL_RELEASE_NOTES }}
+          fail_on_unmatched_files: true
+          make_latest: true
+          files: |
+            dars-${{ env.VERSION }}.zip

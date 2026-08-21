@@ -18,9 +18,9 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"

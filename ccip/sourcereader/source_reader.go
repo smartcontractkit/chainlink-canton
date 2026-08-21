@@ -19,10 +19,10 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
@@ -503,18 +503,18 @@ func (c *sourceReader) LatestAndFinalizedBlock(ctx context.Context) (latest, fin
 	parentHash := parentHash(offsetUint64)
 
 	return &protocol.BlockHeader{
-			Number:     offsetUint64,
-			Hash:       h,
-			ParentHash: parentHash,
-			// TODO: determine if we can get an offset's timestamp.
-			// Timestamp: time.Time{},
-		}, &protocol.BlockHeader{
-			Number:     offsetUint64,
-			Hash:       h,
-			ParentHash: parentHash,
-			// TODO: determine if we can get an offset's timestamp.
-			// Timestamp: time.Time{},
-		}, nil
+		Number:     offsetUint64,
+		Hash:       h,
+		ParentHash: parentHash,
+		// TODO: determine if we can get an offset's timestamp.
+		// Timestamp: time.Time{},
+	}, &protocol.BlockHeader{
+		Number:     offsetUint64,
+		Hash:       h,
+		ParentHash: parentHash,
+		// TODO: determine if we can get an offset's timestamp.
+		// Timestamp: time.Time{},
+	}, nil
 }
 
 func (c *sourceReader) LatestSafeBlock(ctx context.Context) (safe *protocol.BlockHeader, err error) {
