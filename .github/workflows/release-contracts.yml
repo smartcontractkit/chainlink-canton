@@ -41,21 +41,16 @@ jobs:
         working-directory: contracts
         run: |
           # Find the latest tag for the same package that is not the current tag
-          # shellcheck disable=SC2046
-          LAST_TAG=$(git describe --abbrev=0 --always --match "$PACKAGE_NAME/v*" --tags $(git rev-list --tags --skip=1 --max-count=1))
-          echo "Last tag: ${LAST_TAG}"
+          LAST_TAG=$(git tag --sort=-creatordate --list "$PACKAGE_NAME/v*" | grep -Fxv "$PACKAGE_NAME/$VERSION" | head -n 1 || true)
 
           # If no previous tag is found, use the initial commit as the reference
           if [ -z "$LAST_TAG" ]; then
             LAST_TAG=$(git rev-list --max-parents=0 HEAD)
           fi
-
-          # Extract the version part of the last tag
-          LAST_TAG_VERSION="${LAST_TAG##*/}"
-          echo "Last tag version: $LAST_TAG_VERSION"
-          echo "LAST_TAG_VERSION=${LAST_TAG_VERSION}" >> "$GITHUB_ENV"
+          echo "Last tag: ${LAST_TAG}"
 
           # Get the commits between the last tag and the current tag that have updated released artifacts
+          echo "Getting commits between $LAST_TAG and $PACKAGE_NAME/$VERSION"
           COMMITS=$(git log "$LAST_TAG..$PACKAGE_NAME/$VERSION" --pretty=format:"- %s (%h)" -- contracts)
 
           # Output the release notes
