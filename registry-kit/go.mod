@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-canton/registry-kit
 
-go 1.27.0
+go 1.26.5
 
 replace github.com/smartcontractkit/chainlink-canton => ../
 
