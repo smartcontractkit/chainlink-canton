@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-canton/contracts
 
-go 1.26.5
+go 1.26.7
 
 require (
 	github.com/digital-asset/dazl-client/v8 v8.9.0
