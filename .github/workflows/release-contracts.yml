@@ -17,13 +17,6 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-      - name: Create contract artifacts
-        working-directory: contracts
-        run: |
-          zip -r -j dars-${{ env.VERSION }}.zip ./dars/released
-          ARTIFACTS_CHECKSUM=$(sha256 ./dars-${{ env.VERSION }}.zip)
-          echo "Checksum: $ARTIFACTS_CHECKSUM"
-          echo "ARTIFACTS_CHECKSUM=$ARTIFACTS_CHECKSUM" >> "$GITHUB_ENV"
       - name: Extract Package Name from Tag
         id: extract_package_name
         run: |
@@ -36,6 +29,13 @@ jobs:
 
           echo "PACKAGE_NAME=$PACKAGE_NAME" >> "$GITHUB_ENV"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Create contract artifacts
+        working-directory: contracts
+        run: |
+          zip -r -j dars-${{ env.VERSION }}.zip ./dars/released
+          ARTIFACTS_CHECKSUM=$(sha256sum ./dars-${{ env.VERSION }}.zip | awk '{print $1}')
+          echo "Checksum: $ARTIFACTS_CHECKSUM"
+          echo "ARTIFACTS_CHECKSUM=$ARTIFACTS_CHECKSUM" >> "$GITHUB_ENV"
       - name: Find Last Tag for Package and Generate Release Notes
         id: generate_release_notes
         working-directory: contracts
