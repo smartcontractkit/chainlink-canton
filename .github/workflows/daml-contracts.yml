@@ -117,7 +117,7 @@ jobs:
         uses: ./.github/actions/install-dpm
       - name: Test Daml Contracts
         working-directory: contracts
-        run: go run ./cmd/test --root ./contracts --plain --output ./summary.md
+        run: go run ./cmd/test --root . --plain --output ./summary.md
       - name: Output test summary
         if: always()
         working-directory: contracts
