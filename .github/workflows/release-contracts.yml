@@ -82,7 +82,7 @@ jobs:
             echo "## Commits:" >> "$GITHUB_ENV"
             echo "${{ env.COMMITS }}" >> "$GITHUB_ENV"
             echo "" >> "$GITHUB_ENV"
-            echo "## Checksum" >> "$GITHUB_ENV"
+            echo "## Dar Checksum" >> "$GITHUB_ENV"
             echo "${{ env.ARTIFACTS_CHECKSUM }}" >> "$GITHUB_ENV"
           
             echo "EOF" >> "$GITHUB_ENV"
