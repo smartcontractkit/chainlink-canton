@@ -4,6 +4,7 @@ WORKDIR /build
 
 # Copy module files first to maximize cache reuse (deps layer invalidated only when go.mod/go.sum change)
 COPY go.mod go.sum ./
+COPY ./contracts ./contracts
 RUN --mount=type=cache,target=/go/pkg/mod,id=canton-go-mod \
     go mod download
 

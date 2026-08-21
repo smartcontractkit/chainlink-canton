@@ -4,6 +4,7 @@ FROM golang:1.26.7-alpine@sha256:28d89ee9cc0ff9fec75c82ca201e6bf7fdf9a679d4b7b24
 # Layer 1: Download dependencies first to leverage Docker layer caching
 WORKDIR /build
 COPY go.mod go.sum ./
+COPY ./contracts ./contracts
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
