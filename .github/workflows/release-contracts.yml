@@ -32,8 +32,8 @@ jobs:
       - name: Create contract artifacts
         working-directory: contracts
         run: |
-          zip -9 -r -j dars-${{ env.VERSION }}.zip ./dars/released
-          ARTIFACTS_CHECKSUM=$(sha256sum ./dars-${{ env.VERSION }}.zip | awk '{print $1}')
+          zip -9 -r -j chainlink-ccip-${{ env.VERSION }}.zip ./dars/released
+          ARTIFACTS_CHECKSUM=$(sha256sum ./chainlink-ccip-${{ env.VERSION }}.zip | awk '{print $1}')
           echo "Checksum: $ARTIFACTS_CHECKSUM"
           echo "ARTIFACTS_CHECKSUM=$ARTIFACTS_CHECKSUM" >> "$GITHUB_ENV"
       - name: Find Last Tag for Package and Generate Release Notes
@@ -83,7 +83,7 @@ jobs:
             echo "${{ env.COMMITS }}" >> "$GITHUB_ENV"
             echo "" >> "$GITHUB_ENV"
             echo "## Dar Checksum" >> "$GITHUB_ENV"
-            echo "`dars-${{ env.VERSION }}.zip` - `${{ env.ARTIFACTS_CHECKSUM }}`" >> "$GITHUB_ENV"
+            printf '`%s` - `%s`\n' "chainlink-ccip-${{ env.VERSION }}.zip" "${{ env.ARTIFACTS_CHECKSUM }}" >> "$GITHUB_ENV"
           
             echo "EOF" >> "$GITHUB_ENV"
           else
@@ -99,4 +99,4 @@ jobs:
           fail_on_unmatched_files: true
           make_latest: true
           files: |
-            dars-${{ env.VERSION }}.zip
+            chainlink-ccip-${{ env.VERSION }}.zip
