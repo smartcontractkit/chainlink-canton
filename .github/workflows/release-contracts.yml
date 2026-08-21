@@ -38,7 +38,6 @@ jobs:
           echo "ARTIFACTS_CHECKSUM=$ARTIFACTS_CHECKSUM" >> "$GITHUB_ENV"
       - name: Find Last Tag for Package and Generate Release Notes
         id: generate_release_notes
-        working-directory: contracts
         run: |
           # Find the latest tag for the same package that is not the current tag
           LAST_TAG=$(git tag --sort=-creatordate --list "$PACKAGE_NAME/v*" | grep -Fxv "$PACKAGE_NAME/$VERSION" | head -n 1 || true)
