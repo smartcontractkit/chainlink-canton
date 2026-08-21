@@ -23,8 +23,8 @@ type InstrumentHoldingStore struct {
 	filters FiltersByParty
 
 	mux sync.RWMutex
-	// Party -> InstrumentId -> ContractId -> Holding
-	holdings        map[types.PARTY]map[splice_api_token_holding_v1.InstrumentId]map[types.CONTRACT_ID]*apiv2.ActiveContract
+	// InstrumentId -> Party -> ContractId -> Holding
+	holdings        map[splice_api_token_holding_v1.InstrumentId]map[types.PARTY]map[types.CONTRACT_ID]*apiv2.ActiveContract
 	activeContracts map[types.CONTRACT_ID]splice_api_token_holding_v1.HoldingView
 }
 
@@ -77,7 +77,7 @@ func (s *InstrumentHoldingStore) Run(ctx context.Context, streamConfig StreamCon
 	}
 
 	s.mux.Lock()
-	s.holdings = make(map[types.PARTY]map[splice_api_token_holding_v1.InstrumentId]map[types.CONTRACT_ID]*apiv2.ActiveContract)
+	s.holdings = make(map[splice_api_token_holding_v1.InstrumentId]map[types.PARTY]map[types.CONTRACT_ID]*apiv2.ActiveContract)
 	s.activeContracts = make(map[types.CONTRACT_ID]splice_api_token_holding_v1.HoldingView)
 	s.mux.Unlock()
 
@@ -88,15 +88,15 @@ func (s *InstrumentHoldingStore) GetHolding(party types.PARTY, instrumentId spli
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
-	partyHoldings, ok := s.holdings[party]
+	instrumentHoldings, ok := s.holdings[instrumentId]
 	if !ok {
 		return nil, false
 	}
-	instrumentHoldings, ok := partyHoldings[instrumentId]
+	partyHoldings, ok := instrumentHoldings[party]
 	if !ok {
 		return nil, false
 	}
-	holdings := maps.Values(instrumentHoldings)
+	holdings := maps.Values(partyHoldings)
 
 	// Clone all holdings before returning them
 	out := make([]*apiv2.ActiveContract, len(holdings))
@@ -105,6 +105,25 @@ func (s *InstrumentHoldingStore) GetHolding(party types.PARTY, instrumentId spli
 	}
 
 	return out, true
+}
+
+func (s *InstrumentHoldingStore) ListHoldings(instrumentId splice_api_token_holding_v1.InstrumentId) ([]*apiv2.ActiveContract, error) {
+	s.mux.RLock()
+	defer s.mux.RUnlock()
+
+	instrumentHoldings, ok := s.holdings[instrumentId]
+	if !ok {
+		return []*apiv2.ActiveContract{}, nil
+	}
+
+	holdings := make([]*apiv2.ActiveContract, 0)
+	for _, partyHoldings := range instrumentHoldings {
+		for _, holding := range partyHoldings {
+			holdings = append(holdings, proto.CloneOf(holding)) // Clone each holding before adding to the list
+		}
+	}
+
+	return holdings, nil
 }
 
 func (s *InstrumentHoldingStore) onActiveContract(ctx context.Context, activeContract *apiv2.ActiveContract) error {
@@ -116,20 +135,20 @@ func (s *InstrumentHoldingStore) onActiveContract(ctx context.Context, activeCon
 
 	s.mux.Lock()
 	for _, view := range holdingViews {
-		partyHoldings := s.holdings[view.Owner]
-		if partyHoldings == nil {
-			partyHoldings = make(map[splice_api_token_holding_v1.InstrumentId]map[types.CONTRACT_ID]*apiv2.ActiveContract)
+		instrumentHoldings := s.holdings[view.InstrumentId]
+		if instrumentHoldings == nil {
+			instrumentHoldings = make(map[types.PARTY]map[types.CONTRACT_ID]*apiv2.ActiveContract)
 		}
 
-		instrumentHoldings := partyHoldings[view.InstrumentId]
-		if instrumentHoldings == nil {
-			instrumentHoldings = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
+		partyHoldings := instrumentHoldings[view.Owner]
+		if partyHoldings == nil {
+			partyHoldings = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
 		}
 
 		s.activeContracts[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = view
-		instrumentHoldings[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = proto.CloneOf(activeContract) // Create a copy of the ActiveContract
-		partyHoldings[view.InstrumentId] = instrumentHoldings
-		s.holdings[view.Owner] = partyHoldings
+		partyHoldings[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = proto.CloneOf(activeContract) // Create a copy of the ActiveContract
+		instrumentHoldings[view.Owner] = partyHoldings
+		s.holdings[view.InstrumentId] = instrumentHoldings
 	}
 	s.mux.Unlock()
 
@@ -145,24 +164,24 @@ func (s *InstrumentHoldingStore) onCreatedEvent(ctx context.Context, transaction
 
 	s.mux.Lock()
 	for _, view := range holdingViews {
-		partyHoldings := s.holdings[view.Owner]
-		if partyHoldings == nil {
-			partyHoldings = make(map[splice_api_token_holding_v1.InstrumentId]map[types.CONTRACT_ID]*apiv2.ActiveContract)
+		instrumentHoldings := s.holdings[view.InstrumentId]
+		if instrumentHoldings == nil {
+			instrumentHoldings = make(map[types.PARTY]map[types.CONTRACT_ID]*apiv2.ActiveContract)
 		}
 
-		instrumentHoldings := partyHoldings[view.InstrumentId]
-		if instrumentHoldings == nil {
-			instrumentHoldings = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
+		partyHoldings := instrumentHoldings[view.Owner]
+		if partyHoldings == nil {
+			partyHoldings = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
 		}
 
 		s.activeContracts[types.CONTRACT_ID(createdEvent.GetContractId())] = view
-		instrumentHoldings[types.CONTRACT_ID(createdEvent.GetContractId())] = &apiv2.ActiveContract{
+		partyHoldings[types.CONTRACT_ID(createdEvent.GetContractId())] = &apiv2.ActiveContract{
 			CreatedEvent:        proto.CloneOf(createdEvent), // Create a copy of the CreatedEvent
 			SynchronizerId:      transaction.GetSynchronizerId(),
 			ReassignmentCounter: 0,
 		}
-		partyHoldings[view.InstrumentId] = instrumentHoldings
-		s.holdings[view.Owner] = partyHoldings
+		instrumentHoldings[view.Owner] = partyHoldings
+		s.holdings[view.InstrumentId] = instrumentHoldings
 	}
 	s.mux.Unlock()
 
@@ -177,18 +196,18 @@ func (s *InstrumentHoldingStore) onArchivedEvent(ctx context.Context, _ *apiv2.T
 	if !ok {
 		return fmt.Errorf("archived event for contract %v with no active contract record", archivedEvent.GetContractId())
 	}
-	partyHoldings, ok := s.holdings[holdingView.Owner]
-	if !ok {
-		return fmt.Errorf("archived event for contract %v with no holdings for owner %v", archivedEvent.GetContractId(), holdingView.Owner)
-	}
-	instrumentHoldings, ok := partyHoldings[holdingView.InstrumentId]
+	instrumentHoldings, ok := s.holdings[holdingView.InstrumentId]
 	if !ok {
 		return fmt.Errorf("archived event for contract %v with no holdings for instrument %v for owner %v", archivedEvent.GetContractId(), holdingView.InstrumentId, holdingView.Owner)
 	}
+	partyHoldings, ok := instrumentHoldings[holdingView.Owner]
+	if !ok {
+		return fmt.Errorf("archived event for contract %v with no holdings for owner %v", archivedEvent.GetContractId(), holdingView.Owner)
+	}
 	delete(s.activeContracts, types.CONTRACT_ID(archivedEvent.GetContractId()))
-	delete(instrumentHoldings, types.CONTRACT_ID(archivedEvent.GetContractId()))
-	partyHoldings[holdingView.InstrumentId] = instrumentHoldings
-	s.holdings[holdingView.Owner] = partyHoldings
+	delete(partyHoldings, types.CONTRACT_ID(archivedEvent.GetContractId()))
+	instrumentHoldings[holdingView.Owner] = partyHoldings
+	s.holdings[holdingView.InstrumentId] = instrumentHoldings
 
 	return nil
 }

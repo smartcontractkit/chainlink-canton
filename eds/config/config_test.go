@@ -3,6 +3,7 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -90,10 +91,10 @@ chain_selector = "8706591216959472610"
 		party_id = "tokenPoolOwner"
 		instance_address = "0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"
 		pool_owner = "tokenPoolOwner"
-		[token_pool_api.token_pools."0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec".transfer_factory]
+		[token_pool_api.token_pools."0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec".factory]
 			type = "url"
 			token_standard_url = "localhost:8545"
-			[token_pool_api.token_pools."0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec".transfer_factory.token_standard_auth]
+			[token_pool_api.token_pools."0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec".factory.token_standard_auth]
 				type = "insecureStatic"
 				jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30"
 	[token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"]
@@ -101,7 +102,7 @@ chain_selector = "8706591216959472610"
 		party_id = "tokenPoolOwner"
 		instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
 		pool_owner = "tokenPoolOwner"
-		[token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011".burn_mint_factory]
+		[token_pool_api.token_pools."0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011".factory]
 			type = "address"
 			instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"
 			template_id = "#link:Link.Token:LinkToken"
@@ -185,7 +186,7 @@ chain_selector = "8706591216959472610"
 								InstanceAddress: contracts.HexToInstanceAddress("0xcd5fe3362a873da7d7ac7b0ae7aa23761d2c8ea7c3872dcfbc715fc8e92f0dec"),
 							},
 							PoolOwner: "tokenPoolOwner",
-							TransferFactory: &TransferFactory{
+							Factory: &Factory{
 								Type:             FactoryTypeURL,
 								TokenStandardURL: new("localhost:8545"),
 								TokenStandardAuthConfig: &commonconfig.AuthConfig{
@@ -201,7 +202,7 @@ chain_selector = "8706591216959472610"
 								InstanceAddress: contracts.HexToInstanceAddress("0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30011"),
 							},
 							PoolOwner: "tokenPoolOwner",
-							BurnMintFactory: &BurnMintFactory{
+							Factory: &Factory{
 								Type:            FactoryTypeAddress,
 								TemplateId:      new("#link:Link.Token:LinkToken"),
 								Party:           new("linkOwner"),
@@ -227,6 +228,7 @@ chain_selector = "8706591216959472610"
 							TokenId:   "ChainLink",
 						},
 					},
+					SupplyCacheTTL: time.Second * 10, // Default
 				},
 				Node: NodeConfig{
 					URL: "localhost:8545",
@@ -313,7 +315,7 @@ func TestConfig_Merge(t *testing.T) {
 								InstanceAddress: poolAddrA,
 							},
 							PoolOwner: "tokenPoolOwner",
-							TransferFactory: &TransferFactory{
+							Factory: &Factory{
 								Type:             FactoryTypeURL,
 								TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
 							},
@@ -344,7 +346,7 @@ func TestConfig_Merge(t *testing.T) {
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: poolAddrA,
 							},
-							TransferFactory: &TransferFactory{
+							Factory: &Factory{
 								TokenStandardAuthConfig: &commonconfig.AuthConfig{
 									Type: commonconfig.AuthTypeInsecureStatic,
 									JWT:  "jwt-token-pool-a",
@@ -356,7 +358,7 @@ func TestConfig_Merge(t *testing.T) {
 								PartyID:         "tokenPoolOwner",
 								InstanceAddress: poolAddrB,
 							},
-							BurnMintFactory: &BurnMintFactory{
+							Factory: &Factory{
 								Type:            FactoryTypeAddress,
 								TemplateId:      new("#link:Link.Token:LinkToken"),
 								Party:           new("linkOwner"),
@@ -392,7 +394,7 @@ func TestConfig_Merge(t *testing.T) {
 								InstanceAddress: poolAddrA,
 							},
 							PoolOwner: "tokenPoolOwner",
-							TransferFactory: &TransferFactory{
+							Factory: &Factory{
 								Type:             FactoryTypeURL,
 								TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
 								TokenStandardAuthConfig: &commonconfig.AuthConfig{
@@ -408,7 +410,7 @@ func TestConfig_Merge(t *testing.T) {
 								InstanceAddress: poolAddrB,
 							},
 							PoolOwner: "tokenPoolOwner",
-							BurnMintFactory: &BurnMintFactory{
+							Factory: &Factory{
 								Type:            FactoryTypeAddress,
 								TemplateId:      new("#link:Link.Token:LinkToken"),
 								Party:           new("linkOwner"),

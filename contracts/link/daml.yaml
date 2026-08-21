@@ -2,10 +2,12 @@ sdk-version: 3.4.11
 name: link
 source: daml
 init-script: Main:runAll
-version: 2.0.0
+version: 2.1.0
+upgrades: ../dars/released/link-2.0.0.dar
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
+  - "-Wno-upgraded-template-expression-changed"
 data-dependencies:
   - ../dependencies/splice/splice-api-token-metadata-v1-1.0.0.dar
   - ../dependencies/splice/splice-api-token-holding-v1-1.0.0.dar

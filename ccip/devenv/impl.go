@@ -1268,6 +1268,7 @@ func (c *Chain) SendMessage(ctx context.Context, dest uint64, fields cciptestint
 			Type    oapiCommon.MessageExecutorType `json:"type"`
 		}{Type: oapiCommon.Empty}, // Using default Executor
 		Payload:  hex.EncodeToString(fields.Data),
+		Sender:   party,
 		Receiver: hex.EncodeToString(fields.Receiver),
 	}
 	if hasTokenTransfer {

@@ -1,0 +1,10 @@
+bundleVersion: "0.12.5"
+url: https://get.digitalasset.com/utility-dars/canton-network-utility-dars-0.12.5.tar.gz
+sha256: cbf750076d5c33b4ef052ef88030caa25a6a5636601e4ab4525484ea79fd4741
+packages:
+  utility-commercials-v0: "0.4.1"
+  utility-credential-v0: "0.1.0"
+  utility-credential-app-v0: "0.4.1"
+  utility-registry-v0: "0.6.0"
+  utility-registry-holding-v0: "0.2.1"
+  utility-registry-app-v0: "0.7.0"

@@ -79,17 +79,10 @@ import (
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
-func finalityConfigValueFromBlockConfirmations(blockConfirmations uint16) *apiv2.Value {
-	if blockConfirmations == 0 {
-		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-			Constructor: "WaitForFinality",
-			Value:       &apiv2.Value{Sum: &apiv2.Value_Unit{}},
-		}}}
-	}
-
+func finalityConfigValueFromBlockConfirmations() *apiv2.Value {
 	return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
 		Constructor: "BlockDepth",
-		Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(blockConfirmations)}},
+		Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}},
 	}}}
 }
 
@@ -511,7 +504,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-						{Label: "receiverFinalityConfig", Value: finalityConfigValueFromBlockConfirmations(2000)},
+						{Label: "receiverFinalityConfig", Value: finalityConfigValueFromBlockConfirmations()},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
@@ -527,9 +520,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Get disclosures for CCIPReceiver.Execute. The execute submission itself stays
 	// receiver-only; ccip-owned dependencies are only provided via disclosure.
-	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(t.Context(), ccipAPIClient, encodedMessageHex)
+	ccipExecuteDisclosure, err := edsTesthelpers.GetCCIPExecuteDisclosure(t.Context(), ccipAPIClient, encodedMessageHex, types.PARTY(partyReceiver))
 	require.NoError(t, err)
-	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress())
+	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress(), types.PARTY(partyReceiver))
 	require.NoError(t, err)
 
 	executeArgs := receiver.Execute{

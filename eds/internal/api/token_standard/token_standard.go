@@ -4,10 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
+	"sync"
+	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/maps"
@@ -17,11 +22,15 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
@@ -34,14 +43,31 @@ const (
 type TokenConfig struct {
 	Type            config.TokenType
 	RegistryAddress contracts.InstanceAddress
+	TokenID         string
+	TokenName       string
+	TokenSymbol     string
+}
+
+type tokenSupply struct {
+	UpdatedAt   time.Time
+	TotalSupply string
 }
 
 type Server struct {
-	logger              zerolog.Logger
-	activeContractStore store.ActiveContractStoreInterface
+	logger                 zerolog.Logger
+	activeContractStore    store.ActiveContractStoreInterface
+	instrumentHoldingStore store.InstrumentHoldingStoreInterface
 
-	admin  types.PARTY
+	admin types.PARTY
+	// maps Token ID -> TokenConfig
 	tokens map[types.TEXT]TokenConfig
+
+	// Caching a token's totalSupply for the configured duration.
+	// Calculating the total supply is somewhat expensive, as it requires fetching all holdings for the instrument of which there could be many.
+	tokenSupplyCacheTimeout time.Duration
+	// Keyed by Token ID, this map stores the last known total supply for each token and the time it was last updated.
+	tokenSupplies  map[string]tokenSupply
+	tokenSupplyMux *sync.Mutex
 }
 
 var (
@@ -53,13 +79,18 @@ func NewServer(
 	_ context.Context,
 	logger zerolog.Logger,
 	activeContractStore store.ActiveContractStoreInterface,
+	instrumentHoldingStore store.InstrumentHoldingStoreInterface,
 	cfg config.TokenStandardAPIConfig,
 ) (*Server, error) {
 	s := &Server{
-		logger:              logger.With().Str("component", "TokenStandardAPI").Logger(),
-		activeContractStore: activeContractStore,
-		admin:               types.PARTY(cfg.Admin),
-		tokens:              make(map[types.TEXT]TokenConfig),
+		logger:                  logger.With().Str("component", "TokenStandardAPI").Logger(),
+		activeContractStore:     activeContractStore,
+		instrumentHoldingStore:  instrumentHoldingStore,
+		admin:                   types.PARTY(cfg.Admin),
+		tokens:                  make(map[types.TEXT]TokenConfig),
+		tokenSupplyCacheTimeout: cfg.SupplyCacheTTL,
+		tokenSupplies:           make(map[string]tokenSupply),
+		tokenSupplyMux:          new(sync.Mutex),
 	}
 
 	for _, registry := range cfg.Registries {
@@ -71,9 +102,22 @@ func NewServer(
 			return nil, fmt.Errorf("duplicate TokenId in config: %s", registry.TokenId)
 		}
 
+		// Default to the token's ID if name/symbol are not set
+		tokenName := registry.TokenId
+		if registry.TokenName != "" {
+			tokenName = registry.TokenName
+		}
+		tokenSymbol := registry.TokenId
+		if registry.TokenSymbol != "" {
+			tokenSymbol = registry.TokenSymbol
+		}
+
 		s.tokens[types.TEXT(registry.TokenId)] = TokenConfig{
 			Type:            registry.TokenType,
 			RegistryAddress: registry.InstanceAddress,
+			TokenID:         registry.TokenId,
+			TokenName:       tokenName,
+			TokenSymbol:     tokenSymbol,
 		}
 		switch registry.TokenType {
 		case config.TokenTypeLINK:
@@ -86,11 +130,23 @@ func NewServer(
 					TemplateID: contracts.TemplateIDFromBinding(link.LinkTransferInstruction{}),
 					PartyID:    registry.PartyID,
 				},
+				// Register LockLinkHoldings, needed to accurately calculate the total supply
+				store.RegisteredTemplate{
+					TemplateID: contracts.TemplateIDFromBinding(link.LockedLinkHolding{}),
+					PartyID:    registry.PartyID,
+				},
+				// Register LinkTransferPreapprovals, needed to return the correct preapproval from GetTransferFactory
+				store.RegisteredTemplate{
+					TemplateID: contracts.TemplateIDFromBinding(link.LinkTransferPreapproval{}),
+					PartyID:    registry.PartyID,
+				},
 			)
 		default:
 			return nil, fmt.Errorf("unsupported token type: %s", registry.TokenType)
 		}
 	}
+
+	s.instrumentHoldingStore.RegisterParty(cfg.Admin)
 
 	return s, nil
 }
@@ -132,40 +188,47 @@ func (s Server) ListInstruments(c *gin.Context, params oapiTokenMetadataV1.ListI
 		pageToken = parsedIndex
 	}
 
-	sortedTokens := maps.Keys(s.tokens)
-	slices.Sort(sortedTokens)
-
-	if pageToken < 0 || pageToken >= len(sortedTokens) {
+	// Ensure the provided pageToken is valid
+	if pageToken < 0 || pageToken >= len(s.tokens) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiTokenMetadataV1.ErrorResponse{Error: "invalid pageToken"})
 		return
 	}
 
-	endIndex := min(pageToken+int(pageSize), len(sortedTokens))
+	// Sort all configured tokens by ID
+	sortedTokenConfigs := maps.Values(s.tokens)
+	slices.SortFunc(sortedTokenConfigs, func(a, b TokenConfig) int {
+		return strings.Compare(a.TokenID, b.TokenID)
+	})
 
-	instrumentIds := make([]string, endIndex-pageToken)
-	for i, tokenId := range sortedTokens[pageToken:endIndex] {
-		instrumentIds[i] = string(tokenId)
-	}
+	endIndex := min(pageToken+int(pageSize), len(sortedTokenConfigs))
+
+	instrumentIds := make([]TokenConfig, endIndex-pageToken)
+	copy(instrumentIds, sortedTokenConfigs[pageToken:endIndex])
 
 	instruments := make([]oapiTokenMetadataV1.Instrument, len(instrumentIds))
-	for i, id := range instrumentIds {
-		// TODO add Name/Symbol to config?
-		// TODO add total supply information to response
+	for i, tokenConfig := range instrumentIds {
+		totalSupply, err := s.getTotalSupplyForInstrument(tokenConfig.TokenID)
+		if err != nil {
+			s.logger.Error().Err(err).Str("tokenId", tokenConfig.TokenID).Msg("Failed to get total supply for instrument")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTokenMetadataV1.ErrorResponse{Error: "internal server error"})
+			return
+		}
+
 		instruments[i] = oapiTokenMetadataV1.Instrument{
 			Decimals: 10,
-			Id:       id,
-			Name:     id,
+			Id:       tokenConfig.TokenID,
+			Name:     tokenConfig.TokenName,
 			SupportedApis: map[string]int32{
 				"splice-api-token-transfer-instruction-v1": 1,
 			},
-			Symbol:          id,
-			TotalSupply:     nil,
-			TotalSupplyAsOf: nil,
+			Symbol:          tokenConfig.TokenSymbol,
+			TotalSupply:     &totalSupply.TotalSupply,
+			TotalSupplyAsOf: &totalSupply.UpdatedAt,
 		}
 	}
 
 	var nextPageToken *string
-	if endIndex < len(sortedTokens) {
+	if endIndex < len(sortedTokenConfigs) {
 		nextPageToken = new(strconv.Itoa(endIndex))
 	}
 
@@ -176,25 +239,97 @@ func (s Server) ListInstruments(c *gin.Context, params oapiTokenMetadataV1.ListI
 }
 
 func (s Server) GetInstrument(c *gin.Context, instrumentId string) {
-	_, ok := s.tokens[types.TEXT(instrumentId)]
+	tokenConfig, ok := s.tokens[types.TEXT(instrumentId)]
 	if !ok {
 		c.AbortWithStatusJSON(http.StatusNotFound, oapiTokenMetadataV1.ErrorResponse{Error: fmt.Sprintf("No instrument with id %s found", instrumentId)})
 		return
 	}
 
-	// TODO add Name/Symbol to config?
-	// TODO add total supply information to response
+	totalSupply, err := s.getTotalSupplyForInstrument(tokenConfig.TokenID)
+	if err != nil {
+		s.logger.Error().Err(err).Str("tokenId", tokenConfig.TokenID).Msg("Failed to get total supply for instrument")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTokenMetadataV1.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
 	c.JSON(http.StatusOK, oapiTokenMetadataV1.Instrument{
 		Decimals: 10,
-		Id:       instrumentId,
-		Name:     instrumentId,
+		Id:       tokenConfig.TokenID,
+		Name:     tokenConfig.TokenName,
+		Symbol:   tokenConfig.TokenSymbol,
 		SupportedApis: map[string]int32{
 			"splice-api-token-transfer-instruction-v1": 1,
 		},
-		Symbol:          instrumentId,
-		TotalSupply:     nil,
-		TotalSupplyAsOf: nil,
+		TotalSupply:     &totalSupply.TotalSupply,
+		TotalSupplyAsOf: &totalSupply.UpdatedAt,
 	})
+}
+
+func (s Server) getTotalSupplyForInstrument(instrumentId string) (tokenSupply, error) {
+	s.tokenSupplyMux.Lock()
+	defer s.tokenSupplyMux.Unlock()
+
+	// Check cache first
+	cachedSupply, ok := s.tokenSupplies[instrumentId]
+	if ok && time.Since(cachedSupply.UpdatedAt) < s.tokenSupplyCacheTimeout {
+		return cachedSupply, nil
+	}
+
+	// If not in cache or cache is stale, calculate total supply
+	tokenConfig := s.tokens[types.TEXT(instrumentId)]
+	snapshotTime := time.Now()
+	holdings, err := s.instrumentHoldingStore.ListHoldings(splice_api_token_holding_v1.InstrumentId{
+		Admin: s.admin,
+		Id:    types.TEXT(instrumentId),
+	})
+	if err != nil {
+		return tokenSupply{}, fmt.Errorf("failed to list holdings for instrument %s: %w", instrumentId, err)
+	}
+
+	totalSupply := new(big.Rat)
+	switch tokenConfig.Type {
+	case config.TokenTypeLINK:
+		// Iterate over all LINK holdings and sum them up
+		for i, holding := range holdings {
+			parsedHolding, err := bindings.UnmarshalCreatedEvent[link.LinkHolding](holding.GetCreatedEvent())
+			if err != nil {
+				return tokenSupply{}, fmt.Errorf("failed to unmarshal LinkHolding at index %d: %w", i, err)
+			}
+			parsedAmount, ok := new(big.Rat).SetString(string(parsedHolding.HoldingAmount))
+			if !ok {
+				return tokenSupply{}, fmt.Errorf("failed to parse HoldingAmount as big.Rat at index %d: %s", i, parsedHolding.HoldingAmount)
+			}
+			totalSupply.Add(totalSupply, parsedAmount)
+		}
+
+		// List LockLinkHoldings to also sum up
+		lockedHoldings, _ := s.activeContractStore.GetByTemplateId(s.admin, contracts.TemplateIDFromBinding(link.LockedLinkHolding{}))
+		for _, activeContract := range lockedHoldings {
+			parsedLockedHolding, err := bindings.UnmarshalCreatedEvent[link.LockedLinkHolding](activeContract.GetCreatedEvent())
+			if err != nil {
+				return tokenSupply{}, fmt.Errorf("failed to unmarshal LockedLinkHolding: %w", err)
+			}
+			// Skipped holdings that might be for another instrument
+			if parsedLockedHolding.LockedInstrumentId.Admin != s.admin ||
+				parsedLockedHolding.LockedInstrumentId.Id != types.TEXT(instrumentId) {
+				continue
+			}
+			parsedAmount, ok := new(big.Rat).SetString(string(parsedLockedHolding.LockedAmount))
+			if !ok {
+				return tokenSupply{}, fmt.Errorf("failed to parse LockedAmount as big.Rat: %s", parsedLockedHolding.LockedAmount)
+			}
+			totalSupply.Add(totalSupply, parsedAmount)
+		}
+	}
+
+	// Cache totalSupply
+	tokenSupply := tokenSupply{
+		UpdatedAt:   snapshotTime,
+		TotalSupply: totalSupply.FloatString(10), // 10 decimal places
+	}
+	s.tokenSupplies[instrumentId] = tokenSupply
+
+	return tokenSupply, nil
 }
 
 func (s Server) GetTransferFactory(c *gin.Context) {
@@ -233,24 +368,85 @@ func (s Server) GetTransferFactory(c *gin.Context) {
 		return
 	}
 
-	activeRegistryContract, ok := s.activeContractStore.Get(cfg.RegistryAddress)
-	if !ok {
-		s.logger.Error().Str("registryAddress", cfg.RegistryAddress.String()).Msg("Failed to retrieve active registry contract")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTransferInstruction.ErrorResponse{Error: "internal server error"})
+	var (
+		transferKind       = oapiTransferInstruction.Offer
+		factoryContractId  string
+		disclosedContracts []oapiTransferInstruction.DisclosedContract
+		choiceContext      = splice_api_token_metadata_v1.ChoiceContext{Values: make(map[string]splice_api_token_metadata_v1.AnyValue)}
+	)
+
+	switch cfg.Type {
+	case config.TokenTypeLINK:
+		activeRegistryContract, ok := s.activeContractStore.Get(cfg.RegistryAddress)
+		if !ok {
+			s.logger.Error().Str("registryAddress", cfg.RegistryAddress.String()).Msg("Failed to retrieve active registry contract")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTransferInstruction.ErrorResponse{Error: "internal server error"})
+			return
+		}
+		factoryContractId = activeRegistryContract.GetCreatedEvent().GetContractId()
+		disclosedRegistry := ActiveContractToDisclosedContract(activeRegistryContract, req.ExcludeDebugFields != nil && !*req.ExcludeDebugFields)
+		disclosedContracts = append(disclosedContracts, disclosedRegistry)
+
+		// Look up the (optional) transfer preapproval for the receiver
+		transferPreapproval, err := s.getLinkTransferPreApprovalForParty(s.admin, choiceArguments.Transfer.Receiver)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("Failed to retrieve transfer preapproval")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTransferInstruction.ErrorResponse{Error: "internal server error"})
+			return
+		}
+		if transferPreapproval != nil {
+			choiceContext.Values[string(link.TransferPreapprovalContextKey)] = splice_api_token_metadata_v1.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(transferPreapproval.GetCreatedEvent().GetContractId())),
+			}
+			disclosedPreapproval := ActiveContractToDisclosedContract(transferPreapproval, req.ExcludeDebugFields != nil && !*req.ExcludeDebugFields)
+			disclosedContracts = append(disclosedContracts, disclosedPreapproval)
+			transferKind = oapiTransferInstruction.Direct
+		}
+	default:
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTransferInstruction.ErrorResponse{Error: fmt.Sprintf("unsupported token type: %s", cfg.Type)})
 		return
 	}
-	disclosedRegistry := ActiveContractToDisclosedContract(activeRegistryContract, req.ExcludeDebugFields != nil && !*req.ExcludeDebugFields)
+
+	contextData, err := converters.SerializeChoiceContext(choiceContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	// If sender == receiver, the transfer is a self-transfer, regardless of if a prapproval exists
+	if choiceArguments.Transfer.Sender == choiceArguments.Transfer.Receiver {
+		transferKind = oapiTransferInstruction.Self
+	}
 
 	resp := oapiTransferInstruction.TransferFactoryWithChoiceContext{
 		ChoiceContext: oapiTransferInstruction.ChoiceContext{
-			ChoiceContextData:  nil,
-			DisclosedContracts: []oapiTransferInstruction.DisclosedContract{disclosedRegistry},
+			ChoiceContextData:  contextData,
+			DisclosedContracts: disclosedContracts,
 		},
-		FactoryId:    activeRegistryContract.GetCreatedEvent().GetContractId(),
-		TransferKind: oapiTransferInstruction.Offer,
+		FactoryId:    factoryContractId,
+		TransferKind: transferKind,
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+// getLinkTransferPreApprovalForParty looks up a receiver's preapproval from ACS and returns it if it exists.
+// Only valid for LINK Token preapprovals.
+// If no preapproval is found, no error will be returned.
+func (s Server) getLinkTransferPreApprovalForParty(admin, receiver types.PARTY) (*apiv2.ActiveContract, error) {
+	preapprovals, _ := s.activeContractStore.GetByTemplateId(admin, contracts.TemplateIDFromBinding(link.LinkTransferPreapproval{}))
+	for _, ac := range preapprovals {
+		preapproval, err := bindings.UnmarshalCreatedEvent[link.LinkTransferPreapproval](ac.GetCreatedEvent())
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal LinkTransferPreapproval: %w", err)
+		}
+		if preapproval.PreapprovalReceiver == receiver {
+			return ac, nil
+		}
+	}
+
+	return nil, nil //nolint:nilnil // not finding a preapproval is expected
 }
 
 // Transfer Instruction V1

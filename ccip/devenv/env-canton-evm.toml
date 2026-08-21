@@ -102,7 +102,7 @@ execution_interval = 15_000_000_000
   chain_id = "LocalNet"
   port = "8575"
   type = "canton"
-  image = "0.7.1"
+  image = "0.7.3"
   number_of_canton_validators = 2
 
 [fake]

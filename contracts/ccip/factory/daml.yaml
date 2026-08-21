@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: ccip-factory-v2
 source: daml
-version: 2.1.0
+version: 2.1.1
 upgrades: ../../dars/released/ccip-factory-v2-2.0.0.dar
 build-options:
   - "-Wno-crypto-text-is-alpha"
@@ -14,7 +14,7 @@ data-dependencies:
 
   - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
   - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
-  - ../../link/.daml/dist/link-2.0.0.dar
+  - ../../link/.daml/dist/link-2.1.0.dar
 
   - ../codec/.daml/dist/ccip-codec-v2-2.0.0.dar
   - ../api/.daml/dist/ccip-api-v2-2.0.0.dar

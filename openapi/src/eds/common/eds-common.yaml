@@ -109,6 +109,7 @@ components:
       description: A message to be sent from Canton.
       required:
         - destinationChainSelector
+        - sender
         - receiver
         - payload
         - feeToken
@@ -118,6 +119,8 @@ components:
         destinationChainSelector:
           type: string
           description: The chain selector of the destination chain.
+        sender:
+          $ref: "#/components/schemas/PartyId"
         receiver:
           type: string
           description: The receiver of the message on the remote chain, encoded as a hex string.
@@ -165,6 +168,10 @@ components:
           type: string
           description: The decimal amount of the token to be transferred.
           example: "77.77"
+        holdingContractIds:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContractId"
 
     EDSBaseUrl:
       type: string
