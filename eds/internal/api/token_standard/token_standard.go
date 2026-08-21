@@ -12,22 +12,25 @@ import (
 	"sync"
 	"time"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/maps"
-
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/bindings"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
@@ -130,6 +133,11 @@ func NewServer(
 				// Register LockLinkHoldings, needed to accurately calculate the total supply
 				store.RegisteredTemplate{
 					TemplateID: contracts.TemplateIDFromBinding(link.LockedLinkHolding{}),
+					PartyID:    registry.PartyID,
+				},
+				// Register LinkTransferPreapprovals, needed to return the correct preapproval from GetTransferFactory
+				store.RegisteredTemplate{
+					TemplateID: contracts.TemplateIDFromBinding(link.LinkTransferPreapproval{}),
 					PartyID:    registry.PartyID,
 				},
 			)
@@ -360,24 +368,85 @@ func (s Server) GetTransferFactory(c *gin.Context) {
 		return
 	}
 
-	activeRegistryContract, ok := s.activeContractStore.Get(cfg.RegistryAddress)
-	if !ok {
-		s.logger.Error().Str("registryAddress", cfg.RegistryAddress.String()).Msg("Failed to retrieve active registry contract")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTransferInstruction.ErrorResponse{Error: "internal server error"})
+	var (
+		transferKind       = oapiTransferInstruction.Offer
+		factoryContractId  string
+		disclosedContracts []oapiTransferInstruction.DisclosedContract
+		choiceContext      = splice_api_token_metadata_v1.ChoiceContext{Values: make(map[string]splice_api_token_metadata_v1.AnyValue)}
+	)
+
+	switch cfg.Type {
+	case config.TokenTypeLINK:
+		activeRegistryContract, ok := s.activeContractStore.Get(cfg.RegistryAddress)
+		if !ok {
+			s.logger.Error().Str("registryAddress", cfg.RegistryAddress.String()).Msg("Failed to retrieve active registry contract")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTransferInstruction.ErrorResponse{Error: "internal server error"})
+			return
+		}
+		factoryContractId = activeRegistryContract.GetCreatedEvent().GetContractId()
+		disclosedRegistry := ActiveContractToDisclosedContract(activeRegistryContract, req.ExcludeDebugFields != nil && !*req.ExcludeDebugFields)
+		disclosedContracts = append(disclosedContracts, disclosedRegistry)
+
+		// Look up the (optional) transfer preapproval for the receiver
+		transferPreapproval, err := s.getLinkTransferPreApprovalForParty(s.admin, choiceArguments.Transfer.Receiver)
+		if err != nil {
+			s.logger.Error().Err(err).Msg("Failed to retrieve transfer preapproval")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTransferInstruction.ErrorResponse{Error: "internal server error"})
+			return
+		}
+		if transferPreapproval != nil {
+			choiceContext.Values[string(link.TransferPreapprovalContextKey)] = splice_api_token_metadata_v1.AnyValue{
+				AVContractId: new(types.CONTRACT_ID(transferPreapproval.GetCreatedEvent().GetContractId())),
+			}
+			disclosedPreapproval := ActiveContractToDisclosedContract(transferPreapproval, req.ExcludeDebugFields != nil && !*req.ExcludeDebugFields)
+			disclosedContracts = append(disclosedContracts, disclosedPreapproval)
+			transferKind = oapiTransferInstruction.Direct
+		}
+	default:
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiTransferInstruction.ErrorResponse{Error: fmt.Sprintf("unsupported token type: %s", cfg.Type)})
 		return
 	}
-	disclosedRegistry := ActiveContractToDisclosedContract(activeRegistryContract, req.ExcludeDebugFields != nil && !*req.ExcludeDebugFields)
+
+	contextData, err := converters.SerializeChoiceContext(choiceContext)
+	if err != nil {
+		s.logger.Err(err).Msg("failed to serialize CCIP context")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	// If sender == receiver, the transfer is a self-transfer, regardless of if a prapproval exists
+	if choiceArguments.Transfer.Sender == choiceArguments.Transfer.Receiver {
+		transferKind = oapiTransferInstruction.Self
+	}
 
 	resp := oapiTransferInstruction.TransferFactoryWithChoiceContext{
 		ChoiceContext: oapiTransferInstruction.ChoiceContext{
-			ChoiceContextData:  nil,
-			DisclosedContracts: []oapiTransferInstruction.DisclosedContract{disclosedRegistry},
+			ChoiceContextData:  contextData,
+			DisclosedContracts: disclosedContracts,
 		},
-		FactoryId:    activeRegistryContract.GetCreatedEvent().GetContractId(),
-		TransferKind: oapiTransferInstruction.Offer,
+		FactoryId:    factoryContractId,
+		TransferKind: transferKind,
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+// getLinkTransferPreApprovalForParty looks up a receiver's preapproval from ACS and returns it if it exists.
+// Only valid for LINK Token preapprovals.
+// If no preapproval is found, no error will be returned.
+func (s Server) getLinkTransferPreApprovalForParty(admin, receiver types.PARTY) (*apiv2.ActiveContract, error) {
+	preapprovals, _ := s.activeContractStore.GetByTemplateId(admin, contracts.TemplateIDFromBinding(link.LinkTransferPreapproval{}))
+	for _, ac := range preapprovals {
+		preapproval, err := bindings.UnmarshalCreatedEvent[link.LinkTransferPreapproval](ac.GetCreatedEvent())
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal LinkTransferPreapproval: %w", err)
+		}
+		if preapproval.PreapprovalReceiver == receiver {
+			return ac, nil
+		}
+	}
+
+	return nil, nil //nolint:nilnil // not finding a preapproval is expected
 }
 
 // Transfer Instruction V1
