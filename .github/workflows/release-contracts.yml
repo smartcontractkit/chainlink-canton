@@ -50,7 +50,7 @@ jobs:
 
           # Get the commits between the last tag and the current tag that have updated released artifacts
           echo "Getting commits between $LAST_TAG and $PACKAGE_NAME/$VERSION"
-          COMMITS=$(git log "$LAST_TAG..$PACKAGE_NAME/$VERSION" --pretty=format:"- %s (%h)" -- contracts)
+          COMMITS=$(git log "$LAST_TAG..$PACKAGE_NAME/$VERSION" --pretty=format:"- %s (%H)" -- contracts)
 
           # Output the release notes
           echo "Commits:"
