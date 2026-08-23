@@ -20,6 +20,7 @@ import CCIP.CodecV2.FinalityConfig
 import CCIP.LockReleaseTokenPoolV2
 import CCIP.LockReleaseTokenPoolV2CodecGen
 import CCIP.UtilsV2.Context
+import qualified CCIP.RateLimiterV2
 
 mkFinalityConfig n =
   if n == 0
@@ -307,6 +308,109 @@ testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimiterReferences = script do
                 Some got -> do
                     assertRateLimitConfigArgsEqual got (head args)
         _ -> abort "Expected exactly one LockReleaseTokenPool contract"
+
+    pure ()
+
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig_RedirectLimiterRejected : Script ()
+testLockReleaseTokenPoolMCMSEntrypoint_SetRateLimitConfig_RedirectLimiterRejected = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+    tokenAdmin <- allocateParty "token_admin"
+
+    let instanceId = "pool-rl-redirect-test"
+        rlAInstanceId = "rl-redirect-inbound"
+        rlBInstanceId = "rl-redirect-outbound"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId tokenAdmin "LINK"
+
+    now <- getTime
+    -- Limiter A: the one governance signs for (inbound).
+    rlACid <- submit poolOwner do
+        createCmd CCIP.RateLimiterV2.RateLimiter with
+            instanceId = rlAInstanceId
+            poolInstanceId = instanceId
+            poolOwner
+            remoteChainSelector = 123.0
+            direction = CCIP.RateLimiterV2.RateLimitDirection_Inbound
+            mode = CCIP.RateLimiterV2.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            rate = 10.0
+            tokens = 100.0
+            lastUpdated = now
+    -- Limiter B: a distinct configured limiter (outbound) the submitter tries to redirect to.
+    rlBCid <- submit poolOwner do
+        createCmd CCIP.RateLimiterV2.RateLimiter with
+            instanceId = rlBInstanceId
+            poolInstanceId = instanceId
+            poolOwner
+            remoteChainSelector = 123.0
+            direction = CCIP.RateLimiterV2.RateLimitDirection_Outbound
+            mode = CCIP.RateLimiterV2.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 200.0
+            rate = 20.0
+            tokens = 200.0
+            lastUpdated = now
+
+    let rlAAddr = Chainlink.InstanceAddress.make rlAInstanceId poolOwner
+        rlBAddr = Chainlink.InstanceAddress.make rlBInstanceId poolOwner
+        chainConfig = RemoteChainConfig with
+            remotePools = []
+            remoteTokenAddress = "dde9af410cc4f737a136d87d3d4a4deeff1d26fc"
+            inboundCCVs = []
+            outboundCCVs = []
+            finalityConfig = mkFinalityConfig 0
+            inboundRateLimiter = rlAAddr
+            inboundCustomBlockConfirmationsRateLimiter = rlAAddr
+            outboundRateLimiter = rlBAddr
+
+    poolCid <- submit poolOwner do
+        createCmd LockReleaseTokenPool with
+            instanceId
+            poolOwner
+            ccipOwner
+            instrumentId
+            decimals = 18
+            rateLimitAdmin = None
+            remoteChainConfigs = Map.fromList [(123.0, chainConfig)]
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = Splice.Api.Token.MetadataV1.ChoiceContext (TextMap.empty)
+            transferTimeout = Indefinite
+            deps = dummyPoolDeps ccipOwner
+
+    let instAAddr = Chainlink.InstanceAddress.toText rlAAddr
+        poolAddr = Chainlink.InstanceAddress.makeText instanceId poolOwner
+        targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver poolCid
+
+    -- Signed config targets limiter A.
+    let encoded = encodeSetRateLimitConfigParams (SetRateLimitConfigParams with
+            caller = poolOwner
+            rateLimiterInstanceAddress = rlAAddr
+            newIsEnabled = True
+            newCapacity = 50.0
+            newRate = 5.0)
+
+    -- Submitter maps A's address to B's CID (the redirect). Must be rejected.
+    submitMustFail poolOwner do
+        exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+            functionName = "SetRateLimitConfig"
+            operationData = encoded
+            contractIds = Map.fromList
+                [ (poolAddr, toAnyContractId poolCid)
+                , (instAAddr, toAnyContractId rlBCid)
+                ]
+
+    -- Neither limiter's config should have changed.
+    rlContracts <- query @CCIP.RateLimiterV2.RateLimiter poolOwner
+    let mbA = find (\(_, rl) -> rl.instanceId == rlAInstanceId) rlContracts
+        mbB = find (\(_, rl) -> rl.instanceId == rlBInstanceId) rlContracts
+    case (mbA, mbB) of
+        (Some (_, a), Some (_, b)) -> do
+            a.capacity === 100.0
+            a.rate === 10.0
+            b.capacity === 200.0
+            b.rate === 20.0
+        _ -> abort "Expected both rate limiter contracts to be present and unchanged"
 
     pure ()
 
