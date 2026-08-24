@@ -40,8 +40,6 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.releases_created && contains(needs.release-please.outputs.paths_released, 'contracts')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Setup GitHub Token
         id: setup-github-token
