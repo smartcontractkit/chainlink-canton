@@ -54,13 +54,13 @@ jobs:
         working-directory: contracts
         run: |
           echo "Building Dar artifacts for ${{ needs.release-please.outputs.contracts--tag_name }}"
-          zip -9 -r -j chainlink-ccip-v${{ needs.release-please.outputs.contracts--major }}${{ needs.release-please.outputs.contracts--minor }}${{ needs.release-please.outputs.contracts--patch }}.zip ./dars/released
+          zip -9 -r -j chainlink-ccip-v${{ needs.release-please.outputs.contracts--major }}.${{ needs.release-please.outputs.contracts--minor }}.${{ needs.release-please.outputs.contracts--patch }}.zip ./dars/released
       - name: Add artifacts to release
         working-directory: contracts
         env:
           GH_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}
         run: |
-          gh release upload ${{ needs.release-please.outputs.contracts--tag_name }} chainlink-ccip-v${{ needs.release-please.outputs.contracts--major }}${{ needs.release-please.outputs.contracts--minor }}${{ needs.release-please.outputs.contracts--patch }}.zip
+          gh release upload ${{ needs.release-please.outputs.contracts--tag_name }} chainlink-ccip-v${{ needs.release-please.outputs.contracts--major }}.${{ needs.release-please.outputs.contracts--minor }}.${{ needs.release-please.outputs.contracts--patch }}.zip
       - name: Mark release as released
         env:
           GH_TOKEN: ${{ steps.setup-github-token.outputs.access-token }}
