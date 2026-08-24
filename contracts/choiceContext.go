@@ -3,7 +3,7 @@ package contracts
 import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 )
 
 func ChoiceContextFromData(contextData map[string]any) (splice_api_token_metadata_v1.ChoiceContext, error) {

@@ -3,8 +3,8 @@
 package ledgertarget
 
 import (
-	latestholding "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/splice/splice_api_token_holding_v1"
-	latestmeta "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/splice/splice_api_token_metadata_v1"
+	latestholding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
+	latestmeta "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 )
 
 // AdaptChoiceContext maps caller-side choice context into ledger Send bindings.

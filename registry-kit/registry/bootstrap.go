@@ -6,7 +6,7 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	registryapp "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/utility/registry_app_v0"
+	registryapp "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/utility/registry_app_v0"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 )
 

@@ -6,7 +6,7 @@ import (
 	ccipdeploymentutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 // ProposerMCMSAddressRef resolves the MCMS instance used for proposal scheduling.

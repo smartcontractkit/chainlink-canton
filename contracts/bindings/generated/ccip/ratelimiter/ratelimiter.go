@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"strings"
 
-	api "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/mcms/api"
+	api "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/api"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"

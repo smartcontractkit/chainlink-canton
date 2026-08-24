@@ -7,10 +7,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	rt "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/ccipruntime"
-	ccipreceiver "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/receiver"
-	ccipsender "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	rt "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
+	ccipreceiver "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
+	ccipsender "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
 	pprof "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
 	receiverop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/receiver"
 	senderop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/sender"

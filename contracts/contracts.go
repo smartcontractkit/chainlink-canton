@@ -7,7 +7,7 @@ import (
 	"os"
 	"slices"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts/utilitydars"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/utilitydars"
 )
 
 //go:embed dars
