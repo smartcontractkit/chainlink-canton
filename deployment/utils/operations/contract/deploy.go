@@ -14,8 +14,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 )
 
 type DeployInput[TT core.Template] struct {

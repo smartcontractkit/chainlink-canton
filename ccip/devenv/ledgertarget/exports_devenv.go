@@ -3,15 +3,15 @@
 package ledgertarget
 
 import (
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/ccipapi"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/ccipcodec"
-	rt "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/ccipruntime"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/clientapi"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/events"
-	ccipreceiver "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/receiver"
-	ccipsender "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/sender"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/chainlink/chainlinkapi"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipapi"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
+	rt "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/events"
+	ccipreceiver "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
+	ccipsender "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 )
 
 type (

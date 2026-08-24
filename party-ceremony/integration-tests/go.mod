@@ -2,7 +2,7 @@ module github.com/smartcontractkit/chainlink-canton/party-ceremony/integration-t
 
 go 1.26.7
 
-replace github.com/smartcontractkit/chainlink-canton/contracts => ../../contracts
+replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../../contracts
 
 replace github.com/smartcontractkit/chainlink-canton/party-ceremony => ../
 

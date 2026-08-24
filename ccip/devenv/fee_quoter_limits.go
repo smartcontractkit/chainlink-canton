@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 
 	"github.com/smartcontractkit/chainlink-canton/ccip/devenv/ledgertarget"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	feequoterop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )

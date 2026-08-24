@@ -7,10 +7,10 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/coin"
-	mcmsCore "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/mcms/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/coin"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/core"
 )
 
 func Test_setInstanceID(t *testing.T) {

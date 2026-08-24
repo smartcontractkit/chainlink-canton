@@ -3,11 +3,11 @@
 package ledgertarget
 
 import (
-	rt "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/ccipruntime"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/core"
-	ccipreceiver "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/receiver"
-	ccipsender "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/sender"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/chainlink/chainlinkapi"
+	rt "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	ccipreceiver "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
+	ccipsender "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 )
 
 type (

@@ -2,7 +2,7 @@ module github.com/smartcontractkit/chainlink-canton
 
 go 1.26.7
 
-replace github.com/smartcontractkit/chainlink-canton/contracts => ./contracts
+replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ./contracts
 
 // Coming from chainlink-deployments-framework
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
@@ -34,7 +34,7 @@ require (
 	github.com/prometheus/client_golang v1.24.1
 	github.com/rs/zerolog v1.35.1
 	github.com/smartcontractkit/chain-selectors v1.0.108
-	github.com/smartcontractkit/chainlink-canton/contracts v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260811072549-2a0dec67e6be
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260811072549-2a0dec67e6be
@@ -387,6 +387,7 @@ require (
 	github.com/smartcontractkit/ccip-contract-examples/chains/evm v0.0.0-20250826190403-aed7f5f33cde // indirect
 	github.com/smartcontractkit/ccip-owner-contracts v0.1.0 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc // indirect
+	github.com/smartcontractkit/chainlink-canton/contracts v0.0.0-20260824175358-72dc0ee1dee3 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.2-0.20260811153216-3f3baa768540 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.11-0.20260626151909-052e55e62e62 // indirect

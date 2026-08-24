@@ -6,9 +6,9 @@ import (
 	"math/big"
 	"strings"
 
-	clientapi "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/clientapi"
-	chainlinkapi "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/chainlink/chainlinkapi"
-	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/splice/splice_api_token_metadata_v1"
+	clientapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
+	chainlinkapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
+	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"

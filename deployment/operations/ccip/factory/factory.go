@@ -8,8 +8,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	factorybindings "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/factory"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	factorybindings "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 

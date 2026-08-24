@@ -14,9 +14,9 @@ import (
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	mcmsApi "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/mcms/api"
-	mcmsCore "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/mcms/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/api"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/core"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 

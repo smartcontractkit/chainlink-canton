@@ -12,7 +12,7 @@ import (
 	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 

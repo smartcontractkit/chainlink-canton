@@ -13,7 +13,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 )
 
 type InstrumentHoldingStore struct {

@@ -11,7 +11,7 @@ import (
 	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 // NewCantonTransaction converts an EncodedChoice into an MCMS Transaction with Canton-specific AdditionalFields.

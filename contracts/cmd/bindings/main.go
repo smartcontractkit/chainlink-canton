@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/go-daml/codegen"
 	"github.com/smartcontractkit/go-daml/codegen/model"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/contracts/utilitydars"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/utilitydars"
 )
 
 func main() {
@@ -26,9 +26,11 @@ func main() {
 		return
 	}
 
-	artifactsDir := flag.String("artifacts", filepath.Join("contracts", "bindings", "generated"), "Path to the bindings artifacts output directory")
-	basePath := flag.String("basePath", buildInfo.Main.Path+"/contracts/bindings/generated", "Base Go import path for generated bindings")
+	artifactsDir := flag.String("artifacts", filepath.Join("bindings", "generated"), "Path to the bindings artifacts output directory")
+	basePath := flag.String("basePath", buildInfo.Main.Path+"/bindings/generated", "Base Go import path for generated bindings")
 	flag.Parse()
+	fmt.Println(buildInfo.Main.Path)
+	fmt.Println(*basePath)
 
 	ctx := context.Background()
 	tmpDir, cleanup, err := utilitydars.FetchToTemp(ctx, contracts.UtilityPackageIDs())

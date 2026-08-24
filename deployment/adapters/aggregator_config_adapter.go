@@ -16,9 +16,9 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"

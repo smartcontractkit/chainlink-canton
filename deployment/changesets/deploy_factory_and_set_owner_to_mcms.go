@@ -12,7 +12,7 @@ import (
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	factorybindings "github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/factory"
+	factorybindings "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/factory"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"

@@ -12,8 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
-	"github.com/smartcontractkit/chainlink-canton/contracts/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/internal/mocks"
 )
 
