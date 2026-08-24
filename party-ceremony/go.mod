@@ -1,6 +1,8 @@
 module github.com/smartcontractkit/chainlink-canton/party-ceremony
 
-go 1.26.2
+go 1.26.7
+
+replace github.com/smartcontractkit/chainlink-canton/contracts => ../contracts
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0

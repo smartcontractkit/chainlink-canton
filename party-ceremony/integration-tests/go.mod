@@ -1,6 +1,8 @@
 module github.com/smartcontractkit/chainlink-canton/party-ceremony/integration-tests
 
-go 1.26.2
+go 1.26.7
+
+replace github.com/smartcontractkit/chainlink-canton/contracts => ../../contracts
 
 replace github.com/smartcontractkit/chainlink-canton/party-ceremony => ../
 
