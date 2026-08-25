@@ -48,7 +48,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.7
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.52.0
-	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
+	github.com/smartcontractkit/go-daml v0.6.0
 	github.com/smartcontractkit/mcms v0.54.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
