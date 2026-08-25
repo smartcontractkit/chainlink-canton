@@ -11,8 +11,8 @@ DARs live under:
 - `contracts/dars/released` for stable, immutable, release versions
 
 While the `/released` DARs are release candidates that are about to be released, artifacts **must only be acquired from
-tagged GitHub releases**. The latest `contracts/v<x.y.z>` release is considered released, and is the only version that should
-be used in production.
+tagged GitHub releases**. The latest `contracts/v<x.y.z>` release is considered released, and is the only version that
+should be used in production.
 See [Releases](https://github.com/smartcontractkit/chainlink-canton/releases?q=contracts%2F&expanded=true) for the
 latest available version.
 
@@ -92,6 +92,48 @@ CCIP Canton contracts are organized in a modular, layered architecture:
 
 - `TokenReceiveTicket` — authorizes token release on inbound
     - Factory-created via `TokenAdminRegistry`
+
+## Security Considerations
+
+### DAR Vetting
+
+CCIP on Canton relies heavily on Daml interfaces (e.g. `CCIP.APIV2.RMNRemote.IRMNRemote`,
+`CCIP.APIV2.TokenPool.ITokenPool`, `CCIP.APIV2.TokenFactory.ITokenFactory`, `CCIP.APIV2.CCV.ICCV`, etc.) to decouple the
+core protocol from third-party implementations such as token pools, token factories, and CCVs. Contracts are referenced
+across trust boundaries by their interface, and in some cases by `ContractId`s that are resolved dynamically at runtime
+rather than being hardcoded into the core contracts.
+
+This design has an important consequence: **Daml provides no way to inspect the signatory or the implementing package of
+a contract behind an interface at runtime.** When a token pool calls into an `IRMNRemote`, or CCIP dispatches to an
+`ITokenFactory` / `ICCV`, the caller inherently trusts that the contract behind the interface is a legitimate
+implementation. It is not possible to enforce this on-ledger.
+
+The only line of defense is therefore **package vetting** on the participant node:
+
+- On Canton, a package (DAR) must be explicitly *vetted* by a participant operator before any contracts from that
+  package can be created or exercised on that participant. Vetting is a security-critical, privileged operation (see the
+  [Canton glossary entry on Vetting](https://docs.canton.network/overview/understand/glossary#vetting)).
+- If a malicious DAR that implements one of the CCIP interfaces (e.g. a forged `IRMNRemote`, a malicious
+  `ITokenFactory`, or a rogue `ICCV`) is vetted on a participant that runs CCIP-related parties, the entire trust model
+  breaks down — a token pool could unknowingly call into an attacker-controlled `RMNRemote` and receive forged
+  validation results, or accept a spoofed transfer ticket from a malicious factory.
+
+**Operator responsibilities.** Anyone operating a participant node that hosts CCIP-related parties — Chainlink, Node
+Operators (NOPs), token issuers, and token pool owners — MUST:
+
+1. Only vet DARs that they have independently verified and trust. In particular, no third-party implementation of any
+   CCIP interface (`IRMNRemote`, `ICCV`, `ITokenPool`, `ITokenFactory`,
+   `ITokenAdminRegistry`, etc.) may be vetted unless it has been explicitly reviewed and approved.
+2. Treat DAR vetting as a privileged, audited operation. It should never be delegated to untrusted parties or automated
+   based on external input.
+3. Keep vetting scoped: only vet the packages actually required to operate the participant's parties.
+
+**Out of scope for the security model.** Any exploit that requires an attacker to upload and vet a forged or malicious
+DAR on a Chainlink, NOP, or token pool owner participant is considered **out of scope**. Such an attack presupposes that
+the attacker has already compromised the elevated privileges required to vet packages on that node, at which point the
+participant itself is compromised and all CCIP-level guarantees are void. This is consistent with Canton's fundamental
+security principle that operators have full control over — and full responsibility for — the code that runs on their
+validators.
 
 ## Package Structure
 
