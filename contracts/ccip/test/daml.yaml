@@ -24,7 +24,7 @@ data-dependencies:
   - ../tickets/.daml/dist/ccip-tickets-v2-2.0.0.dar
   - ../core/.daml/dist/ccip-core-v2-2.1.0.dar
   - ../utils/.daml/dist/ccip-utils-v2-2.1.0.dar
-  - ../runtime/.daml/dist/ccip-runtime-v2-2.1.0.dar
+  - ../runtime/.daml/dist/ccip-runtime-v2-2.1.1.dar
 
   - ../executor/.daml/dist/ccip-executor-v2-2.0.0.dar
   - ../committee-verifier/.daml/dist/ccip-committee-verifier-v2-2.0.0.dar
