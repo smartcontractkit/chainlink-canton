@@ -11,7 +11,7 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 type ActiveContractStore struct {

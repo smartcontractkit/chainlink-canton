@@ -17,7 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/evm"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/evmops"
