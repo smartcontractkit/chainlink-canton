@@ -19,7 +19,7 @@ require (
 	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.0.0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.118.1
-	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
+	github.com/smartcontractkit/go-daml v0.6.0
 )
 
 require (
