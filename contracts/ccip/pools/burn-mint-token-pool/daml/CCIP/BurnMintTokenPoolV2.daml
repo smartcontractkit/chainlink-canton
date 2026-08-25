@@ -272,6 +272,12 @@ template BurnMintTokenPool
 
         ccipOwner : Party
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        -- | The (local) decimals that the token pool will assume.
+        -- Note: As the Token Standard uses Decimal with a fixed 10 decimals, setting anything but 10 decimals on the pool will result in the local amounts being scaled up/down.
+        -- That is, if the pool is set to 8 decimals, a remote amount of 1.0 will be scaled to Decimal("0.01") when minting/burning locally.
+        -- And vice versa, if the pool is set to 12 decimals, a remote amount of 1.0 will be scaled to Decimal("100.0") when minting/burning locally.
+        -- This is an advanced setting that should only be used if the asset requires additional precision beyond the 10 decimals of the Token Standard, for example with an remote asset that has 18 decimals and requires all of this precision to be preserved when transferring to Canton.
+        -- In general, it is recommended to set the pool decimals to 10, which is the default for the Token Standard and will lead to all amounts being represented correctly locally and in Wallets.
         decimals : Int
 
         -- | Dynamic config

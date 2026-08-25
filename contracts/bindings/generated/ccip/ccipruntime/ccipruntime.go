@@ -32,7 +32,7 @@ var (
 
 const (
 	PackageName = "ccip-runtime-v2"
-	PackageID   = "b43a9896a3d6753fa23d25f42b6021a20984d807ca73f0dc08be71b582451e1c"
+	PackageID   = "de7828d50205a9fd7ab237573e117fa66fe677a57243a8fb3277f3fb2574d6f8"
 	SDKVersion  = "3.4.11"
 )
 
@@ -42,11 +42,12 @@ type Template interface {
 }
 
 const (
-	MaxExecutedMessagesSize = types.INT64(25000)
-	OnRampContextKey        = types.TEXT("on-ramp")
-	NoExecutionAddressBytes = types.TEXT("eba517d200000000000000000000000000000000000000000000000000000000")
-	MessageStaticSize       = types.INT64(69)
-	OffRampContextKey       = types.TEXT("off-ramp")
+	PerPartyRouterInstanceIdPrefix = types.TEXT("per-party-router")
+	MaxExecutedMessagesSize        = types.INT64(25000)
+	OnRampContextKey               = types.TEXT("on-ramp")
+	NoExecutionAddressBytes        = types.TEXT("eba517d200000000000000000000000000000000000000000000000000000000")
+	MessageStaticSize              = types.INT64(69)
+	OffRampContextKey              = types.TEXT("off-ramp")
 )
 
 func argsToMap(args any) map[string]any {
