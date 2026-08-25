@@ -4,10 +4,11 @@ import Daml.Script
 
 import DA.Assert
 import DA.Optional (fromSome)
-import DA.Time (seconds)
+import DA.Time (milliseconds)
 
 import qualified CCIP.RateLimiterV2
 
+testRateLimiterConsumeAndRefill : Script ()
 testRateLimiterConsumeAndRefill = script do
     poolOwner <- allocateParty "pool-owner"
 
@@ -21,24 +22,31 @@ testRateLimiterConsumeAndRefill = script do
             direction = CCIP.RateLimiterV2.RateLimitDirection_Outbound
             mode = CCIP.RateLimiterV2.RateLimitMode_DefaultFinality
             isEnabled = True
-            capacity = 100.0
-            rate = 5.0
-            tokens = 100.0
+            capacity = 1000.0
+            rate = 10.0
+            tokens = 1000.0
             lastUpdated = now
 
     consumed <- submit poolOwner do
         exerciseCmd limiter CCIP.RateLimiterV2.ConsumeCapacity with
-            requested = 90.0
-    consumed.availableBeforeConsume === 100.0
+            requested = 900.0
+    consumed.availableBeforeConsume === 1000.0
+    consumed.consumed === 900.0
 
-    passTime (seconds 10)
+    passTime (milliseconds 10599) -- 10.599 seconds. Since tokens is Numeric 0, 105 tokens should be refilled (rounded down)
 
     limiterState <- fromSome <$> queryContractId poolOwner consumed.rateLimiterCid
-    now2 <- getTime
-    CCIP.RateLimiterV2.availableTokensAt now2 limiterState === 60.0
+    now <- getTime
+    CCIP.RateLimiterV2.availableTokensAt now limiterState === 205.0
+
+    passTime (milliseconds 1) -- 1 millisecond, together with the previous 10.599 seconds, this should be enough to refill 1 more token
+    limiterState <- fromSome <$> queryContractId poolOwner consumed.rateLimiterCid
+    now <- getTime
+    CCIP.RateLimiterV2.availableTokensAt now limiterState === 206.0
 
     debug "testRateLimiterConsumeAndRefill: PASSED"
 
+testRateLimiterRejectsOverCapacity : Script ()
 testRateLimiterRejectsOverCapacity = script do
     poolOwner <- allocateParty "pool-owner"
 
@@ -63,6 +71,7 @@ testRateLimiterRejectsOverCapacity = script do
 
     debug "testRateLimiterRejectsOverCapacity: PASSED"
 
+testRateLimiterSetConfigResetsBucket : Script ()
 testRateLimiterSetConfigResetsBucket = script do
     poolOwner <- allocateParty "pool-owner"
 
@@ -94,6 +103,7 @@ testRateLimiterSetConfigResetsBucket = script do
 
     debug "testRateLimiterSetConfigResetsBucket: PASSED"
 
+testRateLimiterRejectsNegativeRequest : Script ()
 testRateLimiterRejectsNegativeRequest = script do
     poolOwner <- allocateParty "pool-owner"
 

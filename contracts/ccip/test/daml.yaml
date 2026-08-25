@@ -28,9 +28,9 @@ data-dependencies:
 
   - ../executor/.daml/dist/ccip-executor-v2-2.0.0.dar
   - ../committee-verifier/.daml/dist/ccip-committee-verifier-v2-2.0.0.dar
-  - ../rate-limiter/.daml/dist/ccip-rate-limiter-v2-2.0.0.dar
-  - ../pools/lock-release-token-pool/.daml/dist/ccip-lock-release-token-pool-v2-2.1.0.dar
-  - ../pools/burn-mint-token-pool/.daml/dist/ccip-burn-mint-token-pool-v2-2.1.0.dar
+  - ../rate-limiter/.daml/dist/ccip-rate-limiter-v2-2.0.1.dar
+  - ../pools/lock-release-token-pool/.daml/dist/ccip-lock-release-token-pool-v2-2.1.1.dar
+  - ../pools/burn-mint-token-pool/.daml/dist/ccip-burn-mint-token-pool-v2-2.1.1.dar
 
   - ../sender/.daml/dist/ccip-sender-v2-2.1.0.dar
   - ../receiver/.daml/dist/ccip-receiver-v2-2.1.0.dar
