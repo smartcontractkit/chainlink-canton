@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
 #
 # Fail if a changeset modifies existing frozen release artifacts. Normal PRs
-# should only touch dev outputs (contracts/dars/current/, bindings/generated/latest/).
+# should only touch dev outputs (contracts/dars/dev).
 #
 # Allowed without the release-artifacts label:
-#   - Adding a new DAR release snapshot tree (e.g. contracts/dars/v2_0_0/)
-#   - Renaming/moving legacy flat DARs into contracts/dars/v*_*/
-#   - Syncing bindings/generated/mcms/mcms.go when bootstrapping legacy mcms/
+#   - Marking new DARs as released by adding them to contracts/dars/released
+#   - Regenerating bindings (contracts/bindings/generated),
+#     a separate check will ensure that they're always up-to-date
 #
 # Blocked:
 #   - Modifying or deleting a file that already exists on the base branch under
-#     a frozen path (contracts/dars/v*_*/, legacy bindings/generated/v1_0_0/, mcms/)
-#
-# New releases freeze DARs only — do not add bindings/generated/v*_*/ trees.
+#     a frozen path (contracts/dars/released)
 #
 # Bypass: FROZEN_ARTIFACT_CHANGES_OK=1 or PR label release-artifacts (see CI).
 #
@@ -47,8 +45,6 @@ is_frozen_path() {
   local path="$1"
   case "$path" in
     contracts/dars/released/*.dar) return 0 ;;
-    bindings/generated/v[0-9]_*/*) return 0 ;;
-    bindings/generated/mcms/*) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -59,10 +55,6 @@ exists_on_base() {
 }
 
 violations=()
-bootstrapping_v1_mcms=false
-if git diff --name-status "$MERGE_BASE"...HEAD | grep -qE '^A[[:space:]]+bindings/generated/v[0-9]+_[0-9]+_[0-9]+/mcms/mcms\.go'; then
-  bootstrapping_v1_mcms=true
-fi
 
 while IFS=$'\t' read -r status path1 path2; do
   [ -z "$status" ] && continue
@@ -70,9 +62,6 @@ while IFS=$'\t' read -r status path1 path2; do
   case "$status" in
     M*)
       if is_frozen_path "$path1" && exists_on_base "$path1"; then
-        if [ "$path1" = "bindings/generated/mcms/mcms.go" ] && $bootstrapping_v1_mcms; then
-          continue
-        fi
         violations+=("$path1 (modified)")
       fi
       ;;
@@ -82,7 +71,7 @@ while IFS=$'\t' read -r status path1 path2; do
       fi
       ;;
     A*)
-      # New files under frozen dirs are OK (new snapshot dir or new package version).
+      # New files under frozen dirs are OK (newly released package).
       ;;
     R*|C*)
       # Rename/copy: block only when both sides are frozen (in-place snapshot rewrite).
@@ -112,7 +101,7 @@ done
 echo "" >&2
 echo "Day-to-day contract work should only update:" >&2
 echo "  - contracts/dars/dev/     (make compile-contracts)" >&2
-echo "  - bindings/generated/latest/  (make generate-bindings)" >&2
+echo "  - contracts/bindings/generated/  (make generate-bindings)" >&2
 echo "" >&2
 echo "To refresh an existing frozen snapshot (e.g. rewrite ccip-core-1.0.0.dar in v1_0_0/):" >&2
 echo "  1. make contracts && make freeze-release VERSION=<x.y.z>" >&2

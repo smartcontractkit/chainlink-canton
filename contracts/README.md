@@ -6,12 +6,18 @@ on Canton.
 ## Contract artifacts & releases
 
 DARs live under:
+
 - `contracts/dars/dev` for development artifacts, rebuilt on every contract change
-- `contracts/dars/released` for stable, frozen, release versions
+- `contracts/dars/released` for stable, immutable, release versions
 
-Go bindings live under `bindings/generated/latest/` for all in-repo code; frozen releases snapshot DARs only (not versioned binding trees).
+While the `/released` DARs are release candidates that are about to be released, artifacts **must only be acquired from
+tagged GitHub releases**. The latest `contracts/v<x.y.z>` release is considered released, and is the only version that should
+be used in production.
+See [Releases](https://github.com/smartcontractkit/chainlink-canton/releases?q=contracts%2F&expanded=true) for the
+latest available version.
 
-For day-to-day builds (`make contracts`) and **how to cut and migrate to a new release** (e.g. 2.1.0 — freeze, update `ReleaseDir`, import paths, and git tag), see **[bindings/README.md](../bindings/README.md)**.
+Go bindings live under `contracts/bindings/generated/`, enforced to be up-to-date with `/dev` DARs. For details on the
+Go bindings themselves, see **[bindings/README.md](./bindings/README.md)**.
 
 ## Overview
 
@@ -29,7 +35,7 @@ messaging** - users receive verified message data and decide how to process it.
 | State model         | Global shared state               | Per-party isolated state (PerPartyRouter) |
 | Contract visibility | Public                            | Explicit disclosure required              |
 | Risk management     | RMN pausing per lane              | RMN curse mechanism (global + per-chain)  |
-| Message execution   | Single destination executor       | Pluggable Executor interface               |
+| Message execution   | Single destination executor       | Pluggable Executor interface              |
 
 ## Architecture
 
@@ -66,6 +72,7 @@ CCIP Canton contracts are organized in a modular, layered architecture:
 ### Contract Categories
 
 **SHARED CONTRACTS** (fetched via explicit disclosure):
+
 - `GlobalConfig` — chain & lane configuration
 - `TokenAdminRegistry` — token pool registry & ticket authority
 - `FeeQuoter` — fee calculation engine
@@ -75,14 +82,16 @@ CCIP Canton contracts are organized in a modular, layered architecture:
 - `Executor` — message execution wrapper for destination chains
 
 **PER-PARTY CONTRACTS** (user is stakeholder):
+
 - `PerPartyRouter` — isolated state container per user
-  - `outboundSequenceNumbers` : Map destChain → seqNum
-  - `executedMessages` : Set messageHash (with archive pattern for scaling)
-  - `customObservers` : [Party] for optional observers
+    - `outboundSequenceNumbers` : Map destChain → seqNum
+    - `executedMessages` : Set messageHash (with archive pattern for scaling)
+    - `customObservers` : [Party] for optional observers
 
 **TICKETS** (ephemeral, created and consumed during flows):
+
 - `TokenReceiveTicket` — authorizes token release on inbound
-  - Factory-created via `TokenAdminRegistry`
+    - Factory-created via `TokenAdminRegistry`
 
 ## Package Structure
 
@@ -160,159 +169,160 @@ contracts/ccip/
 ```
 
 ### Package imports
+
 ```mermaid
 flowchart BT
-
+%% Splice
     splice-metadata-v1
     splice-holding-v1
     splice-burn-mint-v1
     splice-transfer-instruction-v1
-
+%% Chainlink API
     chainlink-api
-
+%%& MCMS
     mcms-api
     mcms-core
     mcms-core --> chainlink-api
     mcms-core --> mcms-api
-
-    ccip-api
-    ccip-api --> splice-metadata-v1
-    ccip-api --> splice-holding-v1
-    ccip-api --> splice-burn-mint-v1
-    ccip-api --> splice-transfer-instruction-v1
-    ccip-api --> chainlink-api
-    ccip-api --> ccip-codec
-
-    ccip-client
-    ccip-client --> splice-metadata-v1
-    ccip-client --> splice-holding-v1
-    ccip-client --> splice-burn-mint-v1
-    ccip-client --> splice-transfer-instruction-v1
-    ccip-client --> chainlink-api
-    ccip-client --> ccip-codec
-    ccip-client --> ccip-events
-    ccip-client --> ccip-tickets
-    ccip-client --> ccip-extension-api
-
-    ccip-codec
-    ccip-codec --> chainlink-api
-    ccip-codec --> mcms-api
-
-    ccip-committee-verifier
-    ccip-committee-verifier --> splice-metadata-v1
-    ccip-committee-verifier --> splice-holding-v1
-    ccip-committee-verifier --> splice-burn-mint-v1
-    ccip-committee-verifier --> splice-transfer-instruction-v1
-    ccip-committee-verifier --> chainlink-api
-    ccip-committee-verifier --> mcms-api
-    ccip-committee-verifier --> ccip-codec
-    ccip-committee-verifier --> ccip-api
-    ccip-committee-verifier --> ccip-extension-api
-
-    ccip-core
-    ccip-core --> splice-metadata-v1
-    ccip-core --> splice-holding-v1
-    ccip-core --> splice-burn-mint-v1
-    ccip-core --> splice-transfer-instruction-v1
-    ccip-core --> chainlink-api
-    ccip-core --> mcms-api
-    ccip-core --> ccip-api
-    ccip-core --> ccip-tickets
-    ccip-core --> ccip-codec
-    ccip-core --> ccip-events
-
-    ccip-events
-    ccip-events --> splice-metadata-v1
-    ccip-events --> splice-holding-v1
-    ccip-events --> splice-burn-mint-v1
-    ccip-events --> splice-transfer-instruction-v1
-    ccip-events --> chainlink-api
-    ccip-events --> mcms-api
-    ccip-events --> ccip-api
-    ccip-events --> ccip-codec
-
-    ccip-executor
-    ccip-executor --> splice-metadata-v1
-    ccip-executor --> splice-holding-v1
-    ccip-executor --> splice-burn-mint-v1
-    ccip-executor --> splice-transfer-instruction-v1
-    ccip-executor --> chainlink-api
-    ccip-executor --> mcms-api
-    ccip-executor --> ccip-api
-    ccip-executor --> ccip-codec
-    ccip-executor --> ccip-extension-api
-
-    ccip-extension-api
-    ccip-extension-api --> splice-metadata-v1
-    ccip-extension-api --> splice-holding-v1
-    ccip-extension-api --> splice-burn-mint-v1
-    ccip-extension-api --> splice-transfer-instruction-v1
-    ccip-extension-api --> chainlink-api
-    ccip-extension-api --> ccip-api
-
-    ccip-burn-mint-token-pool
-    ccip-burn-mint-token-pool --> splice-metadata-v1
-    ccip-burn-mint-token-pool --> splice-holding-v1
-    ccip-burn-mint-token-pool --> splice-burn-mint-v1
-    ccip-burn-mint-token-pool --> splice-transfer-instruction-v1
-    ccip-burn-mint-token-pool --> chainlink-api
-    ccip-burn-mint-token-pool --> mcms-api
-    ccip-burn-mint-token-pool --> ccip-api
-    ccip-burn-mint-token-pool --> ccip-tickets
-    ccip-burn-mint-token-pool --> ccip-codec
-    ccip-burn-mint-token-pool --> ccip-utils
-    ccip-burn-mint-token-pool --> ccip-events
-    ccip-burn-mint-token-pool --> ccip-rate-limiter
-    ccip-burn-mint-token-pool --> ccip-extension-api
-
-    ccip-lock-release-token-pool
-    ccip-lock-release-token-pool --> splice-metadata-v1
-    ccip-lock-release-token-pool --> splice-holding-v1
-    ccip-lock-release-token-pool --> splice-burn-mint-v1
-    ccip-lock-release-token-pool --> splice-transfer-instruction-v1
-    ccip-lock-release-token-pool --> chainlink-api
-    ccip-lock-release-token-pool --> mcms-api
-    ccip-lock-release-token-pool --> ccip-api
-    ccip-lock-release-token-pool --> ccip-tickets
-    ccip-lock-release-token-pool --> ccip-codec
-    ccip-lock-release-token-pool --> ccip-utils
-    ccip-lock-release-token-pool --> ccip-events
-    ccip-lock-release-token-pool --> ccip-rate-limiter
-    ccip-lock-release-token-pool --> ccip-extension-api
-
-    ccip-rate-limiter
-    ccip-rate-limiter --> chainlink-api
-    ccip-rate-limiter --> mcms-api
-
-    ccip-runtime
-    ccip-runtime --> splice-metadata-v1
-    ccip-runtime --> splice-holding-v1
-    ccip-runtime --> splice-burn-mint-v1
-    ccip-runtime --> splice-transfer-instruction-v1
-    ccip-runtime --> chainlink-api
-    ccip-runtime --> mcms-api
-    ccip-runtime --> ccip-api
-    ccip-runtime --> ccip-tickets
-    ccip-runtime --> ccip-core
-    ccip-runtime --> ccip-utils
-    ccip-runtime --> ccip-codec
-    ccip-runtime --> ccip-extension-api
-    ccip-runtime --> ccip-events
-    ccip-runtime --> ccip-client
-
-    ccip-tickets
-    ccip-tickets --> splice-metadata-v1
-    ccip-tickets --> splice-holding-v1
-    ccip-tickets --> splice-burn-mint-v1
-    ccip-tickets --> splice-transfer-instruction-v1
-    ccip-tickets --> chainlink-api
-    ccip-tickets --> ccip-api
-    ccip-tickets --> ccip-codec
-
-    ccip-utils
-    ccip-utils --> splice-metadata-v1
-    ccip-utils --> mcms-api
-
+%% CCIP API
+    ccip-api-v2
+    ccip-api-v2 --> splice-metadata-v1
+    ccip-api-v2 --> splice-holding-v1
+    ccip-api-v2 --> splice-burn-mint-v1
+    ccip-api-v2 --> splice-transfer-instruction-v1
+    ccip-api-v2 --> chainlink-api
+    ccip-api-v2 --> ccip-codec-v2
+%% CCIP Client API
+    ccip-client-api-v2
+    ccip-client-api-v2 --> splice-metadata-v1
+    ccip-client-api-v2 --> splice-holding-v1
+    ccip-client-api-v2 --> splice-burn-mint-v1
+    ccip-client-api-v2 --> splice-transfer-instruction-v1
+    ccip-client-api-v2 --> chainlink-api
+    ccip-client-api-v2 --> ccip-codec-v2
+    ccip-client-api-v2 --> ccip-events-v2
+    ccip-client-api-v2 --> ccip-tickets-v2
+    ccip-client-api-v2 --> ccip-extension-api-v2
+%% CCIP Codec
+    ccip-codec-v2
+    ccip-codec-v2 --> chainlink-api
+    ccip-codec-v2 --> mcms-api
+%% CCIP CommitteeVerifier
+    ccip-committee-verifier-v2
+    ccip-committee-verifier-v2 --> splice-metadata-v1
+    ccip-committee-verifier-v2 --> splice-holding-v1
+    ccip-committee-verifier-v2 --> splice-burn-mint-v1
+    ccip-committee-verifier-v2 --> splice-transfer-instruction-v1
+    ccip-committee-verifier-v2 --> chainlink-api
+    ccip-committee-verifier-v2 --> mcms-api
+    ccip-committee-verifier-v2 --> ccip-codec-v2
+    ccip-committee-verifier-v2 --> ccip-api-v2
+    ccip-committee-verifier-v2 --> ccip-extension-api-v2
+%% CCIP Core
+    ccip-core-v2
+    ccip-core-v2 --> splice-metadata-v1
+    ccip-core-v2 --> splice-holding-v1
+    ccip-core-v2 --> splice-burn-mint-v1
+    ccip-core-v2 --> splice-transfer-instruction-v1
+    ccip-core-v2 --> chainlink-api
+    ccip-core-v2 --> mcms-api
+    ccip-core-v2 --> ccip-api-v2
+    ccip-core-v2 --> ccip-tickets-v2
+    ccip-core-v2 --> ccip-codec-v2
+    ccip-core-v2 --> ccip-events-v2
+%% CCIP Events
+    ccip-events-v2
+    ccip-events-v2 --> splice-metadata-v1
+    ccip-events-v2 --> splice-holding-v1
+    ccip-events-v2 --> splice-burn-mint-v1
+    ccip-events-v2 --> splice-transfer-instruction-v1
+    ccip-events-v2 --> chainlink-api
+    ccip-events-v2 --> mcms-api
+    ccip-events-v2 --> ccip-api-v2
+    ccip-events-v2 --> ccip-codec-v2
+%% CCIP Executor
+    ccip-executor-v2
+    ccip-executor-v2 --> splice-metadata-v1
+    ccip-executor-v2 --> splice-holding-v1
+    ccip-executor-v2 --> splice-burn-mint-v1
+    ccip-executor-v2 --> splice-transfer-instruction-v1
+    ccip-executor-v2 --> chainlink-api
+    ccip-executor-v2 --> mcms-api
+    ccip-executor-v2 --> ccip-api-v2
+    ccip-executor-v2 --> ccip-codec-v2
+    ccip-executor-v2 --> ccip-extension-api-v2
+%% CCIP Extension API
+    ccip-extension-api-v2
+    ccip-extension-api-v2 --> splice-metadata-v1
+    ccip-extension-api-v2 --> splice-holding-v1
+    ccip-extension-api-v2 --> splice-burn-mint-v1
+    ccip-extension-api-v2 --> splice-transfer-instruction-v1
+    ccip-extension-api-v2 --> chainlink-api
+    ccip-extension-api-v2 --> ccip-api-v2
+%% CCIP BurnMintTokenPool
+    ccip-burn-mint-token-pool-v2
+    ccip-burn-mint-token-pool-v2 --> splice-metadata-v1
+    ccip-burn-mint-token-pool-v2 --> splice-holding-v1
+    ccip-burn-mint-token-pool-v2 --> splice-burn-mint-v1
+    ccip-burn-mint-token-pool-v2 --> splice-transfer-instruction-v1
+    ccip-burn-mint-token-pool-v2 --> chainlink-api
+    ccip-burn-mint-token-pool-v2 --> mcms-api
+    ccip-burn-mint-token-pool-v2 --> ccip-api-v2
+    ccip-burn-mint-token-pool-v2 --> ccip-tickets-v2
+    ccip-burn-mint-token-pool-v2 --> ccip-codec-v2
+    ccip-burn-mint-token-pool-v2 --> ccip-utils-v2
+    ccip-burn-mint-token-pool-v2 --> ccip-events-v2
+    ccip-burn-mint-token-pool-v2 --> ccip-rate-limiter-v2
+    ccip-burn-mint-token-pool-v2 --> ccip-extension-api-v2
+%% CCIP LockReleaseTokenPool
+    ccip-lock-release-token-pool-v2
+    ccip-lock-release-token-pool-v2 --> splice-metadata-v1
+    ccip-lock-release-token-pool-v2 --> splice-holding-v1
+    ccip-lock-release-token-pool-v2 --> splice-burn-mint-v1
+    ccip-lock-release-token-pool-v2 --> splice-transfer-instruction-v1
+    ccip-lock-release-token-pool-v2 --> chainlink-api
+    ccip-lock-release-token-pool-v2 --> mcms-api
+    ccip-lock-release-token-pool-v2 --> ccip-api-v2
+    ccip-lock-release-token-pool-v2 --> ccip-tickets-v2
+    ccip-lock-release-token-pool-v2 --> ccip-codec-v2
+    ccip-lock-release-token-pool-v2 --> ccip-utils-v2
+    ccip-lock-release-token-pool-v2 --> ccip-events-v2
+    ccip-lock-release-token-pool-v2 --> ccip-rate-limiter-v2
+    ccip-lock-release-token-pool-v2 --> ccip-extension-api-v2
+%% CCIP RateLimiter
+    ccip-rate-limiter-v2
+    ccip-rate-limiter-v2 --> chainlink-api
+    ccip-rate-limiter-v2 --> mcms-api
+%% CCIP Runtime
+    ccip-runtime-v2
+    ccip-runtime-v2 --> splice-metadata-v1
+    ccip-runtime-v2 --> splice-holding-v1
+    ccip-runtime-v2 --> splice-burn-mint-v1
+    ccip-runtime-v2 --> splice-transfer-instruction-v1
+    ccip-runtime-v2 --> chainlink-api
+    ccip-runtime-v2 --> mcms-api
+    ccip-runtime-v2 --> ccip-api-v2
+    ccip-runtime-v2 --> ccip-tickets-v2
+    ccip-runtime-v2 --> ccip-core-v2
+    ccip-runtime-v2 --> ccip-utils-v2
+    ccip-runtime-v2 --> ccip-codec-v2
+    ccip-runtime-v2 --> ccip-extension-api-v2
+    ccip-runtime-v2 --> ccip-events-v2
+    ccip-runtime-v2 --> ccip-client-api-v2
+%% CCIP Tickets
+    ccip-tickets-v2
+    ccip-tickets-v2 --> splice-metadata-v1
+    ccip-tickets-v2 --> splice-holding-v1
+    ccip-tickets-v2 --> splice-burn-mint-v1
+    ccip-tickets-v2 --> splice-transfer-instruction-v1
+    ccip-tickets-v2 --> chainlink-api
+    ccip-tickets-v2 --> ccip-api-v2
+    ccip-tickets-v2 --> ccip-codec-v2
+%% CCIP Utils
+    ccip-utils-v2
+    ccip-utils-v2 --> splice-metadata-v1
+    ccip-utils-v2 --> mcms-api
+%% LinkToken
     link
     link --> splice-metadata-v1
     link --> splice-holding-v1
@@ -329,6 +339,7 @@ Per-party routing and state container for sender and receiver flows. Each party 
 contention.
 
 **Fields:**
+
 ```daml
 template PerPartyRouter
     with
@@ -340,9 +351,11 @@ template PerPartyRouter
         executedMessages : Set BytesHex                -- messageHash set (for replay detection)
         archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]  -- archived message sets
         customObservers : [Party]                      -- Optional observers
+        feeTransferLifetime : Optional RelTime
 ```
 
 **Key Choices:**
+
 - `GetSequenceNumber` — Query next sequence number for a destination chain
 - `PrepareSend` — Initiate outbound message (creates SendingMessageV1)
 - `GetFee` — Calculate total fee including CCVs, pool, executor, and network costs
@@ -355,19 +368,22 @@ template PerPartyRouter
 
 ### OnRamp
 
-Implements outbound message processing, called by `PerPartyRouter.CCIPSend`. Encodes messages,
-validates lane configurations, collects CCVs, and issues `TokenSendTicket` if token transfer present.
+Implements outbound message processing, called by `PerPartyRouter.CCIPSend`. Encodes messages, validates lane
+configurations, collects CCVs, and issues `TokenSendTicket` if token transfer present.
 
 **Fields:**
+
 ```daml
 template OnRamp
     with
         instanceId : Text
         ccipOwner : Party
+        maxUSDCentsPerMsg : Numeric 0
         deps : OnRampDeps  -- Includes GlobalConfig, FeeQuoter, RMNRemote
 ```
 
 **Key Choices:**
+
 - `GetRequiredCCVsForSendFromRouter` — Compute required CCVs for outbound lane
 - `GetFeeFromRouter` — Calculate fee components (network, CCV, token pool, executor)
 - `PrepareSendFromRouter` — Build SendingMessageV1 (message state machine)
@@ -376,10 +392,11 @@ template OnRamp
 
 ### OffRamp
 
-Implements inbound message processing, called by `PerPartyRouter.Execute`. Decodes messages,
-validates source chain configs, collects CCVs, and issues `TokenReceiveTicket`.
+Implements inbound message processing, called by `PerPartyRouter.Execute`. Decodes messages, validates source chain
+configs, collects CCVs, and issues `TokenReceiveTicket`.
 
 **Fields:**
+
 ```daml
 template OffRamp
     with
@@ -389,6 +406,7 @@ template OffRamp
 ```
 
 **Key Choices:**
+
 - `GetRequiredCCVsForExecuteFromRouter` — Compute required CCVs for inbound lane
 - `PrepareExecuteFromRouter` — Decode message, build ExecutingMessageV1 (message state machine)
 - `ExecuteFromRouter` — Validate CCVs, issue TokenReceiveTicket, create ExecutionStateChanged event
@@ -398,6 +416,7 @@ template OffRamp
 Shared configuration for chain selectors and lane settings. Managed by `ccipOwner` via MCMS.
 
 **Fields:**
+
 ```daml
 template GlobalConfig
     with
@@ -409,35 +428,38 @@ template GlobalConfig
 ```
 
 **Key Choices:**
+
 - `GetDestChainConfig` — Fetch destination chain configuration
 - `GetSourceChainConfig` — Fetch source chain configuration
 - `ApplyDestChainConfigUpdates` — Update outbound lane configs (MCMS-protected)
 - `ApplySourceChainConfigUpdates` — Update inbound lane configs (MCMS-protected)
 
 **DestChainConfig:**
+
 ```daml
 data DestChainConfig = DestChainConfig
     with
-        isEnabled : Bool
-        addressBytesLength : Int
-        baseExecutionGasCost : Int
-        tokenReceiverAllowed : Bool
-        offRampAddress : BytesHex              -- Remote OffRamp address
-        defaultExecutor : Optional BytesHex    -- Default executor address if none specified
-        laneMandatedCCVs : [CCVId]             -- Required CCVs for this lane
-        defaultCCVs : [CCVId]                  -- Fallback if none specified
-        messageNetworkFeeUSDCents : Numeric 0  -- Per-message fee
-        tokenNetworkFeeUSDCents : Numeric 0    -- Per-token-transfer fee
+        isEnabled : Bool                        -- Flag whether this destination chain is enabled or not.
+        addressBytesLength : Int                -- The length of an address on this chain in bytes, e.g. 20 for EVM, 32 for SVM.
+        tokenReceiverAllowed : Bool             -- Whether specifying `tokenReceiver` in extraArgs is allowed. Must be set to false for all EVM chains.
+        baseExecutionGasCost : Int              -- Base destination-chain gas cost added to ccipReceiveGasLimit for execution pricing.
+        offRampAddress : BytesHex               -- OffRamp address on the destination chain.
+        defaultExecutor : Optional Chainlink.InstanceAddress.RawInstanceAddress -- Default executor to use for messages to this destination chain. `None` means no executor.
+        laneMandatedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress] -- Required CCVs to use for all messages to this destination chain.
+        defaultCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]      -- Default CCVs to use for messages to this destination chain.
+        messageNetworkFeeUSDCents : Numeric 0   -- Network fee in USD cents for messages without token transfers.
+        tokenNetworkFeeUSDCents : Numeric 0     -- Network fee in USD cents for messages with token transfers.
 ```
 
 **SourceChainConfig:**
+
 ```daml
 data SourceChainConfig = SourceChainConfig
     with
-        isEnabled : Bool
-        onRampAddresses : [BytesHex]           -- Remote OnRamp addresses
-        laneMandatedCCVs : [CCVId]
-        defaultCCVs : [CCVId]
+        isEnabled : Bool                        -- Flag whether the source chain is enabled or not.
+        onRampAddresses : [BytesHex]            -- OnRamp addresses on the source chain.
+        defaultCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]      -- Default CCVs to use for messages from this source chain.
+        laneMandatedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress] -- Required CCVs to use for all messages from this source chain.
 ```
 
 ### TokenAdminRegistry
@@ -445,15 +467,17 @@ data SourceChainConfig = SourceChainConfig
 Central authority for token pool registration and `TokenReceiveTicket` issuance.
 
 **Fields:**
+
 ```daml
 template TokenAdminRegistry
     with
         instanceId : Text
         ccipOwner : Party
-        tokenConfigs : Map InstrumentId TokenConfig
+        entryCount : Int
 ```
 
 **Key Choices:**
+
 - `GetTokenConfig` — Query registered pool for a token
 - `SetPool` — Register or unregister a pool for a token (admin-protected)
 - `ConsumeReceiveTicket` — Consume ticket to release inbound tokens (pool + ccipOwner authority)
@@ -467,21 +491,24 @@ Risk Management Network providing emergency stop capability via **curse mechanis
 Supports both global curses and per-chain curses.
 
 **Fields:**
+
 ```daml
 template RMNRemote
     with
-        instanceId : Text
-        rmnOwner : Party               -- Party controlling curse operations (separate from ccipOwner)
-        ccipOwner : Party              -- For association/validation
-        customObservers : [Party]      -- Optional observers
-        cursedSubjects : [BytesHex]    -- Currently cursed subjects
+        instanceId : Text              -- Unique identifier for this RMN instance
+        rmnOwner : Party               -- Party controlling curse operations
+        ccipOwner : Party              -- For deployment association/validation
+        customObservers : [Party]      -- Additional parties allowed to observe RMN state
+        cursedSubjects : [BytesHex]    -- Currently cursed subjects (global or chain-specific)
 ```
 
 **Curse Subjects:**
+
 - Global curse: `bytes16(uint128(0x01000000000000000000000000000001))`
 - Per-chain curse: `bytes16(uint128(chainSelector))`
 
 **Key Choices:**
+
 - `Curse` — Curse a specific subject (rmnOwner authority)
 - `Uncurse` — Uncurse a subject (rmnOwner authority)
 - `CurseChain` — Curse a specific chain selector (convenience)
@@ -495,6 +522,7 @@ template RMNRemote
 Fee calculation engine for per-message and per-token costs. Used by OnRamp and CCIPSender.
 
 **Key Choices:**
+
 - `GetFeeTokenConfig` — Retrieve native fee token configuration
 - `UpdateTokenPrices` — Update exchange rate prices (MCMS-protected)
 - `UpdateFeeTokenConfig` — Update fee token settings (MCMS-protected)
@@ -502,11 +530,13 @@ Fee calculation engine for per-message and per-token costs. Used by OnRamp and C
 ### SendingMessage & ExecutingMessage
 
 **SendingMessage** (CoreV1) — Outbound message state machine created by OnRamp, threaded through:
+
 1. Fee calculation (CCIPSender.CalculateFee)
 2. CCV forwarding to verifiers (CCIPSender.ForwardToVerifier)
 3. Final send (PerPartyRouter.CCIPSend → OnRamp.CCIPSendFromRouter)
 
 **ExecutingMessage** (CoreV1) — Inbound message state machine created by OffRamp, threaded through:
+
 1. CCV verification (CCIPReceiver.Execute → CCVs)
 2. Token pool verification (if token transfer)
 3. Final execution (PerPartyRouter.Execute → OffRamp.ExecuteFromRouter)
@@ -518,6 +548,7 @@ Fee calculation engine for per-message and per-token costs. Used by OnRamp and C
 Pluggable interface for cross-chain message verification implementations. Implementations include `CommitteeVerifier`.
 
 **Key Choices:**
+
 - `CrossChainVerifier_VerifyMessage` — Verify inbound message and append verification to ExecutingMessageV1
 - `CrossChainVerifier_CalculateFee` — Calculate fee for message and append to SendingMessageV1
 - `CrossChainVerifier_GetFee` — Quote-only fee for a destination chain (no message required)
@@ -528,6 +559,7 @@ Pluggable interface for cross-chain message verification implementations. Implem
 CCV implementation using committee-based ECDSA signature verification (matching EVM pattern).
 
 **Fields:**
+
 ```daml
 template CommitteeVerifier
     with
@@ -539,12 +571,14 @@ template CommitteeVerifier
         messageSentObservers : [Party]         -- CCIPMessageSent observers
         storageLocations : [Text]              -- Off-chain storage URLs
         storageLocationsAdmin : Party
+        pendingStorageLocationsAdmin : Party
         remoteChainConfigs : Map (Numeric 0) RemoteChainConfig
         signerConfigs : Map (Numeric 0) SignatureConfig
         deps : CommitteeVerifierDeps
 ```
 
 **Key Choices:**
+
 - `VerifyMessage` (via interface) — ECDSA signature verification for inbound
 - `CalculateFee` — Per-message CCV verification fee
 - `GetFee` — Quote CCV fee without message
@@ -557,6 +591,7 @@ template CommitteeVerifier
 Pluggable interface for message execution on remote chains. Default implementation is `Executor`.
 
 **Key Choices:**
+
 - `Executor_CalculateFee` — Calculate execution cost
 - `Executor_GetFee` — Quote execution fee
 
@@ -565,6 +600,7 @@ Pluggable interface for message execution on remote chains. Default implementati
 Message execution wrapper for destination chains.
 
 **Fields:**
+
 ```daml
 template Executor
     with
@@ -572,11 +608,12 @@ template Executor
         owner : Party
         maxCCVsPerMsg : Int                    -- Safety limit
         dynamicConfig : DynamicConfig
-        allowedCCVs : [RawInstanceAddress]     -- Whitelisted CCVs
+        allowedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]     -- Whitelisted CCVs
         remoteChainConfigs : Map (Numeric 0) RemoteChainConfig
 ```
 
 **Key Choices:**
+
 - `CalculateFee` — Compute execution gas and fee for a message
 - `GetFee` — Query fee for destination chain
 - `ApplyDestChainUpdates` — Update per-chain fee and gas configs (MCMS)
@@ -586,6 +623,7 @@ template Executor
 Pluggable interface for token pool implementations.
 
 **Key Choices:**
+
 - `TokenPool_LockOrBurn` — Initiate outbound token transfer (issuer authority)
 - `TokenPool_ReleaseFromTicket` — Release/mint inbound tokens (pool authority)
 - `TokenPool_GetRequiredCCVs` — Get token-specific CCV requirements
@@ -597,14 +635,16 @@ Pluggable interface for token pool implementations.
 User-owned sender orchestrator. Executes the full outbound flow in a single atomic transaction.
 
 **Fields:**
+
 ```daml
 template CCIPSender
     with
+        instanceId : Text
         owner : Party                          -- Message sender (signatory)
-        -- ccipOwner is NOT a party on this contract (disclosed only)
 ```
 
 **Key Steps:**
+
 1. Accept token holdings (via Holding contract IDs)
 2. Query required CCVs from PerPartyRouter
 3. Get fee quotes from each CCV
@@ -614,6 +654,7 @@ template CCIPSender
 7. Emit CCIPMessageSent event with messageId and encoded message
 
 **Key Choices:**
+
 - `Send` — Execute full outbound flow
 
 #### CCIPReceiver
@@ -621,19 +662,20 @@ template CCIPSender
 User-owned receiver orchestrator. Executes inbound message through CCV verification and pool verification.
 
 **Fields:**
+
 ```daml
 template CCIPReceiver
     with
         instanceId : Text
         owner : Party                          -- Message receiver (signatory)
-        requiredCCVs : [RawInstanceAddress]    -- Receiver's required CCVs
-        optionalCCVs : [RawInstanceAddress]
+        requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]    -- Receiver's required CCVs
+        optionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
         optionalThreshold : Int
-        receiverFinalityConfig : FinalityConfig
-        -- ccipOwner is NOT a party on this contract (disclosed only)
+        receiverFinalityConfig : CCIP.CodecV2.FinalityConfig.FinalityConfig
 ```
 
 **Key Steps:**
+
 1. Accept encoded message and CCV verifications
 2. Thread ExecutingMessageV1 through each CCV.VerifyMessage
 3. Thread ExecutingMessageV1 through optional token pool verification
@@ -641,12 +683,14 @@ template CCIPReceiver
 5. Emit ExecutionStateChanged event with messageId and execution state
 
 **Key Choices:**
+
 - `Execute` — Execute full inbound flow
 - `GetRequiredCCVs` — Query final CCV requirements (aggregated from lane + receiver + pool)
 
 ## Ticket Pattern
 
-Canton's privacy model means CCIP infrastructure cannot directly call user contracts. The **ticket pattern** solves this:
+Canton's privacy model means CCIP infrastructure cannot directly call user contracts. The **ticket pattern** solves
+this:
 
 1. User calls their contract (e.g., TokenPool) to perform an action
 2. Contract issues a ticket proving the action occurred (signatory: ccipOwner + pool/participant)
@@ -658,28 +702,44 @@ Canton's privacy model means CCIP infrastructure cannot directly call user contr
 Created by OffRamp after successful inbound execution. Authorizes token release on receiving chain.
 
 **Fields:**
+
 ```daml
 template TokenReceiveTicket
     with
         ccipOwner : Party
-        ccvOwners : [Party]                -- CCV operators (from verifications)
-        verifiedCCVs : [RawInstanceAddress] -- Exact CCVs that verified the message
-        requiredInboundPoolCCVs : [RawInstanceAddress] -- Pool-required CCVs
-        poolAddress : RawInstanceAddress    -- Exact pool instance
-        poolOwner : Party                   -- Pool that should release
-        receiver : Party                    -- Message receiver
-        tokenReceiver : Party               -- Who gets the tokens
-        instrumentId : InstrumentId
+        -- CCV owner parties accumulated from ExecutingMessageV1's finalize choice.
+        -- Mirrors the widened signatory set for deterministic pool-side validation.
+        ccvOwners : [Party]
+        -- Exact CCV instances that verified the message on the inbound path.
+        -- Pools use these to preserve instance-level trust checks.
+        verifiedCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        -- Resolved inbound pool-required CCV instances captured at execute-time.
+        -- Uses EVM-equivalent semantics:
+        --   * empty pool list means source defaults
+        --   * useDefaultCCVs sentinel expands to source defaults
+        requiredInboundPoolCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        tokenAdminRegistryInstanceId : Text  -- Identifies the issuing TAR
+        -- Exact registered pool instance that performed inbound pool verification.
+        poolAddress : Chainlink.InstanceAddress.RawInstanceAddress
+        poolOwner : Party           -- Observer - pool that should release
+        receiver : Party            -- Message receiver (observer)
+        tokenReceiver : Party       -- Who gets the tokens (may differ from receiver)
+
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         amount : BytesHex
         sourcePoolData : BytesHex
+
         messageId : BytesHex
         sourceChainSelector : Numeric 0
-        finality : FinalityConfig
+        finality : CCIP.CodecV2.FinalityConfig.FinalityConfig
+
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
 ```
 
 **Signatory:** `[ccipOwner, poolOwner] ++ ccvOwners` (deduplicated)
 
 **Key Choice:**
+
 - `Consume` — Archive the ticket after pool releases tokens (ccipOwner + poolOwner authority)
 
 ## Message Encoding (EVM-Compatible)
@@ -695,25 +755,26 @@ messageId = keccak256(encodedMessage)
 ```daml
 data MessageV1 = MessageV1
     with
-        -- Static section (69 bytes) — enables deterministic messageId
+        -- Static length fields (must be in this exact order for encoding)
         sourceChainSelector : Numeric 0   -- uint64
         destChainSelector : Numeric 0     -- uint64
-        sequenceNumber : Numeric 0        -- uint64
+        sequenceNumber : Numeric 0        -- uint64 (called messageNumber in EVM)
         executionGasLimit : Int           -- uint32
-        ccipReceiveGasLimit : Int         -- uint32
-        finality : BytesHex               -- bytes4 finality config
-        ccvAndExecutorHash : BytesHex     -- bytes32 (keccak256(CCV_configs || executor_config))
-        -- Variable section
-        onRampAddress : BytesHex          -- Remote OnRamp address
-        offRampAddress : BytesHex         -- Remote OffRamp address
-        sender : BytesHex                 -- PartyId encoded as bytes
-        receiver : BytesHex               -- PartyId encoded as bytes
-        destBlob : BytesHex               -- Executor-specific arguments
-        tokenTransfer : Optional TokenTransferV1
-        messageData : BytesHex            -- Arbitrary user payload
+        ccipReceiveGasLimit : Int         -- uint32 (gas limit for user callback)
+        finality : CCIP.CodecV2.FinalityConfig.DecodedFinality -- bytes4 finality config
+        ccvAndExecutorHash : BytesHex     -- bytes32 (hash of CCVs and executor)
+        -- Variable length fields (must be in this exact order for encoding)
+        onRampAddress : BytesHex          -- bytes (length-prefixed)
+        offRampAddress : BytesHex         -- bytes (length-prefixed)
+        sender : BytesHex                 -- bytes (length-prefixed)
+        receiver : BytesHex               -- bytes (length-prefixed)
+        destBlob : BytesHex               -- bytes (length-prefixed)
+        tokenTransfer : Optional TokenTransferV1  -- 0 or 1 token transfer
+        messageData : BytesHex            -- bytes (length-prefixed)
 ```
 
 **TokenTransferV1:**
+
 ```daml
 data TokenTransferV1 = TokenTransferV1
     with
@@ -1129,6 +1190,8 @@ Clean all build artifacts:
 cd contracts && dpm clean --all
 ```
 
-Built DARs are output to `.daml/dist/` in each package directory. After building, run `make contracts` from the repo root to:
+Built DARs are output to `.daml/dist/` in each package directory. After building, run `make contracts` from the repo
+root to:
+
 1. Copy DARs to `contracts/dars/dev/`
-2. Generate Go bindings to `bindings/generated/latest/`
+2. Generate Go bindings to `contracts/bindings/generated/`
