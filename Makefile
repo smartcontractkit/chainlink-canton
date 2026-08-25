@@ -1,22 +1,22 @@
 .PHONY: generate-daml-codecs
 generate-daml-codecs:
-	go run ./contracts/cmd/damlcodecs
+	cd ./contracts && go run ./cmd/damlcodecs
 
 .PHONY: compile-contracts
 compile-contracts: generate-daml-codecs
 	@echo "Compiling contracts..."
-	go run ./contracts/cmd/compile -root ./contracts -artifacts ./contracts/dars
+	cd ./contracts && go run ./cmd/compile -root . -artifacts ./dars
 
 .PHONY: generate-bindings
 generate-bindings:
-	go run ./contracts/cmd/bindings
+	cd ./contracts && go run ./cmd/bindings
 
 .PHONY: inspect-dars
 inspect-dars:
 	@echo "Inspecting DARs..."
-	go run ./contracts/cmd/inspect -output ./contracts/dars/dev/PACKAGE_INFO.md ./contracts/dars/dev/*.dar
-	go run ./contracts/cmd/inspect -output ./contracts/dars/legacy/PACKAGE_INFO.md ./contracts/dars/legacy/*.dar
-	go run ./contracts/cmd/inspect -output ./contracts/dars/released/PACKAGE_INFO.md ./contracts/dars/released/*.dar
+	cd ./contracts && go run ./cmd/inspect -output ./dars/dev/PACKAGE_INFO.md ./dars/dev/*.dar
+	cd ./contracts && go run ./cmd/inspect -output ./dars/legacy/PACKAGE_INFO.md ./dars/legacy/*.dar
+	cd ./contracts && go run ./cmd/inspect -output ./dars/released/PACKAGE_INFO.md ./dars/released/*.dar
 
 .PHONY: upgrade-check
 upgrade-check:
@@ -45,7 +45,7 @@ gomodtidy: ## Run go mod tidy on all modules.
 
 .PHONY: test-daml-contracts
 test-daml-contracts:
-	go run ./contracts/cmd/test --root ./contracts
+	cd ./contracts && go run ./cmd/test --root .
 
 # GolangCI-Lint targets
 

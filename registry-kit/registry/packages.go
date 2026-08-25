@@ -7,7 +7,7 @@ import (
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 // UtilityPackages lists vendored Canton Network Utility DARs for upload (dependency order).

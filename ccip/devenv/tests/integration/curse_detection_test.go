@@ -22,7 +22,7 @@ import (
 	_ "github.com/smartcontractkit/chainlink-canton/ccip/devenv" // register the canton impl factory
 	devenvtests "github.com/smartcontractkit/chainlink-canton/ccip/devenv/tests"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters" // register the curse adapters
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 )

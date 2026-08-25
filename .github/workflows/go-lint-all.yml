@@ -43,6 +43,7 @@ jobs:
       matrix:
         dir:
           - .
+          - contracts
           - integration-tests
           - party-ceremony
           - party-ceremony/integration-tests
