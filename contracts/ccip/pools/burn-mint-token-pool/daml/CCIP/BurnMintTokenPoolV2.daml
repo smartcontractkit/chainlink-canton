@@ -1237,6 +1237,9 @@ template BurnMintTokenPool
                             rateLimiterCid <- case Map.lookup limiterAddr contractIds of
                                 None -> abort ("E_RATE_LIMITER_NOT_IN_MAP: " <> limiterAddr)
                                 Some c -> pure (coerceContractId c : ContractId CCIP.RateLimiterV2.RateLimiter)
+                            resolvedLimiter <- fetch rateLimiterCid
+                            assertMsg "E_RATE_LIMITER_ADDRESS_MISMATCH"
+                                (CCIP.RateLimiterV2.rawInstanceAddress resolvedLimiter == rateLimiterInstanceAddress)
                             updatedLimiterCid <- exercise selfCid SetRateLimitConfig with
                                 caller
                                 rateLimiterCid
