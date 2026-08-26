@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/gin-gonic/gin"
@@ -45,6 +46,7 @@ type Server struct {
 	activeContractStore    store.ActiveContractStoreInterface
 	instrumentHoldingStore store.InstrumentHoldingStoreInterface
 
+	mux             sync.RWMutex
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
 }
 
@@ -140,7 +142,9 @@ func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
+	s.mux.RLock()
 	cfg, ok := s.contractConfigs[instanceAddress]
+	s.mux.RUnlock()
 	if !ok {
 		c.AbortWithStatusJSON(http.StatusNotFound, oapiCommon.ErrorResponse{Error: "token pool address not found"})
 		return
@@ -430,7 +434,9 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
+	s.mux.RLock()
 	cfg, ok := s.contractConfigs[instanceAddress]
+	s.mux.RUnlock()
 	if !ok {
 		c.AbortWithStatusJSON(http.StatusNotFound, oapiCommon.ErrorResponse{Error: "token pool address not found"})
 		return
@@ -720,8 +726,12 @@ func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contrac
 	}
 
 	// Reconstruct all contracts + rate limiters
-	var allContracts = make(map[contracts.InstanceAddress]bool, len(s.contractConfigs)*2)
-	for poolAddress, contractConfig := range s.contractConfigs {
+	s.mux.RLock()
+	contractConfigs := maps.Clone(s.contractConfigs)
+	s.mux.RUnlock()
+
+	var allContracts = make(map[contracts.InstanceAddress]bool, len(contractConfigs)*2)
+	for poolAddress, contractConfig := range contractConfigs {
 		allContracts[poolAddress] = true
 		activeContract, ok := s.activeContractStore.Get(poolAddress)
 		if !ok {
@@ -765,4 +775,44 @@ func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contrac
 	}
 
 	return out
+}
+
+// RegisterDiscoveredPool dynamically registers a discovered token pool.
+// This is called by the pool discovery service when a new pool is detected.
+// Note: Templates must be pre-registered before activeContractStore.Run() is called.
+func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.TokenPool) error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	// Check if already registered
+	if _, ok := s.contractConfigs[poolConfig.InstanceAddress]; ok {
+		return nil // Already registered
+	}
+
+	contractConfig := ContractConfig{
+		Type:  poolConfig.Type,
+		Owner: types.PARTY(poolConfig.PoolOwner),
+	}
+
+	// Handle factory if configured
+	if poolConfig.Factory != nil {
+		disclosureFactory, err := factory.NewBurnMintFactory(ctx, types.PARTY(poolConfig.PoolOwner), s.activeContractStore, *poolConfig.Factory)
+		if err != nil {
+			return fmt.Errorf("failed to get burn mint factory for token pool with address %s: %w", poolConfig.InstanceAddress, err)
+		}
+		contractConfig.disclosureFactory = disclosureFactory
+	}
+
+	// Handle transfer preapproval if configured
+	if poolConfig.TransferPreapproval != nil {
+		preapprovalFactoryFunc, err := getPreapprovalFactory(s.activeContractStore, poolConfig.TransferPreapproval.ContextKey, contractConfig.Owner, *poolConfig.TransferPreapproval)
+		if err != nil {
+			return fmt.Errorf("failed to get preapproval factory for token pool with address %s: %w", poolConfig.InstanceAddress, err)
+		}
+		contractConfig.preapproval = preapprovalFactoryFunc
+	}
+
+	s.contractConfigs[poolConfig.InstanceAddress] = contractConfig
+	s.logger.Info().Stringer("address", poolConfig.InstanceAddress).Str("type", string(poolConfig.Type)).Msg("dynamically registered discovered token pool")
+	return nil
 }
