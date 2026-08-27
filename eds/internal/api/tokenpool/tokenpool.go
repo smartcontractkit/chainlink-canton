@@ -126,7 +126,7 @@ func NewServer(
 	return s, nil
 }
 
-func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
+func (s *Server) PostTokenPoolSend(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolSendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
@@ -180,7 +180,7 @@ func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 	}
 }
 
-func (s Server) lockReleaseTokenPoolSend(
+func (s *Server) lockReleaseTokenPoolSend(
 	c *gin.Context,
 	cfg ContractConfig,
 	instanceAddress contracts.InstanceAddress,
@@ -307,7 +307,7 @@ func (s Server) lockReleaseTokenPoolSend(
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s Server) burnMintTokenPoolSend(
+func (s *Server) burnMintTokenPoolSend(
 	c *gin.Context,
 	cfg ContractConfig,
 	instanceAddress contracts.InstanceAddress,
@@ -418,7 +418,7 @@ func (s Server) burnMintTokenPoolSend(
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
+func (s *Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolExecuteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
@@ -479,7 +479,7 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	}
 }
 
-func (s Server) lockReleaseTokenPoolExecute(
+func (s *Server) lockReleaseTokenPoolExecute(
 	c *gin.Context,
 	cfg ContractConfig,
 	instanceAddress contracts.InstanceAddress,
@@ -605,7 +605,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s Server) burnMintTokenPoolExecute(
+func (s *Server) burnMintTokenPoolExecute(
 	c *gin.Context,
 	cfg ContractConfig,
 	instanceAddress contracts.InstanceAddress,
@@ -720,7 +720,7 @@ var _ global.InstanceAddressFilter = &Server{}
 
 // FilterContracts returns the sub-set of addresses that are tracked by the Token Pool API Server.
 // This includes token pools themselves, and their rate limiters.
-func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
+func (s *Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
 	if len(addresses) == 0 {
 		return nil
 	}
@@ -814,5 +814,6 @@ func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.T
 
 	s.contractConfigs[poolConfig.InstanceAddress] = contractConfig
 	s.logger.Info().Stringer("address", poolConfig.InstanceAddress).Str("type", string(poolConfig.Type)).Msg("dynamically registered discovered token pool")
+
 	return nil
 }

@@ -61,7 +61,7 @@ func TestPoolDiscoveryService_CheckForNewPools(t *testing.T) {
 		GetByTemplateId(types.PARTY(observerParty), contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{})).
 		Return(nil, false)
 
-	require.NoError(t, svc.checkForNewPools(t.Context()))
+	svc.checkForNewPools(t.Context())
 
 	assert.True(t, svc.discoveredPools[wantAddress], "pool should be discovered under the instanceId+poolOwner derived address")
 
@@ -72,7 +72,7 @@ func TestPoolDiscoveryService_CheckForNewPools(t *testing.T) {
 
 	// A second scan of the same active contract must not re-register it (the earlier
 	// GetByTemplateId expectation has no call-count limit, so it still matches here).
-	require.NoError(t, svc.checkForNewPools(t.Context()))
+	svc.checkForNewPools(t.Context())
 }
 
 func TestPoolDiscoveryService_CheckForNewPools_LockRelease(t *testing.T) {
@@ -113,7 +113,7 @@ func TestPoolDiscoveryService_CheckForNewPools_LockRelease(t *testing.T) {
 		GetByTemplateId(types.PARTY(observerParty), contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{})).
 		Return([]*apiv2.ActiveContract{activeContract}, true)
 
-	require.NoError(t, svc.checkForNewPools(t.Context()))
+	svc.checkForNewPools(t.Context())
 
 	assert.True(t, svc.discoveredPools[wantAddress], "lock release pool should be discovered under the instanceId+poolOwner derived address")
 

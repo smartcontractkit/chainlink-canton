@@ -71,28 +71,24 @@ func (s *PoolDiscoveryService) Watch(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			if err := s.checkForNewPools(ctx); err != nil {
-				s.logger.Err(err).Msg("error checking for new pools")
-			}
+			s.checkForNewPools(ctx)
 		}
 	}
 }
 
 // checkForNewPools polls the activeContractStore for BurnMintTokenPool and LockReleaseTokenPool contracts.
-func (s *PoolDiscoveryService) checkForNewPools(ctx context.Context) error {
+func (s *PoolDiscoveryService) checkForNewPools(ctx context.Context) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 
-	if err := s.checkBurnMintPools(ctx); err != nil {
-		return err
-	}
-	return s.checkLockReleasePools(ctx)
+	s.checkBurnMintPools(ctx)
+	s.checkLockReleasePools(ctx)
 }
 
-func (s *PoolDiscoveryService) checkBurnMintPools(ctx context.Context) error {
+func (s *PoolDiscoveryService) checkBurnMintPools(ctx context.Context) {
 	templates, ok := s.activeContractStore.GetByTemplateId(s.observerParty, contracts.TemplateIDFromBinding(burnminttokenpool.BurnMintTokenPool{}))
 	if !ok {
-		return nil // No pools yet
+		return // No pools yet
 	}
 
 	for _, activeContract := range templates {
@@ -103,14 +99,12 @@ func (s *PoolDiscoveryService) checkBurnMintPools(ctx context.Context) error {
 		}
 		s.registerIfNew(ctx, pool.Address, config.TokenPoolTypeBurnMint)
 	}
-
-	return nil
 }
 
-func (s *PoolDiscoveryService) checkLockReleasePools(ctx context.Context) error {
+func (s *PoolDiscoveryService) checkLockReleasePools(ctx context.Context) {
 	templates, ok := s.activeContractStore.GetByTemplateId(s.observerParty, contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{}))
 	if !ok {
-		return nil // No pools yet
+		return // No pools yet
 	}
 
 	for _, activeContract := range templates {
@@ -121,8 +115,6 @@ func (s *PoolDiscoveryService) checkLockReleasePools(ctx context.Context) error 
 		}
 		s.registerIfNew(ctx, pool.Address, config.TokenPoolTypeLockRelease)
 	}
-
-	return nil
 }
 
 // registerIfNew registers a discovered pool if it has not already been discovered.
@@ -158,5 +150,6 @@ func (s *PoolDiscoveryService) registerPool(ctx context.Context, address contrac
 	if err := s.tokenPoolServer.RegisterDiscoveredPool(ctx, poolConfig); err != nil {
 		return fmt.Errorf("failed to register pool with tokenpool server: %w", err)
 	}
+
 	return nil
 }
