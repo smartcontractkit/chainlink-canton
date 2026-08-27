@@ -83,7 +83,7 @@ jobs:
           curl --fail --connect-timeout 30 \
             -H "Authorization: Bearer ${{ steps.okta.outputs.access_token }}" \
             -H "Content-Type: application/json" \
-            "https://canton-${CANTON_ENV}.bcy-v.metalhosts.com/api/json/v2/parties/ccipOwner::122009b21cd8f52c55fc9854f7b1771837fa661f47529956ed40708bf656905b5721"
+            "https://${CANTON_ENV}.cv1.bcy-v.metalhosts.com/api/json/v2/authenticated-user"
 
       - name: Verify RPC Proxy connectivity
         run: |
