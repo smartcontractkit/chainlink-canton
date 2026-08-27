@@ -1,0 +1,224 @@
+module CCIP.Registry.RateLimiterV2 where
+
+import DA.Map qualified as Map
+import DA.Numeric qualified as Numeric
+import DA.Time (convertRelTimeToMicroseconds, subTime)
+import DA.Crypto.Text (BytesHex, byteCount)
+
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (assertValidInstanceId)
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+import MCMS.Codec (decodeBoolAt, decodeNumeric0At, decodeOptional, decodePartyAt)
+
+-- | Enforce distinct RateLimiter contract references per logical path. Sharing one RateLimiter
+-- across paths merges quota. Pass Some for the custom-finality slot when it is required.
+assertDistinctRateLimiters
+    : Text
+    -> RawInstanceAddress.RawInstanceAddress
+    -> RawInstanceAddress.RawInstanceAddress
+    -> Optional RawInstanceAddress.RawInstanceAddress
+    -> Update ()
+assertDistinctRateLimiters label inbound outbound maybeCustom = do
+    assertMsg (label <> ": inbound/outbound rate limiters cannot be empty")
+        (inbound /= RawInstanceAddress.empty && outbound /= RawInstanceAddress.empty)
+    assertMsg (label <> ": rate limiters cannot be the same for inbound and outbound")
+        (inbound /= outbound)
+    case maybeCustom of
+        None -> pure ()
+        Some custom -> do
+            assertMsg (label <> ": custom finality inbound rate limiter cannot be empty when finalityConfig is faster than finality")
+                (custom /= RawInstanceAddress.empty)
+            assertMsg (label <> ": custom finality inbound rate limiter must be distinct from the default inbound limiter")
+                (custom /= inbound)
+            assertMsg (label <> ": custom finality inbound rate limiter must be distinct from the outbound limiter")
+                (custom /= outbound)
+
+rateLimiterContextKey : Text
+rateLimiterContextKey = "rate-limiter"
+
+rawInstanceAddress : RateLimiter -> RawInstanceAddress.RawInstanceAddress
+rawInstanceAddress rl = RawInstanceAddress.make rl.instanceId rl.poolOwner
+
+data RateLimitDirection
+    = RateLimitDirection_Outbound
+    | RateLimitDirection_Inbound
+    deriving (Eq, Show)
+
+data RateLimitMode
+    = RateLimitMode_DefaultFinality
+    | RateLimitMode_CustomFinality
+    deriving (Eq, Show)
+
+data ConsumeCapacityResult = ConsumeCapacityResult
+    with
+        rateLimiterCid : ContractId RateLimiter
+        availableBeforeConsume : Numeric 0
+        consumed : Numeric 0
+    deriving (Eq, Show)
+
+-- | Calculate elapsed time in microseconds (as a whole number). Handles negative intervals by returning 0.
+elapsedMicroseconds : Time -> Time -> Numeric 0
+elapsedMicroseconds start end =
+    let micros = convertRelTimeToMicroseconds (subTime end start)
+    in intToNumeric (max 0 micros)
+
+-- | Calculate whole tokens refilled during the elapsed time at a given rate.
+-- | Preserves fractional seconds: (rate * elapsed_micros / 1_000_000) rounded down to whole tokens.
+refilledTokens : Time -> Time -> Numeric 0 -> Numeric 0
+refilledTokens start end rate =
+    let tokenMicros : Decimal = Numeric.mul rate (elapsedMicroseconds start end)
+        microsPerSecond : Decimal = 1000000.0
+        accrued : Decimal = Numeric.div tokenMicros microsPerSecond
+    in intToNumeric (truncate accrued)
+
+-- | Calculate total available capacity at a given time, accounting for refills since last update.
+-- | If disabled, returns capacity. Otherwise returns current tokens plus accrued refills, capped at capacity.
+availableTokensAt : Time -> RateLimiter -> Numeric 0
+availableTokensAt now rl =
+    if not rl.isEnabled then
+        rl.capacity
+    else
+        min rl.capacity (rl.tokens + refilledTokens rl.lastUpdated now rl.rate)
+
+template RateLimiter
+    with
+        instanceId : Text
+        poolInstanceId : Text
+        poolOwner : Party
+        remoteChainSelector : Numeric 0
+        direction : RateLimitDirection
+        mode : RateLimitMode
+        isEnabled : Bool
+        -- | Maximum token capacity for this rate limiter (in pool's local decimal representation).
+        -- Must be scaled according to the associated token pool's decimals setting.
+        capacity : Numeric 0
+        -- | Token refill rate per second (in pool's local decimal representation).
+        -- Must be scaled according to the associated token pool's decimals setting.
+        rate : Numeric 0
+        -- | Current available tokens in the bucket (in pool's local decimal representation).
+        -- Must be scaled according to the associated token pool's decimals setting.
+        tokens : Numeric 0
+        lastUpdated : Time
+        -- Observer party used by the External Disclosure Service (EDS) to auto-detect this
+        -- rate limiter. Set at creation or via SetObserver; cannot be added retroactively
+        -- to a rate limiter deployed on a package version that predates this field.
+        observer : Optional Party
+    where
+        signatory poolOwner
+        observer optional [] pure observer
+        ensure assertValidInstanceId instanceId
+            && capacity >= 0.0
+            && rate >= 0.0
+            && tokens >= 0.0
+
+        choice SetConfig : ContractId RateLimiter
+            with
+                newIsEnabled : Bool
+                newCapacity : Numeric 0
+                newRate : Numeric 0
+            controller poolOwner
+            do
+                assertMsg "RateLimiter: capacity must be non-negative"
+                    (newCapacity >= 0.0)
+                assertMsg "RateLimiter: rate must be non-negative"
+                    (newRate >= 0.0)
+                assertMsg "RateLimiter: enabled config requires rate <= capacity"
+                    (not newIsEnabled || newRate <= newCapacity)
+                assertMsg "RateLimiter: disabled config must have zero capacity and zero rate"
+                    (newIsEnabled || (newCapacity == 0.0 && newRate == 0.0))
+                now <- getTime
+                create this with
+                    isEnabled = newIsEnabled
+                    capacity = newCapacity
+                    rate = newRate
+                    tokens = newCapacity
+                    lastUpdated = now
+
+        -- Sets the EDS observer for this rate limiter.
+        --
+        -- Params:
+        -- observer: Optional party used by EDS to auto-detect this rate limiter
+        --
+        -- Callable by poolOwner
+        choice SetObserver : ContractId RateLimiter
+            with
+                observer : Optional Party
+            controller poolOwner
+            do
+                create this with
+                    observer = observer
+
+        nonconsuming choice ConsumeCapacity : ConsumeCapacityResult
+            with
+                requested : Numeric 0
+            controller poolOwner
+            do
+                if not isEnabled || requested == 0.0 then
+                    pure ConsumeCapacityResult with
+                        rateLimiterCid = self
+                        availableBeforeConsume = availableTokensAt lastUpdated this
+                        consumed = requested
+                else do
+                    now <- getTime
+                    let available = availableTokensAt now this
+
+                    assertMsg "RateLimiter: requested amount must be non-negative"
+                        (requested >= 0.0)
+                    assertMsg "RateLimiter: request exceeds capacity"
+                        (requested <= capacity)
+                    assertMsg "RateLimiter: insufficient capacity"
+                        (requested <= available)
+
+                    archive self
+                    newCid <- create this with
+                        tokens = available - requested
+                        lastUpdated = now
+
+                    pure ConsumeCapacityResult with
+                        rateLimiterCid = newCid
+                        availableBeforeConsume = available
+                        consumed = requested
+
+        interface instance MCMSReceiver for RateLimiter where
+          view = MCMSReceiverView with
+            mcmsController = poolOwner
+            instanceId
+
+          mcmsEntrypoint functionName operationData contractIds = do
+            let selfAddress = RawInstanceAddress.makeText instanceId poolOwner
+            selfCid <- case Map.lookup selfAddress contractIds of
+              None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> selfAddress
+              Some cid -> pure (coerceContractId cid : ContractId RateLimiter)
+
+            case functionName of
+              "SetConfig" -> do
+                case decodeSetConfigParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetConfig"
+                  Some ((newIsEnabled, newCapacity, newRate), finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetConfig" (finalOffset == byteCount operationData)
+                    newCid <- exercise selfCid SetConfig with
+                      newIsEnabled
+                      newCapacity
+                      newRate
+                    pure (Map.insert selfAddress (coerceContractId newCid) contractIds)
+              "SetObserver" -> do
+                case decodeSetObserverParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetObserver"
+                  Some (observer, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetObserver" (finalOffset == byteCount operationData)
+                    newCid <- exercise selfCid SetObserver with
+                      observer
+                    pure (Map.insert selfAddress (coerceContractId newCid) contractIds)
+              _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+-- | Decode SetConfig params: (Bool, Numeric 0, Numeric 0)
+decodeSetConfigParams : BytesHex -> Optional ((Bool, Numeric 0, Numeric 0), Int)
+decodeSetConfigParams encoded = do
+    (newIsEnabled, offset1) <- decodeBoolAt encoded 0
+    (newCapacity, offset2) <- decodeNumeric0At encoded offset1
+    (newRate, finalOffset) <- decodeNumeric0At encoded offset2
+    Some ((newIsEnabled, newCapacity, newRate), finalOffset)
+
+-- | Decode SetObserver params: Optional Party
+decodeSetObserverParams : BytesHex -> Optional (Optional Party, Int)
+decodeSetObserverParams encoded = decodeOptional encoded 0 decodePartyAt

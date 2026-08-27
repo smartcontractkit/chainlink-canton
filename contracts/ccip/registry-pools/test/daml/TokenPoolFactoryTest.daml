@@ -1,0 +1,171 @@
+-- | Integration tests for CCIP.Registry.TokenPoolFactory: exercises the full
+-- deploy + configure + register flow end-to-end against real templates (Daml Script,
+-- no mocking) - propose admin, accept admin, deploy pool, deploy rate limiters,
+-- ApplyChainUpdates, and SetPool, all via one factory choice exercise.
+module TokenPoolFactoryTest where
+
+import Daml.Script
+import DA.Action (mapA_)
+import DA.Assert ((===))
+import DA.Map qualified as Map
+import DA.Optional (fromSome)
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.Registry.RateLimiterV2
+import qualified CCIP.Registry.BurnMintTokenPoolV2
+import qualified CCIP.Registry.LockReleaseTokenPoolV2
+import qualified CCIP.CoreV2.TokenAdminRegistry as TAR
+import CCIP.Registry.TokenPoolFactory
+
+mkLane : Text -> Numeric 0 -> LaneDeploySpec
+mkLane prefix selector = LaneDeploySpec with
+    remoteChainSelector = selector
+    remotePools = ["1fb477ac89df394bead4f46ad754f8aec70cc0e4"]
+    remoteTokenAddress = "cbae4ea0c4c503a582af009bb2b30b75badc1e32"
+    inboundCCVs = []
+    outboundCCVs = []
+    finalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
+    inbound = RateLimiterDeploySpec with
+        instanceId = prefix <> "-in"
+        isEnabled = True
+        capacity = 1000.0
+        rate = 10.0
+    outbound = RateLimiterDeploySpec with
+        instanceId = prefix <> "-out"
+        isEnabled = True
+        capacity = 1000.0
+        rate = 10.0
+    inboundCustomFinality = RateLimiterDeploySpec with
+        instanceId = prefix <> "-in-custom"
+        isEnabled = False
+        capacity = 0.0
+        rate = 0.0
+
+testDeployAndRegisterBurnMintPool_SelfIssued : Script ()
+testDeployAndRegisterBurnMintPool_SelfIssued = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+    observerParty <- allocateParty "registry_observer"
+
+    let instanceId = "e2e-burn-mint-pool"
+        -- Self-issued: instrumentId.admin must equal the admin party for
+        -- ProposeAdministrator's caller == instrumentId.admin check to pass.
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId poolOwner "E2ETOKEN"
+        dummyAddr label = Chainlink.InstanceAddress.make label ccipOwner
+
+    tarCid <- submit ccipOwner do
+        createCmd TAR.TokenAdminRegistry with
+            instanceId = "e2e-tar"
+            ccipOwner
+            entryCount = 0
+
+    factoryCid <- submit ccipOwner do
+        createCmd TokenPoolFactory with
+            ccipOwner
+
+    let lane = mkLane "e2e-lane-1" 1.0
+
+    result <- submit poolOwner do
+        exerciseCmd factoryCid DeployAndRegisterBurnMintPool with
+            instanceId
+            poolOwner
+            instrumentId
+            decimals = 18
+            rateLimitAdmin = None
+            observer = Some observerParty
+            tokenAdminRegistry = dummyAddr "dummy-tar"
+            feeQuoter = dummyAddr "dummy-fq"
+            rmnRemote = dummyAddr "dummy-rmn"
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            transferTimeout = CCIP.Registry.BurnMintTokenPoolV2.Indefinite
+            lanes = [lane]
+            tokenAdminRegistryCid = tarCid
+            existingTokenConfigCid = None
+            admin = poolOwner
+
+    -- Registration landed: TokenConfig now has admin = poolOwner and points at the pool.
+    Some config <- queryContractId poolOwner result.tokenConfigCid
+    config.admin === Some poolOwner
+    config.pendingAdmin === None
+    config.tokenPool === Some (TAR.PoolRegistration poolOwner instanceId)
+
+    -- The pool address returned matches what any other caller would independently
+    -- derive from instanceId+poolOwner (the property pool-discovery's addressing relies on).
+    result.poolInstanceAddress === Chainlink.InstanceAddress.make instanceId poolOwner
+
+    -- The pool itself was deployed with the lane wired up and observer set.
+    pools <- query @CCIP.Registry.BurnMintTokenPoolV2.BurnMintTokenPool poolOwner
+    case filter (\(_, pool) -> pool.instanceId == instanceId) pools of
+        [(_, pool)] -> do
+            pool.observer === Some observerParty
+            Map.size pool.remoteChainConfigs === 1
+        got -> abort ("expected exactly one deployed BurnMintTokenPool, got " <> show (length got))
+
+    -- All three rate limiters for the lane were deployed with observer set.
+    length result.rateLimiterCids === 3
+    rateLimiters <- query @CCIP.Registry.RateLimiterV2.RateLimiter poolOwner
+    let laneRateLimiters = filter (\(_, rl) -> rl.poolInstanceId == instanceId) rateLimiters
+    length laneRateLimiters === 3
+    mapA_ (\(_, rl) -> rl.observer === Some observerParty) laneRateLimiters
+
+    pure ()
+
+testDeployAndRegisterLockReleasePool_SelfIssued : Script ()
+testDeployAndRegisterLockReleasePool_SelfIssued = script do
+    ccipOwner <- allocateParty "ccip_owner"
+    poolOwner <- allocateParty "pool_owner"
+    observerParty <- allocateParty "registry_observer"
+
+    let instanceId = "e2e-lock-release-pool"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId poolOwner "E2ELRTOKEN"
+        dummyAddr label = Chainlink.InstanceAddress.make label ccipOwner
+
+    tarCid <- submit ccipOwner do
+        createCmd TAR.TokenAdminRegistry with
+            instanceId = "e2e-lr-tar"
+            ccipOwner
+            entryCount = 0
+
+    factoryCid <- submit ccipOwner do
+        createCmd TokenPoolFactory with
+            ccipOwner
+
+    let lane = mkLane "e2e-lr-lane-1" 2.0
+
+    result <- submit poolOwner do
+        exerciseCmd factoryCid DeployAndRegisterLockReleasePool with
+            instanceId
+            poolOwner
+            instrumentId
+            decimals = 18
+            rateLimitAdmin = None
+            observer = Some observerParty
+            tokenAdminRegistry = dummyAddr "dummy-tar"
+            feeQuoter = dummyAddr "dummy-fq"
+            rmnRemote = dummyAddr "dummy-rmn"
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            transferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.Indefinite
+            lanes = [lane]
+            tokenAdminRegistryCid = tarCid
+            existingTokenConfigCid = None
+            admin = poolOwner
+
+    Some config <- queryContractId poolOwner result.tokenConfigCid
+    config.admin === Some poolOwner
+    config.tokenPool === Some (TAR.PoolRegistration poolOwner instanceId)
+
+    pools <- query @CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPool poolOwner
+    case filter (\(_, pool) -> pool.instanceId == instanceId) pools of
+        [(_, pool)] -> do
+            pool.observer === Some observerParty
+            Map.size pool.remoteChainConfigs === 1
+        got -> abort ("expected exactly one deployed LockReleaseTokenPool, got " <> show (length got))
+
+    length result.rateLimiterCids === 3
+
+    pure ()

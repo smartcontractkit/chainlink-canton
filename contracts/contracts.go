@@ -52,6 +52,15 @@ const (
 	CCIPBurnMintTokenPoolV2    = Package("ccip-burn-mint-token-pool-v2")
 	CCIPFactoryV2              = Package("ccip-factory-v2")
 
+	// CCIP - Registry pools (EDS auto-detection observer field; separate template
+	// family from the production/LINK pools above, kept isolated so a bug or spam on
+	// the registry-discovery side can never affect production pool serving).
+
+	CCIPRegistryBurnMintTokenPoolV2    = Package("ccip-registry-burn-mint-token-pool-v2")
+	CCIPRegistryLockReleaseTokenPoolV2 = Package("ccip-registry-lock-release-token-pool-v2")
+	CCIPRegistryRateLimiterV2          = Package("ccip-registry-rate-limiter-v2")
+	CCIPRegistryTokenPoolFactory       = Package("ccip-registry-token-pool-factory")
+
 	// CCIP - Legacy
 
 	CCIPCore                 = Package("ccip-core")
@@ -172,6 +181,12 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2: append(ReleasedVersions[CCIPLockReleaseTokenPoolV2], DevVersion),
 	CCIPBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
 	CCIPFactoryV2:              append(ReleasedVersions[CCIPFactoryV2], DevVersion),
+
+	// Registry pools have no released version yet - dev only.
+	CCIPRegistryBurnMintTokenPoolV2:    []string{DevVersion},
+	CCIPRegistryLockReleaseTokenPoolV2: []string{DevVersion},
+	CCIPRegistryRateLimiterV2:          []string{DevVersion},
+	CCIPRegistryTokenPoolFactory:       []string{DevVersion},
 
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
@@ -371,6 +386,11 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2: []string{"ccip", "lockreleasetokenpool"},
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
+
+	CCIPRegistryBurnMintTokenPoolV2:    []string{"ccip", "registry", "burnminttokenpool"},
+	CCIPRegistryLockReleaseTokenPoolV2: []string{"ccip", "registry", "lockreleasetokenpool"},
+	CCIPRegistryRateLimiterV2:          []string{"ccip", "registry", "ratelimiter"},
+	CCIPRegistryTokenPoolFactory:       []string{"ccip", "registry", "tokenpoolfactory"},
 
 	SpliceApiFeaturedAppV1:                []string{"splice", "splice_api_featured_app_v1"},
 	SpliceApiTokenAllocationV1:            []string{"splice", "splice_api_token_allocation_v1"},
