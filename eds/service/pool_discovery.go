@@ -13,6 +13,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
@@ -40,7 +41,12 @@ func NewPoolDiscoveryService(
 ) *PoolDiscoveryService {
 	logger = logger.With().Str("component", "PoolDiscoveryService").Logger()
 
-	// Pre-register both pool templates to watch for CreatedEvents.
+	// Pre-register both pool templates to watch for CreatedEvents, plus RateLimiter so a
+	// discovered pool's rate limiters resolve when serving send/execute. RegisterDiscoveredPool
+	// cannot register these later, as RegisterTemplates must run before activeContractStore.Run.
+	//
+	// TODO: RateLimiter currently has poolOwner as its only stakeholder, so it only resolves while
+	// the observer party is also the pool owner. Depends on RateLimiter gaining an observer field.
 	activeContractStore.RegisterTemplates(
 		store.RegisteredTemplate{
 			TemplateID: contracts.TemplateIDFromBinding(burnminttokenpool.BurnMintTokenPool{}),
@@ -48,6 +54,10 @@ func NewPoolDiscoveryService(
 		},
 		store.RegisteredTemplate{
 			TemplateID: contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{}),
+			PartyID:    observerPartyID,
+		},
+		store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(ratelimiter.RateLimiter{}),
 			PartyID:    observerPartyID,
 		},
 	)

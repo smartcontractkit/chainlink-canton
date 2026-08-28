@@ -81,6 +81,17 @@ func (s *InstrumentHoldingStore) Run(ctx context.Context, streamConfig StreamCon
 	s.activeContracts = make(map[types.CONTRACT_ID]splice_api_token_holding_v1.HoldingView)
 	s.mux.Unlock()
 
+	// No parties registered means nothing to track, and the ledger rejects a stream with an empty
+	// party filter. Callers that need no holdings (e.g. burn/mint-only) can leave this unused.
+	if len(s.filters) == 0 {
+		s.logger.Info().Msg("no parties registered, instrument holding store will not stream")
+		if options.onBackfillCompleted != nil {
+			options.onBackfillCompleted()
+		}
+
+		return nil
+	}
+
 	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, s.onArchivedEvent, nil, options.onBackfillCompleted)
 }
 
