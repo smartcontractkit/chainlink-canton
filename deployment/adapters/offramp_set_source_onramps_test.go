@@ -9,10 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
-
-	// Registers the EVM chain family adapter, which sourceOnRampAddressBytes reads
-	// to resolve the EVM address width.
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 )
 
 const (
@@ -20,135 +16,34 @@ const (
 	testCantonChainSelector = uint64(10109143320554840099) // Canton testnet
 )
 
-// evmOnRampHex is a 20-byte EVM address in the form the changesets pass in.
-const evmOnRampHex = "0x1111111111111111111111111111111111111111"
+// evmOnRampWire is an EVM OnRamp address in the form the source chain writes it
+// into its messages: abi.encode(address), 32 bytes, left zero-padded. This is
+// what the caller supplies and what the ledger stores.
+const evmOnRampWire = "0x0000000000000000000000001111111111111111111111111111111111111111"
 
-// evmOnRampPadded is the same address in the form Canton stores on the ledger.
-const evmOnRampPadded = "0000000000000000000000001111111111111111111111111111111111111111"
+// evmOnRampLedger is evmOnRampWire in the ledger's own form: the same bytes, hex
+// encoded without a 0x prefix.
+const evmOnRampLedger = "0000000000000000000000001111111111111111111111111111111111111111"
 
-func TestPadAndTrimCantonOnRampAddress_EVMRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	raw, err := hex.DecodeString(strings.TrimPrefix(evmOnRampHex, "0x"))
-	require.NoError(t, err)
-
-	padded := padCantonOnRampAddress(raw)
-	require.Equal(t, types.TEXT(evmOnRampPadded), padded)
-
-	decoded, err := hex.DecodeString(string(padded))
-	require.NoError(t, err)
-	require.Equal(t, raw, trimCantonOnRampAddress(decoded, 20))
-}
-
-func TestPadAndTrimCantonOnRampAddress_CantonRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	raw := make([]byte, cantonOnRampAddressBytes)
-	for i := range raw {
-		raw[i] = byte(i + 1)
-	}
-
-	padded := padCantonOnRampAddress(raw)
-	decoded, err := hex.DecodeString(string(padded))
-	require.NoError(t, err)
-	require.Equal(t, raw, decoded)
-
-	// A 32-byte address must survive a trim request for a shorter width.
-	require.Equal(t, raw, trimCantonOnRampAddress(decoded, 20))
-}
-
-func TestTrimCantonOnRampAddress(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		raw     []byte
-		wantLen int
-		want    []byte
-	}{
-		{
-			name:    "trims zero padding",
-			raw:     []byte{0, 0, 1, 2},
-			wantLen: 2,
-			want:    []byte{1, 2},
-		},
-		{
-			name:    "keeps value when the prefix is not zero",
-			raw:     []byte{0, 9, 1, 2},
-			wantLen: 2,
-			want:    []byte{0, 9, 1, 2},
-		},
-		{
-			name:    "keeps value when it is already short",
-			raw:     []byte{1, 2},
-			wantLen: 4,
-			want:    []byte{1, 2},
-		},
-		{
-			name:    "keeps value when no width is wanted",
-			raw:     []byte{0, 0, 1, 2},
-			wantLen: 0,
-			want:    []byte{0, 0, 1, 2},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			require.Equal(t, test.want, trimCantonOnRampAddress(test.raw, test.wantLen))
-		})
-	}
-}
-
-func TestSourceOnRampAddressBytes(t *testing.T) {
-	t.Parallel()
-
-	got, err := sourceOnRampAddressBytes(testEVMChainSelector)
-	require.NoError(t, err)
-	require.Equal(t, 20, got)
-
-	got, err = sourceOnRampAddressBytes(testCantonChainSelector)
-	require.NoError(t, err)
-	require.Equal(t, int(new(CantonChainFamilyAdapter).GetAddressBytesLength()), got)
-
-	_, err = sourceOnRampAddressBytes(1)
-	require.Error(t, err)
-}
-
-func TestDecodeCantonOnRampAddresses_EVMSource(t *testing.T) {
-	t.Parallel()
-
-	addressBytes, err := sourceOnRampAddressBytes(testEVMChainSelector)
-	require.NoError(t, err)
-
-	got, err := decodeCantonOnRampAddresses([]types.TEXT{types.TEXT(evmOnRampPadded)}, addressBytes)
-	require.NoError(t, err)
-	require.Len(t, got, 1)
-	require.Len(t, got[0], 20)
-	require.Equal(t, evmOnRampHex, "0x"+hex.EncodeToString(got[0]))
-}
-
-func TestDecodeCantonOnRampAddresses_InvalidHex(t *testing.T) {
-	t.Parallel()
-
-	_, err := decodeCantonOnRampAddresses([]types.TEXT{"not-hex"}, 20)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "onRampAddresses[0]")
-}
+// evmOnRampContract is the 20-byte contract address. The adapter must reject it:
+// it is not what the source chain puts on the wire.
+const evmOnRampContract = "0x1111111111111111111111111111111111111111"
 
 func TestParseCantonOffRampSourceOnRamps(t *testing.T) {
 	t.Parallel()
 
+	second := "0x0000000000000000000000002222222222222222222222222222222222222222"
+
 	got, err := parseCantonOffRampSourceOnRamps([]string{
-		evmOnRampHex,
-		"  " + evmOnRampHex + "  ", // duplicate after trim
-		"0x2222222222222222222222222222222222222222",
+		evmOnRampWire,
+		"  " + evmOnRampWire + "  ", // duplicate after trimming whitespace
+		second,
 	})
 	require.NoError(t, err)
 	require.Equal(t, []types.TEXT{
-		types.TEXT(evmOnRampPadded),
+		types.TEXT(evmOnRampLedger),
 		types.TEXT("0000000000000000000000002222222222222222222222222222222222222222"),
-	}, got)
+	}, got, "the wire bytes are stored verbatim, and duplicates are dropped")
 }
 
 func TestParseCantonOffRampSourceOnRamps_Errors(t *testing.T) {
@@ -157,14 +52,23 @@ func TestParseCantonOffRampSourceOnRamps_Errors(t *testing.T) {
 	tests := []struct {
 		name  string
 		addrs []string
+		msg   string
 	}{
 		{name: "empty input", addrs: nil},
-		{name: "missing 0x prefix", addrs: []string{evmOnRampPadded}},
+		{
+			// The reader and the changesets both work in the wire encoding, so a
+			// bare contract address must not be silently padded.
+			name:  "20-byte contract address is rejected",
+			addrs: []string{evmOnRampContract},
+			msg:   "must be 32 bytes, got 20",
+		},
+		{name: "missing 0x prefix", addrs: []string{evmOnRampLedger}},
 		{name: "not hex", addrs: []string{"0xzz"}},
 		{name: "empty address", addrs: []string{"0x"}},
 		{
 			name:  "too wide",
 			addrs: []string{"0x" + strings.Repeat("11", cantonOnRampAddressBytes+1)},
+			msg:   "must be 32 bytes, got 33",
 		},
 	}
 
@@ -173,14 +77,52 @@ func TestParseCantonOffRampSourceOnRamps_Errors(t *testing.T) {
 			t.Parallel()
 			_, err := parseCantonOffRampSourceOnRamps(test.addrs)
 			require.Error(t, err)
+			if test.msg != "" {
+				require.Contains(t, err.Error(), test.msg)
+			}
 		})
 	}
+}
+
+func TestDecodeCantonOnRampAddresses(t *testing.T) {
+	t.Parallel()
+
+	got, err := decodeCantonOnRampAddresses([]types.TEXT{types.TEXT(evmOnRampLedger)})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+	require.Len(t, got[0], cantonOnRampAddressBytes,
+		"the reader must preserve the wire width, not reduce it to the 20-byte contract address")
+	require.Equal(t, evmOnRampWire, "0x"+hex.EncodeToString(got[0]))
+}
+
+// TestDecodeCantonOnRampAddresses_RoundTrip pins the property the changesets
+// depend on: what the caller supplies is what the reader gives back.
+func TestDecodeCantonOnRampAddresses_RoundTrip(t *testing.T) {
+	t.Parallel()
+
+	entries, err := parseCantonOffRampSourceOnRamps([]string{evmOnRampWire})
+	require.NoError(t, err)
+
+	got, err := decodeCantonOnRampAddresses(entries)
+	require.NoError(t, err)
+
+	want, err := hex.DecodeString(strings.TrimPrefix(evmOnRampWire, "0x"))
+	require.NoError(t, err)
+	require.Equal(t, [][]byte{want}, got)
+}
+
+func TestDecodeCantonOnRampAddresses_InvalidHex(t *testing.T) {
+	t.Parallel()
+
+	_, err := decodeCantonOnRampAddresses([]types.TEXT{"not-hex"})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "onRampAddresses[0]")
 }
 
 func TestCantonOnRampSetsEqual(t *testing.T) {
 	t.Parallel()
 
-	legacy := types.TEXT(evmOnRampPadded)
+	legacy := types.TEXT(evmOnRampLedger)
 	current := types.TEXT("0000000000000000000000002222222222222222222222222222222222222222")
 
 	tests := []struct {
@@ -196,10 +138,18 @@ func TestCantonOnRampSetsEqual(t *testing.T) {
 			want:    true,
 		},
 		{
-			name:    "equal ignoring hex case and prefix",
-			current: []types.TEXT{types.TEXT("0x" + strings.ToUpper(evmOnRampPadded))},
+			name:    "equal ignoring hex case and 0x prefix",
+			current: []types.TEXT{types.TEXT("0x" + strings.ToUpper(evmOnRampLedger))},
 			desired: []types.TEXT{legacy},
 			want:    true,
+		},
+		{
+			// Width is significant on the wire, so an unpadded address is a
+			// different onramp, not the same one.
+			name:    "padding is significant",
+			current: []types.TEXT{types.TEXT("1111111111111111111111111111111111111111")},
+			desired: []types.TEXT{legacy},
+			want:    false,
 		},
 		{
 			name:    "different length",
@@ -228,10 +178,10 @@ func TestFindCantonSourceChainConfig(t *testing.T) {
 
 	want := core.SourceChainConfig2{
 		IsEnabled:       types.BOOL(true),
-		OnRampAddresses: []types.TEXT{types.TEXT(evmOnRampPadded)},
+		OnRampAddresses: []types.TEXT{types.TEXT(evmOnRampLedger)},
 	}
 	// The ledger returns the NUMERIC map key with a trailing dot. The write path
-	// formats it without one, so both forms must resolve.
+	// formats it without one, so the key is parsed rather than built.
 	configs := map[types.NUMERIC]core.SourceChainConfig2{
 		types.NUMERIC("16015286601757825753."): want,
 	}

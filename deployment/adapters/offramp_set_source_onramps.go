@@ -1,7 +1,6 @@
 package adapters
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -9,9 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	gethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	chainsel "github.com/smartcontractkit/chain-selectors"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
@@ -35,26 +32,27 @@ var (
 )
 
 // cantonOnRampAddressBytes is the width of an OnRamp address in the Canton
-// GlobalConfig source chain config. Canton stores every source family's OnRamp
-// address left-padded to this width. See configure_chain_for_lanes.go and
-// harden_canton_inbound_lane.go, which write the same form.
+// GlobalConfig source chain config.
+//
+// The width comes from the source chain, not from Canton: an EVM source emits
+// its message with the OnRamp address abi-encoded, so Canton must store the same
+// 32 bytes for the equality check on an incoming message to succeed. Every other
+// supported source family also uses 32 bytes. See configure_chain_for_lanes.go
+// and harden_canton_inbound_lane.go, which store the same form.
 const cantonOnRampAddressBytes = 32
 
 // GetOffRampSourceOnRamps implements [ccipadapters.OffRampSourceOnRampReader].
 //
-// The result uses the source family's own address width, not the padded width
-// stored on the ledger. Callers compare it against addresses that the source
-// chain's family adapter produced, so the two encodings must agree.
+// The result is the stored address exactly as the source chain writes it into
+// its messages, which for an EVM source is abi.encode(address): 32 bytes, left
+// zero-padded. The width is not reduced to the source family's contract address
+// width, because the OffRamp matches an incoming message by hashing the onramp
+// bytes the message carries.
 func (a *CantonChainFamilyAdapter) GetOffRampSourceOnRamps(
 	e cldf.Environment,
 	localChainSelector uint64,
 	sourceChainSelector uint64,
 ) ([][]byte, error) {
-	addressBytes, err := sourceOnRampAddressBytes(sourceChainSelector)
-	if err != nil {
-		return nil, err
-	}
-
 	config, found, err := a.readSourceChainConfig(e, localChainSelector, sourceChainSelector)
 	if err != nil {
 		return nil, err
@@ -63,7 +61,7 @@ func (a *CantonChainFamilyAdapter) GetOffRampSourceOnRamps(
 		return nil, nil
 	}
 
-	return decodeCantonOnRampAddresses(config.OnRampAddresses, addressBytes)
+	return decodeCantonOnRampAddresses(config.OnRampAddresses)
 }
 
 // SetOffRampSourceOnRamps implements [ccipadapters.OffRampSourceOnRampSetter].
@@ -260,8 +258,14 @@ func findCantonSourceChainConfig(
 	return core.SourceChainConfig2{}, false, nil
 }
 
-// parseCantonOffRampSourceOnRamps decodes the operator-supplied OnRamps and
-// left-pads each one to the Canton address width. Duplicates are removed.
+// parseCantonOffRampSourceOnRamps decodes the caller-supplied OnRamps into the
+// ledger form. Duplicates are removed.
+//
+// Each entry must already be the address exactly as the source chain writes it
+// into its messages, which is what [ccipadapters.OffRampSetSourceOnRampsEntry]
+// documents. No padding happens here: padding the caller's bytes would hide a
+// caller that supplied the wrong encoding, and the resulting lane would reject
+// every message.
 func parseCantonOffRampSourceOnRamps(addrs []string) ([]types.TEXT, error) {
 	out := make([]types.TEXT, 0, len(addrs))
 	seen := make(map[types.TEXT]struct{}, len(addrs))
@@ -270,17 +274,18 @@ func parseCantonOffRampSourceOnRamps(addrs []string) ([]types.TEXT, error) {
 		if err != nil {
 			return nil, fmt.Errorf("onRamps[%d]: invalid hex address %q: %w", i, addr, err)
 		}
-		if len(raw) == 0 || len(raw) > cantonOnRampAddressBytes {
-			return nil, fmt.Errorf("onRamps[%d]: address %q must be 1-%d bytes, got %d",
+		if len(raw) != cantonOnRampAddressBytes {
+			return nil, fmt.Errorf(
+				"onRamps[%d]: address %q must be %d bytes, got %d; pass the address as the source chain writes it into its messages (for an EVM source, abi.encode(address))",
 				i, addr, cantonOnRampAddressBytes, len(raw))
 		}
 
-		padded := padCantonOnRampAddress(raw)
-		if _, ok := seen[padded]; ok {
+		entry := types.TEXT(hex.EncodeToString(raw))
+		if _, ok := seen[entry]; ok {
 			continue
 		}
-		seen[padded] = struct{}{}
-		out = append(out, padded)
+		seen[entry] = struct{}{}
+		out = append(out, entry)
 	}
 	if len(out) == 0 {
 		return nil, errors.New("no valid onRamp addresses after parsing")
@@ -289,67 +294,19 @@ func parseCantonOffRampSourceOnRamps(addrs []string) ([]types.TEXT, error) {
 	return out, nil
 }
 
-// padCantonOnRampAddress returns the ledger form of an OnRamp address: hex
-// without a 0x prefix, left-padded to the Canton address width.
-func padCantonOnRampAddress(raw []byte) types.TEXT {
-	return types.TEXT(hex.EncodeToString(gethcommon.LeftPadBytes(raw, cantonOnRampAddressBytes)))
-}
-
-// decodeCantonOnRampAddresses converts the ledger form back to the source
-// family's own address width. An entry shorter than wantLen, or one whose
-// leading bytes are not all zero, is returned unchanged.
-func decodeCantonOnRampAddresses(entries []types.TEXT, wantLen int) ([][]byte, error) {
+// decodeCantonOnRampAddresses decodes the ledger form into raw bytes. The width
+// is preserved, so the result is the wire encoding the source chain uses.
+func decodeCantonOnRampAddresses(entries []types.TEXT) ([][]byte, error) {
 	out := make([][]byte, 0, len(entries))
 	for i, entry := range entries {
 		raw, err := hex.DecodeString(strings.TrimPrefix(string(entry), "0x"))
 		if err != nil {
 			return nil, fmt.Errorf("decode onRampAddresses[%d] %q: %w", i, entry, err)
 		}
-		out = append(out, trimCantonOnRampAddress(raw, wantLen))
+		out = append(out, raw)
 	}
 
 	return out, nil
-}
-
-// trimCantonOnRampAddress removes left zero padding down to wantLen bytes.
-func trimCantonOnRampAddress(raw []byte, wantLen int) []byte {
-	if wantLen <= 0 || len(raw) <= wantLen {
-		return raw
-	}
-	prefix := raw[:len(raw)-wantLen]
-	for _, b := range prefix {
-		if b != 0 {
-			return raw
-		}
-	}
-
-	return raw[len(raw)-wantLen:]
-}
-
-// sourceOnRampAddressBytes returns the address width of the source chain's
-// family.
-//
-// An unknown selector, an unregistered family or a zero width is an error. The
-// width decides the encoding of the returned addresses, so a wrong value gives
-// a caller bytes that never match the source family's own encoding. Fail
-// closed instead.
-func sourceOnRampAddressBytes(sourceChainSelector uint64) (int, error) {
-	family, err := chainsel.GetSelectorFamily(sourceChainSelector)
-	if err != nil {
-		return 0, fmt.Errorf("get chain family for source chain %d: %w", sourceChainSelector, err)
-	}
-	adapter, ok := ccipadapters.GetChainFamilyRegistry().GetChainFamily(family)
-	if !ok {
-		return 0, fmt.Errorf(
-			"no chain family adapter registered for source family %q; the binary must import that family's adapter package",
-			family)
-	}
-	length := adapter.GetAddressBytesLength()
-	if length == 0 {
-		return 0, fmt.Errorf("chain family adapter for %q reports a zero address width", family)
-	}
-
-	return int(length), nil
 }
 
 // cantonOnRampSetsEqual compares two ledger-form OnRamp lists without regard to
@@ -374,12 +331,13 @@ func cantonOnRampSetsEqual(current []types.TEXT, desired []types.TEXT) bool {
 }
 
 // normalizeCantonOnRampEntry makes two ledger entries comparable regardless of
-// hex case or a 0x prefix.
+// hex case or a 0x prefix. The width is significant, so no padding is stripped:
+// two addresses that differ only in width are different onramps on the wire.
 func normalizeCantonOnRampEntry(entry types.TEXT) string {
 	raw, err := hex.DecodeString(strings.TrimPrefix(string(entry), "0x"))
 	if err != nil {
 		return strings.ToLower(string(entry))
 	}
 
-	return string(bytes.TrimLeft(raw, "\x00"))
+	return string(raw)
 }

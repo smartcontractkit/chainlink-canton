@@ -18,9 +18,6 @@ import (
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	// Registers the EVM chain family adapter. The Canton reader asks the registry
-	// for the source family's address width.
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
@@ -35,20 +32,22 @@ import (
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
-// sepoliaChainSelector is the EVM source chain of the lane under test. A real EVM
-// selector is required: the reader resolves the address width from the source
-// chain's family.
+// sepoliaChainSelector is the EVM source chain of the lane under test.
 const sepoliaChainSelector = uint64(16015286601757825753)
 
 // baseSepoliaChainSelector is a second inbound lane that the update must leave
 // alone.
 const baseSepoliaChainSelector = uint64(10344971235874465080)
 
+// OnRamp addresses are given in the form the source chain writes them into its
+// messages: abi.encode(address) for an EVM source, i.e. 32 bytes, left
+// zero-padded. That is what OffRampSetSourceOnRampsEntry.OnRamps documents, what
+// the ledger stores, and what the reader returns.
 const (
-	legacyOnRampHex = "0x1111111111111111111111111111111111111111"
-	newOnRampHex    = "0x2222222222222222222222222222222222222222"
-	// bystanderOnRampHex belongs to the lane that must not change.
-	bystanderOnRampHex = "0x3333333333333333333333333333333333333333"
+	legacyOnRampWire = "0x0000000000000000000000001111111111111111111111111111111111111111"
+	newOnRampWire    = "0x0000000000000000000000002222222222222222222222222222222222222222"
+	// bystanderOnRampWire belongs to the lane that must not change.
+	bystanderOnRampWire = "0x0000000000000000000000003333333333333333333333333333333333333333"
 )
 
 // TestOffRampSourceOnRamps_DualAllowlist covers the Canton side of an OnRamp
@@ -168,7 +167,7 @@ func TestOffRampSourceOnRamps_DualAllowlist(t *testing.T) {
 	_, _, err = adapter.SetOffRampSourceOnRamps(env, ccipadapters.OffRampSetSourceOnRampsEntry{
 		LocalChainSelector:  chainSelector,
 		SourceChainSelector: sepoliaChainSelector,
-		OnRamps:             []string{legacyOnRampHex},
+		OnRamps:             []string{legacyOnRampWire},
 	})
 	require.Error(t, err, "the setter must not create a lane")
 	require.Contains(t, err.Error(), "configure the lane first")
@@ -183,7 +182,7 @@ func TestOffRampSourceOnRamps_DualAllowlist(t *testing.T) {
 	applySourceChainConfig(t, bundle, cantonChain, gcRaw, core.SourceChainConfigArgs{
 		SourceChainSelector: types.NUMERIC(strconv.FormatUint(sepoliaChainSelector, 10)),
 		IsEnabled:           types.BOOL(true),
-		OnRampAddresses:     []types.TEXT{paddedOnRamp(t, legacyOnRampHex)},
+		OnRampAddresses:     []types.TEXT{ledgerEntry(t, legacyOnRampWire)},
 		DefaultCCVs:         []chainlinkapi.RawInstanceAddress{ccvRaw},
 		LaneMandatedCCVs:    nil,
 	})
@@ -195,7 +194,7 @@ func TestOffRampSourceOnRamps_DualAllowlist(t *testing.T) {
 	applySourceChainConfig(t, bundle, cantonChain, gcRaw, core.SourceChainConfigArgs{
 		SourceChainSelector: types.NUMERIC(strconv.FormatUint(baseSepoliaChainSelector, 10)),
 		IsEnabled:           types.BOOL(false),
-		OnRampAddresses:     []types.TEXT{paddedOnRamp(t, bystanderOnRampHex)},
+		OnRampAddresses:     []types.TEXT{ledgerEntry(t, bystanderOnRampWire)},
 		DefaultCCVs:         []chainlinkapi.RawInstanceAddress{ccvRaw},
 		LaneMandatedCCVs:    nil,
 	})
@@ -214,8 +213,8 @@ func TestOffRampSourceOnRamps_DualAllowlist(t *testing.T) {
 
 	onRamps, err = adapter.GetOffRampSourceOnRamps(env, chainSelector, sepoliaChainSelector)
 	require.NoError(t, err)
-	require.Equal(t, []string{legacyOnRampHex}, hexOnRamps(onRamps),
-		"the reader must return the EVM address width, not the padded ledger width")
+	require.Equal(t, []string{legacyOnRampWire}, hexOnRamps(onRamps),
+		"the reader must return the wire form, byte for byte")
 
 	// ------------------------------------------------------------------
 	// Phase 1: allowlist both OnRamps
@@ -226,7 +225,7 @@ func TestOffRampSourceOnRamps_DualAllowlist(t *testing.T) {
 	batchOp, skipped, err := adapter.SetOffRampSourceOnRamps(env, ccipadapters.OffRampSetSourceOnRampsEntry{
 		LocalChainSelector:  chainSelector,
 		SourceChainSelector: sepoliaChainSelector,
-		OnRamps:             []string{legacyOnRampHex, newOnRampHex},
+		OnRamps:             []string{legacyOnRampWire, newOnRampWire},
 	})
 	require.NoError(t, err)
 	require.False(t, skipped)
@@ -234,7 +233,7 @@ func TestOffRampSourceOnRamps_DualAllowlist(t *testing.T) {
 
 	onRamps, err = adapter.GetOffRampSourceOnRamps(env, chainSelector, sepoliaChainSelector)
 	require.NoError(t, err)
-	require.ElementsMatch(t, []string{legacyOnRampHex, newOnRampHex}, hexOnRamps(onRamps))
+	require.ElementsMatch(t, []string{legacyOnRampWire, newOnRampWire}, hexOnRamps(onRamps))
 
 	// Nothing but the target lane's OnRamp list may have moved.
 	after := readGlobalConfig(t, env, cantonChain, gcRaw)
@@ -248,7 +247,7 @@ func TestOffRampSourceOnRamps_DualAllowlist(t *testing.T) {
 		LocalChainSelector:  chainSelector,
 		SourceChainSelector: sepoliaChainSelector,
 		// Reversed order, to prove the comparison ignores order.
-		OnRamps: []string{newOnRampHex, legacyOnRampHex},
+		OnRamps: []string{newOnRampWire, legacyOnRampWire},
 	})
 	require.NoError(t, err)
 	require.True(t, skipped, "an allowlist that already matches must be skipped")
@@ -263,14 +262,14 @@ func TestOffRampSourceOnRamps_DualAllowlist(t *testing.T) {
 	_, skipped, err = adapter.SetOffRampSourceOnRamps(env, ccipadapters.OffRampSetSourceOnRampsEntry{
 		LocalChainSelector:  chainSelector,
 		SourceChainSelector: sepoliaChainSelector,
-		OnRamps:             []string{newOnRampHex},
+		OnRamps:             []string{newOnRampWire},
 	})
 	require.NoError(t, err)
 	require.False(t, skipped)
 
 	onRamps, err = adapter.GetOffRampSourceOnRamps(env, chainSelector, sepoliaChainSelector)
 	require.NoError(t, err)
-	require.Equal(t, []string{newOnRampHex}, hexOnRamps(onRamps))
+	require.Equal(t, []string{newOnRampWire}, hexOnRamps(onRamps))
 
 	// Shrinking the allowlist must be as narrow as growing it.
 	after = readGlobalConfig(t, env, cantonChain, gcRaw)
@@ -405,17 +404,16 @@ func applyDestChainConfig(
 	require.NoError(t, err, "apply dest chain config")
 }
 
-// paddedOnRamp converts an operator-facing OnRamp address into the padded form
-// that Canton stores on the ledger.
-func paddedOnRamp(t *testing.T, addr string) types.TEXT {
+// ledgerEntry converts a wire-form OnRamp address into the ledger's own form:
+// the same bytes, hex encoded without a 0x prefix.
+func ledgerEntry(t *testing.T, addr string) types.TEXT {
 	t.Helper()
 
 	raw, err := hex.DecodeString(strings.TrimPrefix(addr, "0x"))
 	require.NoError(t, err)
-	padded := make([]byte, 32)
-	copy(padded[32-len(raw):], raw)
+	require.Len(t, raw, 32, "seed addresses must already be in wire form")
 
-	return types.TEXT(hex.EncodeToString(padded))
+	return types.TEXT(hex.EncodeToString(raw))
 }
 
 // hexOnRamps renders the reader's result in the operator-facing form, so a

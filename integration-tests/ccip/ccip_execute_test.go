@@ -36,9 +36,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
-	// Registers the EVM chain family adapter, which the Canton reader asks for the
-	// source family's address width.
-	_ "github.com/smartcontractkit/chainlink-ccip/chains/evm/deployment/v2_0_0/adapters"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
@@ -338,21 +335,21 @@ func TestCCIPExecuteE2E(t *testing.T) {
 
 	// Cross-check the OnRamp encoding. ConfigureLaneLegAsDest received the 20-byte
 	// EVM OnRamp above and stores it left-padded to 32 bytes. The message executed
-	// further down carries the same address in the padded form, and the OffRamp
+	// further down carries the same address in that padded form, and the OffRamp
 	// matches it against this allowlist, so this test is the reference for which
 	// form is correct.
 	//
-	// The Canton chain family adapter reads the same allowlist and must return the
-	// 20-byte source-family form, because its callers compare the result against
-	// addresses that the source chain's family adapter produced.
+	// The Canton chain family adapter reads the same allowlist and must return
+	// those bytes byte for byte, because that is the form the source chain writes
+	// into its messages and the form its callers compare against.
 	sourceOnRamps, err := (&cantonadapters.CantonChainFamilyAdapter{}).GetOffRampSourceOnRamps(
 		cldfEnv, env.Chain.ChainSelector(), remoteSelector,
 	)
 	require.NoError(t, err, "read source OnRamps through the Canton chain family adapter")
 	require.Equal(t,
-		[][]byte{hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd")},
+		[][]byte{gethcommon.LeftPadBytes(hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"), 32)},
 		sourceOnRamps,
-		"the adapter must return the 20-byte EVM form of the OnRamp configured above",
+		"the adapter must return the wire form of the OnRamp configured above",
 	)
 
 	runningDs := datastore.NewMemoryDataStore()
