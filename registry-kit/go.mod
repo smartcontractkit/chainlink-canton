@@ -8,17 +8,14 @@ replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../contract
 
 replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
 
-replace (
-	github.com/smartcontractkit/chainlink-ccip => github.com/smartcontractkit/chainlink-ccip v0.0.0-20260416055149-75c017f534ca
-	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
-)
+replace github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 
 require (
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/google/uuid v1.6.0
 	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.0.0
-	github.com/smartcontractkit/chainlink-deployments-framework v0.118.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.119.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 )
 
