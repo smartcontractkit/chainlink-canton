@@ -777,9 +777,9 @@ func (s *Server) FilterContracts(addresses []contracts.InstanceAddress) []contra
 	return out
 }
 
-// RegisterDiscoveredPool dynamically registers a discovered token pool.
-// This is called by the pool discovery service when a new pool is detected.
-// Note: Templates must be pre-registered before activeContractStore.Run() is called.
+// RegisterDiscoveredPool builds a ContractConfig for poolConfig and adds it to contractConfigs,
+// making the pool servable by PostTokenPoolSend/PostTokenPoolExecute without a restart. A no-op
+// if the pool's address is already registered.
 func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.TokenPool) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()

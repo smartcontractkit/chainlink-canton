@@ -92,7 +92,6 @@ func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTo
 
 type BurnMintTokenPool struct {
 	Address            contracts.RawInstanceAddress
-	PoolOwner          types.PARTY
 	InstrumentId       splice_api_token_holding_v1.InstrumentId
 	Decimals           types.INT64
 	RemoteChainConfigs map[uint64]RemoteChainConfig
@@ -148,7 +147,6 @@ func ParseBurnMintTokenPool(createdEvent *apiv2.CreatedEvent) (*BurnMintTokenPoo
 
 	return &BurnMintTokenPool{
 		Address:            address,
-		PoolOwner:          boundContract.PoolOwner,
 		RemoteChainConfigs: remoteChainConfigs,
 		InstrumentId:       boundContract.InstrumentId,
 		Decimals:           boundContract.Decimals,
