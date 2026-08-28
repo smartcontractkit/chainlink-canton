@@ -345,7 +345,7 @@ func requireOnlyOnRampsChanged(
 	require.Equal(t, before.DestChainConfigs, after.DestChainConfigs,
 		"an inbound lane update must not touch the outbound lanes")
 
-	require.Equal(t, len(before.SourceChainConfigs), len(after.SourceChainConfigs),
+	require.Len(t, before.SourceChainConfigs, len(after.SourceChainConfigs),
 		"an update must not add or remove a source chain config")
 
 	targetKeys := 0
