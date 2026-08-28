@@ -153,6 +153,9 @@ lookupExecutedMessage messageHash executedMessages archivedExecutionContractIds 
             False
             (reverse archivedExecutionContractIds)
 
+perPartyRouterInstanceIdPrefix : Text
+perPartyRouterInstanceIdPrefix = "per-party-router"
+
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
 --
@@ -205,8 +208,13 @@ template PerPartyRouterFactory
                 assertMsg "router already exists for this party"
                     (not (Map.member partyOwner registeredRouters))
 
+                assertMsg "instanceId must be non-empty" (instanceId /= "")
+
+                -- Prefix all instanceIds with perPartyRouterInstanceIdPrefix to avoid collisions with other CCIP instanceIds.
+                let prefixedInstanceId = perPartyRouterInstanceIdPrefix <> "-" <> instanceId
+
                 assertMsg "instanceId already in use"
-                    (instanceId `notElem` Map.values registeredRouters)
+                    (prefixedInstanceId `notElem` Map.values registeredRouters)
 
                 case feeTransferLifetime of
                     None -> pure ()
@@ -219,7 +227,7 @@ template PerPartyRouterFactory
                 routerCid <- create PerPartyRouter with
                     ccipOwner = ccipOwner
                     partyOwner = partyOwner
-                    instanceId = instanceId
+                    instanceId = prefixedInstanceId
                     deps = deps
                     feeTransferLifetime = feeTransferLifetime
                     outboundSequenceNumbers = Map.empty
@@ -228,7 +236,7 @@ template PerPartyRouterFactory
                     customObservers = []
 
                 newFactoryCid <- create this with
-                    registeredRouters = Map.insert partyOwner instanceId registeredRouters
+                    registeredRouters = Map.insert partyOwner prefixedInstanceId registeredRouters
 
                 pure CreateRouterResult with
                     router = routerCid

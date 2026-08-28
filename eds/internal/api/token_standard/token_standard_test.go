@@ -16,12 +16,14 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/testhelpers"
@@ -347,6 +349,7 @@ func TestServer_GetTransferFactory(t *testing.T) {
 				InstanceId: "linktoken",
 			}),
 		}}, true)
+		mockActiveContractStore.EXPECT().GetByTemplateId(types.PARTY("admin"), contracts.TemplateIDFromBinding(link.LinkTransferPreapproval{})).Return([]*apiv2.ActiveContract{}, false)
 
 		resp, err := client.GetTransferFactoryWithResponse(t.Context(), oapiTransferInstruction.GetFactoryRequest{
 			ChoiceArguments: map[string]any{
@@ -384,6 +387,102 @@ func TestServer_GetTransferFactory(t *testing.T) {
 				TemplateId: "package:module:LinkToken",
 			},
 		}, resp.JSON200.ChoiceContext.DisclosedContracts)
+		expectedChoiceContext, err := converters.SerializeChoiceContext(splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}})
+		require.NoError(t, err)
+		require.Equal(t, expectedChoiceContext, resp.JSON200.ChoiceContext.ChoiceContextData)
+		require.Equal(t, "contractId1", resp.JSON200.FactoryId)
+	})
+	t.Run("Success - with receiver TransferPreapproval", func(t *testing.T) {
+		t.Parallel()
+		mockActiveContractStore, client := setup(t)
+		mockActiveContractStore.EXPECT().Get(contracts.HexToInstanceAddress("0x1")).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+			ContractId: "contractId1",
+			TemplateId: &apiv2.Identifier{
+				PackageId:  "package",
+				ModuleName: "module",
+				EntityName: "LinkToken",
+			},
+			CreateArguments: bindings.MarshalTemplateToRecord(link.LinkRegistry{
+				RegistryAdmin: "admin",
+				RegistryInstrumentId: splice_api_token_holding_v1.InstrumentId{
+					Admin: "admin",
+					Id:    "LINK",
+				},
+				InstanceId: "linktoken",
+			}),
+		}}, true)
+		mockActiveContractStore.EXPECT().GetByTemplateId(types.PARTY("admin"), contracts.TemplateIDFromBinding(link.LinkTransferPreapproval{})).Return([]*apiv2.ActiveContract{
+			{
+				CreatedEvent: &apiv2.CreatedEvent{
+					ContractId: "senderPreapprovalContractId",
+					CreateArguments: bindings.MarshalTemplateToRecord(link.LinkTransferPreapproval{
+						PreapprovalAdmin:    "admin",
+						PreapprovalReceiver: "sender",
+					}),
+				},
+			}, {
+				CreatedEvent: &apiv2.CreatedEvent{
+					ContractId: "receiverPreapprovalContractId",
+					TemplateId: &apiv2.Identifier{
+						PackageId:  "package",
+						ModuleName: "module",
+						EntityName: "LinkTransferPreapproval",
+					},
+					CreateArguments: bindings.MarshalTemplateToRecord(link.LinkTransferPreapproval{
+						PreapprovalAdmin:    "admin",
+						PreapprovalReceiver: "receiver",
+					}),
+				},
+			},
+		}, false)
+
+		resp, err := client.GetTransferFactoryWithResponse(t.Context(), oapiTransferInstruction.GetFactoryRequest{
+			ChoiceArguments: map[string]any{
+				"expectedAdmin": "admin",
+				"transfer": map[string]any{
+					"sender":   "sender",
+					"receiver": "receiver",
+					"amount":   "100",
+					"instrumentId": map[string]any{
+						"admin": "admin",
+						"id":    "LINK",
+					},
+					"requestedAt":      time.Now().Add(time.Hour * -1).Format(time.RFC3339),
+					"executeBefore":    time.Now().Add(time.Hour * 24).Format(time.RFC3339),
+					"inputHoldingCids": []string{""},
+					"meta": map[string]any{
+						"values": map[string]any{},
+					},
+				},
+				"extraArgs": map[string]any{
+					"context": map[string]any{
+						"values": map[string]any{},
+					},
+					"meta": map[string]any{
+						"values": map[string]any{},
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Equalf(t, http.StatusOK, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+		require.Equal(t, []oapiTransferInstruction.DisclosedContract{
+			{
+				ContractId: "contractId1",
+				TemplateId: "package:module:LinkToken",
+			}, {
+				ContractId: "receiverPreapprovalContractId",
+				TemplateId: "package:module:LinkTransferPreapproval",
+			},
+		}, resp.JSON200.ChoiceContext.DisclosedContracts)
+		// Check that the preapproval is picked up correctly
+		expectedChoiceContext, err := converters.SerializeChoiceContext(splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{
+			string(link.TransferPreapprovalContextKey): {
+				AVContractId: new(types.CONTRACT_ID("receiverPreapprovalContractId")),
+			},
+		}})
+		require.NoError(t, err)
+		require.Equal(t, expectedChoiceContext, resp.JSON200.ChoiceContext.ChoiceContextData)
 		require.Equal(t, "contractId1", resp.JSON200.FactoryId)
 	})
 	t.Run("Failure cases", func(t *testing.T) {

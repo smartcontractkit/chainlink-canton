@@ -12,7 +12,7 @@ import (
 )
 
 // DARLoader fetches the raw bytes of a DAR by package name and version.
-// In production, wire [contracts.GetDar] from github.com/smartcontractkit/chainlink-canton/contracts.
+// In production, wire [contracts.GetDar] from github.com/smartcontractkit/chainlink-canton/contracts/v2.
 // In tests, a simple map or fake loader can be used.
 type DARLoader func(packageName, version string) ([]byte, error)
 

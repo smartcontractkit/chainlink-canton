@@ -1,6 +1,8 @@
 module github.com/smartcontractkit/chainlink-canton/party-ceremony
 
-go 1.26.2
+go 1.26.7
+
+replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../contracts
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
@@ -11,7 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/smartcontractkit/chainlink-deployments-framework v0.118.1
 	github.com/spf13/cobra v1.10.2
-	github.com/stretchr/testify v1.12.0
+	github.com/stretchr/testify v1.12.1
 	go.uber.org/zap v1.28.0
 	google.golang.org/grpc v1.83.0
 	google.golang.org/protobuf v1.36.12
@@ -36,6 +38,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.103 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
