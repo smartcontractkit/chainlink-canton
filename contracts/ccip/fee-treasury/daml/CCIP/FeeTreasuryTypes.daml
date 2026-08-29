@@ -6,10 +6,13 @@ import Splice.Api.Token.HoldingV1 (InstrumentId)
 
 -- | Params for the "AuthorizeFeeWithdrawal" MCMS function.
 -- All fields are scalars so they can be safely encoded in the signed merkle leaf.
+-- authorizationId becomes the authorization contract's stable MCMS instanceId,
+-- allowing a later governed operation to cancel that specific authorization.
 -- ContractIds (holdings, factory, mining-round context) are NOT included here —
 -- they must be supplied at execution time via ExecuteFeeWithdrawal choice args.
 data AuthorizeFeeWithdrawalParams = AuthorizeFeeWithdrawalParams
     with
+        authorizationId : Text
         recipient    : Party
         instrumentId : InstrumentId
         maxAmount    : Decimal

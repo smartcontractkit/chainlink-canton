@@ -19,6 +19,7 @@ testAuthorizeFeeWithdrawalParamsRoundtrip = script do
 
     let instrumentId = InstrumentId admin "FeeToken"
         params = AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-codec-test"
             recipient
             instrumentId
             maxAmount    = 1000.0

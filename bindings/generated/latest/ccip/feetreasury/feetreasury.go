@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-fee-treasury"
-	PackageID   = "d12d9826bbcd19de67ada3d3dbfb11000377f1301e678e8e050714a4b29eedea"
+	PackageID   = "1fa7a19b1d741940c6f6513d28a87111dbe99c5b3533dc8ce5ab9d50dc36b983"
 	SDKVersion  = "3.4.11"
 )
 
@@ -92,15 +92,18 @@ func (t *AuthorizeFeeWithdrawal) UnmarshalHex(data string) error {
 
 // AuthorizeFeeWithdrawalParams is a Record type
 type AuthorizeFeeWithdrawalParams struct {
-	Recipient    types.PARTY                              `json:"recipient"`
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	MaxAmount    types.NUMERIC                            `json:"maxAmount" hex:"decimal"`
-	ValiditySecs types.INT64                              `json:"validitySecs"`
+	AuthorizationId types.TEXT                               `json:"authorizationId"`
+	Recipient       types.PARTY                              `json:"recipient"`
+	InstrumentId    splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	MaxAmount       types.NUMERIC                            `json:"maxAmount" hex:"decimal"`
+	ValiditySecs    types.INT64                              `json:"validitySecs"`
 }
 
 // ToMap converts AuthorizeFeeWithdrawalParams to a map for DAML arguments
 func (t AuthorizeFeeWithdrawalParams) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["authorizationId"] = string(t.AuthorizationId)
 
 	m["recipient"] = t.Recipient.ToMap()
 
@@ -131,6 +134,42 @@ func (t AuthorizeFeeWithdrawalParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes AuthorizeFeeWithdrawalParams from hex string (Canton MCMS format)
 func (t *AuthorizeFeeWithdrawalParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// CleanupExpiredAuthorization is a Record type
+type CleanupExpiredAuthorization struct {
+	Submitter types.PARTY `json:"submitter"`
+}
+
+// ToMap converts CleanupExpiredAuthorization to a map for DAML arguments
+func (t CleanupExpiredAuthorization) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["submitter"] = t.Submitter.ToMap()
+
+	return m
+}
+
+func (t CleanupExpiredAuthorization) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *CleanupExpiredAuthorization) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes CleanupExpiredAuthorization to hex string (Canton MCMS format)
+func (t CleanupExpiredAuthorization) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes CleanupExpiredAuthorization from hex string (Canton MCMS format)
+func (t *CleanupExpiredAuthorization) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -194,11 +233,13 @@ func (t *ExecuteFeeWithdrawal) UnmarshalHex(data string) error {
 
 // FeeWithdrawalAuthorization is a Template type
 type FeeWithdrawalAuthorization struct {
-	FeeOwner     types.PARTY                              `json:"feeOwner"`
-	Recipient    types.PARTY                              `json:"recipient"`
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	MaxAmount    types.NUMERIC                            `json:"maxAmount" hex:"decimal"`
-	ExpiresAt    types.TIMESTAMP                          `json:"expiresAt"`
+	InstanceId     types.TEXT                               `json:"instanceId"`
+	FeeOwner       types.PARTY                              `json:"feeOwner"`
+	McmsController types.PARTY                              `json:"mcmsController"`
+	Recipient      types.PARTY                              `json:"recipient"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	MaxAmount      types.NUMERIC                            `json:"maxAmount" hex:"decimal"`
+	ExpiresAt      types.TIMESTAMP                          `json:"expiresAt"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -216,7 +257,13 @@ func (t FeeWithdrawalAuthorization) CreateCommand() *model.CreateCommand {
 	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeOwner"] = t.FeeOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["mcmsController"] = t.McmsController.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["recipient"] = t.Recipient.ToMap()
@@ -242,7 +289,13 @@ func (t FeeWithdrawalAuthorization) CreateCommandWithPackageID(packageID string)
 	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["feeOwner"] = t.FeeOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["mcmsController"] = t.McmsController.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["recipient"] = t.Recipient.ToMap()
@@ -308,11 +361,32 @@ func (t FeeWithdrawalAuthorization) ExecuteFeeWithdrawalWithPackageID(contractID
 	}
 }
 
-// Archive exercises the Archive choice on this FeeWithdrawalAuthorization contract
+// CleanupExpiredAuthorization exercises the CleanupExpiredAuthorization choice on this FeeWithdrawalAuthorization contract
+// This method uses the package name in the template ID
+func (t FeeWithdrawalAuthorization) CleanupExpiredAuthorization(contractID string, args CleanupExpiredAuthorization) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeTreasury", "FeeWithdrawalAuthorization"),
+		ContractID: contractID,
+		Choice:     "CleanupExpiredAuthorization",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// CleanupExpiredAuthorizationWithPackageID exercises the CleanupExpiredAuthorization choice using the provided package ID instead of package name
+func (t FeeWithdrawalAuthorization) CleanupExpiredAuthorizationWithPackageID(contractID string, packageID string, args CleanupExpiredAuthorization) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeTreasury", "FeeWithdrawalAuthorization"),
+		ContractID: contractID,
+		Choice:     "CleanupExpiredAuthorization",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Archive exercises the Archive choice on this FeeWithdrawalAuthorization contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
 func (t FeeWithdrawalAuthorization) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeTreasury", "FeeWithdrawalAuthorization"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeTreasury", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -322,7 +396,7 @@ func (t FeeWithdrawalAuthorization) Archive(contractID string) *model.ExerciseCo
 // ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
 func (t FeeWithdrawalAuthorization) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeTreasury", "FeeWithdrawalAuthorization"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeTreasury", "MCMSReceiver"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]any{},
@@ -349,6 +423,31 @@ func (t FeeWithdrawalAuthorization) WithdrawAuthorizationWithPackageID(contractI
 		Arguments:  argsToMap(args),
 	}
 }
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this FeeWithdrawalAuthorization contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t FeeWithdrawalAuthorization) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeTreasury", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t FeeWithdrawalAuthorization) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeTreasury", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for FeeWithdrawalAuthorization
+
+var _ api.IMCMSReceiver = (*FeeWithdrawalAuthorization)(nil)
 
 // MCMSFeeTreasury is a Template type
 type MCMSFeeTreasury struct {
@@ -533,6 +632,7 @@ func (t *WithdrawAuthorization) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	AuthorizeFeeWithdrawal(args AuthorizeFeeWithdrawal) (*bind.EncodedChoice, error)
 	AuthorizeFeeWithdrawalParams(args AuthorizeFeeWithdrawalParams) (*bind.EncodedChoice, error)
+	CleanupExpiredAuthorization(args CleanupExpiredAuthorization) (*bind.EncodedChoice, error)
 	ExecuteFeeWithdrawal(args ExecuteFeeWithdrawal) (*bind.EncodedChoice, error)
 	WithdrawAuthorization(args WithdrawAuthorization) (*bind.EncodedChoice, error)
 }
@@ -572,6 +672,11 @@ func (e *encoder) AuthorizeFeeWithdrawal(args AuthorizeFeeWithdrawal) (*bind.Enc
 // AuthorizeFeeWithdrawalParams encodes parameters for the AuthorizeFeeWithdrawal choice.
 func (e *encoder) AuthorizeFeeWithdrawalParams(args AuthorizeFeeWithdrawalParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("AuthorizeFeeWithdrawal", args)
+}
+
+// CleanupExpiredAuthorization encodes parameters for the CleanupExpiredAuthorization choice.
+func (e *encoder) CleanupExpiredAuthorization(args CleanupExpiredAuthorization) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("CleanupExpiredAuthorization", args)
 }
 
 // ExecuteFeeWithdrawal encodes parameters for the ExecuteFeeWithdrawal choice.

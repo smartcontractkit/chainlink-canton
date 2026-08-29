@@ -10,9 +10,11 @@ import MCMS.Codec (
     decodeDecimalAt,
     decodeInt64At,
     decodePartyAt,
+    decodeTextAt,
     encodeDecimal,
     encodeInt64,
-    encodeParty
+    encodeParty,
+    encodeText
     )
 
 import CCIP.CodecV2 (decodeInstrumentId, encodeInstrumentId)
@@ -24,13 +26,15 @@ import CCIP.CodecV2 (decodeInstrumentId, encodeInstrumentId)
 
 encodeAuthorizeFeeWithdrawalParams : AuthorizeFeeWithdrawalParams -> BytesHex
 encodeAuthorizeFeeWithdrawalParams params =
-    encodeParty params.recipient
+    encodeText params.authorizationId
+    <> encodeParty params.recipient
     <> encodeInstrumentId params.instrumentId
     <> encodeDecimal params.maxAmount
     <> fromSome (encodeInt64 params.validitySecs)
 
 decodeAuthorizeFeeWithdrawalParamsAt : BytesHex -> Int -> Optional (AuthorizeFeeWithdrawalParams, Int)
 decodeAuthorizeFeeWithdrawalParamsAt encoded offset = do
+    (authorizationId, offset) <- decodeTextAt encoded offset
     (recipient, offset) <- decodePartyAt encoded offset
     (instrumentId, offset) <- decodeInstrumentId encoded offset
     (maxAmount, offset) <- decodeDecimalAt encoded offset

@@ -23,6 +23,7 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.FeeTreasury (
     MCMSFeeTreasury(..),
     FeeWithdrawalAuthorization(..),
+    CleanupExpiredAuthorization(..),
     ExecuteFeeWithdrawal(..),
     WithdrawAuthorization(..),
     )
@@ -57,9 +58,10 @@ testFeeTreasuryMCMSEntrypoint_AuthorizeFeeWithdrawal = script do
     feeOwner  <- allocateParty "fee_owner"
     recipient <- allocateParty "recipient"
 
-    let instanceId   = "fee-treasury-test"
-        instrumentId = InstrumentId feeOwner "FeeToken"
-        instAddr     = RawInstanceAddress.makeText instanceId feeOwner
+    let instanceId      = "fee-treasury-test"
+        authorizationId = "fee-withdrawal-auth-test"
+        instrumentId    = InstrumentId feeOwner "FeeToken"
+        instAddr        = RawInstanceAddress.makeText instanceId feeOwner
 
     treasuryCid <- submit feeOwner do
         createCmd MCMSFeeTreasury with
@@ -68,6 +70,7 @@ testFeeTreasuryMCMSEntrypoint_AuthorizeFeeWithdrawal = script do
             mcmsController = feeOwner
 
     let params = AuthorizeFeeWithdrawalParams with
+            authorizationId
             recipient
             instrumentId
             maxAmount    = 500.0
@@ -89,9 +92,11 @@ testFeeTreasuryMCMSEntrypoint_AuthorizeFeeWithdrawal = script do
     auths <- query @FeeWithdrawalAuthorization feeOwner
     length auths === 1
     let (_, auth) = head auths
-    auth.recipient    === recipient
-    auth.instrumentId === instrumentId
-    auth.maxAmount    === 500.0
+    auth.instanceId      === authorizationId
+    auth.mcmsController  === feeOwner
+    auth.recipient       === recipient
+    auth.instrumentId    === instrumentId
+    auth.maxAmount       === 500.0
 
 -- ========================================================
 -- |   ExecuteFeeWithdrawal: Completed (with preapproval)  |
@@ -124,6 +129,7 @@ testFeeTreasury_ExecuteFeeWithdrawal_Completed = script do
 
     authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-completed-test" treasuryCid
         AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-completed-test"
             recipient; instrumentId; maxAmount = 300.0; validitySecs = 3600
 
     now <- getTime
@@ -184,6 +190,7 @@ testFeeTreasury_ExecuteFeeWithdrawal_Pending = script do
 
     authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-pending-test" treasuryCid
         AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-pending-test"
             recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
 
     now <- getTime
@@ -228,6 +235,7 @@ testFeeTreasury_ExecuteFeeWithdrawal_AmountExceedsCap = script do
 
     authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-cap-test" treasuryCid
         AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-cap-test"
             recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
 
     now <- getTime
@@ -266,6 +274,7 @@ testFeeTreasury_ExecuteFeeWithdrawal_Expired = script do
     -- validitySecs = 1: expires 1 second after authorize
     authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-expired-test" treasuryCid
         AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-expired-test"
             recipient; instrumentId; maxAmount = 100.0; validitySecs = 1
 
     -- Advance time past expiry
@@ -320,10 +329,90 @@ testFeeTreasury_WithdrawAuthorization = script do
 
     authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-cancel-test" treasuryCid
         AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-cancel-test"
             recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
 
     submit feeOwner do
         exerciseCmd authCid WithdrawAuthorization
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 0
+
+-- ========================================================
+-- |   MCMS Entrypoint: WithdrawAuthorization              |
+-- ========================================================
+
+testFeeTreasuryMCMSEntrypoint_WithdrawAuthorization : Script ()
+testFeeTreasuryMCMSEntrypoint_WithdrawAuthorization = script do
+    feeOwner  <- allocateParty "fee_owner"
+    recipient <- allocateParty "recipient"
+
+    let treasuryInstanceId = "fee-treasury-mcms-cancel-test"
+        authorizationId    = "fee-withdrawal-mcms-cancel-test"
+        instrumentId       = InstrumentId feeOwner "FeeToken"
+        authInstAddr       = RawInstanceAddress.makeText authorizationId feeOwner
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId = treasuryInstanceId
+            feeOwner; mcmsController = feeOwner
+
+    authCid <- authorizeViaEntrypoint feeOwner treasuryInstanceId treasuryCid
+        AuthorizeFeeWithdrawalParams with
+            authorizationId
+            recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
+
+    submitMustFail feeOwner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver authCid) MCMSReceiver_Entrypoint with
+            functionName  = "WithdrawAuthorization"
+            operationData = "00"
+            contractIds   = Map.fromList [(authInstAddr, coerceContractId authCid)]
+
+    updatedMap <- submit feeOwner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver authCid) MCMSReceiver_Entrypoint with
+            functionName  = "WithdrawAuthorization"
+            operationData = ""
+            contractIds   = Map.fromList [(authInstAddr, coerceContractId authCid)]
+
+    case Map.lookup authInstAddr updatedMap of
+        None -> pure ()
+        Some _ -> abort "Expected consumed authorization CID to be removed from map"
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 0
+
+-- ========================================================
+-- |   CleanupExpiredAuthorization                        |
+-- ========================================================
+
+testFeeTreasury_CleanupExpiredAuthorization : Script ()
+testFeeTreasury_CleanupExpiredAuthorization = script do
+    feeOwner     <- allocateParty "fee_owner"
+    recipient    <- allocateParty "recipient"
+    cleanupParty <- allocateParty "cleanup_party"
+
+    let treasuryInstanceId = "fee-treasury-cleanup-test"
+        instrumentId       = InstrumentId feeOwner "FeeToken"
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId = treasuryInstanceId
+            feeOwner; mcmsController = feeOwner
+
+    authCid <- authorizeViaEntrypoint feeOwner treasuryInstanceId treasuryCid
+        AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-cleanup-test"
+            recipient; instrumentId; maxAmount = 100.0; validitySecs = 1
+
+    disclosedAuth <- fromSome <$> queryDisclosure feeOwner authCid
+
+    submitMustFail (actAs cleanupParty <> disclose disclosedAuth) do
+        exerciseCmd authCid CleanupExpiredAuthorization with submitter = cleanupParty
+
+    passTime (seconds 2)
+
+    submit (actAs cleanupParty <> disclose disclosedAuth) do
+        exerciseCmd authCid CleanupExpiredAuthorization with submitter = cleanupParty
 
     auths <- query @FeeWithdrawalAuthorization feeOwner
     length auths === 0
@@ -353,6 +442,7 @@ testFeeTreasury_ExecuteFeeWithdrawal_AmountNotPositive = script do
 
     authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-nonpositive-test" treasuryCid
         AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-nonpositive-test"
             recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
 
     now <- getTime
@@ -386,6 +476,7 @@ testFeeTreasury_ExecuteFeeWithdrawal_HoldingsEmpty = script do
 
     authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-emptyholdings-test" treasuryCid
         AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-emptyholdings-test"
             recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
 
     now <- getTime
@@ -423,6 +514,7 @@ testFeeTreasury_ExecuteFeeWithdrawal_RequestedAtInFuture = script do
 
     authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-futurereq-test" treasuryCid
         AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-futurereq-test"
             recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
 
     now <- getTime
@@ -462,6 +554,7 @@ testFeeTreasury_ExecuteFeeWithdrawal_TransferFailed = script do
 
     authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-transferfailed-test" treasuryCid
         AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-transferfailed-test"
             recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
 
     now <- getTime

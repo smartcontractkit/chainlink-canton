@@ -74,11 +74,13 @@ func TestFeeTreasury_WithdrawFeesEndToEndViaMCMS(t *testing.T) {
 
 	// ---- Phase 1: authorize via the full MCMS batch ----
 	feeContract := feetreasury.NewContract(fmt.Sprintf("#%s", feetreasury.PackageName), "CCIP.FeeTreasury", "MCMSFeeTreasury")
+	authorizationID := "fee-withdrawal-itest-" + uuid.New().String()[:8]
 	encoded, err := feeContract.Encoder().AuthorizeFeeWithdrawalParams(feetreasury.AuthorizeFeeWithdrawalParams{
-		Recipient:    types.PARTY(recipient),
-		InstrumentId: instrumentID,
-		MaxAmount:    types.NUMERIC("500"),
-		ValiditySecs: types.INT64(3600),
+		AuthorizationId: authorizationID,
+		Recipient:       types.PARTY(recipient),
+		InstrumentId:    instrumentID,
+		MaxAmount:       types.NUMERIC("500"),
+		ValiditySecs:    types.INT64(3600),
 	})
 	require.NoError(t, err)
 
@@ -118,6 +120,7 @@ func TestFeeTreasury_WithdrawFeesEndToEndViaMCMS(t *testing.T) {
 
 	authCid, auth := queryFeeWithdrawalAuthorization(t, participant, ccipOwner)
 	require.NotNil(t, auth, "FeeWithdrawalAuthorization should exist after MCMS execution")
+	require.Equal(t, authorizationID, string(auth.InstanceId))
 	require.Equal(t, recipient, string(auth.Recipient))
 	require.Equal(t, instrumentID, auth.InstrumentId)
 

@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: ccip-fee-treasury
 source: daml
-version: 2.0.0
+version: 1.0.0
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
