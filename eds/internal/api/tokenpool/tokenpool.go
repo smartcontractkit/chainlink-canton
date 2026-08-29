@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"slices"
 	"strconv"
@@ -17,26 +18,26 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool/factory"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 )
 
 type ContractConfig struct {
-	Type            config.TokenPoolType
-	Owner           types.PARTY
-	transferFactory transferFactory
-	burnMintFactory burnMintFactory
-	preapproval     preapprovalFactory
+	Type              config.TokenPoolType
+	Owner             types.PARTY
+	disclosureFactory factory.DisclosureFactory
+	preapproval       preapprovalFactory
 }
 
 type Server struct {
@@ -85,24 +86,24 @@ func NewServer(
 			// If the TransferFactory is configured, this will make this API automatically retrieve the necessary
 			// ContractIds, Context, and disclosures from the instrument's TransferFactory.
 			// If not enabled, users will have to get these information from the TransferFactory API themselves.
-			if tokenPool.TransferFactory != nil {
-				getFactoryFunc, err := getTransferFactory(ctx, types.PARTY(tokenPool.PoolOwner), activeContractStore, *tokenPool.TransferFactory)
+			if tokenPool.Factory != nil {
+				disclosureFactory, err := factory.NewTransferFactory(ctx, types.PARTY(tokenPool.PoolOwner), activeContractStore, *tokenPool.Factory)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get transfer factory for token pool with address %s: %w", tokenPool.InstanceAddress, err)
 				}
-				contractConfig.transferFactory = getFactoryFunc
+				contractConfig.disclosureFactory = disclosureFactory
 			}
 		case config.TokenPoolTypeBurnMint:
 			s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
 				TemplateID: contracts.TemplateIDFromBinding(burnminttokenpool.BurnMintTokenPool{}),
 				PartyID:    tokenPool.PartyID,
 			})
-			if tokenPool.BurnMintFactory != nil {
-				getFactoryFunc, err := getBurnMintFactory(activeContractStore, *tokenPool.BurnMintFactory)
+			if tokenPool.Factory != nil {
+				disclosureFactory, err := factory.NewBurnMintFactory(ctx, types.PARTY(tokenPool.PoolOwner), activeContractStore, *tokenPool.Factory)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get burn mint factory for token pool with address %s: %w", tokenPool.InstanceAddress, err)
 				}
-				contractConfig.burnMintFactory = getFactoryFunc
+				contractConfig.disclosureFactory = disclosureFactory
 			}
 		default:
 			return nil, fmt.Errorf("unsupported token pool type: %s", tokenPool.Type)
@@ -240,15 +241,15 @@ func (s Server) lockReleaseTokenPoolSend(
 	}
 	var factoryDisclosures []oapiCommon.DisclosedContract
 	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
-	if cfg.transferFactory != nil {
-		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
+	if cfg.disclosureFactory != nil {
+		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
 		choiceContext.Values[string(lockreleasetokenpool.TransferFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(transferFactory)),
+			AVContractId: new(transferFactory),
 		}
 		transferFactoryContext.Values = transferContext.Values
 		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
@@ -353,17 +354,19 @@ func (s Server) burnMintTokenPoolSend(
 
 	// Get BurnMintFactory (if enabled)
 	var factoryDisclosures []oapiCommon.DisclosedContract
-	if cfg.burnMintFactory != nil {
-		burnMintFactory, disclosedFactoryContracts, err := cfg.burnMintFactory(c)
+	if cfg.disclosureFactory != nil {
+		factoryId, factoryCtx, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("burn mint factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
 		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(burnMintFactory)),
+			AVContractId: new(factoryId),
 		}
 		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
+		// Merge factory-returned context (e.g. issuer credentials) into the extra-args context
+		maps.Copy(burnMintFactoryContext.Values, factoryCtx.Values)
 	}
 
 	// Get TransferPreapproval (if enabled)
@@ -458,10 +461,10 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 
 	switch cfg.Type {
 	case config.TokenPoolTypeLockRelease:
-		s.lockReleaseTokenPoolExecute(c, cfg, instanceAddress, activeTokenPoolContract, sourceChainSelector, message)
+		s.lockReleaseTokenPoolExecute(c, cfg, instanceAddress, activeTokenPoolContract, sourceChainSelector, message, types.PARTY(req.Receiver))
 		return
 	case config.TokenPoolTypeBurnMint:
-		s.burnMintTokenPoolExecute(c, cfg, instanceAddress, activeTokenPoolContract, sourceChainSelector, message)
+		s.burnMintTokenPoolExecute(c, cfg, instanceAddress, activeTokenPoolContract, sourceChainSelector, message, types.PARTY(req.Receiver))
 		return
 	default:
 		s.logger.Error().Stringer("address", instanceAddress).Msgf("unknown token pool type: %s", cfg.Type)
@@ -477,6 +480,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 	activeTokenPoolContract *apiv2.ActiveContract,
 	sourceChainSelector uint64,
 	message *protocol.Message,
+	receiver types.PARTY,
 ) {
 	lockReleaseTokenPool, err := ParseLockReleaseTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
@@ -527,9 +531,11 @@ func (s Server) lockReleaseTokenPoolExecute(
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 		return
 	}
+	inputHoldingCids := make([]types.CONTRACT_ID, len(holdings))
 	tokenPoolHoldings := make([]splice_api_token_metadata_v1.AnyValue, len(holdings))
 	disclosedHoldings := make([]oapiCommon.DisclosedContract, len(holdings))
 	for i, holding := range holdings {
+		inputHoldingCids[i] = types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
 		tokenPoolHoldings[i] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId()))}
 		disclosedHoldings[i] = converters.ActiveContractToDisclosedContract(holding)
 	}
@@ -546,15 +552,15 @@ func (s Server) lockReleaseTokenPoolExecute(
 	}
 	var factoryDisclosures []oapiCommon.DisclosedContract
 	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
-	if cfg.transferFactory != nil {
-		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.transferFactory(c, lockReleaseTokenPool.InstrumentId)
+	if cfg.disclosureFactory != nil {
+		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.disclosureFactory.GetExecuteDisclosures(c, message, lockReleaseTokenPool.InstrumentId, inputHoldingCids, receiver)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
 		choiceContext.Values[string(lockreleasetokenpool.TransferFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(transferFactory)),
+			AVContractId: new(transferFactory),
 		}
 		transferFactoryContext.Values = transferContext.Values
 		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
@@ -600,6 +606,7 @@ func (s Server) burnMintTokenPoolExecute(
 	activeTokenPoolContract *apiv2.ActiveContract,
 	sourceChainSelector uint64,
 	message *protocol.Message,
+	receiver types.PARTY,
 ) {
 	burnMintTokenPool, err := ParseBurnMintTokenPool(activeTokenPoolContract.CreatedEvent)
 	if err != nil {
@@ -656,17 +663,19 @@ func (s Server) burnMintTokenPoolExecute(
 
 	// Get BurnMintFactory (if enabled)
 	var factoryDisclosures []oapiCommon.DisclosedContract
-	if cfg.burnMintFactory != nil {
-		burnMintFactory, disclosedFactoryContracts, err := cfg.burnMintFactory(c)
+	if cfg.disclosureFactory != nil {
+		factoryId, factoryCtx, disclosedFactoryContracts, err := cfg.disclosureFactory.GetExecuteDisclosures(c, message, burnMintTokenPool.InstrumentId, nil, receiver)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("burn mint factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
 			return
 		}
 		choiceContext.Values[string(burnminttokenpool.BurnMintFactoryContextKey)] = splice_api_token_metadata_v1.AnyValue{
-			AVContractId: new(types.CONTRACT_ID(burnMintFactory)),
+			AVContractId: new(factoryId),
 		}
 		factoryDisclosures = append(factoryDisclosures, disclosedFactoryContracts...)
+		// Merge factory-returned context (e.g. issuer credentials) into the extra-args context
+		maps.Copy(burnMintFactoryContext.Values, factoryCtx.Values)
 	}
 
 	// If the BurnMintFactory context contains any values, set it as part of the choiceContext

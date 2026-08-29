@@ -10,9 +10,8 @@ import DA.Map qualified as Map
 import DA.Set (Set)
 import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
-import DA.Date (date, Month(Dec))
 import DA.Optional (fromOptional, isNone)
-import DA.Time (time)
+import DA.Time (RelTime, addRelTime, hours)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -48,11 +47,6 @@ import qualified CCIP.UtilsV2.Context
 
 import CCIP.RuntimeV2.PerPartyRouterTypes (PerPartyRouterDeps(..), SetDepsParams(..), AddCustomObserversParams(..), RemoveCustomObserversParams(..))
 import CCIP.RuntimeV2.PerPartyRouterCodecGen (decodeSetDepsParamsAt, decodeAddCustomObserversParamsAt, decodeRemoveCustomObserversParamsAt)
-
--- | Far-future time used as "never expires" for pending transfers.
--- Matches Splice's maxTime pattern: https://github.com/hyperledger-labs/splice/blob/139ee12335f61851d7cbf540a4b56c80622c911f/daml/splice-amulet/daml/Splice/Expiry.daml#L125
-maxTime : Time
-maxTime = time (date 9999 Dec 31) 23 59 59
 
 maxExecutedMessagesSize : Int
 -- Conservatively sized based on Daml Script test validation. Larger values passed locally
@@ -159,6 +153,9 @@ lookupExecutedMessage messageHash executedMessages archivedExecutionContractIds 
             False
             (reverse archivedExecutionContractIds)
 
+perPartyRouterInstanceIdPrefix : Text
+perPartyRouterInstanceIdPrefix = "per-party-router"
+
 -- | Factory for creating PerPartyRouters.
 -- Tracks (party, instanceId) combinations to prevent duplicate instanceIds.
 --
@@ -203,6 +200,7 @@ template PerPartyRouterFactory
             with
                 partyOwner : Party
                 instanceId : Text  -- user specifies their desired instanceId
+                feeTransferLifetime : Optional RelTime
             controller partyOwner
             do
                 -- Check party doesn't already have a router.
@@ -210,21 +208,35 @@ template PerPartyRouterFactory
                 assertMsg "router already exists for this party"
                     (not (Map.member partyOwner registeredRouters))
 
+                assertMsg "instanceId must be non-empty" (instanceId /= "")
+
+                -- Prefix all instanceIds with perPartyRouterInstanceIdPrefix to avoid collisions with other CCIP instanceIds.
+                let prefixedInstanceId = perPartyRouterInstanceIdPrefix <> "-" <> instanceId
+
                 assertMsg "instanceId already in use"
-                    (instanceId `notElem` Map.values registeredRouters)
+                    (prefixedInstanceId `notElem` Map.values registeredRouters)
+
+                case feeTransferLifetime of
+                    None -> pure ()
+                    Some lifetime -> do
+                        assertMsg "feeTransferLifetime must be positive"
+                            (lifetime > hours 0)
+                        assertMsg "feeTransferLifetime must not exceed 90 days"
+                            (lifetime <= hours 2160)
 
                 routerCid <- create PerPartyRouter with
                     ccipOwner = ccipOwner
                     partyOwner = partyOwner
-                    instanceId = instanceId
+                    instanceId = prefixedInstanceId
                     deps = deps
+                    feeTransferLifetime = feeTransferLifetime
                     outboundSequenceNumbers = Map.empty
                     executedMessages = Set.empty
                     archivedExecutionContractIds = []
                     customObservers = []
 
                 newFactoryCid <- create this with
-                    registeredRouters = Map.insert partyOwner instanceId registeredRouters
+                    registeredRouters = Map.insert partyOwner prefixedInstanceId registeredRouters
 
                 pure CreateRouterResult with
                     router = routerCid
@@ -300,6 +312,7 @@ template PerPartyRouter
         executedMessages : Set BytesHex
         archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]
         customObservers : [Party]
+        feeTransferLifetime : Optional RelTime
     where
         signatory ccipOwner
         observer partyOwner :: customObservers
@@ -659,6 +672,8 @@ template PerPartyRouter
                                 (\entry -> fst entry /= ccipOwner && snd entry > 0.0)
                                 (Map.toList recipientFees)
 
+                        let feeTransferLifetimeValue = fromOptional (hours 2160) feeTransferLifetime
+
                         let executeFeeTransfer sender receiver inputHoldingCids amount = do
                                 now <- getTime
                                 let feeTransfer =
@@ -668,7 +683,10 @@ template PerPartyRouter
                                             amount = amount
                                             instrumentId = sendingMsg.feeToken
                                             requestedAt = now
-                                            executeBefore = maxTime
+                                            -- Bounded lifetime keeps the fee transfer under the Splice
+                                            -- tokenStandardMaxTTL limit (90 days). Optional on the router,
+                                            -- defaults to 90 days if not set.
+                                            executeBefore = addRelTime now feeTransferLifetimeValue
                                             inputHoldingCids = inputHoldingCids
                                             meta = Splice.Api.Token.MetadataV1.emptyMetadata
                                 feeResult <- exercise

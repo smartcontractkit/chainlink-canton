@@ -18,7 +18,7 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executorop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -41,14 +41,44 @@ type CantonChainFamilyAdapter struct{}
 
 var CantonFamilySelector = [4]byte{0xdf, 0xaf, 0xaf, 0x4b}
 
+func isEVMSelector(chainSelector uint64) bool {
+	family, err := chainsel.GetSelectorFamily(chainSelector)
+	if err != nil {
+		return false
+	}
+
+	return family == chainsel.FamilyEVM
+}
+
 func DefaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
 	return lanes.FeeQuoterDestChainConfig{
 		OverrideExistingConfig:      false,
 		IsEnabled:                   true,
-		MaxDataBytes:                30_000,
-		MaxPerMsgGasLimit:           3_000_000,
-		DestGasOverhead:             300_000,
-		DestGasPerPayloadByteBase:   16,
+		MaxDataBytes:                32_000,
+		MaxPerMsgGasLimit:           15_000_000,
+		DestGasOverhead:             0,
+		DestGasPerPayloadByteBase:   20,
+		ChainFamilySelector:         binary.BigEndian.Uint32(CantonFamilySelector[:]),
+		DefaultTokenFeeUSDCents:     0,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          50,
+		V1Params:                    nil,
+		V2Params: &lanes.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(38),
+		},
+	}
+}
+
+func defaultCantonFeeQuoterDestChainConfig() lanes.FeeQuoterDestChainConfig {
+	return lanes.FeeQuoterDestChainConfig{
+		OverrideExistingConfig:      false,
+		IsEnabled:                   true,
+		MaxDataBytes:                32_000,
+		MaxPerMsgGasLimit:           15_000_000,
+		DestGasOverhead:             0,
+		DestGasPerPayloadByteBase:   20,
 		ChainFamilySelector:         binary.BigEndian.Uint32(CantonFamilySelector[:]),
 		DefaultTokenFeeUSDCents:     25,
 		DefaultTokenDestGasOverhead: 90_000,
@@ -188,13 +218,7 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		if err != nil {
 			return out, fmt.Errorf("resolve executor for remote chain %d: %w", remoteSelector, err)
 		}
-		defaultInboundCCVs, err := resolveContractRefsByAddresses(
-			ds,
-			input.ChainSelector,
-			datastore.ContractType(committeeverifierop.ContractType),
-			committeeverifierop.Version,
-			remoteCfg.DefaultInboundCCVs,
-		)
+		defaultInboundCCVs, err := resolveDefaultInboundCCVs(input.ChainSelector, remoteCfg)
 		if err != nil {
 			return out, fmt.Errorf("resolve default inbound ccvs for remote chain %d: %w", remoteSelector, err)
 		}
@@ -413,8 +437,37 @@ func (a *CantonChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig(
 }
 
 // GetDefaultFeeQuoterDestChainConfig implements [adapters.ChainFamily].
-func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(_, _ uint64, chainFamilySelector [4]byte) ccipadapters.FeeQuoterDestChainConfigOverrides {
-	defaults := DefaultCantonFeeQuoterDestChainConfig()
+//
+// The lane changeset asks the *remote* chain's adapter how the local chain should configure
+// its FeeQuoter for that remote as a destination, so this is reached with Canton as the
+// destination and sourceChainSelector naming the sending chain.
+func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(sourceChainSelector, _ uint64, chainFamilySelector [4]byte) ccipadapters.FeeQuoterDestChainConfigOverrides {
+	if isEVMSelector(sourceChainSelector) {
+		// Canton has no gas market and execution is manual, so every gas-derived field is
+		// zeroed and the lane is priced by a flat network fee instead. USDPerUnitGas is still
+		// required: the EVM FeeQuoter 2.0 unconditionally reverts NoGasPriceAvailable in
+		// quoteGasForExec for any enabled destination that has no gas-price entry, regardless of
+		// family, so an EVM source must seed a Canton gas price via FeeQuoter::UpdatePrices even
+		// though Canton is priced flat. The value mirrors the non-EVM branch
+		// (defaultCantonFeeQuoterDestChainConfig().V2Params.USDPerUnitGas = 38, i.e. 0.0000000038
+		// USD/gas) and the gas price the Canton-side configure sequence pushes for its EVM remote.
+		return ccipadapters.FeeQuoterDestChainConfigOverrides{
+			IsEnabled:                   new(true),
+			MaxDataBytes:                new(uint32(32_000)),
+			MaxPerMsgGasLimit:           new(uint32(15_000_000)),
+			DestGasOverhead:             new(uint32(0)),
+			DestGasPerPayloadByteBase:   new(uint8(20)),
+			ChainFamilySelector:         chainFamilySelector,
+			DefaultTokenFeeUSDCents:     new(uint16(0)),
+			DefaultTokenDestGasOverhead: new(uint32(0)),
+			DefaultTxGasLimit:           new(uint32(1)),
+			NetworkFeeUSDCents:          new(uint16(50)),
+			LinkFeeMultiplierPercent:    new(uint8(90)),
+			USDPerUnitGas:               defaultCantonFeeQuoterDestChainConfig().V2Params.USDPerUnitGas,
+		}
+	}
+
+	defaults := defaultCantonFeeQuoterDestChainConfig()
 	linkFeeMultiplier := uint8(0)
 	if defaults.V2Params != nil {
 		linkFeeMultiplier = defaults.V2Params.LinkFeeMultiplierPercent
@@ -448,17 +501,37 @@ func (a *CantonChainFamilyAdapter) GetDefaultFinalityConfig() finality.Config {
 }
 
 // GetDefaultRemoteChainConfig implements [adapters.ChainFamily].
-func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(_, _ uint64) ccipadapters.RemoteChainDefaults {
+//
+// The lane changeset asks the *remote* chain's adapter for the defaults the local chain should
+// apply to that remote, so this is reached with Canton as the remote and sourceChainSelector
+// naming the sending chain.
+func (a *CantonChainFamilyAdapter) GetDefaultRemoteChainConfig(sourceChainSelector, _ uint64) ccipadapters.RemoteChainDefaults {
+	if isEVMSelector(sourceChainSelector) {
+		// Canton messages are executed manually (ManuallyExecuteMessage), so no EVM Executor
+		// supports Canton as a destination. SkipExecutorConfig keeps the EVM sequence from
+		// reading or configuring an Executor contract for this lane; the EVM sequence writes
+		// its own no-execution sentinel into the OnRamp's default-executor field, so no
+		// family-specific address crosses this boundary.
+		return ccipadapters.RemoteChainDefaults{
+			AllowTrafficFrom: true,
+			ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
+				USDCentsFee: 0,
+				Enabled:     false,
+			},
+			BaseExecutionGasCost:      200_000,
+			TokenReceiverAllowed:      false,
+			MessageNetworkFeeUSDCents: 50,
+			TokenNetworkFeeUSDCents:   50,
+			SkipExecutorConfig:        true,
+		}
+	}
+
 	return ccipadapters.RemoteChainDefaults{
-		AllowTrafficFrom: true, // TODO: check what this does?
-		ExecutorDestChainConfig: ccipadapters.ExecutorDestChainConfig{
-			USDCentsFee: 0,
-			Enabled:     true,
-		},
+		AllowTrafficFrom:          true,
 		BaseExecutionGasCost:      50_000,
 		TokenReceiverAllowed:      true,
-		MessageNetworkFeeUSDCents: 0,
-		TokenNetworkFeeUSDCents:   0,
+		MessageNetworkFeeUSDCents: 10,
+		TokenNetworkFeeUSDCents:   25,
 	}
 }
 
@@ -500,6 +573,56 @@ func resolveContractRefsByAddresses(ds datastore.DataStore, chainSelector uint64
 	}
 
 	return refs, nil
+}
+
+func resolveDefaultInboundCCVs(
+	chainSelector uint64,
+	remoteCfg ccipadapters.RemoteChainConfig[[]byte, string],
+) ([]datastore.AddressRef, error) {
+	// A Canton CommitteeVerifier verifies Canton-origin messages on the destination chain (it is
+	// the *outbound* CCV consumed by the remote EVM side). It cannot verify EVM-origin messages
+	// on Canton, so it is never a valid *inbound* CCV for a Canton chain. chainlink-ccip's
+	// resolveDefaultCCVs auto-resolves the "default"-qualifier CommitteeVerifier into
+	// DefaultInboundCCVs when the lane YAML leaves it unset; honoring that here would silently
+	// produce an inbound lane backed by a verifier that can never verify — the opposite of
+	// fail-closed. Force the invalid-ccv sentinel as the default inbound CCV regardless of what
+	// was auto-resolved. Explicit per-lane inbound CCVs set via laneMandatedInboundCCVs are
+	// resolved separately (see configureChainForLanes) and remain honored.
+	_ = remoteCfg.DefaultInboundCCVs // explicitly ignored; see comment above
+
+	// Hardening: default inbound CCV is invalid-ccv (fail-closed). The sentinel is hardcoded
+	// rather than resolved from the datastore so lanes stay fail-closed even when no invalid-ccv
+	// qualifier was ever written to the address book.
+	ref, err := invalidCCVAddressRef(chainSelector)
+	if err != nil {
+		return nil, fmt.Errorf("build default invalid-ccv inbound ref: %w", err)
+	}
+
+	return []datastore.AddressRef{ref}, nil
+}
+
+// InvalidCCVRawInstanceAddress is the fail-closed sentinel CCV used as the default inbound CCV
+// when a remote chain config does not specify one. It intentionally points at a CommitteeVerifier
+// instance that can never verify, so unconfigured inbound lanes reject messages.
+const InvalidCCVRawInstanceAddress = "invalid-ccv@ccvOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551"
+
+// invalidCCVAddressRef synthesizes the datastore ref for InvalidCCVRawInstanceAddress. The label
+// carries the raw instance address, which is what dsutil.GetRawInstanceAddressFromAddressRef reads
+// when the ref is converted to a binding.
+func invalidCCVAddressRef(chainSelector uint64) (datastore.AddressRef, error) {
+	raw, err := contracts.RawInstanceAddressFromString(InvalidCCVRawInstanceAddress)
+	if err != nil {
+		return datastore.AddressRef{}, fmt.Errorf("parse %q: %w", InvalidCCVRawInstanceAddress, err)
+	}
+
+	return datastore.AddressRef{
+		ChainSelector: chainSelector,
+		Type:          datastore.ContractType(committeeverifierop.ContractType),
+		Version:       committeeverifierop.Version,
+		Qualifier:     "invalid-ccv",
+		Address:       raw.InstanceAddress().Hex(),
+		Labels:        datastore.NewLabelSet(raw.String()),
+	}, nil
 }
 
 func convertCommitteeVerifierConfigs(configs []ccipadapters.CommitteeVerifierConfig[datastore.AddressRef]) []lanes.CommitteeVerifierConfig[datastore.AddressRef] {

@@ -8,8 +8,8 @@ import (
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	coinBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/coin"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	coinBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/coin"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/coin"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"

@@ -12,7 +12,7 @@ import (
 	"github.com/smartcontractkit/go-daml/codegen/damltemplate"
 )
 
-const contractsRoot = "contracts"
+const contractsRoot = "."
 
 // Custom type codecs map domain-specific types to their hand-written
 // encode/decode functions. Update this when a new custom type is introduced.

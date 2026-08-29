@@ -1,18 +1,20 @@
 package tests
 
 import (
+	"math/big"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
 )
 
 // getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as
@@ -88,4 +90,30 @@ func quoteCCIPSenderFee(
 	}
 
 	return quote
+}
+
+// evmFeeQuoterDestChainConfigForLane returns the FeeQuoter dest-chain defaults that the EVM 2.0
+// chain-family adapter used to expose through the lanes.LaneAdapter registry. It no longer
+// registers there, because CCIP 2.0 lanes are configured through
+// ConfigureChainsForLanesFromTopology. The Canton lane tests still build lanes.UpdateLanesInput
+// by hand, so the values are pinned here.
+func evmFeeQuoterDestChainConfigForLane() lanes.FeeQuoterDestChainConfig {
+	// bytes4(keccak256("CCIP ChainFamilySelector EVM")) = 0x2812d52c
+	const evmChainFamilySelector uint32 = 0x2812d52c
+	return lanes.FeeQuoterDestChainConfig{
+		IsEnabled:                   true,
+		MaxDataBytes:                30_000,
+		MaxPerMsgGasLimit:           3_000_000,
+		DestGasOverhead:             300_000,
+		DestGasPerPayloadByteBase:   16,
+		ChainFamilySelector:         evmChainFamilySelector,
+		DefaultTokenFeeUSDCents:     25,
+		DefaultTokenDestGasOverhead: 90_000,
+		DefaultTxGasLimit:           200_000,
+		NetworkFeeUSDCents:          10,
+		V2Params: &lanes.FeeQuoterV2Params{
+			LinkFeeMultiplierPercent: 90,
+			USDPerUnitGas:            big.NewInt(1e6),
+		},
+	}
 }

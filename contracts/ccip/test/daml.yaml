@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
 name: ccip-test-v2
 source: daml
-version: 2.0.0
+version: 2.1.0
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Wno-template-interface-depends-on-daml-script"
@@ -14,7 +14,7 @@ data-dependencies:
 
   - ../../mcms/api/.daml/dist/mcms-api-1.0.0.dar
   - ../../chainlink/api/.daml/dist/chainlink-api-2.0.0.dar
-  - ../../link/.daml/dist/link-2.0.0.dar
+  - ../../link/.daml/dist/link-2.1.0.dar
 
   - ../codec/.daml/dist/ccip-codec-v2-2.0.0.dar
   - ../api/.daml/dist/ccip-api-v2-2.0.0.dar
@@ -22,19 +22,19 @@ data-dependencies:
   - ../client-api/.daml/dist/ccip-client-api-v2-2.0.0.dar
   - ../events/.daml/dist/ccip-events-v2-2.0.0.dar
   - ../tickets/.daml/dist/ccip-tickets-v2-2.0.0.dar
-  - ../core/.daml/dist/ccip-core-v2-2.0.0.dar
-  - ../utils/.daml/dist/ccip-utils-v2-2.0.0.dar
-  - ../runtime/.daml/dist/ccip-runtime-v2-2.0.0.dar
+  - ../core/.daml/dist/ccip-core-v2-2.1.0.dar
+  - ../utils/.daml/dist/ccip-utils-v2-2.1.0.dar
+  - ../runtime/.daml/dist/ccip-runtime-v2-2.1.1.dar
 
   - ../executor/.daml/dist/ccip-executor-v2-2.0.0.dar
   - ../committee-verifier/.daml/dist/ccip-committee-verifier-v2-2.0.0.dar
-  - ../rate-limiter/.daml/dist/ccip-rate-limiter-v2-2.0.0.dar
-  - ../pools/lock-release-token-pool/.daml/dist/ccip-lock-release-token-pool-v2-2.0.0.dar
-  - ../pools/burn-mint-token-pool/.daml/dist/ccip-burn-mint-token-pool-v2-2.0.0.dar
+  - ../rate-limiter/.daml/dist/ccip-rate-limiter-v2-2.0.1.dar
+  - ../pools/lock-release-token-pool/.daml/dist/ccip-lock-release-token-pool-v2-2.1.1.dar
+  - ../pools/burn-mint-token-pool/.daml/dist/ccip-burn-mint-token-pool-v2-2.1.1.dar
 
-  - ../sender/.daml/dist/ccip-sender-v2-2.0.0.dar
-  - ../receiver/.daml/dist/ccip-receiver-v2-2.0.0.dar
-  - ../factory/.daml/dist/ccip-factory-v2-2.0.0.dar
+  - ../sender/.daml/dist/ccip-sender-v2-2.1.0.dar
+  - ../receiver/.daml/dist/ccip-receiver-v2-2.1.0.dar
+  - ../factory/.daml/dist/ccip-factory-v2-2.1.1.dar
   - ../fee-treasury/.daml/dist/ccip-fee-treasury-1.0.0.dar
 dependencies:
   - daml-prim

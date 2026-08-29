@@ -7,7 +7,7 @@ package mocks
 import (
 	mock "github.com/stretchr/testify/mock"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 // NewMockInstanceAddressFilter creates a new instance of MockInstanceAddressFilter. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

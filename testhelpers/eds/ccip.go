@@ -8,8 +8,10 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
@@ -127,9 +129,11 @@ func GetCCIPExecuteDisclosure(
 	ctx context.Context,
 	ccipAPIClient oapiCCIP.ClientWithResponsesInterface,
 	encodedMessageHex string,
+	receiver types.PARTY,
 ) (*CCIPExecuteDisclosure, error) {
 	resp, err := ccipAPIClient.PostCCIPExecuteWithResponse(ctx, oapiCCIP.CCIPExecuteRequest{
 		EncodedMessage: encodedMessageHex,
+		Receiver:       string(receiver),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error calling CCIPExecute: %w", err)

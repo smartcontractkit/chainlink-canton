@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 )
 
 // NewMockInstrumentHoldingStore creates a new instance of MockInstrumentHoldingStore. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -103,6 +103,68 @@ func (_c *MockInstrumentHoldingStore_GetHolding_Call) Return(activeContracts []*
 }
 
 func (_c *MockInstrumentHoldingStore_GetHolding_Call) RunAndReturn(run func(party types.PARTY, instrumentId splice_api_token_holding_v1.InstrumentId) ([]*v2.ActiveContract, bool)) *MockInstrumentHoldingStore_GetHolding_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListHoldings provides a mock function for the type MockInstrumentHoldingStore
+func (_mock *MockInstrumentHoldingStore) ListHoldings(instrumentId splice_api_token_holding_v1.InstrumentId) ([]*v2.ActiveContract, error) {
+	ret := _mock.Called(instrumentId)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListHoldings")
+	}
+
+	var r0 []*v2.ActiveContract
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(splice_api_token_holding_v1.InstrumentId) ([]*v2.ActiveContract, error)); ok {
+		return returnFunc(instrumentId)
+	}
+	if returnFunc, ok := ret.Get(0).(func(splice_api_token_holding_v1.InstrumentId) []*v2.ActiveContract); ok {
+		r0 = returnFunc(instrumentId)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*v2.ActiveContract)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(splice_api_token_holding_v1.InstrumentId) error); ok {
+		r1 = returnFunc(instrumentId)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockInstrumentHoldingStore_ListHoldings_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListHoldings'
+type MockInstrumentHoldingStore_ListHoldings_Call struct {
+	*mock.Call
+}
+
+// ListHoldings is a helper method to define mock.On call
+//   - instrumentId splice_api_token_holding_v1.InstrumentId
+func (_e *MockInstrumentHoldingStore_Expecter) ListHoldings(instrumentId interface{}) *MockInstrumentHoldingStore_ListHoldings_Call {
+	return &MockInstrumentHoldingStore_ListHoldings_Call{Call: _e.mock.On("ListHoldings", instrumentId)}
+}
+
+func (_c *MockInstrumentHoldingStore_ListHoldings_Call) Run(run func(instrumentId splice_api_token_holding_v1.InstrumentId)) *MockInstrumentHoldingStore_ListHoldings_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 splice_api_token_holding_v1.InstrumentId
+		if args[0] != nil {
+			arg0 = args[0].(splice_api_token_holding_v1.InstrumentId)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockInstrumentHoldingStore_ListHoldings_Call) Return(activeContracts []*v2.ActiveContract, err error) *MockInstrumentHoldingStore_ListHoldings_Call {
+	_c.Call.Return(activeContracts, err)
+	return _c
+}
+
+func (_c *MockInstrumentHoldingStore_ListHoldings_Call) RunAndReturn(run func(instrumentId splice_api_token_holding_v1.InstrumentId) ([]*v2.ActiveContract, error)) *MockInstrumentHoldingStore_ListHoldings_Call {
 	_c.Call.Return(run)
 	return _c
 }

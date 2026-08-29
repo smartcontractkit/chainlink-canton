@@ -6,8 +6,10 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 )
@@ -25,9 +27,11 @@ func GetTokenPoolExecuteDisclosure(
 	tokenPoolAPIClient oapiTokenPool.ClientWithResponsesInterface,
 	encodedMessageHex string,
 	tokenPoolAddress contracts.InstanceAddress,
+	receiver types.PARTY,
 ) (*TokenPoolExecuteDisclosure, error) {
 	resp, err := tokenPoolAPIClient.PostTokenPoolExecuteWithResponse(ctx, tokenPoolAddress.String(), oapiTokenPool.TokenPoolExecuteRequest{
 		EncodedMessage: encodedMessageHex,
+		Receiver:       string(receiver),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error calling Token Pool Execute: %w", err)

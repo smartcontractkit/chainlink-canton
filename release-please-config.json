@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "6f042667feb1fd352018fa8b5bc951a1f2fcffd4",
+  "release-type": "go",
+  "separate-pull-requests": true,
+  "always-update": true,
+  "tag-separator": "/",
+  "bump-minor-pre-major": true,
+  "pull-request-title-pattern": "chore: release ${component} ${version}",
+  "packages": {
+    "contracts": {
+      "release-type": "go",
+      "package-name": "contracts",
+      "draft": true,
+      "force-tag-creation": true
+    }
+  },
+  "plugins": [
+    {
+      "type": "sentence-case"
+    }
+  ],
+  "changelog-sections": [
+    { "type": "build", "section": "Builds", "hidden": true },
+    { "type": "chore", "section": "Miscellaneous", "hidden": true },
+    { "type": "ci", "section": "Continuous Integrations", "hidden": true },
+    { "type": "docs", "section": "Documentation", "hidden": true },
+    { "type": "feat", "section": "Features" },
+    { "type": "fix", "section": "Bug Fixes" },
+    { "type": "perf", "section": "Performance Improvements", "bump": "patch" },
+    { "type": "refactor", "section": "Code Refactoring", "hidden": true },
+    { "type": "revert", "section": "Reverts", "bump": "patch" },
+    { "type": "style", "section": "Styles", "hidden": true },
+    { "type": "test", "section": "Tests", "hidden": true }
+  ]
+}

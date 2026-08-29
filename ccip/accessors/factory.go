@@ -16,7 +16,7 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 const CantonConfigPathEnv = "CANTON_CONFIG_PATH"
@@ -36,7 +36,7 @@ func loadConfig(path string) (*ccip.Config, error) {
 	return &cfg, nil
 }
 
-func CreateCantonAccessorFactory(lggr logger.Logger, genericConfig chainaccess.GenericConfig) (chainaccess.AccessorFactory, error) { //nolint:staticcheck // registry still decodes GenericConfig until local config is supported
+func CreateCantonAccessorFactory(lggr logger.Logger, genericConfig chainaccess.GenericConfig) (chainaccess.AccessorFactory, error) {
 	configPath, ok := os.LookupEnv(CantonConfigPathEnv)
 	if !ok {
 		configPath = ccip.DefaultCantonConfigPath

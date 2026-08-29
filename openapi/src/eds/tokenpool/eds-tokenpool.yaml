@@ -2,7 +2,7 @@ openapi: 3.0.0
 info:
   title: Token Pool Explicit Disclosure API
   description: Provides access to explicit disclosures required to interact with token pools on Canton.
-  version: 0.0.1
+  version: 1.0.0
 
 paths:
   /ccip/v1/external/tokenPool/{address}/send:
@@ -124,10 +124,13 @@ components:
       type: object
       required:
         - encodedMessage
+        - receiver
       properties:
         encodedMessage:
           type: string
           description: The CCIP message to be executed, encoded as a hex string.
+        receiver:
+          $ref: "../common/eds-common.yaml#/components/schemas/PartyId"
     TokenPoolExecuteResponse:
       type: object
       required:

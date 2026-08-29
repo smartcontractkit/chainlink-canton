@@ -7,8 +7,10 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/go-daml/pkg/types"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
@@ -25,9 +27,11 @@ func GetCCVExecuteDisclosure(
 	ccvAPIClient oapiCCV.ClientWithResponsesInterface,
 	encodedMessageHex string,
 	ccvAddress contracts.InstanceAddress,
+	receiver types.PARTY,
 ) (*CCVExecuteDisclosure, error) {
 	resp, err := ccvAPIClient.PostCCVExecuteWithResponse(ctx, ccvAddress.String(), oapiCCV.CCVExecuteRequest{
 		EncodedMessage: encodedMessageHex,
+		Receiver:       string(receiver),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error calling CCVExecute: %w", err)

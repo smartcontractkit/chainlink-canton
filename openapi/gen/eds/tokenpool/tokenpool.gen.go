@@ -22,6 +22,9 @@ import (
 type TokenPoolExecuteRequest struct {
 	// EncodedMessage The CCIP message to be executed, encoded as a hex string.
 	EncodedMessage string `json:"encodedMessage"`
+
+	// Receiver The unique identifier of a party.
+	Receiver externalRef0.PartyId `json:"receiver"`
 }
 
 // TokenPoolExecuteResponse defines model for TokenPoolExecuteResponse.

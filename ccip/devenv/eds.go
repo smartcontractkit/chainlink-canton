@@ -21,8 +21,9 @@ import (
 	cldfdeployment "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/deployment"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
@@ -112,7 +113,7 @@ func (c *Chain) GetExecutorSendDisclosure(ctx context.Context, message oapiCommo
 	return edsTesthelpers.GetExecutorSendDisclosure(ctx, executorAPIClient, message, executorAddress, ccvAddresses)
 }
 
-func (c *Chain) GetTokenPoolExecuteDisclosure(ctx context.Context, encodedMessageHex string, tokenPoolAddress contracts.InstanceAddress) (*edsTesthelpers.TokenPoolExecuteDisclosure, error) {
+func (c *Chain) GetTokenPoolExecuteDisclosure(ctx context.Context, encodedMessageHex string, tokenPoolAddress contracts.InstanceAddress, receiver types.PARTY) (*edsTesthelpers.TokenPoolExecuteDisclosure, error) {
 	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
@@ -122,10 +123,10 @@ func (c *Chain) GetTokenPoolExecuteDisclosure(ctx context.Context, encodedMessag
 		return nil, fmt.Errorf("failed to create Token Pool EDS client: %w", err)
 	}
 
-	return edsTesthelpers.GetTokenPoolExecuteDisclosure(ctx, tokenPoolAPIClient, encodedMessageHex, tokenPoolAddress)
+	return edsTesthelpers.GetTokenPoolExecuteDisclosure(ctx, tokenPoolAPIClient, encodedMessageHex, tokenPoolAddress, receiver)
 }
 
-func (c *Chain) GetCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex string) (*edsTesthelpers.CCIPExecuteDisclosure, error) {
+func (c *Chain) GetCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex string, receiver types.PARTY) (*edsTesthelpers.CCIPExecuteDisclosure, error) {
 	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
@@ -135,10 +136,10 @@ func (c *Chain) GetCCIPExecuteDisclosure(ctx context.Context, encodedMessageHex 
 		return nil, fmt.Errorf("failed to create CCIP EDS client: %w", err)
 	}
 
-	return edsTesthelpers.GetCCIPExecuteDisclosure(ctx, ccipAPIClient, encodedMessageHex)
+	return edsTesthelpers.GetCCIPExecuteDisclosure(ctx, ccipAPIClient, encodedMessageHex, receiver)
 }
 
-func (c *Chain) GetCCVExecuteDisclosure(ctx context.Context, encodedMessageHex string, ccvAddress contracts.InstanceAddress) (*edsTesthelpers.CCVExecuteDisclosure, error) {
+func (c *Chain) GetCCVExecuteDisclosure(ctx context.Context, encodedMessageHex string, ccvAddress contracts.InstanceAddress, receiver types.PARTY) (*edsTesthelpers.CCVExecuteDisclosure, error) {
 	edsURL, err := deployment.GetEDSURL(c.e.DataStore)
 	if err != nil {
 		return nil, err
@@ -148,7 +149,7 @@ func (c *Chain) GetCCVExecuteDisclosure(ctx context.Context, encodedMessageHex s
 		return nil, fmt.Errorf("failed to create CCV EDS client: %w", err)
 	}
 
-	return edsTesthelpers.GetCCVExecuteDisclosure(ctx, ccvAPIClient, encodedMessageHex, ccvAddress)
+	return edsTesthelpers.GetCCVExecuteDisclosure(ctx, ccvAPIClient, encodedMessageHex, ccvAddress, receiver)
 }
 
 const (

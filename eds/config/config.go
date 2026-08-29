@@ -5,13 +5,14 @@ import (
 	"io"
 	"maps"
 	"reflect"
+	"time"
 
 	"dario.cat/mergo"
 	"github.com/BurntSushi/toml"
 	"github.com/go-playground/validator/v10"
 
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 func DefaultConfig() *Config {
@@ -29,6 +30,9 @@ func DefaultConfig() *Config {
 		CCVAPIConfig:       CCVAPIConfig{},
 		ExecutorAPIConfig:  ExecutorAPIConfig{},
 		TokenPoolAPIConfig: TokenPoolAPIConfig{},
+		TokenStandardAPIConfig: TokenStandardAPIConfig{
+			SupplyCacheTTL: time.Second * 10,
+		},
 	}
 }
 
@@ -114,28 +118,21 @@ const (
 type FactoryType string
 
 const (
-	FactoryTypeDisabled FactoryType = ""
-	FactoryTypeAddress  FactoryType = "address"
-	FactoryTypeURL      FactoryType = "url"
+	FactoryTypeDisabled    FactoryType = ""
+	FactoryTypeAddress     FactoryType = "address"
+	FactoryTypeURL         FactoryType = "url"
+	FactoryTypeURLRequests FactoryType = "urlRequests"
 )
 
-type TransferFactory struct {
-	Type FactoryType `toml:"type" validate:"oneof='' address url"`
+type Factory struct {
+	Type FactoryType `toml:"type" validate:"oneof='' address url urlRequests"`
 
 	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
 	Party           *string                    `toml:"party" validate:"required_if=Type address"`
 	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
 
-	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"excluded_unless=Type url,required_if=Type url,omitnil,url"`
-	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url"`
-}
-
-type BurnMintFactory struct {
-	Type FactoryType `toml:"type" validate:"oneof='' address"`
-
-	TemplateId      *string                    `toml:"template_id" validate:"required_if=Type address"`
-	Party           *string                    `toml:"party" validate:"required_if=Type address"`
-	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
+	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests,required_if=Type url,required_if=Type urlRequests,omitnil,url"`
+	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests"`
 }
 
 type TokenPool struct {
@@ -145,8 +142,7 @@ type TokenPool struct {
 	// The owner party of the token pool.
 	PoolOwner string `toml:"pool_owner" validate:"required"`
 
-	TransferFactory     *TransferFactory     `toml:"transfer_factory" validate:"excluded_unless=Type lockRelease"`
-	BurnMintFactory     *BurnMintFactory     `toml:"burn_mint_factory" validate:"excluded_unless=Type burnMint"`
+	Factory             *Factory             `toml:"factory" validate:"omitnil"`
 	TransferPreapproval *TransferPreapproval `toml:"transfer_preapproval" validate:"omitnil"`
 }
 
@@ -171,14 +167,19 @@ const (
 
 type Registry struct {
 	ContractIdentifier
-	TokenType TokenType `toml:"token_type" validate:"required,oneof=LINK"`
-	TokenId   string    `toml:"token_id" validate:"required"`
+	TokenType   TokenType `toml:"token_type" validate:"required,oneof=LINK"`
+	TokenId     string    `toml:"token_id" validate:"required"`
+	TokenName   string    `toml:"token_name"`
+	TokenSymbol string    `toml:"token_symbol"`
 }
 
 type TokenStandardAPIConfig struct {
-	Enabled    bool                `toml:"enabled"`
-	Admin      string              `toml:"admin" validate:"required_if=Enabled true"`
-	Registries map[string]Registry `toml:"registries" validate:"required_if=Enabled true,dive"`
+	Enabled bool `toml:"enabled"`
+	// The duration for which to cache a token's totalSupply.
+	// Defaults to 10 seconds if not specified.
+	SupplyCacheTTL time.Duration       `toml:"supply_cache_ttl"`
+	Admin          string              `toml:"admin" validate:"required_if=Enabled true"`
+	Registries     map[string]Registry `toml:"registries" validate:"required_if=Enabled true,dive"`
 }
 
 // ContractIdentifier uniquely identifies a contract using an InstanceAddress.

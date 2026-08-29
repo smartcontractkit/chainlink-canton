@@ -18,5 +18,6 @@ services:
           {url: '/openapi/eds/ccv/eds-ccv.yaml', name: 'EDS - CCV'},
           {url: '/openapi/eds/executor/eds-executor.yaml', name: 'EDS - Executor'},
           {url: '/openapi/eds/global/eds-global.yaml', name: 'EDS - Global'},
-          {url: '/openapi/eds/tokenpool/eds-tokenpool.yaml', name: 'EDS - Token Pool'}
+          {url: '/openapi/eds/tokenpool/eds-tokenpool.yaml', name: 'EDS - Token Pool'},
+          {url: '/openapi/daRegistry/da-registry-backend-api.yaml', name: 'DA Registry Backend API'}
         ]"

@@ -20,15 +20,15 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/events"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/finality"
@@ -67,6 +67,7 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 	c.AddCommand(newCantonSendMessageCmd(g))
 	c.AddCommand(newCantonSendTokenCmd(g))
 	c.AddCommand(newCantonExecuteCmd(g))
+	c.AddCommand(newCantonSyncReceiverCCVCmd(g))
 	c.AddCommand(newCantonListEventsCmd(g))
 	c.AddCommand(newCantonListHoldingsCmd(g))
 	c.AddCommand(newCantonCreateTransferCmd(g))
@@ -403,6 +404,41 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 	return c
 }
 
+func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
+	var (
+		requiredCCV  string
+		finalityName string
+	)
+	c := &cobra.Command{
+		Use:   "sync-receiver-ccv",
+		Short: "Deploy or update CCIPReceiver required CCVs (run once before inbound load/e2e on prod)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			b, err := g.Resolve(ctx)
+			if err != nil {
+				return err
+			}
+			fin, err := finality.Parse(finalityName)
+			if err != nil {
+				return err
+			}
+			raw, err := contracts.RawInstanceAddressFromString(requiredCCV)
+			if err != nil {
+				return fmt.Errorf("parse --required-ccv: %w", err)
+			}
+
+			_, err = cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, raw)
+
+			return err
+		},
+	}
+	c.Flags().StringVar(&requiredCCV, "required-ccv", "", "Canton committee verifier raw address (instanceId@owner)")
+	c.Flags().StringVar(&finalityName, "finality", "1", "receiver finality profile: finality|safe|1-65535")
+	_ = c.MarkFlagRequired("required-ccv")
+
+	return c
+}
+
 func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierResult, fin finality.Parsed) error {
 	withToken := vr.Message.TokenTransfer != nil
 
@@ -416,11 +452,12 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		return fmt.Errorf("parse VerifierDestAddress: %w", err)
 	}
 
-	ccipExecuteDisclosure, err := eds.GetCCIPExecuteDisclosure(ctx, b.CCIPEDS, encodedHex)
+	receiverParty := types.PARTY(b.Participant.PartyID)
+	ccipExecuteDisclosure, err := eds.GetCCIPExecuteDisclosure(ctx, b.CCIPEDS, encodedHex, receiverParty)
 	if err != nil {
 		return fmt.Errorf("CCIP execute disclosure: %w", err)
 	}
-	ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, b.CCVEDS, encodedHex, verifierRawAddress.InstanceAddress())
+	ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, b.CCVEDS, encodedHex, verifierRawAddress.InstanceAddress(), receiverParty)
 	if err != nil {
 		return fmt.Errorf("CCV execute disclosure: %w", err)
 	}
@@ -447,7 +484,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		if err != nil {
 			return fmt.Errorf("get token pool: %w", err)
 		}
-		tokenPoolExecuteDisclosure, err := eds.GetTokenPoolExecuteDisclosure(ctx, b.TokenPoolEDS, encodedHex, tokenPoolAddress.InstanceAddress())
+		tokenPoolExecuteDisclosure, err := eds.GetTokenPoolExecuteDisclosure(ctx, b.TokenPoolEDS, encodedHex, tokenPoolAddress.InstanceAddress(), receiverParty)
 		if err != nil {
 			return fmt.Errorf("token pool execute disclosure: %w", err)
 		}
@@ -486,7 +523,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 					ChoiceArgument: ledger.MapToValue(executeArgs),
 				}},
 			}},
-			ActAs:              []string{b.Participant.PartyID},
+			ActAs:              []string{string(receiverParty)},
 			DisclosedContracts: allDisclosures,
 		},
 	})
@@ -711,7 +748,12 @@ func cantonSend(
 		},
 		GasLimit: gasLimit,
 		Payload:  hex.EncodeToString(payload),
+		Sender:   b.Participant.PartyID,
 		Receiver: hex.EncodeToString(receiver.Bytes()),
+	}
+	tokenTransferHoldings := make([]string, len(tokenTransferInputCids))
+	for i, cid := range tokenTransferInputCids {
+		tokenTransferHoldings[i] = string(cid)
 	}
 	if withToken {
 		msg.TokenTransfer = &oapiCommon.TokenTransfer{
@@ -720,6 +762,7 @@ func cantonSend(
 				Admin: oapiCommon.PartyId(linkInstrumentId.Admin),
 				Id:    string(linkInstrumentId.Id),
 			},
+			HoldingContractIds: new(tokenTransferHoldings),
 		}
 	}
 

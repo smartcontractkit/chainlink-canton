@@ -29,6 +29,17 @@ jobs:
           chmod +x ./contracts/scripts/check-frozen-release-artifacts.sh
           ./contracts/scripts/check-frozen-release-artifacts.sh "origin/${GITHUB_BASE_REF}"
 
+  upgrade-check:
+    name: Run upgrade checks for all Dars
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+      - name: Run upgrades check
+        run: make upgrade-check
+
   compile-contracts:
     name: Compile Contracts
     runs-on: ubuntu-latest
@@ -105,7 +116,9 @@ jobs:
       - name: Install DPM
         uses: ./.github/actions/install-dpm
       - name: Test Daml Contracts
-        run: go run ./contracts/cmd/test --root ./contracts --plain --output ./summary.md
+        working-directory: contracts
+        run: go run ./cmd/test --root . --plain --output ./summary.md
       - name: Output test summary
         if: always()
+        working-directory: contracts
         run: cat summary.md >$GITHUB_STEP_SUMMARY

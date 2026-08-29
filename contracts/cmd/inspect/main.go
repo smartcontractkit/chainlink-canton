@@ -1,6 +1,3 @@
-// Cannot currently import due to github.com/nao1215/markdown colliding with chainlink-ccv
-//go:build ignore
-
 package main
 
 import (
