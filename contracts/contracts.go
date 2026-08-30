@@ -51,6 +51,7 @@ const (
 	CCIPLockReleaseTokenPoolV2 = Package("ccip-lock-release-token-pool-v2")
 	CCIPBurnMintTokenPoolV2    = Package("ccip-burn-mint-token-pool-v2")
 	CCIPFactoryV2              = Package("ccip-factory-v2")
+	CCIPFeeTreasury            = Package("ccip-fee-treasury")
 
 	// CCIP - Legacy
 
@@ -176,6 +177,7 @@ var Versions map[Package][]string = map[Package][]string{
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
 	MCMSTest:                              []string{DevVersion},
+	CCIPFeeTreasury:                       []string{DevVersion},
 	SpliceApiFeaturedAppV1:                []string{"1.0.0"},
 	SpliceApiTokenAllocationV1:            []string{"1.0.0"},
 	SpliceApiTokenAllocationInstructionV1: []string{"1.0.0"},
@@ -371,6 +373,7 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2: []string{"ccip", "lockreleasetokenpool"},
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
+	CCIPFeeTreasury:            []string{"ccip", "feetreasury"},
 
 	SpliceApiFeaturedAppV1:                []string{"splice", "splice_api_featured_app_v1"},
 	SpliceApiTokenAllocationV1:            []string{"splice", "splice_api_token_allocation_v1"},

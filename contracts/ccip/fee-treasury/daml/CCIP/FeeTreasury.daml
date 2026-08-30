@@ -1,0 +1,172 @@
+-- Two-phase design:
+--   1. feeOwner -> MCMSFeeTreasury.AuthorizeFeeWithdrawal
+--      Creates a FeeWithdrawalAuthorization capturing the approved policy (recipient,
+--      instrument, amount cap, expiry).
+--   2. anyone -> FeeWithdrawalAuthorization.ExecuteFeeWithdrawal
+--      Supplies live ContractIds (holdings, TransferFactory) + ExtraArgs (disclosed
+--      mining-round context). Not subject to MCMS validateTargetCidsSize cap.
+module CCIP.FeeTreasury where
+
+import DA.Crypto.Text (byteCount)
+import DA.Map qualified as Map
+import DA.Time (addRelTime, seconds)
+
+import Splice.Api.Token.HoldingV1 (Holding, InstrumentId(..))
+import Splice.Api.Token.MetadataV1 (ExtraArgs, emptyMetadata)
+import Splice.Api.Token.TransferInstructionV1 (
+    Transfer(..),
+    TransferFactory,
+    TransferFactory_Transfer(..),
+    TransferInstructionResult,
+    TransferInstructionResult_Output(..),
+    )
+
+import Chainlink.InstanceAddress qualified as RawInstanceAddress
+import Chainlink.InstanceAddress (assertValidInstanceId)
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
+import CCIP.FeeTreasuryTypes (AuthorizeFeeWithdrawalParams(..))
+import CCIP.FeeTreasuryCodecGen (decodeAuthorizeFeeWithdrawalParamsAt)
+
+template MCMSFeeTreasury
+    with
+        instanceId     : Text
+        feeOwner       : Party
+        mcmsController : Party
+    where
+        signatory feeOwner
+        observer mcmsController
+
+        ensure assertValidInstanceId instanceId
+
+        -- Nonconsuming: authorizing does not mutate the treasury. The single-use
+        -- capability is the created FeeWithdrawalAuthorization contract itself (its
+        -- ContractId), consumed by ExecuteFeeWithdrawal, WithdrawAuthorization, or
+        -- CleanupExpiredAuthorization.
+        nonconsuming choice AuthorizeFeeWithdrawal : ContractId FeeWithdrawalAuthorization
+            with
+                params : AuthorizeFeeWithdrawalParams
+            controller feeOwner
+            do
+                now <- getTime
+                let expiresAt = now `addRelTime` seconds params.validitySecs
+                create FeeWithdrawalAuthorization with
+                    instanceId     = params.authorizationId
+                    feeOwner
+                    mcmsController
+                    recipient    = params.recipient
+                    instrumentId = params.instrumentId
+                    maxAmount    = params.maxAmount
+                    expiresAt
+
+        interface instance MCMSReceiver for MCMSFeeTreasury where
+            view = MCMSReceiverView with
+                mcmsController
+                instanceId
+
+            mcmsEntrypoint functionName operationData contractIds = do
+                let instAddr = RawInstanceAddress.makeText instanceId feeOwner
+                selfCid <- case Map.lookup instAddr contractIds of
+                    None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+                    Some cid -> pure (coerceContractId cid : ContractId MCMSFeeTreasury)
+
+                case functionName of
+                    "AuthorizeFeeWithdrawal" -> do
+                        case decodeAuthorizeFeeWithdrawalParamsAt operationData 0 of
+                            None -> abort "E_INVALID_PARAMS: AuthorizeFeeWithdrawal"
+                            Some (params, finalOffset) -> do
+                                assertMsg "E_TRAILING_BYTES: AuthorizeFeeWithdrawal" (finalOffset == byteCount operationData)
+                                _ <- exercise selfCid AuthorizeFeeWithdrawal with params
+                                -- AuthorizeFeeWithdrawal is nonconsuming: the treasury CID is
+                                -- unchanged, so the contractIds map is returned as-is.
+                                pure contractIds
+                    _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+
+-- | Single-use MCMS-approved authorization to withdraw fees from feeOwner.
+-- Anyone can submit ExecuteFeeWithdrawal — security comes from the locked policy
+-- (recipient, instrument, amount cap, expiry), not from restricting who calls it.
+-- instanceId makes this authorization independently addressable by MCMS for cancellation.
+template FeeWithdrawalAuthorization
+    with
+        instanceId     : Text
+        feeOwner       : Party
+        mcmsController : Party
+        recipient      : Party
+        instrumentId   : InstrumentId
+        maxAmount      : Decimal
+        expiresAt      : Time
+    where
+        signatory feeOwner
+        observer recipient, mcmsController
+
+        ensure assertValidInstanceId instanceId
+
+        -- | Execute the MCMS-approved withdrawal with live CIDs and disclosed context.
+        choice ExecuteFeeWithdrawal : TransferInstructionResult
+            with
+                submitter           : Party
+                transferFactoryCid  : ContractId TransferFactory
+                inputHoldingCids    : [ContractId Holding]
+                amount              : Decimal
+                extraArgs           : ExtraArgs
+                requestedAt         : Time
+            controller submitter
+            do
+                now <- getTime
+                assertMsg "feetreasury: requestedAt is in the future" (requestedAt <= now)
+                assertMsg "feetreasury: withdrawal authorization expired" (now < expiresAt)
+                assertMsg "feetreasury: amount exceeds authorized cap" (amount <= maxAmount)
+                assertMsg "feetreasury: amount must be positive" (amount > 0.0)
+                assertMsg "feetreasury: input holdings must not be empty" (not (null inputHoldingCids))
+
+                result <- exercise transferFactoryCid TransferFactory_Transfer with
+                    expectedAdmin = instrumentId.admin
+                    transfer = Transfer with
+                        sender           = feeOwner
+                        receiver         = recipient
+                        amount
+                        instrumentId
+                        requestedAt
+                        executeBefore    = expiresAt
+                        inputHoldingCids
+                        meta             = emptyMetadata
+                    extraArgs
+
+                case result.output of
+                    TransferInstructionResult_Failed ->
+                        abort "feetreasury: token transfer failed"
+                    _ -> pure result
+
+        -- | Cancel an unused authorization (e.g. after expiry or policy change).
+        choice WithdrawAuthorization : ()
+            controller feeOwner
+            do pure ()
+
+        -- | Archive an expired authorization without requiring feeOwner authority.
+        choice CleanupExpiredAuthorization : ()
+            with
+                submitter : Party
+            controller submitter
+            do
+                now <- getTime
+                assertMsg "feetreasury: withdrawal authorization not expired" (now >= expiresAt)
+
+        interface instance MCMSReceiver for FeeWithdrawalAuthorization where
+            view = MCMSReceiverView with
+                mcmsController
+                instanceId
+
+            mcmsEntrypoint functionName operationData contractIds = do
+                let instAddr = RawInstanceAddress.makeText instanceId feeOwner
+                selfCid <- case Map.lookup instAddr contractIds of
+                    None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+                    Some cid -> pure (coerceContractId cid : ContractId FeeWithdrawalAuthorization)
+
+                case functionName of
+                    "WithdrawAuthorization" -> do
+                        assertMsg "E_TRAILING_BYTES: WithdrawAuthorization" (byteCount operationData == 0)
+                        _ <- exercise selfCid WithdrawAuthorization
+                        pure (Map.delete instAddr contractIds)
+                    _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

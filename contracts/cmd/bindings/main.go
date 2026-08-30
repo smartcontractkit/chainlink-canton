@@ -114,6 +114,7 @@ func main() {
 		DecimalFields: map[string]bool{
 			"usdPerUnitGas": true, // FeeQuoter gas price updates
 			"usdPerToken":   true, // FeeQuoter token price updates
+			"maxAmount":     true, // MCMSFeeTreasury AuthorizeFeeWithdrawal cap
 		},
 		VariantTagByteMap: map[string]map[string]byte{
 			"CCIP.LockReleaseTokenPoolV2Types.TransferTimeout": {
