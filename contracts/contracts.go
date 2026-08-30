@@ -177,7 +177,7 @@ var Versions map[Package][]string = map[Package][]string{
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
 	MCMSTest:                              []string{DevVersion},
-	CCIPFeeTreasury: []string{DevVersion},
+	CCIPFeeTreasury:                       []string{DevVersion},
 	SpliceApiFeaturedAppV1:                []string{"1.0.0"},
 	SpliceApiTokenAllocationV1:            []string{"1.0.0"},
 	SpliceApiTokenAllocationInstructionV1: []string{"1.0.0"},

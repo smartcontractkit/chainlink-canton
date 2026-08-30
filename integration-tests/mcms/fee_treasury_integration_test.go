@@ -14,14 +14,14 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/feetreasury"
-	mcmsApi "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/api"
-	mcmsCore "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/mcms/core"
-	splice "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-	metadatav1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	transferv1 "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_transfer_instruction_v1"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	bindings "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/feetreasury"
+	mcmsApi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/api"
+	mcmsCore "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/core"
+	splice "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
+	metadatav1 "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
+	transferv1 "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -76,7 +76,7 @@ func TestFeeTreasury_WithdrawFeesEndToEndViaMCMS(t *testing.T) {
 	feeContract := feetreasury.NewContract(fmt.Sprintf("#%s", feetreasury.PackageName), "CCIP.FeeTreasury", "MCMSFeeTreasury")
 	authorizationID := "fee-withdrawal-itest-" + uuid.New().String()[:8]
 	encoded, err := feeContract.Encoder().AuthorizeFeeWithdrawalParams(feetreasury.AuthorizeFeeWithdrawalParams{
-		AuthorizationId: authorizationID,
+		AuthorizationId: types.TEXT(authorizationID),
 		Recipient:       types.PARTY(recipient),
 		InstrumentId:    instrumentID,
 		MaxAmount:       types.NUMERIC("500"),
