@@ -63,7 +63,8 @@ func TestPoolDiscoveryService_CheckForNewPools(t *testing.T) {
 
 	svc.checkForNewPools(t.Context())
 
-	assert.True(t, svc.discoveredPools[wantAddress], "pool should be discovered under the instanceId+poolOwner derived address")
+	_, discovered := svc.discoveredPools[wantAddress]
+	assert.True(t, discovered, "pool should be discovered under the instanceId+poolOwner derived address")
 
 	// Registering must have used the pool's own owner, not the observer party.
 	mockStore.EXPECT().Get(wantAddress).Return(activeContract, true)
@@ -115,7 +116,8 @@ func TestPoolDiscoveryService_CheckForNewPools_LockRelease(t *testing.T) {
 
 	svc.checkForNewPools(t.Context())
 
-	assert.True(t, svc.discoveredPools[wantAddress], "lock release pool should be discovered under the instanceId+poolOwner derived address")
+	_, discovered := svc.discoveredPools[wantAddress]
+	assert.True(t, discovered, "lock release pool should be discovered under the instanceId+poolOwner derived address")
 
 	mockStore.EXPECT().Get(wantAddress).Return(activeContract, true)
 	res := server.FilterContracts([]contracts.InstanceAddress{wantAddress})

@@ -778,16 +778,13 @@ func (s *Server) FilterContracts(addresses []contracts.InstanceAddress) []contra
 }
 
 // RegisterDiscoveredPool builds a ContractConfig for poolConfig and adds it to contractConfigs,
-// making the pool servable by PostTokenPoolSend/PostTokenPoolExecute without a restart. A no-op
-// if the pool's address is already registered.
+// making the pool servable by PostTokenPoolSend/PostTokenPoolExecute without a restart. Always
+// overwrites any existing entry for the same address - the caller (PoolDiscoveryService) is
+// responsible for only calling this for a genuinely new-or-newer pool, since InstanceIds aren't
+// guaranteed unique and a later-created pool should win over an earlier one at the same address.
 func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.TokenPool) error {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-
-	// Check if already registered
-	if _, ok := s.contractConfigs[poolConfig.InstanceAddress]; ok {
-		return nil // Already registered
-	}
 
 	contractConfig := ContractConfig{
 		Type:  poolConfig.Type,

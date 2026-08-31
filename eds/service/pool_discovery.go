@@ -26,8 +26,12 @@ type PoolDiscoveryService struct {
 	activeContractStore store.ActiveContractStoreInterface
 	tokenPoolServer     *tokenpool.Server
 	observerParty       types.PARTY
-	discoveredPools     map[contracts.InstanceAddress]bool
-	mux                 sync.Mutex
+	// discoveredPools tracks the ledger offset of the contract currently registered for each
+	// address. InstanceIds aren't guaranteed unique, so two distinct contracts can derive the
+	// same address; the offset lets a later-created contract always win, regardless of the
+	// (effectively random) order poll results are processed in.
+	discoveredPools map[contracts.InstanceAddress]int64
+	mux             sync.Mutex
 }
 
 // NewPoolDiscoveryService creates a new pool discovery service.
@@ -67,7 +71,7 @@ func NewPoolDiscoveryService(
 		activeContractStore: activeContractStore,
 		tokenPoolServer:     tokenPoolServer,
 		observerParty:       types.PARTY(observerPartyID),
-		discoveredPools:     make(map[contracts.InstanceAddress]bool),
+		discoveredPools:     make(map[contracts.InstanceAddress]int64),
 	}
 }
 
@@ -107,7 +111,7 @@ func (s *PoolDiscoveryService) checkBurnMintPools(ctx context.Context) {
 			s.logger.Err(err).Msg("failed to parse burn mint token pool")
 			continue
 		}
-		s.registerIfNew(ctx, pool.Address, config.TokenPoolTypeBurnMint)
+		s.registerIfNewer(ctx, pool.Address, activeContract.GetCreatedEvent().GetOffset(), config.TokenPoolTypeBurnMint)
 	}
 }
 
@@ -123,15 +127,17 @@ func (s *PoolDiscoveryService) checkLockReleasePools(ctx context.Context) {
 			s.logger.Err(err).Msg("failed to parse lock release token pool")
 			continue
 		}
-		s.registerIfNew(ctx, pool.Address, config.TokenPoolTypeLockRelease)
+		s.registerIfNewer(ctx, pool.Address, activeContract.GetCreatedEvent().GetOffset(), config.TokenPoolTypeLockRelease)
 	}
 }
 
-// registerIfNew registers a discovered pool if it has not already been discovered.
+// registerIfNewer registers a discovered pool if its ledger offset is newer than whatever is
+// currently registered for the same address, so a later-created contract always wins over an
+// earlier one that happens to derive the same address (see discoveredPools).
 // Caller must hold s.mux.
-func (s *PoolDiscoveryService) registerIfNew(ctx context.Context, rawAddress contracts.RawInstanceAddress, poolType config.TokenPoolType) {
+func (s *PoolDiscoveryService) registerIfNewer(ctx context.Context, rawAddress contracts.RawInstanceAddress, offset int64, poolType config.TokenPoolType) {
 	address := rawAddress.InstanceAddress()
-	if s.discoveredPools[address] {
+	if existingOffset, ok := s.discoveredPools[address]; ok && existingOffset >= offset {
 		return
 	}
 
@@ -140,7 +146,7 @@ func (s *PoolDiscoveryService) registerIfNew(ctx context.Context, rawAddress con
 		return
 	}
 
-	s.discoveredPools[address] = true
+	s.discoveredPools[address] = offset
 	s.logger.Info().Stringer("address", address).Str("type", string(poolType)).Msg("discovered and registered new token pool")
 }
 
