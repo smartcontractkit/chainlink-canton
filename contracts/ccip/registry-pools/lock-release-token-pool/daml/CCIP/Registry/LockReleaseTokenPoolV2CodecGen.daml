@@ -15,6 +15,7 @@ import MCMS.Codec (
     decodeNumeric0At,
     decodeOptional,
     decodePartyAt,
+    decodePartyList,
     decodeTextAt,
     encodeBool,
     encodeBytesHex,
@@ -24,6 +25,7 @@ import MCMS.Codec (
     encodeNumeric0,
     encodeOptional,
     encodeParty,
+    encodePartyList,
     encodeText,
     encodeUint8,
     extractBytes
@@ -163,12 +165,12 @@ decodeRateLimitConfigArgsAt encoded offset = do
 encodeSetDynamicConfigParams : SetDynamicConfigParams -> BytesHex
 encodeSetDynamicConfigParams params =
     encodeOptional params.rateLimitAdmin encodeParty
-    <> encodeOptional params.observer encodeParty
+    <> encodePartyList params.observers
 
 decodeSetDynamicConfigParamsAt : BytesHex -> Int -> Optional (SetDynamicConfigParams, Int)
 decodeSetDynamicConfigParamsAt encoded offset = do
     (rateLimitAdmin, offset) <- decodeOptional encoded offset decodePartyAt
-    (observer, offset) <- decodeOptional encoded offset decodePartyAt
+    (observers, offset) <- decodePartyList encoded offset
     Some (SetDynamicConfigParams{..}, offset)
 
 

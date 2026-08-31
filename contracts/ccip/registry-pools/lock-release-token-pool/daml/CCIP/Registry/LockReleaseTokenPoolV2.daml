@@ -248,14 +248,14 @@ customFinalityRateLimiterRequired finalityConfig =
 deployRateLimiter
     : Party
     -> Text
-    -> Optional Party
+    -> [Party]
     -> Numeric 0
     -> CCIP.Registry.RateLimiterV2.RateLimitDirection
     -> CCIP.Registry.RateLimiterV2.RateLimitMode
     -> Time
     -> RateLimiterDeploySpec
     -> Update (ContractId CCIP.Registry.RateLimiterV2.RateLimiter)
-deployRateLimiter poolOwner poolInstanceId observer remoteChainSelector direction mode now spec =
+deployRateLimiter poolOwner poolInstanceId observers remoteChainSelector direction mode now spec =
     create CCIP.Registry.RateLimiterV2.RateLimiter with
         instanceId = spec.instanceId
         poolInstanceId
@@ -268,7 +268,7 @@ deployRateLimiter poolOwner poolInstanceId observer remoteChainSelector directio
         rate = spec.rate
         tokens = spec.capacity
         lastUpdated = now
-        observer
+        observers
 
 -- | Result of Initialize: the rate limiters deployed and the TokenConfig registered with TAR.
 data InitializeResult = InitializeResult
@@ -296,10 +296,10 @@ template LockReleaseTokenPool
         -- | Dynamic config
         -- Party capable of updating rate limits for this pool.
         rateLimitAdmin : Optional Party
-        -- Observer party used by the External Disclosure Service (EDS) to auto-detect this
+        -- Observer parties used by the External Disclosure Service (EDS) to auto-detect this
         -- pool. Set at creation or via SetDynamicConfig; cannot be added retroactively to a
         -- pool deployed on a package version that predates this field.
-        observer : Optional Party
+        observers : [Party]
 
         -- Remote chain config: remote token address, CCV requirements, and rate limiter requirements for each remote chain.
         -- Keyed by remote chain selector.
@@ -318,7 +318,7 @@ template LockReleaseTokenPool
         deps : LockReleaseTokenPoolDeps
     where
         signatory poolOwner
-        observer optional [] pure rateLimitAdmin <> optional [] pure observer
+        observer optional [] pure rateLimitAdmin <> observers
 
         ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
             && CCIP.CodecV2.Math.isValidTokenDecimals decimals
@@ -416,18 +416,18 @@ template LockReleaseTokenPool
         --
         -- Params:
         -- rateLimitAdmin: Optional party that can manage rate limits
-        -- observer: Optional party used by EDS to auto-detect this pool
+        -- observers: parties used by EDS to auto-detect this pool
         --
         -- Callable by poolOwner
         choice SetDynamicConfig : ContractId LockReleaseTokenPool
             with
                 rateLimitAdmin : Optional Party
-                observer : Optional Party
+                observers : [Party]
             controller poolOwner
             do
                 create this with
                     rateLimitAdmin = rateLimitAdmin
-                    observer = observer
+                    observers = observers
 
         -- Sets the remote chain configurations for the pool.
         -- 
@@ -526,13 +526,13 @@ template LockReleaseTokenPool
 
                 now <- getTime
                 chainUpdatesAndCids <- mapA (\lane -> do
-                    inboundCid <- deployRateLimiter poolOwner instanceId observer
+                    inboundCid <- deployRateLimiter poolOwner instanceId observers
                         lane.remoteChainSelector CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound
                         CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality now lane.inbound
-                    outboundCid <- deployRateLimiter poolOwner instanceId observer
+                    outboundCid <- deployRateLimiter poolOwner instanceId observers
                         lane.remoteChainSelector CCIP.Registry.RateLimiterV2.RateLimitDirection_Outbound
                         CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality now lane.outbound
-                    inboundCustomFinalityCid <- deployRateLimiter poolOwner instanceId observer
+                    inboundCustomFinalityCid <- deployRateLimiter poolOwner instanceId observers
                         lane.remoteChainSelector CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound
                         CCIP.Registry.RateLimiterV2.RateLimitMode_CustomFinality now lane.inboundCustomFinality
                     let chainUpdate = ChainUpdate with
@@ -1362,7 +1362,7 @@ template LockReleaseTokenPool
                             assertMsg "E_TRAILING_BYTES: SetDynamicConfig" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid SetDynamicConfig with
                                 rateLimitAdmin
-                                observer
+                                observers
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "ApplyChainUpdates" -> do
                     case decodeApplyChainUpdatesParamsAt operationData 0 of

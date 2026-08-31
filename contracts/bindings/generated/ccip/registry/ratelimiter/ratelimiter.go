@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-rate-limiter-v2"
-	PackageID   = "3a95e5a257115e0330ba1c22d084908d6f487289d75d01a59420c93e924dbe99"
+	PackageID   = "6856206c569bf6c13704eb5cd3fedecb64245fce1af80898b4ddf6580f51fa92"
 	SDKVersion  = "3.4.11"
 )
 
@@ -235,7 +235,7 @@ type RateLimiter struct {
 	Rate                types.NUMERIC      `json:"rate"`
 	Tokens              types.NUMERIC      `json:"tokens"`
 	LastUpdated         types.TIMESTAMP    `json:"lastUpdated"`
-	Observer            *types.PARTY       `json:"observer" hex:"optional"`
+	Observers           []types.PARTY      `json:"observers"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -291,17 +291,14 @@ func (t RateLimiter) CreateCommand() *model.CreateCommand {
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["lastUpdated"] = t.LastUpdated
 
-	if t.Observer != nil {
-		args["observer"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.Observer).ToMap(),
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
 		}
-	} else {
-		args["observer"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+		return res
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -352,17 +349,14 @@ func (t RateLimiter) CreateCommandWithPackageID(packageID string) *model.CreateC
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["lastUpdated"] = t.LastUpdated
 
-	if t.Observer != nil {
-		args["observer"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.Observer).ToMap(),
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
 		}
-	} else {
-		args["observer"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+		return res
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -457,23 +451,23 @@ func (t RateLimiter) ArchiveWithPackageID(contractID string, packageID string) *
 	}
 }
 
-// SetObserver exercises the SetObserver choice on this RateLimiter contract
+// SetObservers exercises the SetObservers choice on this RateLimiter contract
 // This method uses the package name in the template ID
-func (t RateLimiter) SetObserver(contractID string, args SetObserver) *model.ExerciseCommand {
+func (t RateLimiter) SetObservers(contractID string, args SetObservers) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Registry.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
-		Choice:     "SetObserver",
+		Choice:     "SetObservers",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// SetObserverWithPackageID exercises the SetObserver choice using the provided package ID instead of package name
-func (t RateLimiter) SetObserverWithPackageID(contractID string, packageID string, args SetObserver) *model.ExerciseCommand {
+// SetObserversWithPackageID exercises the SetObservers choice using the provided package ID instead of package name
+func (t RateLimiter) SetObserversWithPackageID(contractID string, packageID string, args SetObservers) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Registry.RateLimiterV2", "RateLimiter"),
 		ContractID: contractID,
-		Choice:     "SetObserver",
+		Choice:     "SetObservers",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -545,48 +539,44 @@ func (t *SetConfig) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// SetObserver is a Record type
-type SetObserver struct {
-	Observer *types.PARTY `json:"observer" hex:"optional"`
+// SetObservers is a Record type
+type SetObservers struct {
+	Observers []types.PARTY `json:"observers"`
 }
 
-// ToMap converts SetObserver to a map for DAML arguments
-func (t SetObserver) ToMap() map[string]any {
+// ToMap converts SetObservers to a map for DAML arguments
+func (t SetObservers) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	if t.Observer != nil {
-		m["observer"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.Observer).ToMap(),
+	m["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
 		}
-	} else {
-		m["observer"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+		return res
+	}()
 
 	return m
 }
 
-func (t SetObserver) MarshalJSON() ([]byte, error) {
+func (t SetObservers) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *SetObserver) UnmarshalJSON(data []byte) error {
+func (t *SetObservers) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes SetObserver to hex string (Canton MCMS format)
-func (t SetObserver) MarshalHex() (string, error) {
+// MarshalHex encodes SetObservers to hex string (Canton MCMS format)
+func (t SetObservers) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes SetObserver from hex string (Canton MCMS format)
-func (t *SetObserver) UnmarshalHex(data string) error {
+// UnmarshalHex decodes SetObservers from hex string (Canton MCMS format)
+func (t *SetObservers) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -596,7 +586,7 @@ func (t *SetObserver) UnmarshalHex(data string) error {
 type MCMSEncoder interface {
 	ConsumeCapacity(args ConsumeCapacity) (*bind.EncodedChoice, error)
 	SetConfig(args SetConfig) (*bind.EncodedChoice, error)
-	SetObserver(args SetObserver) (*bind.EncodedChoice, error)
+	SetObservers(args SetObservers) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -636,9 +626,9 @@ func (e *encoder) SetConfig(args SetConfig) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetConfig", args)
 }
 
-// SetObserver encodes parameters for the SetObserver choice.
-func (e *encoder) SetObserver(args SetObserver) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("SetObserver", args)
+// SetObservers encodes parameters for the SetObservers choice.
+func (e *encoder) SetObservers(args SetObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetObservers", args)
 }
 
 // Verify MCMSEncoder interface implementation

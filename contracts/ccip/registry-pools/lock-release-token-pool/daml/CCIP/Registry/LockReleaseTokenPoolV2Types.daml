@@ -76,7 +76,7 @@ data TransferTimeout
 data SetDynamicConfigParams = SetDynamicConfigParams
     with
         rateLimitAdmin : Optional Party
-        observer : Optional Party
+        observers : [Party]
     deriving (Eq, Show)
 
 -- | Params for ApplyChainUpdates choice
