@@ -299,7 +299,8 @@ template LockReleaseTokenPool
         -- Party capable of updating rate limits for this pool.
         rateLimitAdmin : Optional Party
         -- Observer parties used by the External Disclosure Service (EDS) to auto-detect this
-        -- pool. Set at creation or via SetObservers; cannot be added retroactively to a
+        -- pool. Mandatory - must contain at least one party, enforced by the ensure clause
+        -- below. Set at creation or via SetObservers; cannot be added retroactively to a
         -- pool deployed on a package version that predates this field.
         observers : [Party]
 
@@ -323,6 +324,7 @@ template LockReleaseTokenPool
         observer optional [] pure rateLimitAdmin <> observers
 
         ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
+            && not (null observers)
             && CCIP.CodecV2.Math.isValidTokenDecimals decimals
             && all
                 (\cfg -> CCIP.CodecV2.FinalityConfig.isValidFinalityConfig cfg.finalityConfig)
