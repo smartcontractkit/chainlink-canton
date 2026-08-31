@@ -406,7 +406,7 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 		CcipOwner:    types.PARTY(partyCCIP),
 		InstrumentId: linkInstrumentId,
 		Decimals:     10,
-		Observers:    nil,
+		Observers:    []types.PARTY{types.PARTY(partyCCIP)},
 		// Set directly at creation - Initialize only manages remoteChainConfigs/rate
 		// limiters/TAR registration, not the token-transfer fee overrides.
 		TokenTransferFeeConfigs: map[types.NUMERIC]registrybnm.TokenTransferFeeConfig2{

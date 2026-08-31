@@ -100,13 +100,15 @@ template RateLimiter
         tokens : Numeric 0
         lastUpdated : Time
         -- Observer parties used by the External Disclosure Service (EDS) to auto-detect this
-        -- rate limiter. Set at creation or via SetObservers; cannot be added retroactively
+        -- rate limiter. Mandatory - must contain at least one party, enforced by the ensure
+        -- clause below. Set at creation or via SetObservers; cannot be added retroactively
         -- to a rate limiter deployed on a package version that predates this field.
         observers : [Party]
     where
         signatory poolOwner
         observer observers
         ensure assertValidInstanceId instanceId
+            && not (null observers)
             && capacity >= 0.0
             && rate >= 0.0
             && tokens >= 0.0
