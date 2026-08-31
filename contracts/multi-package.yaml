@@ -33,7 +33,6 @@ packages:
   - ccip/registry-pools/burn-mint-token-pool
   - ccip/registry-pools/lock-release-token-pool
   - ccip/registry-pools/rate-limiter
-  - ccip/registry-pools/factory
   - ccip/registry-pools/test
 
   - test/interfaces

@@ -59,7 +59,6 @@ const (
 	CCIPRegistryBurnMintTokenPoolV2    = Package("ccip-registry-burn-mint-token-pool-v2")
 	CCIPRegistryLockReleaseTokenPoolV2 = Package("ccip-registry-lock-release-token-pool-v2")
 	CCIPRegistryRateLimiterV2          = Package("ccip-registry-rate-limiter-v2")
-	CCIPRegistryTokenPoolFactory       = Package("ccip-registry-token-pool-factory")
 
 	// CCIP - Legacy
 
@@ -186,7 +185,6 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPRegistryBurnMintTokenPoolV2:    []string{DevVersion},
 	CCIPRegistryLockReleaseTokenPoolV2: []string{DevVersion},
 	CCIPRegistryRateLimiterV2:          []string{DevVersion},
-	CCIPRegistryTokenPoolFactory:       []string{DevVersion},
 
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
@@ -390,7 +388,6 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPRegistryBurnMintTokenPoolV2:    []string{"ccip", "registry", "burnminttokenpool"},
 	CCIPRegistryLockReleaseTokenPoolV2: []string{"ccip", "registry", "lockreleasetokenpool"},
 	CCIPRegistryRateLimiterV2:          []string{"ccip", "registry", "ratelimiter"},
-	CCIPRegistryTokenPoolFactory:       []string{"ccip", "registry", "tokenpoolfactory"},
 
 	SpliceApiFeaturedAppV1:                []string{"splice", "splice_api_featured_app_v1"},
 	SpliceApiTokenAllocationV1:            []string{"splice", "splice_api_token_allocation_v1"},
