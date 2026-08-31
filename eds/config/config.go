@@ -33,6 +33,7 @@ func DefaultConfig() *Config {
 		TokenStandardAPIConfig: TokenStandardAPIConfig{
 			SupplyCacheTTL: time.Second * 10,
 		},
+		RegistryAPIConfig: RegistryAPIConfig{},
 	}
 }
 
@@ -49,6 +50,7 @@ type Config struct {
 	ExecutorAPIConfig      ExecutorAPIConfig      `toml:"executor_api"`
 	TokenPoolAPIConfig     TokenPoolAPIConfig     `toml:"token_pool_api"`
 	TokenStandardAPIConfig TokenStandardAPIConfig `toml:"token_standard_api"`
+	RegistryAPIConfig      RegistryAPIConfig      `toml:"registry_api"`
 }
 
 type ServerConfig struct {
@@ -154,7 +156,16 @@ type TransferPreapproval struct {
 type TokenPoolAPIConfig struct {
 	Enabled bool `toml:"enabled"`
 	// TokenPools is keyed by instance_address (contracts.InstanceAddress.Hex()) so layered configs merge per pool.
-	TokenPools map[string]TokenPool `toml:"token_pools" validate:"required_if=Enabled true,dive"`
+	// Not required_if=Enabled true: an instance running purely on registry-discovered pools may start with none.
+	TokenPools map[string]TokenPool `toml:"token_pools" validate:"dive"`
+}
+
+// RegistryAPIConfig configures EDS's registry observer party, used to detect Registry-deployed
+// token pools that name it as an observer. PartyID is EDS's own party - it is never a pool's
+// owner party, which is a separate, per-pool party EDS has no rights over.
+type RegistryAPIConfig struct {
+	Enabled bool   `toml:"enabled"`
+	PartyID string `toml:"party_id" validate:"required_if=Enabled true"`
 }
 
 // Token Standard API
