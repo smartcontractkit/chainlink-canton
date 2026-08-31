@@ -21,7 +21,6 @@ data-dependencies:
   - ../rate-limiter/.daml/dist/ccip-registry-rate-limiter-v2-2.0.1.dar
   - ../lock-release-token-pool/.daml/dist/ccip-registry-lock-release-token-pool-v2-2.1.1.dar
   - ../burn-mint-token-pool/.daml/dist/ccip-registry-burn-mint-token-pool-v2-2.1.1.dar
-  - ../factory/.daml/dist/ccip-registry-token-pool-factory-1.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

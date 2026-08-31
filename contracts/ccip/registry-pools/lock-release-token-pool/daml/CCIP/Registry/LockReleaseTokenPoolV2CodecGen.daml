@@ -4,7 +4,7 @@ module CCIP.Registry.LockReleaseTokenPoolV2CodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.Registry.LockReleaseTokenPoolV2Types (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimiterReferencesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), TransferTimeout(..))
+import CCIP.Registry.LockReleaseTokenPoolV2Types (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimiterReferencesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), RateLimiterDeploySpec(..), LaneDeploySpec(..), TransferTimeout(..))
 
 import MCMS.Codec (
     decodeBoolAt,
@@ -163,10 +163,12 @@ decodeRateLimitConfigArgsAt encoded offset = do
 encodeSetDynamicConfigParams : SetDynamicConfigParams -> BytesHex
 encodeSetDynamicConfigParams params =
     encodeOptional params.rateLimitAdmin encodeParty
+    <> encodeOptional params.observer encodeParty
 
 decodeSetDynamicConfigParamsAt : BytesHex -> Int -> Optional (SetDynamicConfigParams, Int)
 decodeSetDynamicConfigParamsAt encoded offset = do
     (rateLimitAdmin, offset) <- decodeOptional encoded offset decodePartyAt
+    (observer, offset) <- decodeOptional encoded offset decodePartyAt
     Some (SetDynamicConfigParams{..}, offset)
 
 
@@ -296,6 +298,56 @@ decodeRemovePoolReceiveContextValueParamsAt : BytesHex -> Int -> Optional (Remov
 decodeRemovePoolReceiveContextValueParamsAt encoded offset = do
     (contextKey, offset) <- decodeTextAt encoded offset
     Some (RemovePoolReceiveContextValueParams{..}, offset)
+
+
+-- ===============================================
+-- |              RateLimiterDeploySpec
+-- ===============================================
+
+encodeRateLimiterDeploySpec : RateLimiterDeploySpec -> BytesHex
+encodeRateLimiterDeploySpec params =
+    encodeText params.instanceId
+    <> encodeBool params.isEnabled
+    <> encodeNumeric0 params.capacity
+    <> encodeNumeric0 params.rate
+
+decodeRateLimiterDeploySpecAt : BytesHex -> Int -> Optional (RateLimiterDeploySpec, Int)
+decodeRateLimiterDeploySpecAt encoded offset = do
+    (instanceId, offset) <- decodeTextAt encoded offset
+    (isEnabled, offset) <- decodeBoolAt encoded offset
+    (capacity, offset) <- decodeNumeric0At encoded offset
+    (rate, offset) <- decodeNumeric0At encoded offset
+    Some (RateLimiterDeploySpec{..}, offset)
+
+
+-- ===============================================
+-- |              LaneDeploySpec
+-- ===============================================
+
+encodeLaneDeploySpec : LaneDeploySpec -> BytesHex
+encodeLaneDeploySpec params =
+    encodeNumeric0 params.remoteChainSelector
+    <> encodeBytesHexList params.remotePools
+    <> encodeBytesHex params.remoteTokenAddress
+    <> encodeList params.inboundCCVs encodeRawInstanceAddress
+    <> encodeList params.outboundCCVs encodeRawInstanceAddress
+    <> encodeRequestedFinality params.finalityConfig
+    <> encodeRateLimiterDeploySpec params.inbound
+    <> encodeRateLimiterDeploySpec params.outbound
+    <> encodeRateLimiterDeploySpec params.inboundCustomFinality
+
+decodeLaneDeploySpecAt : BytesHex -> Int -> Optional (LaneDeploySpec, Int)
+decodeLaneDeploySpecAt encoded offset = do
+    (remoteChainSelector, offset) <- decodeNumeric0At encoded offset
+    (remotePools, offset) <- decodeBytesHexList encoded offset
+    (remoteTokenAddress, offset) <- decodeBytesHexAt encoded offset
+    (inboundCCVs, offset) <- decodeList encoded offset decodeRawInstanceAddressAt
+    (outboundCCVs, offset) <- decodeList encoded offset decodeRawInstanceAddressAt
+    (finalityConfig, offset) <- decodeRequestedFinalityAt encoded offset
+    (inbound, offset) <- decodeRateLimiterDeploySpecAt encoded offset
+    (outbound, offset) <- decodeRateLimiterDeploySpecAt encoded offset
+    (inboundCustomFinality, offset) <- decodeRateLimiterDeploySpecAt encoded offset
+    Some (LaneDeploySpec{..}, offset)
 
 
 

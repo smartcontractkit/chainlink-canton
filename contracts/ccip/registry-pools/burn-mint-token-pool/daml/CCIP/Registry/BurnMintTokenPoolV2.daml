@@ -36,6 +36,8 @@ import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.CodecV2.MessageCodecV1
 import qualified CCIP.CodecV2.Math
 import qualified CCIP.CodecV2.Uint256
+import qualified CCIP.CoreV2.TokenAdminRegistry as TAR
+import CCIP.CoreV2.TokenAdminRegistryTypes (PoolRegistration(..))
 import qualified CCIP.EventsV2.Events
 import qualified CCIP.InterfacesV2.TokenPool
 import qualified CCIP.Registry.RateLimiterV2
@@ -69,6 +71,8 @@ import CCIP.Registry.BurnMintTokenPoolV2Types (
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
     RemovePoolReceiveContextValueParams(..),
+    RateLimiterDeploySpec(..),
+    LaneDeploySpec(..),
     )
 
 burnMintFactoryContextKey : Text
@@ -263,6 +267,38 @@ calculateFeeFromBps amount feeBps = CCIP.CodecV2.Math.mulDivDown amount feeBps b
 customFinalityRateLimiterRequired : CCIP.CodecV2.FinalityConfig.FinalityConfig -> Bool
 customFinalityRateLimiterRequired finalityConfig =
     CCIP.CodecV2.FinalityConfig.customFinalityRateLimiterRequired finalityConfig
+
+deployRateLimiter
+    : Party
+    -> Text
+    -> Optional Party
+    -> Numeric 0
+    -> CCIP.Registry.RateLimiterV2.RateLimitDirection
+    -> CCIP.Registry.RateLimiterV2.RateLimitMode
+    -> Time
+    -> RateLimiterDeploySpec
+    -> Update (ContractId CCIP.Registry.RateLimiterV2.RateLimiter)
+deployRateLimiter poolOwner poolInstanceId observer remoteChainSelector direction mode now spec =
+    create CCIP.Registry.RateLimiterV2.RateLimiter with
+        instanceId = spec.instanceId
+        poolInstanceId
+        poolOwner
+        remoteChainSelector
+        direction
+        mode
+        isEnabled = spec.isEnabled
+        capacity = spec.capacity
+        rate = spec.rate
+        tokens = spec.capacity
+        lastUpdated = now
+        observer
+
+-- | Result of Initialize: the rate limiters deployed and the TokenConfig registered with TAR.
+data InitializeResult = InitializeResult
+    with
+        rateLimiterCids : [ContractId CCIP.Registry.RateLimiterV2.RateLimiter]
+        tokenConfigCid : ContractId TAR.TokenConfig
+    deriving (Eq, Show)
 
 -- | Burn/mint token pool with dynamic CCV requirements per chain.
 template BurnMintTokenPool
@@ -482,6 +518,80 @@ template BurnMintTokenPool
                         chainsToAdd
                 create this with
                     remoteChainConfigs = remoteChainConfigsAdded
+
+        -- Runs the deploy+configure+register flow for this already-created pool: propose+accept
+        -- admin for the instrument if needed, deploy rate limiters and wire up lanes via
+        -- ApplyChainUpdates, and register with the shared TokenAdminRegistry - all as one atomic
+        -- operation, callable via a single CreateAndExercise ledger command right after create.
+        --
+        -- Only supports the self-issued/self-serve admin path: instrumentId.admin must equal
+        -- admin, since ProposeAdministrator requires caller == instrumentId.admin, and this
+        -- choice calls it with caller = admin. For instruments where the registry owner must
+        -- co-sign admin assignment, propose/accept admin separately first, then call this with
+        -- existingTokenConfigCid = Some (the resulting cid).
+        nonconsuming choice Initialize : InitializeResult
+            with
+                tokenAdminRegistryCid : ContractId TAR.TokenAdminRegistry
+                existingTokenConfigCid : Optional (ContractId TAR.TokenConfig)
+                admin : Party
+                lanes : [LaneDeploySpec]
+            controller poolOwner, admin
+            do
+                proposeResult <- exercise tokenAdminRegistryCid TAR.ProposeAdministrator with
+                    tokenConfigCid = existingTokenConfigCid
+                    instrumentId
+                    newAdmin = admin
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    caller = admin
+                acceptedTokenConfigCid <- exercise proposeResult.tokenAdminRegistryCid TAR.AcceptAdminRole with
+                    tokenConfigCid = proposeResult.tokenConfigCid
+                    instrumentId
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    caller = admin
+
+                now <- getTime
+                chainUpdatesAndCids <- mapA (\lane -> do
+                    inboundCid <- deployRateLimiter poolOwner instanceId observer
+                        lane.remoteChainSelector CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound
+                        CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality now lane.inbound
+                    outboundCid <- deployRateLimiter poolOwner instanceId observer
+                        lane.remoteChainSelector CCIP.Registry.RateLimiterV2.RateLimitDirection_Outbound
+                        CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality now lane.outbound
+                    inboundCustomFinalityCid <- deployRateLimiter poolOwner instanceId observer
+                        lane.remoteChainSelector CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound
+                        CCIP.Registry.RateLimiterV2.RateLimitMode_CustomFinality now lane.inboundCustomFinality
+                    let chainUpdate = ChainUpdate with
+                            remoteChainSelector = lane.remoteChainSelector
+                            remotePools = lane.remotePools
+                            remoteTokenAddress = lane.remoteTokenAddress
+                            inboundCCVs = lane.inboundCCVs
+                            outboundCCVs = lane.outboundCCVs
+                            finalityConfig = lane.finalityConfig
+                            inboundRateLimiter = Chainlink.InstanceAddress.make lane.inbound.instanceId poolOwner
+                            inboundCustomBlockConfirmationsRateLimiter = Chainlink.InstanceAddress.make lane.inboundCustomFinality.instanceId poolOwner
+                            outboundRateLimiter = Chainlink.InstanceAddress.make lane.outbound.instanceId poolOwner
+                    pure (chainUpdate, [inboundCid, outboundCid, inboundCustomFinalityCid])
+                    ) lanes
+
+                let chainUpdates = map fst chainUpdatesAndCids
+                    rateLimiterCids = concat (map snd chainUpdatesAndCids)
+
+                _ <- exercise self ApplyChainUpdates with
+                    remoteChainSelectorsToRemove = []
+                    chainsToAdd = chainUpdates
+
+                newTokenConfigCid <- exercise proposeResult.tokenAdminRegistryCid TAR.SetPool with
+                    tokenConfigCid = acceptedTokenConfigCid
+                    instrumentId
+                    tokenPool = Some PoolRegistration with
+                        poolOwner
+                        poolInstanceId = instanceId
+                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                    caller = admin
+
+                pure InitializeResult with
+                    rateLimiterCids
+                    tokenConfigCid = newTokenConfigCid
 
         -- Updates the token transfer fee configurations for specified destination chains.
         -- 

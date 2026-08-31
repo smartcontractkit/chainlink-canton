@@ -138,3 +138,28 @@ data RemovePoolReceiveContextValueParams = RemovePoolReceiveContextValueParams
     with
         contextKey : Text
     deriving (Eq, Show)
+
+-- | Config for one RateLimiter to deploy alongside a lane, via Initialize. Direction/mode are
+-- implied by which slot of LaneDeploySpec this occupies, not repeated here.
+data RateLimiterDeploySpec = RateLimiterDeploySpec
+    with
+        instanceId : Text
+        isEnabled : Bool
+        capacity : Numeric 0
+        rate : Numeric 0
+    deriving (Eq, Show)
+
+-- | Config for one remote-chain lane to wire up via Initialize: routing/CCV/finality config,
+-- plus the three rate limiters to deploy alongside it (matching ChainUpdate's shape).
+data LaneDeploySpec = LaneDeploySpec
+    with
+        remoteChainSelector : Numeric 0
+        remotePools : [BytesHex]
+        remoteTokenAddress : BytesHex
+        inboundCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        outboundCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        finalityConfig : CCIP.CodecV2.FinalityConfig.FinalityConfig
+        inbound : RateLimiterDeploySpec
+        outbound : RateLimiterDeploySpec
+        inboundCustomFinality : RateLimiterDeploySpec
+    deriving (Eq, Show)
