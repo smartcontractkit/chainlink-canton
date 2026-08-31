@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-lock-release-token-pool-v2"
-	PackageID   = "687262cc0bc60564e7f412d131d0d55db51ef35d8c34e5bc3d15d36d483418cd"
+	PackageID   = "f6af449b8be23f7bf4aa9ab822993da9752f601d90962840d629a9444eed57f4"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1024,7 +1024,7 @@ type LockReleaseTokenPool struct {
 	InstrumentId            splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
 	Decimals                types.INT64                                `json:"decimals"`
 	RateLimitAdmin          *types.PARTY                               `json:"rateLimitAdmin" hex:"optional"`
-	Observer                *types.PARTY                               `json:"observer" hex:"optional"`
+	Observers               []types.PARTY                              `json:"observers"`
 	RemoteChainConfigs      map[types.NUMERIC]RemoteChainConfig        `json:"remoteChainConfigs"`
 	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig2  `json:"tokenTransferFeeConfigs"`
 	PoolReceiveContext      splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
@@ -1073,17 +1073,14 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 		}
 	}
 
-	if t.Observer != nil {
-		args["observer"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.Observer).ToMap(),
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
 		}
-	} else {
-		args["observer"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+		return res
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["remoteChainConfigs"] = func() any {
@@ -1147,17 +1144,14 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 		}
 	}
 
-	if t.Observer != nil {
-		args["observer"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.Observer).ToMap(),
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
 		}
-	} else {
-		args["observer"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+		return res
+	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["remoteChainConfigs"] = func() any {
@@ -2137,8 +2131,8 @@ func (t *RemovePoolReceiveContextValueParams) UnmarshalHex(data string) error {
 
 // SetDynamicConfig is a Record type
 type SetDynamicConfig struct {
-	RateLimitAdmin *types.PARTY `json:"rateLimitAdmin" hex:"optional"`
-	Observer       *types.PARTY `json:"observer" hex:"optional"`
+	RateLimitAdmin *types.PARTY  `json:"rateLimitAdmin" hex:"optional"`
+	Observers      []types.PARTY `json:"observers"`
 }
 
 // ToMap converts SetDynamicConfig to a map for DAML arguments
@@ -2157,17 +2151,13 @@ func (t SetDynamicConfig) ToMap() map[string]any {
 		}
 	}
 
-	if t.Observer != nil {
-		m["observer"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.Observer).ToMap(),
+	m["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
 		}
-	} else {
-		m["observer"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+		return res
+	}()
 
 	return m
 }
@@ -2196,8 +2186,8 @@ func (t *SetDynamicConfig) UnmarshalHex(data string) error {
 
 // SetDynamicConfigParams is a Record type
 type SetDynamicConfigParams struct {
-	RateLimitAdmin *types.PARTY `json:"rateLimitAdmin" hex:"optional"`
-	Observer       *types.PARTY `json:"observer" hex:"optional"`
+	RateLimitAdmin *types.PARTY  `json:"rateLimitAdmin" hex:"optional"`
+	Observers      []types.PARTY `json:"observers"`
 }
 
 // ToMap converts SetDynamicConfigParams to a map for DAML arguments
@@ -2216,17 +2206,13 @@ func (t SetDynamicConfigParams) ToMap() map[string]any {
 		}
 	}
 
-	if t.Observer != nil {
-		m["observer"] = map[string]any{
-			"_type": "optional",
-			"value": (*t.Observer).ToMap(),
+	m["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
 		}
-	} else {
-		m["observer"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+		return res
+	}()
 
 	return m
 }

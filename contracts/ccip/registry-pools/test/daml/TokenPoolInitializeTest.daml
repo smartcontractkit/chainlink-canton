@@ -70,7 +70,7 @@ testInitializeBurnMintPool_SelfIssued = script do
                 instrumentId
                 decimals = 18
                 rateLimitAdmin = None
-                observer = Some observerParty
+                observers = [observerParty]
                 remoteChainConfigs = Map.empty
                 tokenTransferFeeConfigs = Map.empty
                 poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -95,7 +95,7 @@ testInitializeBurnMintPool_SelfIssued = script do
     pools <- query @CCIP.Registry.BurnMintTokenPoolV2.BurnMintTokenPool poolOwner
     case filter (\(_, pool) -> pool.instanceId == instanceId) pools of
         [(_, pool)] -> do
-            pool.observer === Some observerParty
+            pool.observers === [observerParty]
             Map.size pool.remoteChainConfigs === 1
         got -> abort ("expected exactly one deployed BurnMintTokenPool, got " <> show (length got))
 
@@ -104,7 +104,7 @@ testInitializeBurnMintPool_SelfIssued = script do
     rateLimiters <- query @CCIP.Registry.RateLimiterV2.RateLimiter poolOwner
     let laneRateLimiters = filter (\(_, rl) -> rl.poolInstanceId == instanceId) rateLimiters
     length laneRateLimiters === 3
-    mapA_ (\(_, rl) -> rl.observer === Some observerParty) laneRateLimiters
+    mapA_ (\(_, rl) -> rl.observers === [observerParty]) laneRateLimiters
 
     pure ()
 
@@ -155,7 +155,7 @@ testInitializeLockReleasePool_SelfIssued = script do
                 instrumentId
                 decimals = 18
                 rateLimitAdmin = None
-                observer = Some observerParty
+                observers = [observerParty]
                 remoteChainConfigs = Map.empty
                 tokenTransferFeeConfigs = Map.empty
                 poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -177,7 +177,7 @@ testInitializeLockReleasePool_SelfIssued = script do
     pools <- query @CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPool poolOwner
     case filter (\(_, pool) -> pool.instanceId == instanceId) pools of
         [(_, pool)] -> do
-            pool.observer === Some observerParty
+            pool.observers === [observerParty]
             Map.size pool.remoteChainConfigs === 1
         got -> abort ("expected exactly one deployed LockReleaseTokenPool, got " <> show (length got))
 

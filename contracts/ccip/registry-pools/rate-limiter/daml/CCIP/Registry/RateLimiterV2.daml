@@ -8,7 +8,7 @@ import DA.Crypto.Text (BytesHex, byteCount)
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Chainlink.InstanceAddress (assertValidInstanceId)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
-import MCMS.Codec (decodeBoolAt, decodeNumeric0At, decodeOptional, decodePartyAt)
+import MCMS.Codec (decodeBoolAt, decodeNumeric0At, decodePartyList)
 
 -- | Enforce distinct RateLimiter contract references per logical path. Sharing one RateLimiter
 -- across paths merges quota. Pass Some for the custom-finality slot when it is required.
@@ -99,13 +99,13 @@ template RateLimiter
         -- Must be scaled according to the associated token pool's decimals setting.
         tokens : Numeric 0
         lastUpdated : Time
-        -- Observer party used by the External Disclosure Service (EDS) to auto-detect this
-        -- rate limiter. Set at creation or via SetObserver; cannot be added retroactively
+        -- Observer parties used by the External Disclosure Service (EDS) to auto-detect this
+        -- rate limiter. Set at creation or via SetObservers; cannot be added retroactively
         -- to a rate limiter deployed on a package version that predates this field.
-        observer : Optional Party
+        observers : [Party]
     where
         signatory poolOwner
-        observer optional [] pure observer
+        observer observers
         ensure assertValidInstanceId instanceId
             && capacity >= 0.0
             && rate >= 0.0
@@ -134,19 +134,19 @@ template RateLimiter
                     tokens = newCapacity
                     lastUpdated = now
 
-        -- Sets the EDS observer for this rate limiter.
+        -- Sets the EDS observers for this rate limiter.
         --
         -- Params:
-        -- observer: Optional party used by EDS to auto-detect this rate limiter
+        -- observers: parties used by EDS to auto-detect this rate limiter
         --
         -- Callable by poolOwner
-        choice SetObserver : ContractId RateLimiter
+        choice SetObservers : ContractId RateLimiter
             with
-                observer : Optional Party
+                observers : [Party]
             controller poolOwner
             do
                 create this with
-                    observer = observer
+                    observers = observers
 
         nonconsuming choice ConsumeCapacity : ConsumeCapacityResult
             with
@@ -201,13 +201,13 @@ template RateLimiter
                       newCapacity
                       newRate
                     pure (Map.insert selfAddress (coerceContractId newCid) contractIds)
-              "SetObserver" -> do
-                case decodeSetObserverParams operationData of
-                  None -> abort "E_INVALID_PARAMS: SetObserver"
-                  Some (observer, finalOffset) -> do
-                    assertMsg "E_TRAILING_BYTES: SetObserver" (finalOffset == byteCount operationData)
-                    newCid <- exercise selfCid SetObserver with
-                      observer
+              "SetObservers" -> do
+                case decodeSetObserversParams operationData of
+                  None -> abort "E_INVALID_PARAMS: SetObservers"
+                  Some (observers, finalOffset) -> do
+                    assertMsg "E_TRAILING_BYTES: SetObservers" (finalOffset == byteCount operationData)
+                    newCid <- exercise selfCid SetObservers with
+                      observers
                     pure (Map.insert selfAddress (coerceContractId newCid) contractIds)
               _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
@@ -219,6 +219,6 @@ decodeSetConfigParams encoded = do
     (newRate, finalOffset) <- decodeNumeric0At encoded offset2
     Some ((newIsEnabled, newCapacity, newRate), finalOffset)
 
--- | Decode SetObserver params: Optional Party
-decodeSetObserverParams : BytesHex -> Optional (Optional Party, Int)
-decodeSetObserverParams encoded = decodeOptional encoded 0 decodePartyAt
+-- | Decode SetObservers params: [Party]
+decodeSetObserversParams : BytesHex -> Optional ([Party], Int)
+decodeSetObserversParams encoded = decodePartyList encoded 0

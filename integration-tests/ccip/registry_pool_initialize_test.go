@@ -1,4 +1,4 @@
-package changesets
+package tests
 
 import (
 	"context"
@@ -113,8 +113,8 @@ func TestInitializeBurnMintTokenPool(t *testing.T) {
 		PoolOwner:          types.PARTY(party),
 		CcipOwner:          types.PARTY(party),
 		InstrumentId:       instrumentId,
-		Decimals:           18,
-		Observer:           partyPtr(types.PARTY(observerParty)),
+		Decimals:           10,
+		Observers:          []types.PARTY{types.PARTY(observerParty)},
 		PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{},
 		TransferTimeout: registrybnm.TransferTimeout{
 			Indefinite: &types.UNIT{},
@@ -126,12 +126,7 @@ func TestInitializeBurnMintTokenPool(t *testing.T) {
 		},
 	}
 
-	_, err = submitCreate(ctx, participant, party, pool)
-	require.NoError(t, err, "create pool")
-
 	poolInstanceAddress := contracts.NewRawInstanceAddress(contracts.InstanceID(poolInstanceID), types.PARTY(party)).InstanceAddress()
-	poolCID, err := contract.FindActiveContractIDByInstanceAddress(ctx, participant.LedgerServices.State, []string{party}, pool.GetTemplateID(), poolInstanceAddress)
-	require.NoError(t, err, "find pool contract ID")
 
 	lane := registrybnm.LaneDeploySpec{
 		RemoteChainSelector: "1.0",
@@ -164,8 +159,8 @@ func TestInitializeBurnMintTokenPool(t *testing.T) {
 		Admin:                  types.PARTY(party),
 		Lanes:                  []registrybnm.LaneDeploySpec{lane},
 	}
-	_, err = submitExercise(ctx, participant, party, pool, poolCID, "Initialize", initArgs)
-	require.NoError(t, err, "exercise Initialize")
+	_, err = submitCreateAndExercise(ctx, participant, party, pool, "Initialize", initArgs)
+	require.NoError(t, err, "create pool and exercise Initialize atomically")
 
 	// TokenConfig was registered: admin == poolOwner, tokenPool points at this pool.
 	tokenConfigAddress := contracts.InstanceID(hex.EncodeToString(contracts.EncodeInstrumentID(instrumentId).Bytes())).
@@ -180,26 +175,20 @@ func TestInitializeBurnMintTokenPool(t *testing.T) {
 
 	// The pool was re-created (ApplyChainUpdates archives+recreates) with the lane wired up.
 	pool2 := findActiveContract[registrybnm.BurnMintTokenPool](t, ctx, participant, party, pool.GetTemplateID(), poolInstanceAddress)
-	require.NotNil(t, pool2.Observer)
-	require.Equal(t, types.PARTY(observerParty), *pool2.Observer)
+	require.Equal(t, []types.PARTY{types.PARTY(observerParty)}, pool2.Observers)
 	require.Len(t, pool2.RemoteChainConfigs, 1)
 
-	// All three rate limiters for the lane were deployed with the observer set.
+	// All three rate limiters for the lane were deployed with the observers set.
 	for _, spec := range []registrybnm.RateLimiterDeploySpec{lane.Inbound, lane.Outbound, lane.InboundCustomFinality} {
 		rlAddress := contracts.NewRawInstanceAddress(contracts.InstanceID(spec.InstanceId), types.PARTY(party)).InstanceAddress()
 		rl := findActiveContract[registryrl.RateLimiter](t, ctx, participant, party, registryrl.RateLimiter{}.GetTemplateID(), rlAddress)
 		require.Equal(t, types.TEXT(poolInstanceID), rl.PoolInstanceId)
 		require.Equal(t, types.PARTY(party), rl.PoolOwner)
-		require.NotNil(t, rl.Observer)
-		require.Equal(t, types.PARTY(observerParty), *rl.Observer)
+		require.Equal(t, []types.PARTY{types.PARTY(observerParty)}, rl.Observers)
 		require.Equal(t, spec.IsEnabled, rl.IsEnabled)
 		require.Equal(t, spec.Capacity, rl.Capacity)
 		require.Equal(t, spec.Rate, rl.Rate)
 	}
-}
-
-func partyPtr(p types.PARTY) *types.PARTY {
-	return &p
 }
 
 // creatable is satisfied by every generated binding template struct.
@@ -208,45 +197,31 @@ type creatable interface {
 	GetTemplateID() string
 }
 
-// submitCreate submits a single Create command for payload, authorized by actAs.
-func submitCreate(ctx context.Context, participant canton.Participant, actAs string, payload creatable) (*apiv2.SubmitAndWaitForTransactionResponse, error) {
+// submitCreateAndExercise submits a single CreateAndExercise command: payload is
+// created and choice is exercised on the resulting contract in one atomic
+// transaction, authorized by actAs. This is the real usage pattern Initialize is
+// designed for - a caller never needs to see the pool's contractId, since it's
+// created and exercised on in the same command.
+func submitCreateAndExercise(
+	ctx context.Context,
+	participant canton.Participant,
+	actAs string,
+	payload creatable,
+	choice string,
+	choiceArg any,
+) (*apiv2.SubmitAndWaitForTransactionResponse, error) {
 	createCmd := payload.CreateCommand()
 	return participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.NewString(),
 			ActAs:     []string{actAs},
 			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{
-					Create: &apiv2.CreateCommand{
+				Command: &apiv2.Command_CreateAndExercise{
+					CreateAndExercise: &apiv2.CreateAndExerciseCommand{
 						TemplateId:      contracts.IdentifierFromBinding(payload),
 						CreateArguments: damlledger.MapToRecord(createCmd.Arguments),
-					},
-				},
-			}},
-		},
-	})
-}
-
-// submitExercise submits a single Exercise command for choice on contractID, authorized by actAs.
-func submitExercise(
-	ctx context.Context,
-	participant canton.Participant,
-	actAs string,
-	template interface{ GetTemplateID() string },
-	contractID, choice string,
-	choiceArg any,
-) (*apiv2.SubmitAndWaitForTransactionResponse, error) {
-	return participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			ActAs:     []string{actAs},
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{
-					Exercise: &apiv2.ExerciseCommand{
-						TemplateId:     contracts.IdentifierFromBinding(template),
-						ContractId:     contractID,
-						Choice:         choice,
-						ChoiceArgument: damlledger.MapToValue(choiceArg),
+						Choice:          choice,
+						ChoiceArgument:  damlledger.MapToValue(choiceArg),
 					},
 				},
 			}},
