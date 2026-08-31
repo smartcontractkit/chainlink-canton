@@ -17,7 +17,7 @@ data-dependencies:
   - ../../extension-api/.daml/dist/ccip-extension-api-v2-2.0.0.dar
   - ../../events/.daml/dist/ccip-events-v2-2.0.0.dar
   - ../../tickets/.daml/dist/ccip-tickets-v2-2.0.0.dar
-  - ../../core/.daml/dist/ccip-core-v2-2.1.0.dar
+  - ../../core/.daml/dist/ccip-core-v2-2.1.1.dar
   - ../../utils/.daml/dist/ccip-utils-v2-2.1.0.dar
   - ../rate-limiter/.daml/dist/ccip-registry-rate-limiter-v2-2.0.1.dar
 dependencies:

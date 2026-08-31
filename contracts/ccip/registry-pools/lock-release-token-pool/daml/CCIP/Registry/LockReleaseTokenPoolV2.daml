@@ -47,6 +47,7 @@ import qualified CCIP.UtilsV2.Context
 
 import CCIP.Registry.LockReleaseTokenPoolV2CodecGen (
     decodeSetDynamicConfigParamsAt,
+    decodeSetObserversParamsAt,
     decodeApplyChainUpdatesParamsAt,
     decodeApplyTokenTransferFeeConfigUpdatesParamsAt,
     decodeSetRateLimiterReferencesParamsAt,
@@ -64,6 +65,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2Types (
     RateLimitConfigArgs(..),
     TransferTimeout(..),
     SetDynamicConfigParams(..),
+    SetObserversParams(..),
     ApplyChainUpdatesParams(..),
     ApplyTokenTransferFeeConfigUpdatesParams(..),
     SetRateLimiterReferencesParams(..),
@@ -297,7 +299,7 @@ template LockReleaseTokenPool
         -- Party capable of updating rate limits for this pool.
         rateLimitAdmin : Optional Party
         -- Observer parties used by the External Disclosure Service (EDS) to auto-detect this
-        -- pool. Set at creation or via SetDynamicConfig; cannot be added retroactively to a
+        -- pool. Set at creation or via SetObservers; cannot be added retroactively to a
         -- pool deployed on a package version that predates this field.
         observers : [Party]
 
@@ -416,17 +418,28 @@ template LockReleaseTokenPool
         --
         -- Params:
         -- rateLimitAdmin: Optional party that can manage rate limits
-        -- observers: parties used by EDS to auto-detect this pool
         --
         -- Callable by poolOwner
         choice SetDynamicConfig : ContractId LockReleaseTokenPool
             with
                 rateLimitAdmin : Optional Party
-                observers : [Party]
             controller poolOwner
             do
                 create this with
                     rateLimitAdmin = rateLimitAdmin
+
+        -- Sets the EDS observers for the pool.
+        --
+        -- Params:
+        -- observers: parties used by EDS to auto-detect this pool
+        --
+        -- Callable by poolOwner
+        choice SetObservers : ContractId LockReleaseTokenPool
+            with
+                observers : [Party]
+            controller poolOwner
+            do
+                create this with
                     observers = observers
 
         -- Sets the remote chain configurations for the pool.
@@ -1362,6 +1375,13 @@ template LockReleaseTokenPool
                             assertMsg "E_TRAILING_BYTES: SetDynamicConfig" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid SetDynamicConfig with
                                 rateLimitAdmin
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetObservers" -> do
+                    case decodeSetObserversParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: SetObservers"
+                        Some (SetObserversParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetObservers" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetObservers with
                                 observers
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 "ApplyChainUpdates" -> do

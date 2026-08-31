@@ -76,6 +76,11 @@ data TransferTimeout
 data SetDynamicConfigParams = SetDynamicConfigParams
     with
         rateLimitAdmin : Optional Party
+    deriving (Eq, Show)
+
+-- | Params for SetObservers choice
+data SetObserversParams = SetObserversParams
+    with
         observers : [Party]
     deriving (Eq, Show)
 
