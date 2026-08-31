@@ -73,3 +73,19 @@ jobs:
         run: |
           cd integration-tests/mcms
           go test -v -count 1 -timeout 20m -run TestMCMS_ChangesetProposalE2E ./...
+
+  test-offramp-source-onramps:
+    name: TestOffRampSourceOnRamps_DualAllowlist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: integration-tests/go.mod
+          cache-dependency-path: integration-tests/go.sum
+      - name: Run Go tests
+        run: |
+          cd integration-tests/mcms
+          go test -v -count 1 -timeout 20m -run '^TestOffRampSourceOnRamps_DualAllowlist$' ./...
