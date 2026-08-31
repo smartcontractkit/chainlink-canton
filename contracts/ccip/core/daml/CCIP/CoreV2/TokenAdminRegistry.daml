@@ -445,16 +445,6 @@ template TokenAdminRegistry
                     Some admin -> pure admin
                 assertMsg "SetTransferFactory: caller is not the admin" (admin == caller)
 
-                case transferFactory of
-                    None -> pure ()
-                    Some factoryCid -> do
-                        factoryView <- exercise factoryCid
-                            Splice.Api.Token.TransferInstructionV1.TransferFactory_PublicFetch with
-                                expectedAdmin = instrumentId.admin
-                                actor = caller
-                        assertMsg "SetTransferFactory: factory admin mismatch"
-                            (factoryView.admin == instrumentId.admin)
-
                 archive tokenConfigCid
                 create config with transferFactory
 
@@ -473,16 +463,6 @@ template TokenAdminRegistry
                     None -> abort "SetBurnMintFactory: no admin set for instrument"
                     Some admin -> pure admin
                 assertMsg "SetBurnMintFactory: caller is not the admin" (admin == caller)
-
-                case burnMintFactory of
-                    None -> pure ()
-                    Some factoryCid -> do
-                        factoryView <- exercise factoryCid
-                            Splice.Api.Token.BurnMintV1.BurnMintFactory_PublicFetch with
-                                expectedAdmin = instrumentId.admin
-                                actor = caller
-                        assertMsg "SetBurnMintFactory: factory admin mismatch"
-                            (factoryView.admin == instrumentId.admin)
 
                 archive tokenConfigCid
                 create config with burnMintFactory
