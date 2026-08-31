@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-lock-release-token-pool-v2"
-	PackageID   = "f6af449b8be23f7bf4aa9ab822993da9752f601d90962840d629a9444eed57f4"
+	PackageID   = "42c39df6943667e9ee2aeee1055cf88ba76724a16046ba76ead3333f25b07207"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1376,6 +1376,27 @@ func (t LockReleaseTokenPool) SetDynamicConfigWithPackageID(contractID string, p
 	}
 }
 
+// SetObservers exercises the SetObservers choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) SetObservers(contractID string, args SetObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Registry.LockReleaseTokenPoolV2", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetObserversWithPackageID exercises the SetObservers choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) SetObserversWithPackageID(contractID string, packageID string, args SetObservers) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Registry.LockReleaseTokenPoolV2", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // AddPoolReceiveContextNonContractValue exercises the AddPoolReceiveContextNonContractValue choice on this LockReleaseTokenPool contract
 // This method uses the package name in the template ID
 func (t LockReleaseTokenPool) AddPoolReceiveContextNonContractValue(contractID string, args AddPoolReceiveContextNonContractValue) *model.ExerciseCommand {
@@ -2131,8 +2152,7 @@ func (t *RemovePoolReceiveContextValueParams) UnmarshalHex(data string) error {
 
 // SetDynamicConfig is a Record type
 type SetDynamicConfig struct {
-	RateLimitAdmin *types.PARTY  `json:"rateLimitAdmin" hex:"optional"`
-	Observers      []types.PARTY `json:"observers"`
+	RateLimitAdmin *types.PARTY `json:"rateLimitAdmin" hex:"optional"`
 }
 
 // ToMap converts SetDynamicConfig to a map for DAML arguments
@@ -2150,14 +2170,6 @@ func (t SetDynamicConfig) ToMap() map[string]any {
 			"value": nil,
 		}
 	}
-
-	m["observers"] = func() []any {
-		res := make([]any, 0, len(t.Observers))
-		for _, e := range t.Observers {
-			res = append(res, e.ToMap())
-		}
-		return res
-	}()
 
 	return m
 }
@@ -2186,8 +2198,7 @@ func (t *SetDynamicConfig) UnmarshalHex(data string) error {
 
 // SetDynamicConfigParams is a Record type
 type SetDynamicConfigParams struct {
-	RateLimitAdmin *types.PARTY  `json:"rateLimitAdmin" hex:"optional"`
-	Observers      []types.PARTY `json:"observers"`
+	RateLimitAdmin *types.PARTY `json:"rateLimitAdmin" hex:"optional"`
 }
 
 // ToMap converts SetDynamicConfigParams to a map for DAML arguments
@@ -2205,14 +2216,6 @@ func (t SetDynamicConfigParams) ToMap() map[string]any {
 			"value": nil,
 		}
 	}
-
-	m["observers"] = func() []any {
-		res := make([]any, 0, len(t.Observers))
-		for _, e := range t.Observers {
-			res = append(res, e.ToMap())
-		}
-		return res
-	}()
 
 	return m
 }
@@ -2235,6 +2238,90 @@ func (t SetDynamicConfigParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetDynamicConfigParams from hex string (Canton MCMS format)
 func (t *SetDynamicConfigParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetObservers is a Record type
+type SetObservers struct {
+	Observers []types.PARTY `json:"observers"`
+}
+
+// ToMap converts SetObservers to a map for DAML arguments
+func (t SetObservers) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SetObservers) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetObservers) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetObservers to hex string (Canton MCMS format)
+func (t SetObservers) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetObservers from hex string (Canton MCMS format)
+func (t *SetObservers) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetObserversParams is a Record type
+type SetObserversParams struct {
+	Observers []types.PARTY `json:"observers"`
+}
+
+// ToMap converts SetObserversParams to a map for DAML arguments
+func (t SetObserversParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SetObserversParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetObserversParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetObserversParams to hex string (Canton MCMS format)
+func (t SetObserversParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetObserversParams from hex string (Canton MCMS format)
+func (t *SetObserversParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2833,6 +2920,8 @@ type MCMSEncoder interface {
 	RemovePoolReceiveContextValueParams(args RemovePoolReceiveContextValueParams) (*bind.EncodedChoice, error)
 	SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, error)
 	SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error)
+	SetObservers(args SetObservers) (*bind.EncodedChoice, error)
+	SetObserversParams(args SetObserversParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
@@ -2991,6 +3080,16 @@ func (e *encoder) SetDynamicConfig(args SetDynamicConfig) (*bind.EncodedChoice, 
 // SetDynamicConfigParams encodes parameters for the SetDynamicConfig choice.
 func (e *encoder) SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetDynamicConfig", args)
+}
+
+// SetObservers encodes parameters for the SetObservers choice.
+func (e *encoder) SetObservers(args SetObservers) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetObservers", args)
+}
+
+// SetObserversParams encodes parameters for the SetObservers choice.
+func (e *encoder) SetObserversParams(args SetObserversParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetObservers", args)
 }
 
 // SetRateLimitConfig encodes parameters for the SetRateLimitConfig choice.

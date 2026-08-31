@@ -4,7 +4,7 @@ module CCIP.Registry.LockReleaseTokenPoolV2CodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.Registry.LockReleaseTokenPoolV2Types (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimiterReferencesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), RateLimiterDeploySpec(..), LaneDeploySpec(..), TransferTimeout(..))
+import CCIP.Registry.LockReleaseTokenPoolV2Types (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), SetObserversParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimiterReferencesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), RateLimiterDeploySpec(..), LaneDeploySpec(..), TransferTimeout(..))
 
 import MCMS.Codec (
     decodeBoolAt,
@@ -165,13 +165,25 @@ decodeRateLimitConfigArgsAt encoded offset = do
 encodeSetDynamicConfigParams : SetDynamicConfigParams -> BytesHex
 encodeSetDynamicConfigParams params =
     encodeOptional params.rateLimitAdmin encodeParty
-    <> encodePartyList params.observers
 
 decodeSetDynamicConfigParamsAt : BytesHex -> Int -> Optional (SetDynamicConfigParams, Int)
 decodeSetDynamicConfigParamsAt encoded offset = do
     (rateLimitAdmin, offset) <- decodeOptional encoded offset decodePartyAt
-    (observers, offset) <- decodePartyList encoded offset
     Some (SetDynamicConfigParams{..}, offset)
+
+
+-- ===============================================
+-- |              SetObserversParams
+-- ===============================================
+
+encodeSetObserversParams : SetObserversParams -> BytesHex
+encodeSetObserversParams params =
+    encodePartyList params.observers
+
+decodeSetObserversParamsAt : BytesHex -> Int -> Optional (SetObserversParams, Int)
+decodeSetObserversParamsAt encoded offset = do
+    (observers, offset) <- decodePartyList encoded offset
+    Some (SetObserversParams{..}, offset)
 
 
 -- ===============================================
