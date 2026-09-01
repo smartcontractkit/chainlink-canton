@@ -54,6 +54,11 @@ data SourceChainConfig = SourceChainConfig
         onRampAddresses : [BytesHex]            -- OnRamp addresses on the source chain.
         defaultCCVs : [RawInstanceAddress]      -- Default CCVs to use for messages from this source chain.
         laneMandatedCCVs : [RawInstanceAddress] -- Required CCVs to use for all messages from this source chain.
+        configVersion : Optional (Numeric 0)    -- Monotonically increasing per-selector version, bumped on every
+                                                 -- ApplySourceChainConfigUpdates. Not settable via SourceChainConfigArgs,
+                                                 -- so it cannot be forged by the caller. Used to detect that a message's
+                                                 -- CCV policy snapshot (see ExecutingMessage.sourceConfigVersion) has
+                                                 -- gone stale between PrepareExecute and ExecuteFromRouter.
     deriving (Eq, Show)
 
 -- | Ensures at least one CCV combined, no zero addresses, no duplicates within or across both sets.

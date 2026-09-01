@@ -7,6 +7,7 @@ module CCIP.CoreV2.GlobalConfig(
 import DA.Crypto.Text (byteCount)
 import DA.Foldable (forA_)
 import DA.Map qualified as Map
+import DA.Optional (fromOptional)
 
 import qualified Splice.Api.Token.MetadataV1
 
@@ -155,9 +156,19 @@ template GlobalConfig
                     validateDefaultAndMandatedCCVs defaultCCVs laneMandatedCCVs
 
                 -- Update
+                -- configVersion is bumped unconditionally on every update to a given selector so
+                -- that an ExecutingMessage prepared under the old config is provably stale (see
+                -- OffRamp.ExecuteFromRouter), regardless of which fields actually changed.
                 let newConfigs = foldl
                         (\configs SourceChainConfigArgs{sourceChainSelector, isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} ->
-                            Map.insert sourceChainSelector SourceChainConfig{isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs} configs)
+                            let previousVersion = case Map.lookup sourceChainSelector configs of
+                                    None -> 0.0
+                                    Some previousCfg -> fromOptional 0.0 previousCfg.configVersion
+                            in Map.insert sourceChainSelector
+                                SourceChainConfig with
+                                    isEnabled, onRampAddresses, defaultCCVs, laneMandatedCCVs
+                                    configVersion = Some (previousVersion + 1.0)
+                                configs)
                         sourceChainConfigs
                         sourceChainConfigUpdates
                 create this with sourceChainConfigs = newConfigs

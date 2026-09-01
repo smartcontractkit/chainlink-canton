@@ -30,7 +30,7 @@ var (
 
 const (
 	PackageName = "ccip-core-v2"
-	PackageID   = "e1068af4a88f2024200f748f1f8319c7335d2501d07cc8648ba7d4b09a0ae863"
+	PackageID   = "5f2177cd8b0d99bf2dac5936040c60fff1389578f192a25ae7fc4f8e30e6ba9b"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1716,6 +1716,7 @@ type ExecutingMessage struct {
 	InboundPoolVerification *InboundPoolVerification          `json:"inboundPoolVerification" hex:"optional"`
 	Deps                    ExecutingMessageDeps              `json:"deps"`
 	State                   ExecutingMessageState             `json:"state"`
+	SourceConfigVersion     *types.NUMERIC                    `json:"sourceConfigVersion" hex:"optional"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1838,6 +1839,18 @@ func (t ExecutingMessage) CreateCommand() *model.CreateCommand {
 		args["state"] = model.NestedToDAMLValue(t.State)
 	}
 
+	if t.SourceConfigVersion != nil {
+		args["sourceConfigVersion"] = map[string]any{
+			"_type": "optional",
+			"value": *t.SourceConfigVersion,
+		}
+	} else {
+		args["sourceConfigVersion"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -1952,6 +1965,18 @@ func (t ExecutingMessage) CreateCommandWithPackageID(packageID string) *model.Cr
 
 	if t.State != "" {
 		args["state"] = model.NestedToDAMLValue(t.State)
+	}
+
+	if t.SourceConfigVersion != nil {
+		args["sourceConfigVersion"] = map[string]any{
+			"_type": "optional",
+			"value": *t.SourceConfigVersion,
+		}
+	} else {
+		args["sourceConfigVersion"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
 	}
 
 	return &model.CreateCommand{
@@ -7133,6 +7158,7 @@ type SourceChainConfig2 struct {
 	OnRampAddresses  []types.TEXT                      `json:"onRampAddresses" hex:"[]bytes"`
 	DefaultCCVs      []chainlinkapi.RawInstanceAddress `json:"defaultCCVs"`
 	LaneMandatedCCVs []chainlinkapi.RawInstanceAddress `json:"laneMandatedCCVs"`
+	ConfigVersion    *types.NUMERIC                    `json:"configVersion" hex:"optional"`
 }
 
 // ToMap converts SourceChainConfig2 to a map for DAML arguments
@@ -7164,6 +7190,18 @@ func (t SourceChainConfig2) ToMap() map[string]any {
 		}
 		return res
 	}()
+
+	if t.ConfigVersion != nil {
+		m["configVersion"] = map[string]any{
+			"_type": "optional",
+			"value": *t.ConfigVersion,
+		}
+	} else {
+		m["configVersion"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	return m
 }

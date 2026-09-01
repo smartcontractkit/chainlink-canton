@@ -95,6 +95,7 @@ testReceiverGetRequiredCCVsMatchesPrepareExecute = script do
                     onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                     laneMandatedCCVs = [laneCcv]
                     defaultCCVs = []
+                    configVersion = Some 0.0
                   )
                 ]
 
@@ -231,6 +232,7 @@ testReceiverGetRequiredCCVsDoesNotInjectPoolDefaultsForMessageOnly = script do
                     onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                     laneMandatedCCVs = [laneCcv]
                     defaultCCVs = [defaultCcv]
+                    configVersion = Some 0.0
                   )
                 ]
 

@@ -225,7 +225,7 @@ testGlobalConfigMCMSEntrypoint_ApplySourceChainConfigUpdates = script do
       ccipOwner
       chainSelector = 123.0
       destChainConfigs = Map.empty
-      sourceChainConfigs = Map.fromList [(456.0, CCIP.CoreV2.GlobalConfig.SourceChainConfig True ["abcd"] [] [])]
+      sourceChainConfigs = Map.fromList [(456.0, CCIP.CoreV2.GlobalConfig.SourceChainConfig True ["abcd"] [] [] None)]
 
   let instAddr = Chainlink.InstanceAddress.makeText instanceId ccipOwner
   let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver gcCid

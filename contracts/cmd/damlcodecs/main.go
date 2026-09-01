@@ -48,6 +48,18 @@ var customCodecs = map[string]damltemplate.CustomCodec{
 		DecodeFunc:   "decodeRequestedFinalityAt",
 		ImportModule: "CCIP.CodecV2",
 	},
+	// "Numeric 0" is handled natively by go-daml's codegen for plain fields, but its Optional-type
+	// resolution (buildEncodeExpr / getOptionalElemDecodeFunc) does a raw prefix trim on "Optional "
+	// without stripping the parentheses Daml requires around a parameterized type, so an
+	// "Optional (Numeric 0)" field resolves against the literal string "(Numeric 0)" rather than
+	// "Numeric 0" and falls through to an invalid generated identifier. Registering it explicitly
+	// here, keyed on that literal parenthesized form, is the supported override path for exactly
+	// this kind of gap (see the map's doc comment above).
+	"(Numeric 0)": {
+		EncodeFunc:   "encodeNumeric0",
+		DecodeFunc:   "decodeNumeric0At",
+		ImportModule: "MCMS.Codec",
+	},
 }
 
 // Variant tag byte overrides. By default variants use constructor index as

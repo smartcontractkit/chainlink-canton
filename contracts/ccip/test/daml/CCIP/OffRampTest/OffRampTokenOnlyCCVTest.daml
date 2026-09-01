@@ -37,6 +37,7 @@ testTokenOnlyExecuteIncludesLaneMandatedCCVs = script do
                     onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                     laneMandatedCCVs = [laneCcv]
                     defaultCCVs = []
+                    configVersion = Some 0.0
                   )
                 ]
 
@@ -108,6 +109,7 @@ testTokenOnlyExecuteMergesPoolAndLaneCCVs = script do
                     onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                     laneMandatedCCVs = [laneCcv]
                     defaultCCVs = []
+                    configVersion = Some 0.0
                   )
                 ]
 

@@ -234,6 +234,7 @@ template OffRamp
                     optionalCCVThreshold = baseOptionalCCVThreshold
                     receiverFinalityConfig = receiverFinalityConfig
                     sourceDefaultCCVs = sourceConfig.defaultCCVs
+                    sourceConfigVersion = sourceConfig.configVersion
                     inboundPoolVerification = None
                     deps = CCIP.CoreV2.ExecutingMessage.ExecutingMessageDeps with
                         offRamp = rawInstanceAddress this
@@ -306,6 +307,15 @@ template OffRamp
                     None -> abort "offramp: unknown source chain"
                     Some c -> pure c
                 assertValidMessageForLane instanceId ccipOwner globalConfig.chainSelector sourceConfig message
+
+                -- Revalidate that the CCV policy pinned onto this ExecutingMessage at
+                -- PrepareExecute time is still the active policy. Without this, a CCV removed from
+                -- sourceConfig.defaultCCVs/laneMandatedCCVs after PrepareExecute (e.g. because it
+                -- was compromised) could still successfully verify and execute this message, since
+                -- AddCCVVerification only checks membership in the snapshotted requiredCCVs/
+                -- optionalCCVs, never the live GlobalConfig.
+                assertMsg "offramp: source chain config changed since PrepareExecute; re-prepare required"
+                    (execMsg.sourceConfigVersion == sourceConfig.configVersion)
 
                 -- Token transfers must complete the pool step before execution.
                 case execMsg.tokenReceiver of

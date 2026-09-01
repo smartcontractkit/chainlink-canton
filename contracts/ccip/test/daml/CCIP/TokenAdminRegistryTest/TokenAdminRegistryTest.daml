@@ -272,6 +272,7 @@ testFinalizeExecuteRejectsPoolChangedAfterInboundVerification = script do
       optionalCCVThreshold = 0
       receiverFinalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
       sourceDefaultCCVs = []
+      sourceConfigVersion = Some 0.0
       inboundPoolVerification = Some (CCIP.CoreV2.ExecutingMessage.InboundPoolVerification with
         poolInstanceId = poolV1.poolInstanceId
         poolOwner = poolV1.poolOwner

@@ -124,6 +124,7 @@ encodeSourceChainConfig params =
     <> encodeBytesHexList params.onRampAddresses
     <> encodeRawInstanceAddressList params.defaultCCVs
     <> encodeRawInstanceAddressList params.laneMandatedCCVs
+    <> encodeOptional params.configVersion encodeNumeric0
 
 decodeSourceChainConfigAt : BytesHex -> Int -> Optional (SourceChainConfig, Int)
 decodeSourceChainConfigAt encoded offset = do
@@ -131,6 +132,7 @@ decodeSourceChainConfigAt encoded offset = do
     (onRampAddresses, offset) <- decodeBytesHexList encoded offset
     (defaultCCVs, offset) <- decodeRawInstanceAddressList encoded offset
     (laneMandatedCCVs, offset) <- decodeRawInstanceAddressList encoded offset
+    (configVersion, offset) <- decodeOptional encoded offset decodeNumeric0At
     Some (SourceChainConfig{..}, offset)
 
 

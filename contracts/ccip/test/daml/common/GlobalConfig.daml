@@ -250,6 +250,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
                     onRampAddresses = ["1111111111111111"]
                     defaultCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "0xabc"]
                     laneMandatedCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "0x123"]
+                    configVersion = Some 0.0
                 )]
     submitMustFail owner do
         createCmd CCIP.CoreV2.GlobalConfig.GlobalConfig with
@@ -262,6 +263,7 @@ testGlobalConfig_ApplySourceChainConfigUpdates = do
                     onRampAddresses = ["1111111111111111"]
                     defaultCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "0xabc"]
                     laneMandatedCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "0x123"]
+                    configVersion = Some 0.0
                 )]
 
     pure()

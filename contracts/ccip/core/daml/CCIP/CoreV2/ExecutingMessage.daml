@@ -85,6 +85,11 @@ template ExecutingMessage
         --   message-only: Prepared -(FinalizeExecute)-> consumed
         --   token-receive: RequirePoolCCVs -> Prepared -(FinalizeExecute)-> consumed
         state : ExecutingMessageState
+        -- Snapshot of GlobalConfig.sourceChainConfigs[sourceChainSelector].configVersion at
+        -- PrepareExecute time. ExecuteFromRouter asserts this still matches the live value, so a
+        -- CCV policy revoked after PrepareExecute (e.g. a compromised committee verifier) cannot
+        -- still verify this message. See SourceChainConfig.configVersion for the config-side counterpart.
+        sourceConfigVersion : Optional (Numeric 0)
     where
         signatory dedup (
             [ccipOwner]

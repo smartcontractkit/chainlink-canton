@@ -445,6 +445,7 @@ setupExecuteFixture suffix sourceDefaultCCVs = do
                     onRampAddresses = ["0000000000000000000000000000000000000000000000000000000000000001"]
                     defaultCCVs = sourceDefaultCCVs
                     laneMandatedCCVs = []
+                    configVersion = Some 0.0
                   )
                 ]
 
@@ -607,6 +608,7 @@ mkExecutingMessage ccipOwner receiver sourceDefaultCCVs = do
                 rmnRemote = Chainlink.InstanceAddress.make "rmn-inbound-pool-bounds" ccipOwner
                 tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-inbound-pool-bounds" ccipOwner
             state = CCIP.CoreV2.ExecutingMessage.ExecutingMessageState_RequirePoolCCVs
+            sourceConfigVersion = Some 0.0
 
 testSetInboundPoolCCVsRejectsTooManyAndExpandedCCVs : Script ()
 testSetInboundPoolCCVsRejectsTooManyAndExpandedCCVs = script do
