@@ -244,10 +244,11 @@ testTokenAdminRegistryMCMSEntrypoint_ProposeAdministrator = script do
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId tarCid)]
 
-  let newTarCid = coerceContractId (lookupContractId instAddr newContractIds) : ContractId CCIP.CoreV2.TokenAdminRegistry.TokenAdminRegistry
-      configCid = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV2.TokenAdminRegistry.TokenConfig
-  Some tar <- queryContractId ccipOwner newTarCid
-  tar.entryCount === 1
+  let configCid = coerceContractId (lookupContractId (tokenConfigAddr ccipOwner instrumentId) newContractIds) : ContractId CCIP.CoreV2.TokenAdminRegistry.TokenConfig
+  -- Query the same TokenAdminRegistry contract to verify it hasn't been archived
+  Some tar <- queryContractId ccipOwner tarCid
+  -- entryCount is deprecated and should not update
+  tar.entryCount === 0
   Some config <- queryContractId ccipOwner configCid
   config.admin === None
   config.pendingAdmin === Some newAdmin
