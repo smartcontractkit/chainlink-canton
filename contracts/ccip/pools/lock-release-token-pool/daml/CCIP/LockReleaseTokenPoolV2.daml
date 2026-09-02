@@ -595,7 +595,11 @@ template LockReleaseTokenPool
             with
                 newTransferTimeout : TransferTimeout
             controller poolOwner
-            do create this with transferTimeout = newTransferTimeout
+            do
+                case newTransferTimeout of
+                    Indefinite -> pure ()
+                    RelativeHours h -> assertMsg "pool: invalid transfer timeout, must be non-zero" (h > 0)
+                create this with transferTimeout = newTransferTimeout
 
         -- Get required CCV raw instance addresses based on chain and direction.
         nonconsuming choice GetRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
