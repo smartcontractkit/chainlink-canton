@@ -16,6 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
+
+	"github.com/smartcontractkit/chainlink-canton/deployment/authentication/clientcredentials"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	indexerclient "github.com/smartcontractkit/chainlink-ccv/indexer/pkg/client"
@@ -63,69 +66,91 @@ type Bundle struct {
 
 // New builds a Bundle for the given profile + user config.
 func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserConfig) (*Bundle, error) {
-	// --- Canton ---
-	authProvider, err := authorizationcode.NewDiscoveryProvider(ctx, cfg.Canton.AuthServerURL, cfg.Canton.AuthClientID)
-	if err != nil {
-		return nil, fmt.Errorf("create auth provider: %w", err)
+	bundle := &Bundle{
+		Profile: profile,
+		Config:  cfg,
 	}
-	if _, err := authProvider.TokenSource().Token(); err != nil {
-		return nil, fmt.Errorf("retrieve initial token: %w", err)
+	var err error
+
+	if !cfg.Canton.Disabled {
+		// --- Canton ---
+		var authProvider authentication.Provider
+		switch cfg.Canton.AuthType {
+		case "static":
+			authProvider = authentication.NewInsecureStaticProvider(cfg.Canton.AuthJWT)
+		case "clientCredentials":
+			authProvider, err = clientcredentials.NewDiscoveryProvider(ctx, cfg.Canton.AuthServerURL, cfg.Canton.AuthClientID, cfg.Canton.AuthClientSecret)
+			if err != nil {
+				return nil, fmt.Errorf("create clientCredentials provider: %w", err)
+			}
+		case "authorizationCode":
+			fallthrough
+		default:
+			authProvider, err = authorizationcode.NewDiscoveryProvider(ctx, cfg.Canton.AuthServerURL, cfg.Canton.AuthClientID)
+			if err != nil {
+				return nil, fmt.Errorf("create authorizationCode provider: %w", err)
+			}
+		}
+
+		if _, err := authProvider.TokenSource().Token(); err != nil {
+			return nil, fmt.Errorf("retrieve initial token: %w", err)
+		}
+
+		rpcCfg := provider.RPCChainProviderConfig{
+			Participants: []provider.ParticipantConfig{{
+				Endpoints: provider.Endpoints{
+					JSONLedgerAPIURL: "json",
+					GRPCLedgerAPIURL: cfg.Canton.ParticipantGRPCLedgerAPIURL,
+					ValidatorAPIURL:  cfg.Canton.ValidatorAPIURL,
+				},
+				UserID:       cfg.Canton.UserID,
+				PartyID:      cfg.Canton.PartyID,
+				AuthProvider: authProvider,
+			}},
+		}
+		ch, err := provider.NewRPCChainProvider(profile.CantonSelector, rpcCfg).Initialize(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("init canton chain: %w", err)
+		}
+		cantonChain, ok := ch.(*canton.Chain)
+		if !ok {
+			return nil, fmt.Errorf("unexpected chain type %T", ch)
+		}
+		if len(cantonChain.Participants) == 0 {
+			return nil, fmt.Errorf("no participants configured")
+		}
+		bundle.Participant = cantonChain.Participants[0]
+
+		// --- Validator API clients ---
+		_, _, bundle.AmuletTransferClient, err = testhelpers.NewValidatorAPIClients(bundle.Participant)
+		if err != nil {
+			return nil, fmt.Errorf("create validator API clients: %w", err)
+		}
+
+		// --- EDS clients ---
+		bundle.CCIPEDS, err = oapiCCIP.NewClientWithResponses(profile.EDSURL)
+		if err != nil {
+			return nil, fmt.Errorf("create CCIP EDS client: %w", err)
+		}
+		bundle.CCVEDS, err = oapiCCV.NewClientWithResponses(profile.EDSURL)
+		if err != nil {
+			return nil, fmt.Errorf("create CCV EDS client: %w", err)
+		}
+		bundle.ExecutorEDS, err = oapiExecutor.NewClientWithResponses(profile.EDSURL)
+		if err != nil {
+			return nil, fmt.Errorf("create executor EDS client: %w", err)
+		}
+		bundle.TokenPoolEDS, err = oapiTokenPool.NewClientWithResponses(profile.EDSURL)
+		if err != nil {
+			return nil, fmt.Errorf("create token pool EDS client: %w", err)
+		}
+		bundle.LinkTransferClient, err = oapiTransferInstruction.NewClientWithResponses(profile.EDSURL)
+		if err != nil {
+			return nil, fmt.Errorf("create transferInstruction EDS client: %w", err)
+		}
 	}
 
-	rpcCfg := provider.RPCChainProviderConfig{
-		Participants: []provider.ParticipantConfig{{
-			Endpoints: provider.Endpoints{
-				JSONLedgerAPIURL: "json",
-				GRPCLedgerAPIURL: cfg.Canton.ParticipantGRPCLedgerAPIURL,
-				ValidatorAPIURL:  cfg.Canton.ValidatorAPIURL,
-			},
-			UserID:       cfg.Canton.UserID,
-			PartyID:      cfg.Canton.PartyID,
-			AuthProvider: authProvider,
-		}},
-	}
-	ch, err := provider.NewRPCChainProvider(profile.CantonSelector, rpcCfg).Initialize(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("init canton chain: %w", err)
-	}
-	cantonChain, ok := ch.(*canton.Chain)
-	if !ok {
-		return nil, fmt.Errorf("unexpected chain type %T", ch)
-	}
-	if len(cantonChain.Participants) == 0 {
-		return nil, fmt.Errorf("no participants configured")
-	}
-	participant := cantonChain.Participants[0]
-
-	// --- Validator API clients ---
-	_, _, amuletTransferClient, err := testhelpers.NewValidatorAPIClients(participant)
-	if err != nil {
-		return nil, fmt.Errorf("create validator API clients: %w", err)
-	}
-
-	// --- EDS clients ---
-	ccipEds, err := oapiCCIP.NewClientWithResponses(profile.EDSURL)
-	if err != nil {
-		return nil, fmt.Errorf("create CCIP EDS client: %w", err)
-	}
-	ccvEds, err := oapiCCV.NewClientWithResponses(profile.EDSURL)
-	if err != nil {
-		return nil, fmt.Errorf("create CCV EDS client: %w", err)
-	}
-	execEds, err := oapiExecutor.NewClientWithResponses(profile.EDSURL)
-	if err != nil {
-		return nil, fmt.Errorf("create executor EDS client: %w", err)
-	}
-	tokenPoolEds, err := oapiTokenPool.NewClientWithResponses(profile.EDSURL)
-	if err != nil {
-		return nil, fmt.Errorf("create token pool EDS client: %w", err)
-	}
-	transferInstructionEds, err := oapiTransferInstruction.NewClientWithResponses(profile.EDSURL)
-	if err != nil {
-		return nil, fmt.Errorf("create transferInstruction EDS client: %w", err)
-	}
-
-	idx, err := indexerclient.NewIndexerClient(profile.IndexerURL, &http.Client{Timeout: 15 * time.Second})
+	bundle.IndexerClient, err = indexerclient.NewIndexerClient(profile.IndexerURL, &http.Client{Timeout: 15 * time.Second})
 	if err != nil {
 		return nil, fmt.Errorf("create indexer client: %w", err)
 	}
@@ -139,7 +164,7 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 	if err != nil {
 		return nil, fmt.Errorf("parse EVM chain id: %w", err)
 	}
-	ethClient, err := ethclient.DialContext(ctx, cfg.EVM.RPCURL)
+	bundle.ETHClient, err = ethclient.DialContext(ctx, cfg.EVM.RPCURL)
 	if err != nil {
 		return nil, fmt.Errorf("dial EVM rpc: %w", err)
 	}
@@ -151,46 +176,28 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 	if !ok {
 		return nil, fmt.Errorf("invalid EVM private key")
 	}
-	ethAddress := crypto.PubkeyToAddress(*publicKeyECDSA)
-	chainIDBig := new(big.Int).SetUint64(chainID)
-	auth, err := bind.NewKeyedTransactorWithChainID(pk, chainIDBig)
+	bundle.ETHAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
+	bundle.EthChainID = new(big.Int).SetUint64(chainID)
+	bundle.EthAuth, err = bind.NewKeyedTransactorWithChainID(pk, bundle.EthChainID)
 	if err != nil {
 		return nil, fmt.Errorf("create EVM transactor: %w", err)
 	}
 
 	// --- Explorers ---
-	ccipExplorerURL := profile.CCIPExlorerURL
+	bundle.CCIPExplorerURL = profile.CCIPExlorerURL
 	if cfg.CCIPExplorerURL != "" {
-		ccipExplorerURL = cfg.CCIPExplorerURL
+		bundle.CCIPExplorerURL = cfg.CCIPExplorerURL
 	}
-	evmExplorerURL := profile.EVMExplorerURL
+	bundle.EVMExplorerURL = profile.EVMExplorerURL
 	if cfg.EVMExplorerURL != "" {
-		evmExplorerURL = cfg.EVMExplorerURL
+		bundle.EVMExplorerURL = cfg.EVMExplorerURL
 	}
-	cantonExplorerURL := profile.CantonExplorerURL
+	bundle.CantonExplorerURL = profile.CantonExplorerURL
 	if cfg.CantonExplorerURL != "" {
-		cantonExplorerURL = cfg.CantonExplorerURL
+		bundle.CantonExplorerURL = cfg.CantonExplorerURL
 	}
 
-	return &Bundle{
-		Profile:              profile,
-		Config:               cfg,
-		Participant:          participant,
-		CCIPEDS:              ccipEds,
-		CCVEDS:               ccvEds,
-		ExecutorEDS:          execEds,
-		TokenPoolEDS:         tokenPoolEds,
-		AmuletTransferClient: amuletTransferClient,
-		LinkTransferClient:   transferInstructionEds,
-		IndexerClient:        idx,
-		ETHClient:            ethClient,
-		ETHAddress:           ethAddress,
-		EthAuth:              auth,
-		EthChainID:           chainIDBig,
-		CCIPExplorerURL:      ccipExplorerURL,
-		EVMExplorerURL:       evmExplorerURL,
-		CantonExplorerURL:    cantonExplorerURL,
-	}, nil
+	return bundle, nil
 }
 
 func (b *Bundle) CCIPExplorerLink(msgId string) string {

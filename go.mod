@@ -28,6 +28,7 @@ require (
 	github.com/icza/gox v0.2.14
 	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/jpillora/backoff v1.0.0
+	github.com/karalabe/hid v1.0.1-0.20260315100226-f5d04adeffeb
 	github.com/lib/pq v1.12.3
 	github.com/moby/moby/api v1.55.0
 	github.com/oapi-codegen/runtime v1.7.0
@@ -280,7 +281,6 @@ require (
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
-	github.com/karalabe/hid v1.0.1-0.20260315100226-f5d04adeffeb // indirect
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect

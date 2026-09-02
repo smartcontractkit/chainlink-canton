@@ -1,7 +1,7 @@
 # Example configuration for the CCIP demo CLI.
-# All canton and evm fields are required.
 
 canton:
+  authType: "authorizationCode"
   authServerURL: "https://auth.example.com"
   authClientID: "my-client-id"
   participantGRPCLedgerAPIURL: "participant.example.com:5001"

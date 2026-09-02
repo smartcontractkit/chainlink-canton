@@ -73,6 +73,8 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 	c.AddCommand(newCantonCreateTransferCmd(g))
 	c.AddCommand(newCantonAcceptTransferCmd(g))
 
+	c.AddCommand(newCantonExternalPartyCommand(g))
+
 	return c
 }
 
@@ -96,7 +98,7 @@ func newCantonListEventsCmd(g *Globals) *cobra.Command {
 		Short: "List active CCIPMessageSent or ExecutionStateChanged contracts",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -172,7 +174,7 @@ func newCantonListHoldingsCmd(g *Globals) *cobra.Command {
 		Short: "List all token holdings for the configured party",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -229,7 +231,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 		Short: "Create an outgoing TransferInstruction",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -338,7 +340,7 @@ func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 		Short: "Accept an incoming TransferInstruction by contract ID",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -377,7 +379,7 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 		Short: "Execute on Canton a message sent from EVM",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -414,7 +416,7 @@ func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 		Short: "Deploy or update CCIPReceiver required CCVs (run once before inbound load/e2e on prod)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -552,7 +554,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 		Short: "Send a message-only CCIP message from Canton to EVM",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -600,7 +602,7 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 		Short: "Send a LINK token transfer CCIP message from Canton to EVM",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
