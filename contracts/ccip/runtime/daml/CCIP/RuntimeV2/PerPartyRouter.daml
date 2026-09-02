@@ -11,7 +11,7 @@ import DA.Set (Set)
 import DA.Set qualified as Set
 import DA.Crypto.Text (BytesHex, keccak256, byteCount)
 import DA.Optional (fromOptional, isNone)
-import DA.Time (RelTime, addRelTime, hours)
+import DA.Time (RelTime, addRelTime, days)
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -54,6 +54,10 @@ maxExecutedMessagesSize : Int
 -- pressure. TODO: benchmark and tune this against a real Canton participant/synchronizer
 -- setup instead of relying on script-runner limits.
 maxExecutedMessagesSize = 25000
+
+-- Global that will be used as executeBefore for all outgoing fee transfers to Verifiers, Pools, and Executors
+globalFeeTransferLifetime : RelTime
+globalFeeTransferLifetime = days 14
 
 addFeeForParty : Map.Map Party Decimal -> Party -> Decimal -> Map.Map Party Decimal
 addFeeForParty allocs recipient amount =
@@ -200,7 +204,7 @@ template PerPartyRouterFactory
             with
                 partyOwner : Party
                 instanceId : Text  -- user specifies their desired instanceId
-                feeTransferLifetime : Optional RelTime
+                feeTransferLifetime : Optional RelTime -- Deprecated and unused
             controller partyOwner
             do
                 -- Check party doesn't already have a router.
@@ -216,20 +220,12 @@ template PerPartyRouterFactory
                 assertMsg "instanceId already in use"
                     (prefixedInstanceId `notElem` Map.values registeredRouters)
 
-                case feeTransferLifetime of
-                    None -> pure ()
-                    Some lifetime -> do
-                        assertMsg "feeTransferLifetime must be positive"
-                            (lifetime > hours 0)
-                        assertMsg "feeTransferLifetime must not exceed 90 days"
-                            (lifetime <= hours 2160)
-
                 routerCid <- create PerPartyRouter with
                     ccipOwner = ccipOwner
                     partyOwner = partyOwner
                     instanceId = prefixedInstanceId
                     deps = deps
-                    feeTransferLifetime = feeTransferLifetime
+                    feeTransferLifetime = None
                     outboundSequenceNumbers = Map.empty
                     executedMessages = Set.empty
                     archivedExecutionContractIds = []
@@ -312,7 +308,7 @@ template PerPartyRouter
         executedMessages : Set BytesHex
         archivedExecutionContractIds : [ContractId ArchivedExecutedMessages]
         customObservers : [Party]
-        feeTransferLifetime : Optional RelTime
+        feeTransferLifetime : Optional RelTime -- Deprecated
     where
         signatory ccipOwner
         observer partyOwner :: customObservers
@@ -672,8 +668,6 @@ template PerPartyRouter
                                 (\entry -> fst entry /= ccipOwner && snd entry > 0.0)
                                 (Map.toList recipientFees)
 
-                        let feeTransferLifetimeValue = fromOptional (hours 2160) feeTransferLifetime
-
                         let executeFeeTransfer sender receiver inputHoldingCids amount = do
                                 now <- getTime
                                 let feeTransfer =
@@ -683,10 +677,7 @@ template PerPartyRouter
                                             amount = amount
                                             instrumentId = sendingMsg.feeToken
                                             requestedAt = now
-                                            -- Bounded lifetime keeps the fee transfer under the Splice
-                                            -- tokenStandardMaxTTL limit (90 days). Optional on the router,
-                                            -- defaults to 90 days if not set.
-                                            executeBefore = addRelTime now feeTransferLifetimeValue
+                                            executeBefore = addRelTime now globalFeeTransferLifetime
                                             inputHoldingCids = inputHoldingCids
                                             meta = Splice.Api.Token.MetadataV1.emptyMetadata
                                 feeResult <- exercise
