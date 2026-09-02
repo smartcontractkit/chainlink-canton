@@ -537,6 +537,19 @@
 | `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
 | `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
 
+## <a name="fc1fcb7dbfd1959cafbd54bfa6f6cc88c1678607b0f95ee3f6ee8e9ee8eb2b60"></a>link-2.1.0.dar
+- Name: `link`
+- Version: `2.1.0`
+- Package ID: `fc1fcb7dbfd1959cafbd54bfa6f6cc88c1678607b0f95ee3f6ee8e9ee8eb2b60`
+### Dependencies:
+|                PACKAGE NAME                | VERSION |                                                               PACKAGE ID                                                                |
+|--------------------------------------------|---------|-----------------------------------------------------------------------------------------------------------------------------------------|
+| `link`                                     | `2.1.0` | [`fc1fcb7dbfd1959cafbd54bfa6f6cc88c1678607b0f95ee3f6ee8e9ee8eb2b60`](#fc1fcb7dbfd1959cafbd54bfa6f6cc88c1678607b0f95ee3f6ee8e9ee8eb2b60) |
+| `splice-api-token-burn-mint-v1`            | `1.0.0` | [`9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e`](#9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e) |
+| `splice-api-token-holding-v1`              | `1.0.0` | [`718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b`](#718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b) |
+| `splice-api-token-metadata-v1`             | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
+| `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
+
 ## <a name="674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240"></a>mcms-api-1.0.0.dar
 - Name: `mcms-api`
 - Version: `1.0.0`
