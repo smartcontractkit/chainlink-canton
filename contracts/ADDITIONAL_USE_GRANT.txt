@@ -1,0 +1,11 @@
+Additional Use Grant(s):
+
+You may make use of the components of the Licensed Work located at:
+
+1. Contracts (released DARs): https://github.com/smartcontractkit/chainlink-canton/tree/main/contracts/dars/released
+2. Explicit Disclosure Service (EDS): https://github.com/smartcontractkit/chainlink-canton/tree/main/eds
+
+(collectively, the "Permitted Components") solely for purposes of deploying, running, or adapting the Permitted Components, whether by (a) running the Licensor-provided implementation unmodified, (b) creating a modified or derivative version or (c) querying data via CCIP Explicit Disclosure API, as applicable.
+
+For the avoidance of doubt, this Additional Use Grant does not permit production use of the Licensed Work (or any component thereof) to create, operate, or offer a service that competes with the Licensed Work or any other Chainlink product or service. Please review the Chainlink Terms of Service (https://chain.link/terms) for more information.
+

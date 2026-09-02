@@ -11,7 +11,7 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 type ActiveContractStore struct {
@@ -22,7 +22,7 @@ type ActiveContractStore struct {
 
 	mux                        sync.RWMutex
 	contractsByInstanceAddress map[contracts.InstanceAddress]*apiv2.ActiveContract
-	contractsByTemplateId      map[types.PARTY]map[contracts.TemplateID]*apiv2.ActiveContract
+	contractsByTemplateId      map[types.PARTY]map[contracts.TemplateID]map[types.CONTRACT_ID]*apiv2.ActiveContract
 	contractsByContractId      map[types.CONTRACT_ID]*apiv2.ActiveContract
 }
 
@@ -84,7 +84,7 @@ func (s *ActiveContractStore) Run(ctx context.Context, streamConfig StreamConfig
 
 	s.mux.Lock()
 	s.contractsByInstanceAddress = make(map[contracts.InstanceAddress]*apiv2.ActiveContract)
-	s.contractsByTemplateId = make(map[types.PARTY]map[contracts.TemplateID]*apiv2.ActiveContract)
+	s.contractsByTemplateId = make(map[types.PARTY]map[contracts.TemplateID]map[types.CONTRACT_ID]*apiv2.ActiveContract)
 	s.contractsByContractId = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
 	s.mux.Unlock()
 
@@ -101,9 +101,9 @@ func (s *ActiveContractStore) Get(address contracts.InstanceAddress) (*apiv2.Act
 	return proto.CloneOf(value), ok
 }
 
-// GetByTemplateId returns the active contract for the given TemplateID, if it exists.
+// GetByTemplateId returns the active contracts for the given TemplateID and party, if any exist.
 // It accepts TemplateIds in both the #packageName and PackageId syntax.
-func (s *ActiveContractStore) GetByTemplateId(party types.PARTY, templateId contracts.TemplateID) (*apiv2.ActiveContract, bool) {
+func (s *ActiveContractStore) GetByTemplateId(party types.PARTY, templateId contracts.TemplateID) ([]*apiv2.ActiveContract, bool) {
 	s.mux.RLock()
 	defer s.mux.RUnlock()
 
@@ -111,13 +111,22 @@ func (s *ActiveContractStore) GetByTemplateId(party types.PARTY, templateId cont
 	if !ok {
 		return nil, false
 	}
-	value, ok := contractsForParty[templateId]
+	contractsByContractId, ok := contractsForParty[templateId]
 	if !ok {
 		return nil, false
 	}
 
-	// Return a copy of the ActiveContract
-	return proto.CloneOf(value), true
+	if len(contractsByContractId) == 0 {
+		return nil, false
+	}
+
+	activeContracts := make([]*apiv2.ActiveContract, 0, len(contractsByContractId))
+	for _, activeContract := range contractsByContractId {
+		// Create a copy of the ActiveContract before returning it
+		activeContracts = append(activeContracts, proto.CloneOf(activeContract))
+	}
+
+	return activeContracts, true
 }
 
 func (s *ActiveContractStore) GetByContractId(contractId types.CONTRACT_ID) (*apiv2.ActiveContract, bool) {
@@ -147,21 +156,37 @@ func (s *ActiveContractStore) onActiveContract(ctx context.Context, activeContra
 		party := types.PARTY(witnessParty)
 		contractsForParty, ok := s.contractsByTemplateId[party]
 		if !ok {
-			contractsForParty = make(map[contracts.TemplateID]*apiv2.ActiveContract)
+			contractsForParty = make(map[contracts.TemplateID]map[types.CONTRACT_ID]*apiv2.ActiveContract)
 			s.contractsByTemplateId[party] = contractsForParty
 		}
+
 		// Add by PackageId
-		contractsForParty[contracts.TemplateID{
+		templateIdPackageId := contracts.TemplateID{
 			PackageID:  activeContract.GetCreatedEvent().GetTemplateId().GetPackageId(),
 			ModuleName: activeContract.GetCreatedEvent().GetTemplateId().GetModuleName(),
 			EntityName: activeContract.GetCreatedEvent().GetTemplateId().GetEntityName(),
-		}] = activeContract
+		}
+		contractsByPackageId, ok := contractsForParty[templateIdPackageId]
+		if !ok {
+			contractsByPackageId = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
+			contractsForParty[templateIdPackageId] = contractsByPackageId
+		}
+		contractsByPackageId[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
+		contractsForParty[templateIdPackageId] = contractsByPackageId
+
 		// Add by PackageName
-		contractsForParty[contracts.TemplateID{
+		templateIdPackageName := contracts.TemplateID{
 			PackageID:  fmt.Sprintf("#%s", activeContract.GetCreatedEvent().GetPackageName()),
 			ModuleName: activeContract.GetCreatedEvent().GetTemplateId().GetModuleName(),
 			EntityName: activeContract.GetCreatedEvent().GetTemplateId().GetEntityName(),
-		}] = activeContract
+		}
+		contractsByPackageName, ok := contractsForParty[templateIdPackageName]
+		if !ok {
+			contractsByPackageName = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
+			contractsForParty[templateIdPackageName] = contractsByPackageName
+		}
+		contractsByPackageName[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
+		contractsForParty[templateIdPackageName] = contractsByPackageName
 	}
 	s.mux.Unlock()
 
@@ -187,21 +212,37 @@ func (s *ActiveContractStore) onCreatedEvent(ctx context.Context, transaction *a
 		party := types.PARTY(witnessParty)
 		contractsForParty, ok := s.contractsByTemplateId[party]
 		if !ok {
-			contractsForParty = make(map[contracts.TemplateID]*apiv2.ActiveContract)
+			contractsForParty = make(map[contracts.TemplateID]map[types.CONTRACT_ID]*apiv2.ActiveContract)
 			s.contractsByTemplateId[party] = contractsForParty
 		}
+
 		// Add by PackageId
-		contractsForParty[contracts.TemplateID{
-			PackageID:  createdEvent.GetTemplateId().GetPackageId(),
-			ModuleName: createdEvent.GetTemplateId().GetModuleName(),
-			EntityName: createdEvent.GetTemplateId().GetEntityName(),
-		}] = activeContract
+		templateIdPackageId := contracts.TemplateID{
+			PackageID:  activeContract.GetCreatedEvent().GetTemplateId().GetPackageId(),
+			ModuleName: activeContract.GetCreatedEvent().GetTemplateId().GetModuleName(),
+			EntityName: activeContract.GetCreatedEvent().GetTemplateId().GetEntityName(),
+		}
+		contractsByPackageId, ok := contractsForParty[templateIdPackageId]
+		if !ok {
+			contractsByPackageId = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
+			contractsForParty[templateIdPackageId] = contractsByPackageId
+		}
+		contractsByPackageId[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
+		contractsForParty[templateIdPackageId] = contractsByPackageId
+
 		// Add by PackageName
-		contractsForParty[contracts.TemplateID{
-			PackageID:  fmt.Sprintf("#%s", createdEvent.GetPackageName()),
-			ModuleName: createdEvent.GetTemplateId().GetModuleName(),
-			EntityName: createdEvent.GetTemplateId().GetEntityName(),
-		}] = activeContract
+		templateIdPackageName := contracts.TemplateID{
+			PackageID:  fmt.Sprintf("#%s", activeContract.GetCreatedEvent().GetPackageName()),
+			ModuleName: activeContract.GetCreatedEvent().GetTemplateId().GetModuleName(),
+			EntityName: activeContract.GetCreatedEvent().GetTemplateId().GetEntityName(),
+		}
+		contractsByPackageName, ok := contractsForParty[templateIdPackageName]
+		if !ok {
+			contractsByPackageName = make(map[types.CONTRACT_ID]*apiv2.ActiveContract)
+			contractsForParty[templateIdPackageName] = contractsByPackageName
+		}
+		contractsByPackageName[types.CONTRACT_ID(activeContract.GetCreatedEvent().GetContractId())] = activeContract
+		contractsForParty[templateIdPackageName] = contractsByPackageName
 	}
 	s.mux.Unlock()
 
@@ -231,17 +272,19 @@ func (s *ActiveContractStore) onArchivedEvent(ctx context.Context, _ *apiv2.Tran
 			continue
 		}
 		// Delete by PackageId
-		delete(contractsForParty, contracts.TemplateID{
+		contractsByPackageId := contractsForParty[contracts.TemplateID{
 			PackageID:  archivedEvent.GetTemplateId().GetPackageId(),
 			ModuleName: archivedEvent.GetTemplateId().GetModuleName(),
 			EntityName: archivedEvent.GetTemplateId().GetEntityName(),
-		})
+		}]
+		delete(contractsByPackageId, types.CONTRACT_ID(archivedEvent.GetContractId()))
 		// Delete by PackageName
-		delete(contractsForParty, contracts.TemplateID{
+		contractsByPackageName := contractsForParty[contracts.TemplateID{
 			PackageID:  fmt.Sprintf("#%s", archivedEvent.GetPackageName()),
 			ModuleName: archivedEvent.GetTemplateId().GetModuleName(),
 			EntityName: archivedEvent.GetTemplateId().GetEntityName(),
-		})
+		}]
+		delete(contractsByPackageName, types.CONTRACT_ID(archivedEvent.GetContractId()))
 	}
 
 	return nil

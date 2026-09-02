@@ -23,7 +23,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/deployment"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"

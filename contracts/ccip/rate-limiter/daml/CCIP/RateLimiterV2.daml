@@ -1,6 +1,7 @@
 module CCIP.RateLimiterV2 where
 
 import DA.Map qualified as Map
+import DA.Numeric qualified as Numeric
 import DA.Time (convertRelTimeToMicroseconds, subTime)
 import DA.Crypto.Text (BytesHex, byteCount)
 
@@ -55,18 +56,29 @@ data ConsumeCapacityResult = ConsumeCapacityResult
         consumed : Numeric 0
     deriving (Eq, Show)
 
-elapsedSeconds : Time -> Time -> Numeric 0
-elapsedSeconds start end =
+-- | Calculate elapsed time in microseconds (as a whole number). Handles negative intervals by returning 0.
+elapsedMicroseconds : Time -> Time -> Numeric 0
+elapsedMicroseconds start end =
     let micros = convertRelTimeToMicroseconds (subTime end start)
-        secs : Int = max 0 (micros / 1000000)
-    in intToNumeric secs
+    in intToNumeric (max 0 micros)
 
+-- | Calculate whole tokens refilled during the elapsed time at a given rate.
+-- | Preserves fractional seconds: (rate * elapsed_micros / 1_000_000) rounded down to whole tokens.
+refilledTokens : Time -> Time -> Numeric 0 -> Numeric 0
+refilledTokens start end rate =
+    let tokenMicros : Decimal = Numeric.mul rate (elapsedMicroseconds start end)
+        microsPerSecond : Decimal = 1000000.0
+        accrued : Decimal = Numeric.div tokenMicros microsPerSecond
+    in intToNumeric (truncate accrued)
+
+-- | Calculate total available capacity at a given time, accounting for refills since last update.
+-- | If disabled, returns capacity. Otherwise returns current tokens plus accrued refills, capped at capacity.
 availableTokensAt : Time -> RateLimiter -> Numeric 0
 availableTokensAt now rl =
     if not rl.isEnabled then
         rl.capacity
     else
-        min rl.capacity (rl.tokens + (elapsedSeconds rl.lastUpdated now * rl.rate))
+        min rl.capacity (rl.tokens + refilledTokens rl.lastUpdated now rl.rate)
 
 template RateLimiter
     with
@@ -77,8 +89,14 @@ template RateLimiter
         direction : RateLimitDirection
         mode : RateLimitMode
         isEnabled : Bool
+        -- | Maximum token capacity for this rate limiter (in pool's local decimal representation).
+        -- Must be scaled according to the associated token pool's decimals setting.
         capacity : Numeric 0
+        -- | Token refill rate per second (in pool's local decimal representation).
+        -- Must be scaled according to the associated token pool's decimals setting.
         rate : Numeric 0
+        -- | Current available tokens in the bucket (in pool's local decimal representation).
+        -- Must be scaled according to the associated token pool's decimals setting.
         tokens : Numeric 0
         lastUpdated : Time
     where

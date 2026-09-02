@@ -5,13 +5,14 @@ import (
 	"io"
 	"maps"
 	"reflect"
+	"time"
 
 	"dario.cat/mergo"
 	"github.com/BurntSushi/toml"
 	"github.com/go-playground/validator/v10"
 
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 func DefaultConfig() *Config {
@@ -29,6 +30,10 @@ func DefaultConfig() *Config {
 		CCVAPIConfig:       CCVAPIConfig{},
 		ExecutorAPIConfig:  ExecutorAPIConfig{},
 		TokenPoolAPIConfig: TokenPoolAPIConfig{},
+		TokenStandardAPIConfig: TokenStandardAPIConfig{
+			SupplyCacheTTL: time.Second * 10,
+		},
+		RegistryAPIConfig: RegistryAPIConfig{},
 	}
 }
 
@@ -45,6 +50,7 @@ type Config struct {
 	ExecutorAPIConfig      ExecutorAPIConfig      `toml:"executor_api"`
 	TokenPoolAPIConfig     TokenPoolAPIConfig     `toml:"token_pool_api"`
 	TokenStandardAPIConfig TokenStandardAPIConfig `toml:"token_standard_api"`
+	RegistryAPIConfig      RegistryAPIConfig      `toml:"registry_api"`
 }
 
 type ServerConfig struct {
@@ -150,7 +156,16 @@ type TransferPreapproval struct {
 type TokenPoolAPIConfig struct {
 	Enabled bool `toml:"enabled"`
 	// TokenPools is keyed by instance_address (contracts.InstanceAddress.Hex()) so layered configs merge per pool.
-	TokenPools map[string]TokenPool `toml:"token_pools" validate:"required_if=Enabled true,dive"`
+	// Not required_if=Enabled true: an instance running purely on registry-discovered pools may start with none.
+	TokenPools map[string]TokenPool `toml:"token_pools" validate:"dive"`
+}
+
+// RegistryAPIConfig configures EDS's registry observer party, used to detect Registry-deployed
+// token pools that name it as an observer. PartyID is EDS's own party - it is never a pool's
+// owner party, which is a separate, per-pool party EDS has no rights over.
+type RegistryAPIConfig struct {
+	Enabled bool   `toml:"enabled"`
+	PartyID string `toml:"party_id" validate:"required_if=Enabled true"`
 }
 
 // Token Standard API
@@ -163,14 +178,19 @@ const (
 
 type Registry struct {
 	ContractIdentifier
-	TokenType TokenType `toml:"token_type" validate:"required,oneof=LINK"`
-	TokenId   string    `toml:"token_id" validate:"required"`
+	TokenType   TokenType `toml:"token_type" validate:"required,oneof=LINK"`
+	TokenId     string    `toml:"token_id" validate:"required"`
+	TokenName   string    `toml:"token_name"`
+	TokenSymbol string    `toml:"token_symbol"`
 }
 
 type TokenStandardAPIConfig struct {
-	Enabled    bool                `toml:"enabled"`
-	Admin      string              `toml:"admin" validate:"required_if=Enabled true"`
-	Registries map[string]Registry `toml:"registries" validate:"required_if=Enabled true,dive"`
+	Enabled bool `toml:"enabled"`
+	// The duration for which to cache a token's totalSupply.
+	// Defaults to 10 seconds if not specified.
+	SupplyCacheTTL time.Duration       `toml:"supply_cache_ttl"`
+	Admin          string              `toml:"admin" validate:"required_if=Enabled true"`
+	Registries     map[string]Registry `toml:"registries" validate:"required_if=Enabled true,dive"`
 }
 
 // ContractIdentifier uniquely identifies a contract using an InstanceAddress.

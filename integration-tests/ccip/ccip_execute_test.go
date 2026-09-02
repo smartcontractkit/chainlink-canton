@@ -48,15 +48,15 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
-	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/receiver"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -75,21 +75,15 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 
-	// Import to register adapters
-	_ "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
+	// Imported for its side effect of registering the Canton adapters, and for the
+	// chain family adapter used in the OnRamp encoding assertion.
+	cantonadapters "github.com/smartcontractkit/chainlink-canton/deployment/adapters"
 )
 
-func finalityConfigValueFromBlockConfirmations(blockConfirmations uint16) *apiv2.Value {
-	if blockConfirmations == 0 {
-		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-			Constructor: "WaitForFinality",
-			Value:       &apiv2.Value{Sum: &apiv2.Value_Unit{}},
-		}}}
-	}
-
+func finalityConfigValueFromBlockConfirmations() *apiv2.Value {
 	return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
 		Constructor: "BlockDepth",
-		Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(blockConfirmations)}},
+		Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 2000}},
 	}}}
 }
 
@@ -338,6 +332,26 @@ func TestCCIPExecuteE2E(t *testing.T) {
 		ExtraConfigs: lanes.ExtraConfigs{},
 	})
 	require.NoErrorf(t, err, "Failed to configure chain for lanes")
+
+	// Cross-check the OnRamp encoding. ConfigureLaneLegAsDest received the 20-byte
+	// EVM OnRamp above and stores it left-padded to 32 bytes. The message executed
+	// further down carries the same address in that padded form, and the OffRamp
+	// matches it against this allowlist, so this test is the reference for which
+	// form is correct.
+	//
+	// The Canton chain family adapter reads the same allowlist and must return
+	// those bytes byte for byte, because that is the form the source chain writes
+	// into its messages and the form its callers compare against.
+	sourceOnRamps, err := (&cantonadapters.CantonChainFamilyAdapter{}).GetOffRampSourceOnRamps(
+		cldfEnv, env.Chain.ChainSelector(), remoteSelector,
+	)
+	require.NoError(t, err, "read source OnRamps through the Canton chain family adapter")
+	require.Equal(t,
+		[][]byte{gethcommon.LeftPadBytes(hexutil.MustDecode("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd"), 32)},
+		sourceOnRamps,
+		"the adapter must return the wire form of the OnRamp configured above",
+	)
+
 	runningDs := datastore.NewMemoryDataStore()
 	for _, address := range deployLaneLegReport.Output.Addresses {
 		err = runningDs.Addresses().Add(address)
@@ -511,7 +525,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
 						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
 						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-						{Label: "receiverFinalityConfig", Value: finalityConfigValueFromBlockConfirmations(2000)},
+						{Label: "receiverFinalityConfig", Value: finalityConfigValueFromBlockConfirmations()},
 						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
 						{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},

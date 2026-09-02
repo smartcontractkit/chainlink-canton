@@ -1,22 +1,22 @@
 .PHONY: generate-daml-codecs
 generate-daml-codecs:
-	go run ./contracts/cmd/damlcodecs
+	cd ./contracts && go run ./cmd/damlcodecs
 
 .PHONY: compile-contracts
 compile-contracts: generate-daml-codecs
 	@echo "Compiling contracts..."
-	go run ./contracts/cmd/compile -root ./contracts -artifacts ./contracts/dars
+	cd ./contracts && go run ./cmd/compile -root . -artifacts ./dars
 
 .PHONY: generate-bindings
 generate-bindings:
-	go run ./contracts/cmd/bindings
+	cd ./contracts && go run ./cmd/bindings
 
 .PHONY: inspect-dars
 inspect-dars:
 	@echo "Inspecting DARs..."
-	go run ./contracts/cmd/inspect -output ./contracts/dars/dev/PACKAGE_INFO.md ./contracts/dars/dev/*.dar
-	go run ./contracts/cmd/inspect -output ./contracts/dars/legacy/PACKAGE_INFO.md ./contracts/dars/legacy/*.dar
-	go run ./contracts/cmd/inspect -output ./contracts/dars/released/PACKAGE_INFO.md ./contracts/dars/released/*.dar
+	cd ./contracts && go run ./cmd/inspect -output ./dars/dev/PACKAGE_INFO.md ./dars/dev/*.dar
+	cd ./contracts && go run ./cmd/inspect -output ./dars/legacy/PACKAGE_INFO.md ./dars/legacy/*.dar
+	cd ./contracts && go run ./cmd/inspect -output ./dars/released/PACKAGE_INFO.md ./dars/released/*.dar
 
 .PHONY: upgrade-check
 upgrade-check:
@@ -45,11 +45,11 @@ gomodtidy: ## Run go mod tidy on all modules.
 
 .PHONY: test-daml-contracts
 test-daml-contracts:
-	go run ./contracts/cmd/test --root ./contracts
+	cd ./contracts && go run ./cmd/test --root .
 
 # GolangCI-Lint targets
 
-.PHONY: golangci-lint-main golangci-lint-integration-tests golangci-lint-party-ceremony golangci-lint-party-ceremony-integration-tests
+.PHONY: golangci-lint-main golangci-lint-integration-tests golangci-lint-party-ceremony golangci-lint-party-ceremony-integration-tests golangci-lint-registry-kit
 golangci-lint-main: ## Run golangci-lint on the main module.
 	golangci-lint run
 golangci-lint-integration-tests: ## Run golangci-lint on the integration-tests module.
@@ -58,11 +58,13 @@ golangci-lint-party-ceremony: ## Run golangci-lint on the party-ceremony module.
 	cd party-ceremony && golangci-lint run
 golangci-lint-party-ceremony-integration-tests: ## Run golangci-lint on the party-ceremony/integration-tests module.
 	cd party-ceremony/integration-tests && golangci-lint run
+golangci-lint-registry-kit: ## Run golangci-lint on the registry-kit module.
+	cd registry-kit && golangci-lint run
 
 .PHONY: golangci-lint-all
-golangci-lint-all: golangci-lint-main golangci-lint-integration-tests golangci-lint-party-ceremony golangci-lint-party-ceremony-integration-tests ## Run golangci-lint on all modules.
+golangci-lint-all: golangci-lint-main golangci-lint-integration-tests golangci-lint-party-ceremony golangci-lint-party-ceremony-integration-tests golangci-lint-registry-kit ## Run golangci-lint on all modules.
 
-.PHONY: golangci-lint-fix-main golangci-lint-fix-integration-tests golangci-lint-fix-party-ceremony golangci-lint-fix-party-ceremony-integration-tests
+.PHONY: golangci-lint-fix-main golangci-lint-fix-integration-tests golangci-lint-fix-party-ceremony golangci-lint-fix-party-ceremony-integration-tests golangci-lint-fix-registry-kit
 golangci-lint-fix-main: ## Run golangci-lint --fix on the main module.
 	golangci-lint run --fix
 golangci-lint-fix-integration-tests: ## Run golangci-lint --fix on the integration-tests module.
@@ -71,9 +73,11 @@ golangci-lint-fix-party-ceremony: ## Run golangci-lint --fix on the party-ceremo
 	cd party-ceremony && golangci-lint run --fix
 golangci-lint-fix-party-ceremony-integration-tests: ## Run golangci-lint --fix on the party-ceremony/integration-tests module.
 	cd party-ceremony/integration-tests && golangci-lint run --fix
+golangci-lint-fix-registry-kit: ## Run golangci-lint --fix on the registry-kit module.
+	cd registry-kit && golangci-lint run --fix
 
 .PHONY: golangci-lint-fix-all
-golangci-lint-fix-all: golangci-lint-fix-main golangci-lint-fix-integration-tests golangci-lint-fix-party-ceremony golangci-lint-fix-party-ceremony-integration-tests ## Run golangci-lint --fix on all modules.
+golangci-lint-fix-all: golangci-lint-fix-main golangci-lint-fix-integration-tests golangci-lint-fix-party-ceremony golangci-lint-fix-party-ceremony-integration-tests golangci-lint-fix-registry-kit ## Run golangci-lint --fix on all modules.
 
 ## Run all fix targets.
 ## Compiles contracts, generates bindings, runs all go generates, runs go mod tidy, and runs golangci-lint --fix on all modules.

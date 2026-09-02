@@ -27,3 +27,6 @@ scripts/prod_mainnet/.env
 scripts/prod_mainnet/.env.example
 .env.prod-testnet.local
 .for-agents/
+
+contracts/dependencies/utility/*.dar
+contracts/dependencies/utility/.cache/

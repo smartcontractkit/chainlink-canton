@@ -75,18 +75,15 @@ tokenConfigObservers registryOwner isCCIPManaged instrumentId admin pendingAdmin
 assertTokenConfigForInstrument
     : Text
     -> Party
-    -> Int
     -> Splice.Api.Token.HoldingV1.InstrumentId
     -> TokenConfig
     -> Update ()
-assertTokenConfigForInstrument registryInstanceId registryOwner allocatedConfigCount instrumentId config = do
+assertTokenConfigForInstrument registryInstanceId registryOwner instrumentId config = do
     let expectedConfigInstanceId = tokenConfigInstanceId instrumentId
     assertMsg "TAR token config: registry instance mismatch"
         (config.registryInstanceId == registryInstanceId)
     assertMsg "TAR token config: registry owner mismatch"
         (config.registryOwner == registryOwner)
-    assertMsg "TAR token config: index not allocated by registry"
-        (config.index < allocatedConfigCount)
     assertMsg "TAR token config: instanceId mismatch"
         (config.instanceId == expectedConfigInstanceId)
     assertMsg "TAR token config: instrument mismatch"
@@ -95,17 +92,14 @@ assertTokenConfigForInstrument registryInstanceId registryOwner allocatedConfigC
 assertTokenConfigForTokenAddress
     : Text
     -> Party
-    -> Int
     -> BytesHex
     -> TokenConfig
     -> Update ()
-assertTokenConfigForTokenAddress registryInstanceId registryOwner allocatedConfigCount tokenAddress config = do
+assertTokenConfigForTokenAddress registryInstanceId registryOwner tokenAddress config = do
     assertMsg "TAR token config: registry instance mismatch"
         (config.registryInstanceId == registryInstanceId)
     assertMsg "TAR token config: registry owner mismatch"
         (config.registryOwner == registryOwner)
-    assertMsg "TAR token config: index not allocated by registry"
-        (config.index < allocatedConfigCount)
     assertMsg "TAR token config: instanceId/token address mismatch"
         (config.instanceId == tokenAddress)
     assertMsg "TAR token config: encoded instrument mismatch"
@@ -180,7 +174,7 @@ data ProposeAdministratorResult = ProposeAdministratorResult
         tokenAdminRegistryCid : ContractId TokenAdminRegistry
         tokenConfigCid : ContractId TokenConfig
         created : Bool
-        index : Int
+        index : Int -- Deprecated
     deriving (Eq, Show)
 
 template TokenConfig
@@ -188,7 +182,7 @@ template TokenConfig
         instanceId : Text
         registryInstanceId : Text
         registryOwner : Party
-        index : Int
+        index : Int -- Deprecated
         isCCIPManaged : Bool
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
         admin : Optional Party
@@ -202,7 +196,6 @@ template TokenConfig
         ensure
             Chainlink.InstanceAddress.assertValidInstanceId instanceId
             && Chainlink.InstanceAddress.assertValidInstanceId registryInstanceId
-            && index >= 0
             && instanceId == tokenConfigInstanceId instrumentId
 
         interface instance CCIP.APIV2.TokenAdminRegistry.ITokenConfig for TokenConfig where
@@ -246,10 +239,10 @@ template TokenAdminRegistry
         -- owner has to be ccipOwner (ie, the owner of the OffRamp) in order to be able to consume
         -- send tickets
         ccipOwner : Party
-        entryCount : Int
+        entryCount : Int -- Deprecated
     where
         signatory ccipOwner
-        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId && entryCount >= 0
+        ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
 
         interface instance CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry for TokenAdminRegistry where
             view = CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistryView
@@ -266,7 +259,7 @@ template TokenAdminRegistry
 
             tokenAdminRegistry_fetchTokenConfigImpl self arg = do
                 config <- fetch (coerceContractId arg.tokenConfigCid)
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount arg.instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner arg.instrumentId config
                 pure CCIP.APIV2.TokenAdminRegistry.TokenConfigView
                     with
                         ccipOwner = config.registryOwner
@@ -408,7 +401,7 @@ template TokenAdminRegistry
             controller caller
             do
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 pure config
 
         nonconsuming choice SetPool : ContractId TokenConfig
@@ -421,7 +414,7 @@ template TokenAdminRegistry
             controller caller
             do
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 admin <- case config.admin of
                     None -> abort "SetPool: no admin set for instrument"
                     Some admin -> pure admin
@@ -439,21 +432,11 @@ template TokenAdminRegistry
             controller caller
             do
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 admin <- case config.admin of
                     None -> abort "SetTransferFactory: no admin set for instrument"
                     Some admin -> pure admin
                 assertMsg "SetTransferFactory: caller is not the admin" (admin == caller)
-
-                case transferFactory of
-                    None -> pure ()
-                    Some factoryCid -> do
-                        factoryView <- exercise factoryCid
-                            Splice.Api.Token.TransferInstructionV1.TransferFactory_PublicFetch with
-                                expectedAdmin = instrumentId.admin
-                                actor = caller
-                        assertMsg "SetTransferFactory: factory admin mismatch"
-                            (factoryView.admin == instrumentId.admin)
 
                 archive tokenConfigCid
                 create config with transferFactory
@@ -468,21 +451,11 @@ template TokenAdminRegistry
             controller caller
             do
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 admin <- case config.admin of
                     None -> abort "SetBurnMintFactory: no admin set for instrument"
                     Some admin -> pure admin
                 assertMsg "SetBurnMintFactory: caller is not the admin" (admin == caller)
-
-                case burnMintFactory of
-                    None -> pure ()
-                    Some factoryCid -> do
-                        factoryView <- exercise factoryCid
-                            Splice.Api.Token.BurnMintV1.BurnMintFactory_PublicFetch with
-                                expectedAdmin = instrumentId.admin
-                                actor = caller
-                        assertMsg "SetBurnMintFactory: factory admin mismatch"
-                            (factoryView.admin == instrumentId.admin)
 
                 archive tokenConfigCid
                 create config with burnMintFactory
@@ -496,7 +469,7 @@ template TokenAdminRegistry
             controller caller
             do
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 pendingAdmin <- case config.pendingAdmin of
                     None -> abort "AcceptAdminRole: no pending admin to accept"
                     Some pendingAdmin -> pure pendingAdmin
@@ -516,7 +489,7 @@ template TokenAdminRegistry
             controller caller
             do
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 currentAdmin <- case config.admin of
                     None -> abort "TransferAdminRole: no admin to transfer"
                     Some admin -> pure admin
@@ -537,7 +510,7 @@ template TokenAdminRegistry
                 configOpt <- case tokenConfigCid of
                     Some cid -> do
                         config <- fetch cid
-                        assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                        assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                         pure (Some config)
                     None -> pure None
                 pure (case configOpt of
@@ -564,7 +537,7 @@ template TokenAdminRegistry
                 case tokenConfigCid of
                     Some configCid -> do
                         config <- fetch configCid
-                        assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                        assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                         assertMsg "ProposeAdministrator: managed token config can only be proposed by owner"
                             (not config.isCCIPManaged || isOwner)
                         assertMsg "ProposeAdministrator: admin already set" (isNone config.admin)
@@ -578,14 +551,11 @@ template TokenAdminRegistry
                             index = config.index
 
                     None -> do
-                        let newConfigIndex = entryCount
-                        archive self
-                        newTarCid <- create this with entryCount = entryCount + 1
                         configCid <- create TokenConfig with
                             instanceId = tokenConfigInstanceId instrumentId
                             registryInstanceId = instanceId
                             registryOwner = ccipOwner
-                            index = newConfigIndex
+                            index = 0
                             isCCIPManaged = isOwner
                             instrumentId
                             admin = None
@@ -594,10 +564,10 @@ template TokenAdminRegistry
                             transferFactory = None
                             burnMintFactory = None
                         pure ProposeAdministratorResult with
-                            tokenAdminRegistryCid = newTarCid
+                            tokenAdminRegistryCid = self
                             tokenConfigCid = configCid
                             created = True
-                            index = newConfigIndex
+                            index = 0
 
         -- | Consume a token receive ticket to authorize token release.
         -- Validates caller is the registered pool owner, ticket was issued by this TAR,
@@ -613,7 +583,7 @@ template TokenAdminRegistry
             controller caller
             do
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 pool <- registeredPoolOrAbort "ConsumeReceiveTicket" config
                 assertRegisteredPoolCaller "ConsumeReceiveTicket" caller poolInstanceId pool
                 let poolAddress = Chainlink.InstanceAddress.make pool.poolInstanceId pool.poolOwner
@@ -652,7 +622,7 @@ template TokenAdminRegistry
                     Some iid -> pure iid
 
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 pool <- registeredPoolOrAbort "TAR outbound" config
                 assertRegisteredPoolCaller "TAR outbound" caller poolInstanceId pool
 
@@ -683,7 +653,7 @@ template TokenAdminRegistry
                     Some iid -> pure iid
 
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 pool <- registeredPoolOrAbort "TAR outbound fee" config
                 assertRegisteredPoolCaller "TAR outbound fee" caller poolInstanceId pool
 
@@ -722,7 +692,7 @@ template TokenAdminRegistry
                     (instrumentId == expectedInstrumentId)
 
                 config <- fetch tokenConfigCid
-                assertTokenConfigForInstrument instanceId ccipOwner entryCount instrumentId config
+                assertTokenConfigForInstrument instanceId ccipOwner instrumentId config
                 pool <- registeredPoolOrAbort "TAR outbound send" config
                 assertRegisteredPoolCaller "TAR outbound send" caller poolInstanceId pool
                 assertMsg "TAR outbound send: token amount must be 32 bytes" (byteCount amount == 32)
@@ -757,7 +727,7 @@ template TokenAdminRegistry
                         "SetInboundPoolCCVs: no token transfer in message"
                         execMsg.message.tokenTransfer
                 config <- fetch tokenConfigCid
-                assertTokenConfigForTokenAddress instanceId ccipOwner entryCount tt.destTokenAddress config
+                assertTokenConfigForTokenAddress instanceId ccipOwner tt.destTokenAddress config
                 pool <- registeredPoolOrAbort "SetInboundPoolCCVs" config
                 assertRegisteredPoolCaller "SetInboundPoolCCVs" caller poolInstanceId pool
                 exercise executingMessageCid CCIP.CoreV2.ExecutingMessage.SetInboundPoolCCVs with
@@ -790,7 +760,7 @@ template TokenAdminRegistry
                         execMsg.message.tokenTransfer
 
                 config <- fetch tokenConfigCid
-                assertTokenConfigForTokenAddress instanceId ccipOwner entryCount tt.destTokenAddress config
+                assertTokenConfigForTokenAddress instanceId ccipOwner tt.destTokenAddress config
                 pool <- registeredPoolOrAbort "TAR finalize" config
                 let poolAddress = Chainlink.InstanceAddress.make pool.poolInstanceId pool.poolOwner
                 poolVerification <- case execMsg.inboundPoolVerification of

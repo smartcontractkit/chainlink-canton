@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/gin-gonic/gin"
@@ -18,12 +19,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
@@ -45,6 +46,7 @@ type Server struct {
 	activeContractStore    store.ActiveContractStoreInterface
 	instrumentHoldingStore store.InstrumentHoldingStoreInterface
 
+	mux             sync.RWMutex
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
 }
 
@@ -124,7 +126,7 @@ func NewServer(
 	return s, nil
 }
 
-func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
+func (s *Server) PostTokenPoolSend(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolSendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
@@ -140,7 +142,9 @@ func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
+	s.mux.RLock()
 	cfg, ok := s.contractConfigs[instanceAddress]
+	s.mux.RUnlock()
 	if !ok {
 		c.AbortWithStatusJSON(http.StatusNotFound, oapiCommon.ErrorResponse{Error: "token pool address not found"})
 		return
@@ -176,7 +180,7 @@ func (s Server) PostTokenPoolSend(c *gin.Context, address string) {
 	}
 }
 
-func (s Server) lockReleaseTokenPoolSend(
+func (s *Server) lockReleaseTokenPoolSend(
 	c *gin.Context,
 	cfg ContractConfig,
 	instanceAddress contracts.InstanceAddress,
@@ -303,7 +307,7 @@ func (s Server) lockReleaseTokenPoolSend(
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s Server) burnMintTokenPoolSend(
+func (s *Server) burnMintTokenPoolSend(
 	c *gin.Context,
 	cfg ContractConfig,
 	instanceAddress contracts.InstanceAddress,
@@ -414,7 +418,7 @@ func (s Server) burnMintTokenPoolSend(
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
+func (s *Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	var req oapiTokenPool.TokenPoolExecuteRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
@@ -430,7 +434,9 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: err.Error()})
 		return
 	}
+	s.mux.RLock()
 	cfg, ok := s.contractConfigs[instanceAddress]
+	s.mux.RUnlock()
 	if !ok {
 		c.AbortWithStatusJSON(http.StatusNotFound, oapiCommon.ErrorResponse{Error: "token pool address not found"})
 		return
@@ -473,7 +479,7 @@ func (s Server) PostTokenPoolExecute(c *gin.Context, address string) {
 	}
 }
 
-func (s Server) lockReleaseTokenPoolExecute(
+func (s *Server) lockReleaseTokenPoolExecute(
 	c *gin.Context,
 	cfg ContractConfig,
 	instanceAddress contracts.InstanceAddress,
@@ -599,7 +605,7 @@ func (s Server) lockReleaseTokenPoolExecute(
 	c.JSON(http.StatusOK, resp)
 }
 
-func (s Server) burnMintTokenPoolExecute(
+func (s *Server) burnMintTokenPoolExecute(
 	c *gin.Context,
 	cfg ContractConfig,
 	instanceAddress contracts.InstanceAddress,
@@ -714,14 +720,18 @@ var _ global.InstanceAddressFilter = &Server{}
 
 // FilterContracts returns the sub-set of addresses that are tracked by the Token Pool API Server.
 // This includes token pools themselves, and their rate limiters.
-func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
+func (s *Server) FilterContracts(addresses []contracts.InstanceAddress) []contracts.InstanceAddress {
 	if len(addresses) == 0 {
 		return nil
 	}
 
 	// Reconstruct all contracts + rate limiters
-	var allContracts = make(map[contracts.InstanceAddress]bool, len(s.contractConfigs)*2)
-	for poolAddress, contractConfig := range s.contractConfigs {
+	s.mux.RLock()
+	contractConfigs := maps.Clone(s.contractConfigs)
+	s.mux.RUnlock()
+
+	var allContracts = make(map[contracts.InstanceAddress]bool, len(contractConfigs)*2)
+	for poolAddress, contractConfig := range contractConfigs {
 		allContracts[poolAddress] = true
 		activeContract, ok := s.activeContractStore.Get(poolAddress)
 		if !ok {
@@ -765,4 +775,42 @@ func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contrac
 	}
 
 	return out
+}
+
+// RegisterDiscoveredPool builds a ContractConfig for poolConfig and adds it to contractConfigs,
+// making the pool servable by PostTokenPoolSend/PostTokenPoolExecute without a restart. Always
+// overwrites any existing entry for the same address - the caller (PoolDiscoveryService) is
+// responsible for only calling this for a genuinely new-or-newer pool, since InstanceIds aren't
+// guaranteed unique and a later-created pool should win over an earlier one at the same address.
+func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.TokenPool) error {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+
+	contractConfig := ContractConfig{
+		Type:  poolConfig.Type,
+		Owner: types.PARTY(poolConfig.PoolOwner),
+	}
+
+	// Handle factory if configured
+	if poolConfig.Factory != nil {
+		disclosureFactory, err := factory.NewBurnMintFactory(ctx, types.PARTY(poolConfig.PoolOwner), s.activeContractStore, *poolConfig.Factory)
+		if err != nil {
+			return fmt.Errorf("failed to get burn mint factory for token pool with address %s: %w", poolConfig.InstanceAddress, err)
+		}
+		contractConfig.disclosureFactory = disclosureFactory
+	}
+
+	// Handle transfer preapproval if configured
+	if poolConfig.TransferPreapproval != nil {
+		preapprovalFactoryFunc, err := getPreapprovalFactory(s.activeContractStore, poolConfig.TransferPreapproval.ContextKey, contractConfig.Owner, *poolConfig.TransferPreapproval)
+		if err != nil {
+			return fmt.Errorf("failed to get preapproval factory for token pool with address %s: %w", poolConfig.InstanceAddress, err)
+		}
+		contractConfig.preapproval = preapprovalFactoryFunc
+	}
+
+	s.contractConfigs[poolConfig.InstanceAddress] = contractConfig
+	s.logger.Info().Stringer("address", poolConfig.InstanceAddress).Str("type", string(poolConfig.Type)).Msg("dynamically registered discovered token pool")
+
+	return nil
 }

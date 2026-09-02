@@ -18,7 +18,7 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	committeeverifierop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	executorop "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
@@ -218,7 +218,7 @@ func (a *CantonChainFamilyAdapter) configureChainForLanes(
 		if err != nil {
 			return out, fmt.Errorf("resolve executor for remote chain %d: %w", remoteSelector, err)
 		}
-		defaultInboundCCVs, err := resolveDefaultInboundCCVs(ds, input.ChainSelector, remoteCfg)
+		defaultInboundCCVs, err := resolveDefaultInboundCCVs(input.ChainSelector, remoteCfg)
 		if err != nil {
 			return out, fmt.Errorf("resolve default inbound ccvs for remote chain %d: %w", remoteSelector, err)
 		}
@@ -444,7 +444,13 @@ func (a *CantonChainFamilyAdapter) GetDefaultCommitteeVerifierRemoteChainConfig(
 func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(sourceChainSelector, _ uint64, chainFamilySelector [4]byte) ccipadapters.FeeQuoterDestChainConfigOverrides {
 	if isEVMSelector(sourceChainSelector) {
 		// Canton has no gas market and execution is manual, so every gas-derived field is
-		// zeroed and the lane is priced by a flat network fee instead.
+		// zeroed and the lane is priced by a flat network fee instead. USDPerUnitGas is still
+		// required: the EVM FeeQuoter 2.0 unconditionally reverts NoGasPriceAvailable in
+		// quoteGasForExec for any enabled destination that has no gas-price entry, regardless of
+		// family, so an EVM source must seed a Canton gas price via FeeQuoter::UpdatePrices even
+		// though Canton is priced flat. The value mirrors the non-EVM branch
+		// (defaultCantonFeeQuoterDestChainConfig().V2Params.USDPerUnitGas = 38, i.e. 0.0000000038
+		// USD/gas) and the gas price the Canton-side configure sequence pushes for its EVM remote.
 		return ccipadapters.FeeQuoterDestChainConfigOverrides{
 			IsEnabled:                   new(true),
 			MaxDataBytes:                new(uint32(32_000)),
@@ -457,7 +463,7 @@ func (a *CantonChainFamilyAdapter) GetDefaultFeeQuoterDestChainConfig(sourceChai
 			DefaultTxGasLimit:           new(uint32(1)),
 			NetworkFeeUSDCents:          new(uint16(50)),
 			LinkFeeMultiplierPercent:    new(uint8(90)),
-			// USDPerUnitGas is left unset to avoid a gas price update by default.
+			USDPerUnitGas:               defaultCantonFeeQuoterDestChainConfig().V2Params.USDPerUnitGas,
 		}
 	}
 
@@ -570,23 +576,23 @@ func resolveContractRefsByAddresses(ds datastore.DataStore, chainSelector uint64
 }
 
 func resolveDefaultInboundCCVs(
-	ds datastore.DataStore,
 	chainSelector uint64,
 	remoteCfg ccipadapters.RemoteChainConfig[[]byte, string],
 ) ([]datastore.AddressRef, error) {
-	if len(remoteCfg.DefaultInboundCCVs) > 0 {
-		return resolveContractRefsByAddresses(
-			ds,
-			chainSelector,
-			datastore.ContractType(committeeverifierop.ContractType),
-			committeeverifierop.Version,
-			remoteCfg.DefaultInboundCCVs,
-		)
-	}
+	// A Canton CommitteeVerifier verifies Canton-origin messages on the destination chain (it is
+	// the *outbound* CCV consumed by the remote EVM side). It cannot verify EVM-origin messages
+	// on Canton, so it is never a valid *inbound* CCV for a Canton chain. chainlink-ccip's
+	// resolveDefaultCCVs auto-resolves the "default"-qualifier CommitteeVerifier into
+	// DefaultInboundCCVs when the lane YAML leaves it unset; honoring that here would silently
+	// produce an inbound lane backed by a verifier that can never verify — the opposite of
+	// fail-closed. Force the invalid-ccv sentinel as the default inbound CCV regardless of what
+	// was auto-resolved. Explicit per-lane inbound CCVs set via laneMandatedInboundCCVs are
+	// resolved separately (see configureChainForLanes) and remain honored.
+	_ = remoteCfg.DefaultInboundCCVs // explicitly ignored; see comment above
 
-	// Hardening: default inbound CCV is invalid-ccv (fail-closed) when not explicitly configured.
-	// The sentinel is hardcoded rather than resolved from the datastore so lanes stay fail-closed
-	// even when no invalid-ccv qualifier was ever written to the address book.
+	// Hardening: default inbound CCV is invalid-ccv (fail-closed). The sentinel is hardcoded
+	// rather than resolved from the datastore so lanes stay fail-closed even when no invalid-ccv
+	// qualifier was ever written to the address book.
 	ref, err := invalidCCVAddressRef(chainSelector)
 	if err != nil {
 		return nil, fmt.Errorf("build default invalid-ccv inbound ref: %w", err)

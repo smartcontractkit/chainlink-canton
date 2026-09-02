@@ -3,11 +3,12 @@ package config
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 func TestRead(t *testing.T) {
@@ -227,6 +228,7 @@ chain_selector = "8706591216959472610"
 							TokenId:   "ChainLink",
 						},
 					},
+					SupplyCacheTTL: time.Second * 10, // Default
 				},
 				Node: NodeConfig{
 					URL: "localhost:8545",

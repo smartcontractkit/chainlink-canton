@@ -1,0 +1,24 @@
+chain_selector = "9268731218649498074"
+
+[server]
+  host = "0.0.0.0"
+  port = 8089
+
+[node]
+  url = "participant1.grpc-ledger-api.localhost:8080"
+  max_retries = 10
+
+[node.auth]
+  type = 'insecureStatic'
+  user_id = 'user-participant1'
+  # jwt should be taken from a separate secrets file, see eds-token-pools_secrets.toml (alongside this file)
+
+[monitoring]
+  enabled = false
+
+[token_pool_api]
+  enabled = true
+
+[registry_api]
+  enabled = true
+  party_id = "chainlink-registry-observer::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"

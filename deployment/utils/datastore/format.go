@@ -6,7 +6,7 @@ import (
 	datastore2 "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
 func ToInstanceAddress(ref datastore.AddressRef) (contracts.InstanceAddress, error) {

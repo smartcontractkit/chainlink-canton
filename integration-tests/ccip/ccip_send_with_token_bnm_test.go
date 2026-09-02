@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/http"
 	"os"
 	"slices"
 	"strconv"
@@ -36,24 +37,24 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/bindings"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipcodec"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ccipruntime"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/clientapi"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/committeeverifier"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/core"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/events"
-	executorBinding "github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/executor"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/ratelimiter"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/ccip/sender"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/chainlink/chainlinkapi"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/link"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_burn_mint_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_holding_v1"
-	"github.com/smartcontractkit/chainlink-canton/bindings/generated/latest/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/commonconfig"
-	"github.com/smartcontractkit/chainlink-canton/contracts"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/events"
+	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_burn_mint_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -77,6 +78,7 @@ import (
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
 	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 
@@ -603,7 +605,21 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 			TokenStandardAPIConfig: config.TokenStandardAPIConfig{
-				Enabled: false,
+				Enabled: true,
+				Admin:   partySender,
+				Registries: map[string]config.Registry{
+					string(linkInstrumentId.Id): {
+						ContractIdentifier: config.ContractIdentifier{
+							PartyID:         partySender,
+							InstanceAddress: linkRegistryAddress.InstanceAddress(),
+						},
+						TokenType:   config.TokenTypeLINK,
+						TokenId:     string(linkInstrumentId.Id),
+						TokenName:   "ChainLink Token",
+						TokenSymbol: "LINK",
+					},
+				},
+				SupplyCacheTTL: time.Nanosecond, // lower possible value, to practically disable caching
 			},
 		})
 		log.Info().Err(err).Msg("EDS-pool terminated")
@@ -623,6 +639,8 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err, "Failed to create Executor API client")
 	tokenPoolAPIClient, err := oapiTokenPool.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPoolPort))
 	require.NoError(t, err, "Failed to create Token Pool API client")
+	tokenMetadataAPIClient, err := tokenMetadataV1.NewClientWithResponses(fmt.Sprintf("http://localhost:%d", edsPoolPort))
+	require.NoError(t, err, "Failed to create Token Metadata API client")
 
 	waitForEDSListening(t, edsCCIPPort, edsPoolPort)
 
@@ -746,6 +764,23 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		senderHoldingCids[i] = types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
 	}
 
+	// Query EDS' TokenMetadata API
+	linkMetadata, err := tokenMetadataAPIClient.GetInstrumentWithResponse(t.Context(), string(linkInstrumentId.Id))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, linkMetadata.StatusCode(), "expected 200 OK from TokenMetadata API for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200, "expected non-nil JSON200 response from TokenMetadata API for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200.TotalSupply, "expected non-nil TotalSupply in TokenMetadata API response for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200.TotalSupplyAsOf, "expected non-nil TotalSupplyAsOf in TokenMetadata API response for LINK instrument")
+	t.Logf("Queried Token Metadata: id: %v, symbol: %v, name: %v, totalSupply: %v, totalSupplyAsOf: %v",
+		linkMetadata.JSON200.Id,
+		linkMetadata.JSON200.Symbol,
+		linkMetadata.JSON200.Name,
+		*linkMetadata.JSON200.TotalSupply,
+		*linkMetadata.JSON200.TotalSupplyAsOf,
+	)
+	require.Equal(t, "50.0000000000", *linkMetadata.JSON200.TotalSupply)
+	require.WithinDuration(t, time.Now(), *linkMetadata.JSON200.TotalSupplyAsOf, time.Second, "expected LastUpdated to be recent")
+
 	// Get transfer factory for Amulet tokens (sender to CCIP owner)
 	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
 	require.NoError(t, err, "failed to get transfer factory")
@@ -789,7 +824,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// Extract transfer factory context values (e.g. amulet-rules) for the fee token input
 	transferFactoryContextValues := testhelpers.ExtractChoiceContextValues(choiceContext)
 
-	const tokenTransferAmountDecimal = "0.0000010000"
+	const tokenTransferAmountDecimal = "1.0"
 
 	executorRawOrHashedAddress := oapiCommon.RawOrHashedAddress{}
 	_ = executorRawOrHashedAddress.FromRawInstanceAddress(executorAddress.String())
@@ -1004,8 +1039,8 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// Verify that the event contains the feeToken InstrumentId
 	require.Equal(t, nativeInstrumentId, ccipMessageSent.Event.FeeToken, "CCIPMessageSent should contain feeToken InstrumentId")
 
-	// Verify pool feeBps haircut: 10,000 smallest units with 5% feeBps => 9,500 bridged.
-	require.Equal(t, int64(9500), extractTokenTransferAmountFromEncodedMessageHex(t, ccipMessageSent.Event.EncodedMessage), "encoded token amount should be net after 5% feeBps")
+	// Verify pool feeBps haircut: 1e10 LINK, minus 5% feeBps => 0.95e10 bridged.
+	require.Equal(t, int64(9500000000), extractTokenTransferAmountFromEncodedMessageHex(t, ccipMessageSent.Event.EncodedMessage), "encoded token amount should be net after 5% feeBps")
 	// Verify that the event itself contains the original amount without fees
 	wantAmount, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
 	require.True(t, ok, "token transfer amount should parse as a decimal value")
@@ -1041,6 +1076,26 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 
 		return linkDelta.Cmp(netLinkTransferAmountRat) == 0
 	}, 15*time.Second, 200*time.Millisecond, "sender LINK deduction should equal net token transfer amount after pool feeBps")
+
+	// Query EDS' TokenMetadata API again, checking that totalSupply has decreased
+	linkMetadata, err = tokenMetadataAPIClient.GetInstrumentWithResponse(t.Context(), string(linkInstrumentId.Id))
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, linkMetadata.StatusCode(), "expected 200 OK from TokenMetadata API for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200, "expected non-nil JSON200 response from TokenMetadata API for LINK instrument")
+	require.NotNil(t, linkMetadata.JSON200.TotalSupply, "expected TotalSupply to be non-nil after token transfer")
+	require.NotNil(t, linkMetadata.JSON200.TotalSupplyAsOf, "expected TotalSupplyAsOf to be non-nil after token transfer")
+	t.Logf("Queried Token Metadata: id: %v, symbol: %v, name: %v, totalSupply: %v, totalSupplyAsOf: %v",
+		linkMetadata.JSON200.Id,
+		linkMetadata.JSON200.Symbol,
+		linkMetadata.JSON200.Name,
+		*linkMetadata.JSON200.TotalSupply,
+		*linkMetadata.JSON200.TotalSupplyAsOf,
+	)
+	// Started with 50 LINK
+	// - 1 LINK bridged
+	// + 0.05 LINK pool feeBps retained by sender's pool (poolOwner == sender)
+	// = 49.05 LINK remaining in total supply
+	require.Equal(t, "49.0500000000", *linkMetadata.JSON200.TotalSupply)
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", ccipMessageSent.Event.MessageId)
