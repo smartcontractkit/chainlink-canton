@@ -197,6 +197,120 @@ testSameOwnerDistinctInstanceIds = script do
 
     pure ()
 
+-- | AddCCVFee rejects negative destGasLimit, destBytesOverhead, and feeUSDCents.
+testAddCCVFeeRejectsNegativeResourceValues : Script ()
+testAddCCVFeeRejectsNegativeResourceValues = script do
+    ccipOwner <- allocateParty "ccip-owner-negres"
+    ccvOwner <- allocateParty "ccv-owner-negres"
+
+    let destChainSelector : Numeric 0 = 456.0
+    let ccv = Chainlink.InstanceAddress.make "ccv-id-negres" ccvOwner
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with admin = ccipOwner; id = "feeToken"
+
+    let deps = CCIP.CoreV2.SendingMessage.SendingMessageDeps with
+            router = Chainlink.InstanceAddress.make "router-negres" ccipOwner
+            onRamp = Chainlink.InstanceAddress.make "onramp-negres" ccipOwner
+            globalConfig = Chainlink.InstanceAddress.make "globalconfig-negres" ccipOwner
+            rmnRemote = Chainlink.InstanceAddress.make "rmn-negres" ccipOwner
+            tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-negres" ccipOwner
+            feeQuoter = Chainlink.InstanceAddress.make "feequoter-negres" ccipOwner
+
+    let mkSendingMessage = createCmd CCIP.CoreV2.SendingMessage.SendingMessage with
+            deps = deps
+            ccipOwner = ccipOwner
+            sender = ccipOwner
+            destChainSelector = destChainSelector
+            destAddressBytesLength = 20
+            sequenceNumber = 1.0
+            destDefaultCCVs = []
+            requiredCCVs = [ccv]
+            requiredExecutor = None
+            executorAddress = "0000000000000000000000000000000000000000000000000000000000000000"
+            executionMode = Some CCIP.CoreV2.SendingMessage.ExecutionMode_NoExecutor
+            sourceChainSelector = 123.0
+            senderAddress = ""
+            receiver = "842bfeb3bcb6ec81ceaec55cf9a0e9db5eb77be0"
+            payload = ""
+            executionGasLimit = 0
+            ccipReceiveGasLimit = 0
+            ccvAndExecutorHash = ""
+            onRampAddress = ""
+            offRampAddress = ""
+            tokenReceiver = ""
+            tokenArgs = ""
+            feeToken = feeToken
+            networkFeeUSDCents = 0.0
+            expectedTokenInstrumentId = None
+            tokenAmountBeforeTokenPoolFees = 0.0
+            outboundPoolCCVs = None
+            executorArgs = ""
+            executorFee = None
+            executorDestGasLimit = 0
+            executorDestBytesOverhead = 0
+            executorFeeTokenAmount = 0.0
+            observingParties = [ccvOwner]
+            ccvFees = []
+            tokenSendFee = None
+            ccvFeeTokenAmounts = []
+            tokenSendFeeTokenAmount = 0.0
+            networkFeeTokenAmount = 0.0
+            tokenSendData = None
+            verifierData = []
+            ccvOwners = []
+            message = None
+            encodedMessage = ""
+            messageId = ""
+            state = CCIP.CoreV2.SendingMessage.SendingMessageState_Prepared
+
+    -- Negative destGasLimit is rejected.
+    sendingMessageCid1 <- submit ccipOwner do mkSendingMessage
+    submitMustFail (actAs ccvOwner) do
+        exerciseCmd sendingMessageCid1 CCIP.CoreV2.SendingMessage.AddCCVFee with
+            ccvInstanceId = "ccv-id-negres"
+            feeUSDCents = 0.0
+            destGasLimit = -1
+            destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = ccvOwner
+
+    -- Negative destBytesOverhead is rejected.
+    sendingMessageCid2 <- submit ccipOwner do mkSendingMessage
+    submitMustFail (actAs ccvOwner) do
+        exerciseCmd sendingMessageCid2 CCIP.CoreV2.SendingMessage.AddCCVFee with
+            ccvInstanceId = "ccv-id-negres"
+            feeUSDCents = 0.0
+            destGasLimit = 0
+            destBytesOverhead = -1
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = ccvOwner
+
+    -- Negative feeUSDCents is rejected.
+    sendingMessageCid3 <- submit ccipOwner do mkSendingMessage
+    submitMustFail (actAs ccvOwner) do
+        exerciseCmd sendingMessageCid3 CCIP.CoreV2.SendingMessage.AddCCVFee with
+            ccvInstanceId = "ccv-id-negres"
+            feeUSDCents = -1.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = ccvOwner
+
+    -- Zero is still a legitimate value for all three fields.
+    sendingMessageCid4 <- submit ccipOwner do mkSendingMessage
+    sendingMessageCid4 <- submit (actAs ccvOwner) do
+        exerciseCmd sendingMessageCid4 CCIP.CoreV2.SendingMessage.AddCCVFee with
+            ccvInstanceId = "ccv-id-negres"
+            feeUSDCents = 0.0
+            destGasLimit = 0
+            destBytesOverhead = 0
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            caller = ccvOwner
+
+    Some sm <- queryContractId ccipOwner sendingMessageCid4
+    length sm.ccvFees === 1
+
+    pure ()
+
 testValidateDestChainAddress : Script ()
 testValidateDestChainAddress = do
     -- In: 20 bytes, unpadded
