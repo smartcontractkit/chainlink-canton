@@ -23,8 +23,8 @@ import (
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/ledger/usbwallet"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/cantonops"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/ledger/usbwallet"
 )
 
 func newCantonExternalPartyCommand(g *Globals) *cobra.Command {

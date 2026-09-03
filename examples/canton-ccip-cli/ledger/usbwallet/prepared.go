@@ -9,7 +9,7 @@ import (
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 
-	devicepb "github.com/smartcontractkit/chainlink-canton/examples/cli/ledger/proto"
+	devicepb "github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/ledger/proto"
 )
 
 // driverMetadataField is the field number of Metadata.InputContract.driver_metadata. The

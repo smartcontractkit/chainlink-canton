@@ -6,7 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	cmdpkg "github.com/smartcontractkit/chainlink-canton/examples/cli/cmd"
+	cmdpkg "github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/cmd"
 )
 
 func main() {

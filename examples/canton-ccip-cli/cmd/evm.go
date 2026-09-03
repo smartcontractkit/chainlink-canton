@@ -18,11 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/evm"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/evmops"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/finality"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/cantonops"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/clients"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/evmops"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/finality"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/input"
 )
 
 // parseAmount parses an amount string that may include exponents (e.g. "1e18")

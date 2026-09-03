@@ -4,8 +4,8 @@ package cmd
 import (
 	"context"
 
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
-	cfgpkg "github.com/smartcontractkit/chainlink-canton/examples/cli/internal/config"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/clients"
+	cfgpkg "github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/config"
 )
 
 // Globals are flags shared by every subcommand.

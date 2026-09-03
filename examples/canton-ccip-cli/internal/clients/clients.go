@@ -33,7 +33,7 @@ import (
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
-	cfgpkg "github.com/smartcontractkit/chainlink-canton/examples/cli/internal/config"
+	cfgpkg "github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/config"
 )
 
 // Bundle holds every constructed client/handle used by the commands.
