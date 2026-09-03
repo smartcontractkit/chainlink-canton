@@ -17,10 +17,17 @@ import (
 // to keep the device side hash identical to the one computed by the participant.
 const driverMetadataField protowire.Number = 1001
 
+// deviceMessage is one of the component messages a prepared transaction is split into. The label
+// is only used to point at the offending component when the device rejects one of them.
+type deviceMessage struct {
+	label   string
+	payload []byte
+}
+
 // splitPreparedTransaction serializes a prepared transaction into the component messages the
 // device expects, in transmission order: the DAML transaction, every node (children before
 // their parents), the metadata and finally every input contract.
-func splitPreparedTransaction(transaction *interactivepb.PreparedTransaction) ([][]byte, error) {
+func splitPreparedTransaction(transaction *interactivepb.PreparedTransaction) ([]deviceMessage, error) {
 	damlTransaction := transaction.GetTransaction()
 	if damlTransaction == nil {
 		return nil, errors.New("ledger: prepared transaction has no DAML transaction")
@@ -55,10 +62,10 @@ func splitPreparedTransaction(transaction *interactivepb.PreparedTransaction) ([
 		return nil, err
 	}
 
-	messages := make([][]byte, 0, 2+len(nodes)+len(metadata.GetInputContracts()))
-	messages = append(messages, deviceTransaction)
+	messages := make([]deviceMessage, 0, 2+len(nodes)+len(metadata.GetInputContracts()))
+	messages = append(messages, deviceMessage{label: "DAML transaction", payload: deviceTransaction})
 
-	for _, node := range nodes {
+	for i, node := range nodes {
 		deviceNode := &devicepb.DeviceDamlTransaction_Node{NodeId: node.GetNodeId()}
 		if versioned := node.GetV1(); versioned != nil {
 			deviceNode.VersionedNode = &devicepb.DeviceDamlTransaction_Node_V1{V1: versioned}
@@ -68,21 +75,27 @@ func splitPreparedTransaction(transaction *interactivepb.PreparedTransaction) ([
 		if err != nil {
 			return nil, fmt.Errorf("ledger: failed to marshal node %q: %w", node.GetNodeId(), err)
 		}
-		messages = append(messages, encoded)
+		messages = append(messages, deviceMessage{
+			label:   fmt.Sprintf("node %d/%d (node id %q)", i+1, len(nodes), node.GetNodeId()),
+			payload: encoded,
+		})
 	}
 
 	deviceMetadata, err := convertMetadata(metadata)
 	if err != nil {
 		return nil, err
 	}
-	messages = append(messages, deviceMetadata)
+	messages = append(messages, deviceMessage{label: "metadata", payload: deviceMetadata})
 
 	for i, inputContract := range metadata.GetInputContracts() {
 		encoded, err := convertInputContract(inputContract)
 		if err != nil {
 			return nil, fmt.Errorf("ledger: failed to marshal input contract %d: %w", i, err)
 		}
-		messages = append(messages, encoded)
+		messages = append(messages, deviceMessage{
+			label:   fmt.Sprintf("input contract %d/%d", i+1, len(metadata.GetInputContracts())),
+			payload: encoded,
+		})
 	}
 
 	return messages, nil

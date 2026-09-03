@@ -117,7 +117,7 @@ func TestSplitPreparedTransaction(t *testing.T) {
 	require.Len(t, messages, 5)
 
 	var damlTransaction devicepb.DeviceDamlTransaction
-	require.NoError(t, proto.Unmarshal(messages[0], &damlTransaction))
+	require.NoError(t, proto.Unmarshal(messages[0].payload, &damlTransaction))
 	require.Equal(t, "2.1", damlTransaction.GetVersion())
 	require.Equal(t, []string{"0"}, damlTransaction.GetRoots())
 	require.Equal(t, int32(2), damlTransaction.GetNodesCount())
@@ -125,22 +125,36 @@ func TestSplitPreparedTransaction(t *testing.T) {
 
 	// The child create node is sent before its exercise parent.
 	var firstNode, secondNode devicepb.DeviceDamlTransaction_Node
-	require.NoError(t, proto.Unmarshal(messages[1], &firstNode))
-	require.NoError(t, proto.Unmarshal(messages[2], &secondNode))
+	require.NoError(t, proto.Unmarshal(messages[1].payload, &firstNode))
+	require.NoError(t, proto.Unmarshal(messages[2].payload, &secondNode))
 	require.Equal(t, "1", firstNode.GetNodeId())
 	require.Equal(t, "0", secondNode.GetNodeId())
 
 	var metadata devicepb.DeviceMetadata
-	require.NoError(t, proto.Unmarshal(messages[3], &metadata))
+	require.NoError(t, proto.Unmarshal(messages[3].payload, &metadata))
 	require.Equal(t, "sync", metadata.GetSynchronizerId())
 	require.Equal(t, int32(1), metadata.GetInputContractsCount())
 	require.Equal(t, []string{"alice"}, metadata.GetSubmitterInfo().GetActAs())
 
 	var inputContract devicepb.DeviceMetadata_InputContract
-	require.NoError(t, proto.Unmarshal(messages[4], &inputContract))
+	require.NoError(t, proto.Unmarshal(messages[4].payload, &inputContract))
 	require.Equal(t, uint64(7), inputContract.GetCreatedAt())
 	require.Equal(t, "contract", inputContract.GetV1().GetContractId())
-	require.NotContains(t, string(messages[4]), "this blob must not be sent to the device")
+	require.NotContains(t, string(messages[4].payload), "this blob must not be sent to the device")
+
+	// Labels are what a device side rejection is reported against, so they have to identify
+	// the component unambiguously.
+	labels := make([]string, 0, len(messages))
+	for _, message := range messages {
+		labels = append(labels, message.label)
+	}
+	require.Equal(t, []string{
+		"DAML transaction",
+		`node 1/2 (node id "1")`,
+		`node 2/2 (node id "0")`,
+		"metadata",
+		"input contract 1/1",
+	}, labels)
 }
 
 func TestSplitPreparedTransactionPreservesDriverMetadata(t *testing.T) {

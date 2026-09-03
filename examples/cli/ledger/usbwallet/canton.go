@@ -9,7 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os/signal"
+	"runtime"
 	"sync"
+	"syscall"
 
 	interactivepb "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -57,6 +60,34 @@ const (
 const challengeLength = 24
 
 const swOK uint16 = 0x9000
+
+// swTxParsingFailed is returned by the Canton app when it fails to parse one of the streamed
+// components of a prepared transaction.
+const swTxParsingFailed uint16 = 0xB005
+
+// swBlindSigningDisabled is returned when the device is asked to sign something it cannot
+// display and blind signing is turned off in the Canton app settings.
+const swBlindSigningDisabled uint16 = 0x6A80
+
+// swTxTooLong is returned when a single streamed component exceeds the fixed transaction buffer
+// of the app.
+const swTxTooLong uint16 = 0xB004
+
+var (
+	// ErrTransactionParsingFailed is reported when the device could not parse a prepared
+	// transaction. Unlike an unrecognized template, which the app blind signs, this is a hard
+	// failure of the on-device protobuf parser, e.g. because a component exceeds the very small
+	// dynamic memory pool of the app.
+	ErrTransactionParsingFailed = LedgerStatusError(swTxParsingFailed)
+
+	// ErrTransactionTooLong is reported when a single component of a prepared transaction does
+	// not fit into the fixed transaction buffer of the app.
+	ErrTransactionTooLong = LedgerStatusError(swTxTooLong)
+
+	// ErrBlindSigningDisabled is reported when signing requires blind signing but it is disabled
+	// in the Canton app settings.
+	ErrBlindSigningDisabled = LedgerStatusError(swBlindSigningDisabled)
+)
 
 // LedgerStatusError is returned when the device replies with a status word other than 0x9000.
 type LedgerStatusError uint16
@@ -305,7 +336,7 @@ func (w *cantonWallet) SignHash(path accounts.DerivationPath, hash []byte) ([]by
 		return nil, accounts.ErrWalletClosed
 	}
 
-	signature, _, err := w.ledgerSign(P1_SIGN_HASH, path, [][]byte{hash}, nil)
+	signature, _, err := w.ledgerSign(P1_SIGN_HASH, path, []deviceMessage{{label: "hash", payload: hash}}, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +358,13 @@ func (w *cantonWallet) SignHash(path accounts.DerivationPath, hash []byte) ([]by
 //	Splice.Wallet.TransferPreapproval.TransferPreapprovalProposal
 //
 // See: https://github.com/LedgerHQ/app-canton/blob/develop/doc/CLEARSIGN.md#supported-transaction-types-lines-113-123
+//
+// Note that the device only degrades to blind signing for transactions it parses successfully but
+// does not recognize. If its protobuf parser itself trips over a component, for example because
+// the transaction exceeds the very small dynamic memory pool of the app, it aborts with
+// ErrTransactionParsingFailed instead. Callers that want to keep going in that case have to fall
+// back to SignHash over the prepared transaction hash reported by the participant, which means
+// giving up on the device recomputing the hash itself.
 func (w *cantonWallet) SignPreparedTransaction(path accounts.DerivationPath, transaction *interactivepb.PreparedTransaction) ([]byte, error) {
 	messages, err := splitPreparedTransaction(transaction)
 	if err != nil {
@@ -373,7 +411,15 @@ func (w *cantonWallet) SignTopologyTransactions(path accounts.DerivationPath, tr
 		return nil, nil, accounts.ErrWalletClosed
 	}
 
-	signature, challengeSignature, err := w.ledgerSign(P1_SIGN_UNTYPED_VERSIONED_MESSAGE, path, transactions, challenge)
+	messages := make([]deviceMessage, 0, len(transactions))
+	for i, transaction := range transactions {
+		messages = append(messages, deviceMessage{
+			label:   fmt.Sprintf("topology transaction %d/%d", i+1, len(transactions)),
+			payload: transaction,
+		})
+	}
+
+	signature, challengeSignature, err := w.ledgerSign(P1_SIGN_UNTYPED_VERSIONED_MESSAGE, path, messages, challenge)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -413,10 +459,16 @@ func (w *cantonWallet) ledgerExchange(ins cantonInstruction, p1 cantonParam1, p2
 			apdu = nil
 		}
 		// Send over to the device
-		w.log.Trace("Data chunk sent to the Ledger", "chunk", hexutil.Bytes(chunk))
+		w.log.Trace("Sending data chunk to ledger...", "chunk", hexutil.Bytes(chunk))
+		// See https://github.com/sstallion/go-hid/issues/15
+		runtime.LockOSThread()
+		signal.Ignore(syscall.SIGURG)
 		if _, err := w.device.Write(chunk); err != nil {
 			return nil, err
 		}
+		signal.Reset(syscall.SIGURG)
+		runtime.UnlockOSThread()
+		w.log.Trace("Chunk sent.")
 	}
 
 	// Stream the reply back from the wallet in 64 byte chunks
@@ -424,9 +476,16 @@ func (w *cantonWallet) ledgerExchange(ins cantonInstruction, p1 cantonParam1, p2
 	chunk = chunk[:64] // Yeah, we surely have enough space
 	for {
 		// Read the next chunk from the Ledger wallet
+		w.log.Trace("Reading data chunk from ledger...")
+		runtime.LockOSThread()
+		signal.Ignore(syscall.SIGURG)
 		if _, err := io.ReadFull(w.device, chunk); err != nil {
+			signal.Reset(syscall.SIGURG)
+			runtime.UnlockOSThread()
 			return nil, err
 		}
+		signal.Reset(syscall.SIGURG)
+		runtime.UnlockOSThread()
 		w.log.Trace("Data chunk received from the Ledger", "chunk", hexutil.Bytes(chunk))
 
 		// Make sure the transport header matches
@@ -506,7 +565,7 @@ func encodeDerivationPath(derivationPath accounts.DerivationPath) []byte {
 
 // ledgerSign runs a full SIGN_TX sequence: the derivation path (plus the optional attestation
 // challenge) first, then every message, with the last one carrying the signature response.
-func (w *cantonWallet) ledgerSign(p1 cantonParam1, derivationPath accounts.DerivationPath, messages [][]byte, challenge []byte) ([]byte, []byte, error) {
+func (w *cantonWallet) ledgerSign(p1 cantonParam1, derivationPath accounts.DerivationPath, messages []deviceMessage, challenge []byte) ([]byte, []byte, error) {
 	pathData := encodeDerivationPath(derivationPath)
 	pathData = append(pathData, challenge...)
 
@@ -523,14 +582,19 @@ func (w *cantonWallet) ledgerSign(p1 cantonParam1, derivationPath accounts.Deriv
 
 	// The first APDU carries the path and must always announce that more data follows.
 	if _, err := w.ledgerExchange(INS_SIGN_TX, p1, P2_FIRST|P2_MORE, pathData); err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("derivation path: %w", err)
 	}
 
 	var reply []byte
 	for i, message := range messages {
 		var err error
-		if reply, err = w.ledgerSendChunked(INS_SIGN_TX, p1, message, i == len(messages)-1); err != nil {
-			return nil, nil, err
+		if reply, err = w.ledgerSendChunked(INS_SIGN_TX, p1, message.payload, i == len(messages)-1); err != nil {
+			label := message.label
+			if label == "" {
+				label = fmt.Sprintf("message %d/%d", i+1, len(messages))
+			}
+
+			return nil, nil, fmt.Errorf("%s (%d bytes): %w", label, len(message.payload), err)
 		}
 	}
 

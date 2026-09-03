@@ -23,6 +23,23 @@ app protocol and signs Ed25519 payloads for Canton workflows.
   (transaction header, ordered nodes, metadata, input contracts)
 - Preserves unknown `driver_metadata` fields in input contracts so host/device hash computation stays aligned
 
+## Device side parsing limits
+
+The Canton app parses every streamed component on device with nanopb, out of a dynamic memory
+pool of only a few kilobytes and into a fixed size component buffer. Transactions it parses but
+does not recognize are blind signed, but transactions its parser trips over are rejected outright
+with `SW_TX_PARSING_FAIL` (`0xB005`) or `SW_WRONG_TX_LENGTH` (`0xB004`), surfaced here as
+`ErrTransactionParsingFailed` and `ErrTransactionTooLong`. Large or deeply nested transactions,
+such as a CCIP send, hit this.
+
+Errors from `SignPreparedTransaction` name the component the device rejected, e.g.
+`node 7/13 (node id "6") (4821 bytes): ledger: device returned status word 0xB005 ...`.
+
+Callers that want to keep going have to fall back to `SignHash` over the prepared transaction
+hash reported by the participant. That works only with blind signing enabled in the Canton app
+settings, and it gives up on the device recomputing the hash itself, so it should be a deliberate,
+visible decision. The example CLI does this in `internal/cantonops`.
+
 ## Prerequisites
 
 - A Ledger device with the Canton app open

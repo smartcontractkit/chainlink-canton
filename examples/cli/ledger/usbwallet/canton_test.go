@@ -1,6 +1,7 @@
 package usbwallet
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -45,4 +46,18 @@ func TestParseSignatureResponse(t *testing.T) {
 		_, _, err := parseSignatureResponse([]byte{0x40, 0x01}, false)
 		require.Error(t, err)
 	})
+}
+
+func TestLedgerStatusErrorIs(t *testing.T) {
+	t.Parallel()
+
+	// The status word errors are wrapped with the component that the device rejected, so
+	// callers have to be able to unwrap them to decide whether to fall back to blind signing.
+	err := fmt.Errorf("node 3/12 (4821 bytes): %w", LedgerStatusError(0xB005))
+	require.ErrorIs(t, err, ErrTransactionParsingFailed)
+	require.NotErrorIs(t, err, ErrBlindSigningDisabled)
+	require.Contains(t, err.Error(), "node 3/12 (4821 bytes)")
+	require.Contains(t, err.Error(), "transaction parsing failed")
+
+	require.ErrorIs(t, fmt.Errorf("hash: %w", LedgerStatusError(0x6A80)), ErrBlindSigningDisabled)
 }

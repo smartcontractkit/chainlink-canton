@@ -18,12 +18,12 @@ import (
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	v30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/protocol/v30"
 	versionv1 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/version/v1"
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
 	"github.com/smartcontractkit/chainlink-canton/examples/cli/ledger/usbwallet"
 )
 
@@ -40,15 +40,6 @@ func newCantonExternalPartyCommand(g *Globals) *cobra.Command {
 	return c
 }
 
-func parseDerivationPath(pathOrIndex string) (accounts.DerivationPath, error) {
-	index, err := strconv.ParseUint(pathOrIndex, 10, 32)
-	if err == nil {
-		return accounts.DerivationPath{0x80000000 + 44, 0x80000000 + 6767, 0x80000000 + 0, 0x80000000 + 0, 0x80000000 + uint32(index)}, nil
-	}
-
-	return accounts.ParseDerivationPath(pathOrIndex)
-}
-
 func newGetFingerprintCmd(g *Globals) *cobra.Command {
 	var (
 		derivationPathFlag string
@@ -63,7 +54,7 @@ func newGetFingerprintCmd(g *Globals) *cobra.Command {
 				return err
 			}
 
-			derivationPath, err := parseDerivationPath(derivationPathFlag)
+			derivationPath, err := cantonops.ParseDerivationPath(derivationPathFlag)
 			if err != nil {
 				return fmt.Errorf("failed to parse derivation path: %w", err)
 			}
@@ -318,7 +309,7 @@ func newSignTopologyTransactionCmd(g *Globals) *cobra.Command {
 			defer wallet.Close()
 
 			// Parse derivation path
-			derivationPath, err := parseDerivationPath(derivationPathFlag)
+			derivationPath, err := cantonops.ParseDerivationPath(derivationPathFlag)
 			if err != nil {
 				return fmt.Errorf("failed to parse derivation path: %w", err)
 			}
@@ -342,7 +333,7 @@ func newSignTopologyTransactionCmd(g *Globals) *cobra.Command {
 			}
 
 			// Sign hash
-			fmt.Printf("Confirm the signature on your Ledger device for the multihash: %s\n", hex.EncodeToString(multihash))
+			fmt.Printf("📜 Confirm the signature on your Ledger device for the multihash: %s\n", strings.ToUpper(hex.EncodeToString(multihash)))
 			signature, err := wallet.SignHash(derivationPath, multihash)
 			if err != nil {
 				return fmt.Errorf("failed to sign multihash with Ledger: %w", err)
