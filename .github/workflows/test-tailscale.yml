@@ -1,0 +1,137 @@
+# Required secrets:
+#   TS_OAUTH_CLIENT_ID_CANTON  — Tailscale OAuth client ID (repo-wide)
+#   TS_AUDIENCE_CANTON         — Tailscale audience tag (repo-wide)
+#
+# Per environment (devnet, testnet, mainnet):
+#   CANTON_OKTA_AUTHORIZER_<ENV>     — Okta issuer URL (e.g. https://trial.okta.com/oauth2/default)
+#   CANTON_OKTA_CLIENT_ID_<ENV>      — Okta OAuth client ID for CI/CD
+#   CANTON_OKTA_CLIENT_SECRET_<ENV>  — Okta OAuth client secret for CI/CD
+
+name: Test Tailscale Connectivity
+run-name: "Test Tailscale connectivity to Canton (${{ inputs.canton_environment || 'devnet' }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      canton_environment:
+        description: "Canton environment to test"
+        type: choice
+        options:
+          - devnet
+          - testnet
+          - mainnet
+        default: devnet
+
+jobs:
+  test-tailscale:
+    name: "Test Tailscale Connectivity (${{ inputs.canton_environment }})"
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      CANTON_ENV: ${{ inputs.canton_environment }}
+      CANTON_OKTA_AUTHORIZER: >-
+        ${{
+          inputs.canton_environment == 'testnet' && secrets.CANTON_OKTA_AUTHORIZER_TESTNET ||
+          inputs.canton_environment == 'mainnet' && secrets.CANTON_OKTA_AUTHORIZER_MAINNET ||
+          secrets.CANTON_OKTA_AUTHORIZER_DEVNET
+        }}
+      CANTON_OKTA_CLIENT_ID: >-
+        ${{
+          inputs.canton_environment == 'testnet' && secrets.CANTON_OKTA_CLIENT_ID_TESTNET ||
+          inputs.canton_environment == 'mainnet' && secrets.CANTON_OKTA_CLIENT_ID_MAINNET ||
+          secrets.CANTON_OKTA_CLIENT_ID_DEVNET
+        }}
+      CANTON_OKTA_CLIENT_SECRET: >-
+        ${{
+          inputs.canton_environment == 'testnet' && secrets.CANTON_OKTA_CLIENT_SECRET_TESTNET ||
+          inputs.canton_environment == 'mainnet' && secrets.CANTON_OKTA_CLIENT_SECRET_MAINNET ||
+          secrets.CANTON_OKTA_CLIENT_SECRET_DEVNET
+        }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@53acf823325fe9ca47f4cdaa951f90b4b0de5bb9 # v4.1.1
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID_CANTON }}
+          audience: ${{ secrets.TS_AUDIENCE_CANTON }}
+          tags: tag:bcy-validators-gha
+
+      - name: "[DEBUG] 1 - Tailscale node info"
+        run: |
+          echo "=== Tailscale status (this node + peers) ==="
+          tailscale status || true
+          echo ""
+          echo "=== This node's Tailscale IP ==="
+          tailscale ip -4 || true
+          echo ""
+          echo "=== Tailscale debug prefs (confirm AcceptRoutes=true) ==="
+          tailscale debug prefs 2>&1 | head -30 || true
+
+      - name: "[DEBUG] 2 - DNS configuration (Split DNS shows app connector DoH)"
+        run: |
+          echo "=== Tailscale DNS status ==="
+          tailscale dns status || true
+          echo ""
+          echo "=== /etc/resolv.conf ==="
+          cat /etc/resolv.conf
+
+      - name: "[DEBUG] 3 - DNS resolution (LB IPs returned by app connector DoH)"
+        run: |
+          echo "=== getent hosts canton-devnet.bcy-v.metalhosts.com ==="
+          getent hosts canton-devnet.bcy-v.metalhosts.com || true
+          echo "=== getent hosts canton-testnet.bcy-v.metalhosts.com ==="
+          getent hosts canton-testnet.bcy-v.metalhosts.com || true
+          echo "=== getent hosts testnet.cv1.bcy-v.metalhosts.com ==="
+          getent hosts testnet.cv2.bcy-v.metalhosts.com || true
+          echo "=== getent hosts testnet.cv1.bcy-v.metalhosts.com ==="
+          getent hosts testnet.cv3.bcy-v.metalhosts.com || true
+          echo "=== getent hosts testnet.cv1.bcy-v.metalhosts.com ==="
+          getent hosts testnet.cv3.bcy-v.metalhosts.com || true
+
+      - name: "[DEBUG] 4 - Routes (expect LB IPs via tailscale0, but they are MISSING)"
+        run: |
+          echo "=== All routes via tailscale ==="
+          ip route show table all | grep tailscale || echo "(no tailscale routes found)"
+          echo ""
+          echo "=== Full routing table ==="
+          ip route show table all
+      
+      - name: Get Okta access token
+        id: okta
+        run: |
+          RESPONSE=$(curl -s --fail -X POST \
+            "${CANTON_OKTA_AUTHORIZER}/v1/token" \
+            -u "${CANTON_OKTA_CLIENT_ID}:${CANTON_OKTA_CLIENT_SECRET}" \
+            -d "grant_type=client_credentials&scope=daml_ledger_api")
+          TOKEN=$(echo "$RESPONSE" | jq -r '.access_token')
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "::error::Failed to obtain Okta access token"
+            exit 1
+          fi
+          echo "::add-mask::${TOKEN}"
+          echo "access_token=${TOKEN}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Canton connectivity
+        run: |
+          curl --fail --connect-timeout 30 \
+            -H "Authorization: Bearer ${{ steps.okta.outputs.access_token }}" \
+            -H "Content-Type: application/json" \
+            "https://${CANTON_ENV}.cv1.bcy-v.metalhosts.com/api/json/v2/authenticated-user"
+
+      - name: Verify RPC Proxy connectivity
+        run: |
+          curl -s -X POST "https://rpc-proxy-main-prod.tailec47a7.ts.net/gha-canton/16015286601757825753" \
+            -H "Content-Type: application/json" \
+            --data '{
+              "jsonrpc":"2.0",
+              "method":"eth_blockNumber",
+              "params":[],
+              "id":1
+            }'
