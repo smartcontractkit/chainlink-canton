@@ -18,11 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/evm"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/evmops"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/finality"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/cantonops"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/clients"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/evmops"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/finality"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/input"
 )
 
 // parseAmount parses an amount string that may include exponents (e.g. "1e18")
@@ -78,7 +78,7 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 		Short: "Send a message-only CCIP message from EVM to Canton",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, true) // Disable Canton initialization
 			if err != nil {
 				return err
 			}
@@ -92,7 +92,7 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 			}
 			receiverPartyHashed := contracts.HashedPartyFromString(receiverParty)
 			if receiverParty == "" {
-				receiverPartyHashed = contracts.HashedPartyFromString(b.Participant.PartyID)
+				receiverPartyHashed = contracts.HashedPartyFromString(b.Config.Canton.PartyID)
 			}
 
 			return evmSend(ctx, b, receiverPartyHashed, []byte(payload), feeToken, nil, fin)
@@ -118,7 +118,7 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 		Short: "Send a LINK token transfer CCIP message from EVM to Canton",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, true) // Disable Canton initialization
 			if err != nil {
 				return err
 			}
@@ -140,7 +140,7 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 			}}
 			receiverPartyHashed := contracts.HashedPartyFromString(receiverParty)
 			if receiverParty == "" {
-				receiverPartyHashed = contracts.HashedPartyFromString(b.Participant.PartyID)
+				receiverPartyHashed = contracts.HashedPartyFromString(b.Config.Canton.PartyID)
 			}
 
 			return evmSend(ctx, b, receiverPartyHashed, nil, feeToken, tokenAmounts, fin)
@@ -303,7 +303,7 @@ func newEVMExecuteCmd(g *Globals) *cobra.Command {
 		Short: "Execute on EVM a message sent from Canton (used with --executor none)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, true)
 			if err != nil {
 				return err
 			}

@@ -6,10 +6,16 @@ package cantonops
 
 import (
 	"context"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/google/uuid"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
@@ -24,6 +30,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/ledger/usbwallet"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
@@ -43,9 +50,9 @@ const (
 	propagationPoll    = 2 * time.Second
 )
 
-// waitForActiveContract polls for an active contract matching templateID
+// WaitForActiveContract polls for an active contract matching templateID
 // until one appears, ctx is cancelled, or propagationTimeout elapses.
-func waitForActiveContract(
+func WaitForActiveContract(
 	ctx context.Context,
 	participant canton.Participant,
 	templateID *apiv2.Identifier,
@@ -70,9 +77,174 @@ func waitForActiveContract(
 	}
 }
 
+func ParseDerivationPath(pathOrIndex string) (accounts.DerivationPath, error) {
+	index, err := strconv.ParseUint(pathOrIndex, 10, 32)
+	if err == nil {
+		return accounts.DerivationPath{0x80000000 + 44, 0x80000000 + 6767, 0x80000000 + 0, 0x80000000 + 0, 0x80000000 + uint32(index)}, nil
+	}
+
+	return accounts.ParseDerivationPath(pathOrIndex)
+}
+
+func CantonSubmit(
+	ctx context.Context,
+	participant canton.Participant,
+	ledgerFlag string,
+	commands []*apiv2.Command,
+	disclosedContracts []*apiv2.DisclosedContract,
+) (*apiv2.Transaction, error) {
+	// Parse ledger flag to determine submission path
+	if ledgerFlag == "" {
+		// Direct submission using local party
+		resp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
+			Commands: &apiv2.Commands{
+				CommandId:          uuid.NewString(),
+				Commands:           commands,
+				ActAs:              []string{participant.PartyID},
+				DisclosedContracts: disclosedContracts,
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("submitAndWaitForTransaction: %w", err)
+		}
+
+		return resp.GetTransaction(), nil
+	}
+	// Interactive Ledger signing flow
+
+	// Parse derivation path
+	derivationPath, err := ParseDerivationPath(ledgerFlag)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ledger derivation path: %w", err)
+	}
+
+	// Connect Ledger
+	fmt.Println("Looking for connected Ledger devices...")
+	ledgerHub, err := usbwallet.NewCantonLedgerHub()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Ledger hub: %w", err)
+	}
+	wallets := ledgerHub.Wallets()
+	if len(wallets) == 0 {
+		return nil, fmt.Errorf("no Ledger wallets found. Please connect a Ledger device and try again")
+	}
+	fmt.Printf("Found %d connected Ledger wallets\n", len(wallets))
+	wallet := wallets[0]
+
+	err = wallet.Open("")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open Ledger wallet: %w", err)
+	}
+	defer wallet.Close()
+
+	fmt.Printf("Getting public key for derivation path: %v\n", derivationPath.String())
+
+	// Get the public key at the derivation path and compare with expected key
+	pubkey, err := wallet.GetPublicKey(derivationPath, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get public key from Ledger: %w", err)
+	}
+	fingerprint, err := usbwallet.Fingerprint(pubkey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get fingerprint from Ledger: %w", err)
+	}
+	fmt.Printf("Using key with fingerprint %s to sign transaction\n", fingerprint)
+	splitParty := strings.Split(participant.PartyID, "::")
+	if len(splitParty) != 2 {
+		return nil, fmt.Errorf("wrong partyId format, expected hint::fingerprint, got: %s", participant.PartyID)
+	}
+	if splitParty[1] != fingerprint {
+		return nil, fmt.Errorf("fingerprint mismatch: Ledger device has %s, but participant partyId has %s", fingerprint, splitParty[1])
+	}
+
+	// Prepare transaction
+	preparedSubmission, err := participant.LedgerServices.InteractiveSubmission.PrepareSubmission(ctx, &interactive.PrepareSubmissionRequest{
+		CommandId:          uuid.NewString(),
+		Commands:           commands,
+		ActAs:              []string{participant.PartyID},
+		ReadAs:             []string{participant.PartyID},
+		DisclosedContracts: disclosedContracts,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("prepareSubmission: %w", err)
+	}
+
+	// Sign transaction
+	fmt.Printf("📜 Signing transaction, tx hash=%v\n", strings.ToUpper(hex.EncodeToString(preparedSubmission.GetPreparedTransactionHash())))
+	signature, err := signPreparedTransaction(wallet, derivationPath, preparedSubmission)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign prepared transaction: %w", err)
+	}
+	fmt.Println("✅ Transaction signed.")
+
+	// Submit transaction
+	resp, err := participant.LedgerServices.InteractiveSubmission.ExecuteSubmissionAndWaitForTransaction(ctx, &interactive.ExecuteSubmissionAndWaitForTransactionRequest{
+		SubmissionId:        uuid.NewString(),
+		PreparedTransaction: preparedSubmission.GetPreparedTransaction(),
+		PartySignatures: &interactive.PartySignatures{
+			Signatures: []*interactive.SinglePartySignatures{
+				{
+					Party: participant.PartyID,
+					Signatures: []*apiv2.Signature{{
+						Format:               apiv2.SignatureFormat_SIGNATURE_FORMAT_CONCAT,
+						Signature:            signature,
+						SignedBy:             fingerprint,
+						SigningAlgorithmSpec: apiv2.SigningAlgorithmSpec_SIGNING_ALGORITHM_SPEC_ED25519,
+					}},
+				},
+			},
+		},
+		HashingSchemeVersion: preparedSubmission.GetHashingSchemeVersion(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("executeSubmissionAndWaitForTransaction: %w", err)
+	}
+
+	return resp.GetTransaction(), nil
+}
+
+// signPreparedTransaction streams the prepared transaction to the device so it recomputes the
+// transaction hash itself.
+//
+// The Canton app can only do that for transactions that fit its on-device parser. Large or deeply
+// nested transactions, such as a CCIP send, overrun the tiny dynamic memory pool or the fixed
+// component buffer of the app and are rejected with SW_TX_PARSING_FAIL / SW_WRONG_TX_LENGTH. That
+// is not the graceful "template unknown, blind sign it" path of the app, it aborts the signing
+// session outright, so we retry by signing the transaction hash reported by the participant
+// instead.
+func signPreparedTransaction(
+	wallet usbwallet.CantonWallet,
+	derivationPath accounts.DerivationPath,
+	preparedSubmission *interactive.PrepareSubmissionResponse,
+) ([]byte, error) {
+	signature, err := wallet.SignPreparedTransaction(derivationPath, preparedSubmission.GetPreparedTransaction())
+	if err == nil {
+		return signature, nil
+	}
+	if !errors.Is(err, usbwallet.ErrTransactionParsingFailed) && !errors.Is(err, usbwallet.ErrTransactionTooLong) {
+		return nil, err
+	}
+
+	fmt.Printf("⚠️ The Ledger device could not process this transaction (%v).\n", err)
+	fmt.Println("⚠️ Falling back to blind signing: the device signs the transaction hash reported by")
+	fmt.Println("⚠️ the participant instead of recomputing it, so it cannot verify what it signs.")
+	fmt.Println("⚠️ Blind signing has to be enabled in the Canton app settings for this to work.")
+
+	signature, err = wallet.SignHash(derivationPath, preparedSubmission.GetPreparedTransactionHash())
+	if err != nil {
+		if errors.Is(err, usbwallet.ErrBlindSigningDisabled) {
+			return nil, fmt.Errorf("blind signing is disabled in the Canton app settings: %w", err)
+		}
+
+		return nil, fmt.Errorf("blind signing the transaction hash: %w", err)
+	}
+
+	return signature, nil
+}
+
 // GetOrCreateRouter returns the PerPartyRouter contract id for the
 // participant's party, creating one via the factory if it doesn't exist.
-func GetOrCreateRouter(ctx context.Context, participant canton.Participant, ccipEdsClient oapiCCIP.ClientWithResponsesInterface) (string, error) {
+func GetOrCreateRouter(ctx context.Context, participant canton.Participant, ccipEdsClient oapiCCIP.ClientWithResponsesInterface, useLedger string) (string, error) {
 	active, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, perPartyRouterTemplateID)
 	if err != nil {
 		return "", fmt.Errorf("list PerPartyRouter: %w", err)
@@ -81,36 +253,35 @@ func GetOrCreateRouter(ctx context.Context, participant canton.Participant, ccip
 		return active[0].GetCreatedEvent().GetContractId(), nil
 	}
 
-	fmt.Printf("No active PerPartyRouter found for party %s, deploying one...\n", participant.PartyID)
+	fmt.Printf("⚠️ No active PerPartyRouter found for party %s, deploying one...\n", participant.PartyID)
 	disclosures, err := eds.GetPerPartyRouterFactoryDisclosure(ctx, ccipEdsClient, participant.PartyID)
 	if err != nil {
 		return "", fmt.Errorf("get factory disclosure: %w", err)
 	}
 
-	resp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: perPartyRouterFactoryTemplateID,
-					ContractId: disclosures.ContractId,
-					Choice:     "CreateRouter",
-					ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
-						PartyOwner: types.PARTY(participant.PartyID),
-						InstanceId: types.TEXT(fmt.Sprintf("router-%s", participant.PartyID)),
-					}),
-				}},
+	tx, err := CantonSubmit(
+		ctx,
+		participant,
+		useLedger,
+		[]*apiv2.Command{{
+			Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+				TemplateId: perPartyRouterFactoryTemplateID,
+				ContractId: disclosures.ContractId,
+				Choice:     "CreateRouter",
+				ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
+					PartyOwner: types.PARTY(participant.PartyID),
+					InstanceId: types.TEXT(fmt.Sprintf("router-%s", participant.PartyID)),
+				}),
 			}},
-			ActAs:              []string{participant.PartyID},
-			DisclosedContracts: disclosures.DisclosedContracts,
-		},
-	})
+		}},
+		disclosures.DisclosedContracts,
+	)
 	if err != nil {
 		return "", fmt.Errorf("submit CreateRouter: %w", err)
 	}
-	fmt.Printf("Created PerPartyRouter in update: %s\n", resp.GetTransaction().GetUpdateId())
+	fmt.Printf("Created PerPartyRouter in update: %s\n", tx.GetUpdateId())
 
-	contract, err := waitForActiveContract(ctx, participant, perPartyRouterTemplateID)
+	contract, err := WaitForActiveContract(ctx, participant, perPartyRouterTemplateID)
 	if err != nil {
 		return "", err
 	}
@@ -120,7 +291,7 @@ func GetOrCreateRouter(ctx context.Context, participant canton.Participant, ccip
 
 // GetOrCreateSender returns the CCIPSender contract id for the party,
 // creating one if missing.
-func GetOrCreateSender(ctx context.Context, participant canton.Participant) (string, error) {
+func GetOrCreateSender(ctx context.Context, participant canton.Participant, useLedger string) (string, error) {
 	active, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, ccipSenderTemplateID)
 	if err != nil {
 		return "", fmt.Errorf("list CCIPSender: %w", err)
@@ -129,28 +300,28 @@ func GetOrCreateSender(ctx context.Context, participant canton.Participant) (str
 		return active[0].GetCreatedEvent().GetContractId(), nil
 	}
 
-	fmt.Printf("No active CCIPSender found for party %s, deploying one...\n", participant.PartyID)
-	resp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: ccipSenderTemplateID,
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "ccipsender"}}},
-						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: participant.PartyID}}},
-					}},
+	fmt.Printf("⚠️ No active CCIPSender found for party %s, deploying one...\n", participant.PartyID)
+	tx, err := CantonSubmit(
+		ctx,
+		participant,
+		useLedger,
+		[]*apiv2.Command{{
+			Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
+				TemplateId: ccipSenderTemplateID,
+				CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+					{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "ccipsender"}}},
+					{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: participant.PartyID}}},
 				}},
 			}},
-			ActAs: []string{participant.PartyID},
-		},
-	})
+		}},
+		nil,
+	)
 	if err != nil {
 		return "", fmt.Errorf("submit Create CCIPSender: %w", err)
 	}
-	fmt.Printf("Created CCIPSender in update: %s\n", resp.GetTransaction().GetUpdateId())
+	fmt.Printf("Created CCIPSender in update: %s\n", tx.GetUpdateId())
 
-	contract, err := waitForActiveContract(ctx, participant, ccipSenderTemplateID)
+	contract, err := WaitForActiveContract(ctx, participant, ccipSenderTemplateID)
 	if err != nil {
 		return "", err
 	}
@@ -265,37 +436,38 @@ func updateReceiverRequiredCCVs(
 	participant canton.Participant,
 	receiverCid string,
 	requiredCCVs []contracts.RawInstanceAddress,
+	useLedger string,
 ) (string, error) {
 	bindingCCVs := make([]chainlinkapi.RawInstanceAddress, len(requiredCCVs))
 	for i, ccv := range requiredCCVs {
 		bindingCCVs[i] = chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(ccv.String())}
 	}
 
-	resp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: ccipReceiverTemplateID,
-					ContractId: receiverCid,
-					Choice:     "UpdateRequiredCCVs",
-					ChoiceArgument: ledger.MapToValue(receiver.UpdateRequiredCCVs{
-						NewRequiredCCVs: bindingCCVs,
-					}),
-				}},
+	tx, err := CantonSubmit(
+		ctx,
+		participant,
+		useLedger,
+		[]*apiv2.Command{{
+			Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+				TemplateId: ccipReceiverTemplateID,
+				ContractId: receiverCid,
+				Choice:     "UpdateRequiredCCVs",
+				ChoiceArgument: ledger.MapToValue(receiver.UpdateRequiredCCVs{
+					NewRequiredCCVs: bindingCCVs,
+				}),
 			}},
-			ActAs: []string{participant.PartyID},
-		},
-	})
+		}},
+		nil,
+	)
 	if err != nil {
 		return "", fmt.Errorf("submit UpdateRequiredCCVs: %w", err)
 	}
 
-	newCid, err := extractCreatedReceiverCID(resp.GetTransaction())
+	newCid, err := extractCreatedReceiverCID(tx)
 	if err != nil {
 		return "", err
 	}
-	fmt.Printf("Updated CCIPReceiver required CCVs in update: %s\n", resp.GetTransaction().GetUpdateId())
+	fmt.Printf("Updated CCIPReceiver required CCVs in update: %s\n", tx.GetUpdateId())
 
 	return newCid, nil
 }
@@ -380,6 +552,7 @@ func GetOrCreateReceiver(
 	participant canton.Participant,
 	receiverFinality ccipcodec.FinalityConfig,
 	requiredCCV contracts.RawInstanceAddress,
+	useLedger string,
 ) (string, error) {
 	requiredCCVs := []contracts.RawInstanceAddress{requiredCCV}
 
@@ -400,43 +573,43 @@ func GetOrCreateReceiver(
 		}
 
 		fmt.Printf(
-			"Updating CCIPReceiver %s required CCVs to %s...\n",
+			"⚠️ Updating CCIPReceiver %s required CCVs to %s...\n",
 			receiverCid,
 			requiredCCV,
 		)
 
-		return updateReceiverRequiredCCVs(ctx, participant, receiverCid, requiredCCVs)
+		return updateReceiverRequiredCCVs(ctx, participant, receiverCid, requiredCCVs, useLedger)
 	}
 
 	fmt.Printf(
-		"No CCIPReceiver with %s finality found for party %s, deploying one (CCV %s)...\n",
+		"⚠️ No CCIPReceiver with %s finality found for party %s, deploying one (CCV %s)...\n",
 		receiverFinalityLabel(receiverFinality),
 		participant.PartyID,
 		requiredCCV,
 	)
-	resp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: ccipReceiverTemplateID,
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: receiverInstanceID(receiverFinality)}}},
-						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: participant.PartyID}}},
-						{Label: "receiverFinalityConfig", Value: receiverFinalityField(receiverFinality)},
-						{Label: "requiredCCVs", Value: requiredCCVsListValue(requiredCCVs)},
-						{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-						{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-					}},
+	tx, err := CantonSubmit(
+		ctx,
+		participant,
+		useLedger,
+		[]*apiv2.Command{{
+			Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
+				TemplateId: ccipReceiverTemplateID,
+				CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
+					{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: receiverInstanceID(receiverFinality)}}},
+					{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: participant.PartyID}}},
+					{Label: "receiverFinalityConfig", Value: receiverFinalityField(receiverFinality)},
+					{Label: "requiredCCVs", Value: requiredCCVsListValue(requiredCCVs)},
+					{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
+					{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
 				}},
 			}},
-			ActAs: []string{participant.PartyID},
-		},
-	})
+		}},
+		nil,
+	)
 	if err != nil {
 		return "", fmt.Errorf("submit Create CCIPReceiver: %w", err)
 	}
-	fmt.Printf("Created CCIPReceiver in update: %s\n", resp.GetTransaction().GetUpdateId())
+	fmt.Printf("Created CCIPReceiver in update: %s\n", tx.GetUpdateId())
 
 	return waitForReceiverWithFinality(ctx, participant, receiverFinality)
 }

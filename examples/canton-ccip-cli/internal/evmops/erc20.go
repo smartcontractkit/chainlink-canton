@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/chainlink-ccip/chains/evm/gobindings/generated/v1_5_1/factory_burn_mint_erc20"
 
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/clients"
+	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/internal/input"
 )
 
 func EnsureERC20Allowance(
