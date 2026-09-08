@@ -80,7 +80,7 @@ func WaitForActiveContract(
 func ParseDerivationPath(pathOrIndex string) (accounts.DerivationPath, error) {
 	index, err := strconv.ParseUint(pathOrIndex, 10, 32)
 	if err == nil {
-		return accounts.DerivationPath{0x80000000 + 44, 0x80000000 + 6767, 0x80000000 + 0, 0x80000000 + 0, 0x80000000 + uint32(index)}, nil
+		return accounts.DerivationPath{0x80000000 + 44, 0x80000000 + 6767, 0x80000000 + uint32(index), 0x80000000 + 0, 0x80000000 + 0}, nil
 	}
 
 	return accounts.ParseDerivationPath(pathOrIndex)
