@@ -22,6 +22,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/ledger/usbwallet"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
@@ -30,7 +31,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
-	"github.com/smartcontractkit/chainlink-canton/examples/canton-ccip-cli/ledger/usbwallet"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
@@ -92,6 +92,7 @@ func CantonSubmit(
 	ledgerFlag string,
 	commands []*apiv2.Command,
 	disclosedContracts []*apiv2.DisclosedContract,
+	transactionFormat *apiv2.TransactionFormat,
 ) (*apiv2.Transaction, error) {
 	// Parse ledger flag to determine submission path
 	if ledgerFlag == "" {
@@ -103,6 +104,7 @@ func CantonSubmit(
 				ActAs:              []string{participant.PartyID},
 				DisclosedContracts: disclosedContracts,
 			},
+			TransactionFormat: transactionFormat,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("submitAndWaitForTransaction: %w", err)
@@ -275,6 +277,7 @@ func GetOrCreateRouter(ctx context.Context, participant canton.Participant, ccip
 			}},
 		}},
 		disclosures.DisclosedContracts,
+		nil,
 	)
 	if err != nil {
 		return "", fmt.Errorf("submit CreateRouter: %w", err)
@@ -314,6 +317,7 @@ func GetOrCreateSender(ctx context.Context, participant canton.Participant, useL
 				}},
 			}},
 		}},
+		nil,
 		nil,
 	)
 	if err != nil {
@@ -457,6 +461,7 @@ func updateReceiverRequiredCCVs(
 				}),
 			}},
 		}},
+		nil,
 		nil,
 	)
 	if err != nil {
@@ -604,6 +609,7 @@ func GetOrCreateReceiver(
 				}},
 			}},
 		}},
+		nil,
 		nil,
 	)
 	if err != nil {

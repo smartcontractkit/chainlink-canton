@@ -1,4 +1,4 @@
-# CCIP Canton <-> EVM Demo CLI
+# CCIP Canton <-> EVM CLI
 
 A small Cobra-based CLI that demonstrates sending and executing CCIP messages between Ethereum Mainnet and Canton
 Mainnet.
