@@ -18,9 +18,9 @@ data-dependencies:
   - ../../codec/.daml/dist/ccip-codec-v2-2.0.0.dar
   - ../../core/.daml/dist/ccip-core-v2-2.1.1.dar
 
-  - ../rate-limiter/.daml/dist/ccip-registry-rate-limiter-v2-2.0.1.dar
-  - ../lock-release-token-pool/.daml/dist/ccip-registry-lock-release-token-pool-v2-2.1.1.dar
-  - ../burn-mint-token-pool/.daml/dist/ccip-registry-burn-mint-token-pool-v2-2.1.1.dar
+  - ../rate-limiter/.daml/dist/ccip-registry-rate-limiter-1.0.0.dar
+  - ../lock-release-token-pool/.daml/dist/ccip-registry-lock-release-token-pool-1.0.0.dar
+  - ../burn-mint-token-pool/.daml/dist/ccip-registry-burn-mint-token-pool-1.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

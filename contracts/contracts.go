@@ -56,9 +56,9 @@ const (
 	// family from the production/LINK pools above, kept isolated so a bug or spam on
 	// the registry-discovery side can never affect production pool serving).
 
-	CCIPRegistryBurnMintTokenPoolV2    = Package("ccip-registry-burn-mint-token-pool-v2")
-	CCIPRegistryLockReleaseTokenPoolV2 = Package("ccip-registry-lock-release-token-pool-v2")
-	CCIPRegistryRateLimiterV2          = Package("ccip-registry-rate-limiter-v2")
+	CCIPRegistryBurnMintTokenPoolV2    = Package("ccip-registry-burn-mint-token-pool")
+	CCIPRegistryLockReleaseTokenPoolV2 = Package("ccip-registry-lock-release-token-pool")
+	CCIPRegistryRateLimiterV2          = Package("ccip-registry-rate-limiter")
 
 	// CCIP - Legacy
 

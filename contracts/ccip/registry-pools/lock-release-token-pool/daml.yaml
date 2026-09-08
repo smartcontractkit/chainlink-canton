@@ -1,7 +1,7 @@
 sdk-version: 3.4.11
-name: ccip-registry-lock-release-token-pool-v2
+name: ccip-registry-lock-release-token-pool
 source: daml
-version: 2.1.1
+version: 1.0.0
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
@@ -19,7 +19,7 @@ data-dependencies:
   - ../../tickets/.daml/dist/ccip-tickets-v2-2.0.0.dar
   - ../../core/.daml/dist/ccip-core-v2-2.1.1.dar
   - ../../utils/.daml/dist/ccip-utils-v2-2.1.0.dar
-  - ../rate-limiter/.daml/dist/ccip-registry-rate-limiter-v2-2.0.1.dar
+  - ../rate-limiter/.daml/dist/ccip-registry-rate-limiter-1.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib
