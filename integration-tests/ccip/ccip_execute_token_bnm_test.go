@@ -422,9 +422,6 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			Decimals:           10,
 			InstanceID:         poolInstanceId,
 			PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
-			TransferTimeout: burnminttokenpool.TransferTimeout{
-				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
-			},
 			RemoteChainConfigs: map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{
 				types.NUMERIC(sourceChainSelector): {
 					RemotePools:        []types.TEXT{types.TEXT(hex.EncodeToString(remotePoolAddress))},
