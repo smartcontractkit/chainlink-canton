@@ -93,7 +93,9 @@ func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[D
 			RemoteChainConfigs:      remoteChainConfigs,
 			TokenTransferFeeConfigs: tokenTransferFeeConfigs,
 			PoolReceiveContext:      poolReceiveContext,
-			Deps:                    cfg.Deps,
+			// TransferTimeout is deprecated and unused
+			TransferTimeout: burnminttokenpool.TransferTimeout{RelativeHours: new(types.INT64(0))},
+			Deps:            cfg.Deps,
 		},
 		OwnerParty: types.PARTY(cfg.PoolOwner),
 	})
