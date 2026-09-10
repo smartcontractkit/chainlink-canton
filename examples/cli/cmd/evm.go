@@ -134,8 +134,14 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Transferred token: profile's test token by default, or the configured
+			// override (evm.tokenAddress) for self-issued tokens.
+			tokenAddress := b.Profile.EthTokenAddress
+			if a := b.Config.EVM.TokenAddress; a != "" {
+				tokenAddress = common.HexToAddress(a)
+			}
 			tokenAmounts := []routerwrapper.ClientEVMTokenAmount{{
-				Token:  b.Profile.EthTokenAddress,
+				Token:  tokenAddress,
 				Amount: amount,
 			}}
 			receiverPartyHashed := contracts.HashedPartyFromString(receiverParty)

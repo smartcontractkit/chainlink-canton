@@ -23,11 +23,22 @@ type CantonConfig struct {
 	ValidatorAPIURL             string `mapstructure:"validatorAPIURL"`
 	UserID                      string `mapstructure:"userID"`
 	PartyID                     string `mapstructure:"partyID"`
+	// TokenPoolEDSURL overrides the profile's EDS URL for the token-pool API
+	// only — e.g. a local/registry EDS that discovered a self-issued pool the
+	// public EDS doesn't serve. CCIP/CCV disclosures still use the profile URL.
+	TokenPoolEDSURL string `mapstructure:"tokenPoolEdsUrl"`
+	// TokenInstrumentID overrides the transferred token's Canton instrument id
+	// (default: the profile's LINK instrument). The instrument's admin is the
+	// configured partyID (self-issued tokens).
+	TokenInstrumentID string `mapstructure:"tokenInstrumentId"`
 }
 
 type EVMConfig struct {
 	RPCURL        string `mapstructure:"rpcURL"`
 	PrivateKeyHex string `mapstructure:"privateKeyHex"`
+	// TokenAddress overrides the transferred token's EVM contract address
+	// (default: the profile's test token).
+	TokenAddress string `mapstructure:"tokenAddress"`
 }
 
 // Load reads the YAML config from path and returns a validated UserConfig.
