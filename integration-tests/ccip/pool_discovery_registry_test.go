@@ -13,12 +13,13 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
+	config2 "github.com/smartcontractkit/chainlink-canton/authentication/config"
+
 	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/freeport"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
@@ -31,10 +32,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rate_limiter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/service"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -275,8 +276,8 @@ func runDiscoveryEDS(t *testing.T, env testhelpers.TestEnvironment, registryObse
 			},
 			Node: config.NodeConfig{
 				URL: participant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
+				AuthConfig: config2.AuthConfig{
+					Type:   config2.AuthTypeInsecureStatic,
 					UserID: participant.UserID,
 					JWT:    edsToken.AccessToken,
 				},

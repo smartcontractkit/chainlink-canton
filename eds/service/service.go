@@ -17,6 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/eds/api/global"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
 	edsCommon "github.com/smartcontractkit/chainlink-canton/eds/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/ccip"
@@ -26,15 +31,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/token_standard"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool"
+	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/tokenMetadataV1"
+	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	"github.com/smartcontractkit/chainlink-canton/eds/monitoring"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
-	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
-	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
 func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) error {

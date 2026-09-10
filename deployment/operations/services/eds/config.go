@@ -9,7 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	"github.com/smartcontractkit/chainlink-canton/authentication/config"
+
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -101,8 +102,8 @@ var BuildConfig = operations.NewOperation(
 			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
+				AuthConfig: config.AuthConfig{
+					Type:   config.AuthTypeInsecureStatic,
 					UserID: participant.UserID,
 					JWT:    jwt.AccessToken,
 				},
@@ -112,8 +113,8 @@ var BuildConfig = operations.NewOperation(
 		} else {
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.InternalEndpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
+				AuthConfig: config.AuthConfig{
+					Type:   config.AuthTypeInsecureStatic,
 					UserID: participant.UserID,
 					JWT:    jwt.AccessToken,
 				},
@@ -150,7 +151,7 @@ var BuildConfig = operations.NewOperation(
 			var (
 				tokenPoolType           edsConfig.TokenPoolType
 				tokenStandardURL        *string
-				tokenStandardAuthConfig *commonconfig.AuthConfig
+				tokenStandardAuthConfig *config.AuthConfig
 			)
 			switch ref.Type {
 			case datastore.ContractType(lock_release_token_pool.ContractType):

@@ -1,0 +1,19 @@
+version: "3.3"
+name: swagger-ui
+services:
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    container_name: "swagger-ui"
+    ports:
+      - "80:8080"
+    volumes:
+      - .:/usr/share/nginx/html/openapi
+    environment:
+      URLS: "[
+          {url: '/openapi/ccip/eds-ccip.yaml', name: 'EDS - CCIP'},
+          {url: '/openapi/ccv/eds-ccv.yaml', name: 'EDS - CCV'},
+          {url: '/openapi/executor/eds-executor.yaml', name: 'EDS - Executor'},
+          {url: '/openapi/global/eds-global.yaml', name: 'EDS - Global'},
+          {url: '/openapi/tokenpool/eds-tokenpool.yaml', name: 'EDS - Token Pool'},
+        ]"

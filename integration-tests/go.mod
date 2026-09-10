@@ -1,10 +1,14 @@
 module github.com/smartcontractkit/chainlink-canton/integration-tests
 
-go 1.26.7
+go 1.26.8
 
 replace github.com/smartcontractkit/chainlink-canton => ../
 
+replace github.com/smartcontractkit/chainlink-canton/authentication => ../authentication
+
 replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../contracts
+
+replace github.com/smartcontractkit/chainlink-canton/eds => ../eds
 
 replace github.com/smartcontractkit/chainlink-canton/party-ceremony => ../party-ceremony
 
@@ -23,9 +27,11 @@ require (
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.1
-	github.com/smartcontractkit/chain-selectors v1.0.109
+	github.com/smartcontractkit/chain-selectors v1.0.111
 	github.com/smartcontractkit/chainlink-canton v0.0.0
-	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.0.0
+	github.com/smartcontractkit/chainlink-canton/authentication v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.0
+	github.com/smartcontractkit/chainlink-canton/eds v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-canton/registry-kit v0.0.0
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260827113113-d8474fe8cd02
@@ -280,7 +286,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccv/deployment v0.1.1-0.20260811153216-3f3baa768540 // indirect
-	github.com/smartcontractkit/chainlink-common/keystore v1.3.0 // indirect
+	github.com/smartcontractkit/chainlink-common/keystore v1.3.1-0.20260903141829-ef07b52a737d // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.11-0.20260724142814-45996a1bcb72 // indirect
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260722105404-d3fb34ccc58b // indirect
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260710181111-6417709a55ee // indirect
@@ -364,16 +370,16 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.4 // indirect
 	golang.org/x/arch v0.22.0 // indirect
-	golang.org/x/crypto v0.56.0 // indirect
-	golang.org/x/exp v0.0.0-20260820142414-ca536658362e // indirect
-	golang.org/x/net v0.58.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
+	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/oauth2 v0.37.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/term v0.46.0 // indirect
+	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.49.0 // indirect
+	golang.org/x/tools v0.50.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
 	google.golang.org/grpc v1.83.2 // indirect

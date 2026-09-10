@@ -11,7 +11,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/go-playground/validator/v10"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	authConfig "github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
@@ -60,9 +60,9 @@ type ServerConfig struct {
 }
 
 type NodeConfig struct {
-	URL        string                  `toml:"url" validate:"required,url"`
-	AuthConfig commonconfig.AuthConfig `toml:"auth" validate:"required"`
-	MaxRetries int                     `toml:"max_retries"`
+	URL        string                `toml:"url" validate:"required,url"`
+	AuthConfig authConfig.AuthConfig `toml:"auth" validate:"required"`
+	MaxRetries int                   `toml:"max_retries"`
 }
 
 // Global API
@@ -133,8 +133,8 @@ type Factory struct {
 	Party           *string                    `toml:"party" validate:"required_if=Type address"`
 	InstanceAddress *contracts.InstanceAddress `toml:"instance_address" validate:"required_if=Type address"`
 
-	TokenStandardURL        *string                  `toml:"token_standard_url" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests,required_if=Type url,required_if=Type urlRequests,omitnil,url"`
-	TokenStandardAuthConfig *commonconfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests"`
+	TokenStandardURL        *string                `toml:"token_standard_url" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests,required_if=Type url,required_if=Type urlRequests,omitnil,url"`
+	TokenStandardAuthConfig *authConfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests"`
 }
 
 type TokenPool struct {

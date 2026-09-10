@@ -11,12 +11,12 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
 type ContractConfig struct{}

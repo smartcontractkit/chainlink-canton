@@ -8,8 +8,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
 func RawInstanceAddress(a chainlinkapi.RawInstanceAddress) (contracts.RawInstanceAddress, error) {

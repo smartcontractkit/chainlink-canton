@@ -25,13 +25,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool/factory"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 )
 
 type ContractConfig struct {

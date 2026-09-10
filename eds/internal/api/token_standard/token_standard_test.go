@@ -26,9 +26,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
+	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/tokenMetadataV1"
+	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/testhelpers"
-	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
 const RequestSizeLimit = 100_000

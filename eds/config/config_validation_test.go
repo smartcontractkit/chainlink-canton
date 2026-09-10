@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	authConfig "github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
@@ -52,8 +52,8 @@ func TestConfigValidation(t *testing.T) {
 					s: Factory{
 						Type:             FactoryTypeURL,
 						TokenStandardURL: new("https://eds.chain.link"),
-						TokenStandardAuthConfig: &commonconfig.AuthConfig{
-							Type: commonconfig.AuthTypeInsecureStatic,
+						TokenStandardAuthConfig: &authConfig.AuthConfig{
+							Type: authConfig.AuthTypeInsecureStatic,
 							JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 						},
 					},
@@ -70,8 +70,8 @@ func TestConfigValidation(t *testing.T) {
 					s: Factory{
 						Type:             FactoryTypeURL,
 						TokenStandardURL: nil,
-						TokenStandardAuthConfig: &commonconfig.AuthConfig{ // Must not be specified, unless TokenStandardURL is specified as well
-							Type: commonconfig.AuthTypeInsecureStatic,
+						TokenStandardAuthConfig: &authConfig.AuthConfig{ // Must not be specified, unless TokenStandardURL is specified as well
+							Type: authConfig.AuthTypeInsecureStatic,
 							JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 						},
 					},
@@ -81,8 +81,8 @@ func TestConfigValidation(t *testing.T) {
 					s: Factory{
 						Type:             FactoryTypeURLRequests,
 						TokenStandardURL: new("https://eds.chain.link"),
-						TokenStandardAuthConfig: &commonconfig.AuthConfig{
-							Type: commonconfig.AuthTypeInsecureStatic,
+						TokenStandardAuthConfig: &authConfig.AuthConfig{
+							Type: authConfig.AuthTypeInsecureStatic,
 							JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 						},
 					},
@@ -169,8 +169,8 @@ func TestConfigValidation(t *testing.T) {
 						TemplateId:      new("#package.module.entity"),
 						Party:           new("partyid"),
 						InstanceAddress: new(contracts.HexToInstanceAddress("0x1234")),
-						TokenStandardAuthConfig: &commonconfig.AuthConfig{
-							Type: commonconfig.AuthTypeInsecureStatic,
+						TokenStandardAuthConfig: &authConfig.AuthConfig{
+							Type: authConfig.AuthTypeInsecureStatic,
 							JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 						}, // must not be specified
 					},
@@ -346,8 +346,8 @@ func TestCCIPAPIConfigConfigValidate(t *testing.T) {
 		},
 		Node: NodeConfig{
 			URL: "http://localhost:8545",
-			AuthConfig: commonconfig.AuthConfig{
-				Type: commonconfig.AuthTypeInsecureStatic,
+			AuthConfig: authConfig.AuthConfig{
+				Type: authConfig.AuthTypeInsecureStatic,
 				JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 			},
 		},
@@ -380,8 +380,8 @@ func TestPoolOnlyEDSConfigValidate(t *testing.T) {
 		},
 		Node: NodeConfig{
 			URL: "http://localhost:8545",
-			AuthConfig: commonconfig.AuthConfig{
-				Type: commonconfig.AuthTypeInsecureStatic,
+			AuthConfig: authConfig.AuthConfig{
+				Type: authConfig.AuthTypeInsecureStatic,
 				JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 			},
 		},

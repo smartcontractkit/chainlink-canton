@@ -14,7 +14,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ccip"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/registry"

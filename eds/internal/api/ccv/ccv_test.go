@@ -19,12 +19,12 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/testhelpers"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
 const RequestSizeLimit = 100_000

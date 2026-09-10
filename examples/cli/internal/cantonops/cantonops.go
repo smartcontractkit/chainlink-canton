@@ -24,7 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 )

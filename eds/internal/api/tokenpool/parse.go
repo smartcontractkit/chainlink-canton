@@ -13,7 +13,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
-	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
 )
 
 type RemoteChainConfig struct {
@@ -43,7 +42,7 @@ func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTo
 
 	remoteChainConfigs := make(map[uint64]RemoteChainConfig, len(boundContract.RemoteChainConfigs))
 	for chainSelectorString, remoteChainConfig := range boundContract.RemoteChainConfigs {
-		chainSelector, err := internalparse.Uint64Checked(string(chainSelectorString))
+		chainSelector, err := parse.Uint64Checked(string(chainSelectorString))
 		if err != nil {
 			return nil, fmt.Errorf("invalid chain selector %q: %w", chainSelectorString, err)
 		}
@@ -107,7 +106,7 @@ func ParseBurnMintTokenPool(createdEvent *apiv2.CreatedEvent) (*BurnMintTokenPoo
 
 	remoteChainConfigs := make(map[uint64]RemoteChainConfig, len(boundContract.RemoteChainConfigs))
 	for chainSelectorString, remoteChainConfig := range boundContract.RemoteChainConfigs {
-		chainSelector, err := internalparse.Uint64Checked(string(chainSelectorString))
+		chainSelector, err := parse.Uint64Checked(string(chainSelectorString))
 		if err != nil {
 			return nil, fmt.Errorf("invalid chain selector %q: %w", chainSelectorString, err)
 		}

@@ -26,12 +26,12 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/deployment"
 	cantonChangesets "github.com/smartcontractkit/chainlink-canton/deployment/changesets"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
 	edsConfig "github.com/smartcontractkit/chainlink-canton/eds/config"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 )
 
