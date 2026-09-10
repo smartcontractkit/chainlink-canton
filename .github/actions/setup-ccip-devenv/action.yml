@@ -11,7 +11,15 @@ inputs:
     # builds the verifier/devenv Docker images, while go.mod pins the `ccv up` tooling
     # that generates their configs. A mismatch across config-format changes (e.g. #1193
     # bootstrap monitoring.Config) makes the verifier container exit on startup.
+    # Preferred: use ccv-ref-go-mod input to point to a go.mod file
     default: v0.9.0
+  ccv-ref-go-mod:
+    description: >-
+      Optional path to a go.mod file. If set, extract
+      github.com/smartcontractkit/chainlink-ccv version from it and use that as
+      the checkout ref (overrides ccv-ref).
+    required: false
+    default: ""
   ccv-iam-role:
     description: AWS IAM role ARN for CCV ECR authentication
     required: true
@@ -55,12 +63,40 @@ runs:
         path: ${{ inputs.canton-path }}
         ref: ${{ github.sha }}
 
+    - name: Resolve chainlink-ccv ref from go.mod
+      id: resolve-ccv-ref
+      shell: bash
+      env:
+        CCV_REF_GO_MOD: ${{ inputs.ccv-ref-go-mod }}
+        CCV_REF: ${{ inputs.ccv-ref }}
+      run: |
+        set -euo pipefail
+        # If a go.mod path is provided, derive the chainlink-ccv checkout ref from
+        # its module requirement to keep tooling/image versions in sync.
+        if [[ -n "${CCV_REF_GO_MOD}" ]]; then
+          if [[ ! -f "${CCV_REF_GO_MOD}" ]]; then
+            echo "go.mod file not found at path: ${CCV_REF_GO_MOD}" >&2
+            exit 1
+          fi
+          resolved_ref="$(
+            awk '$1 == "github.com/smartcontractkit/chainlink-ccv" { print $2; exit }' "${CCV_REF_GO_MOD}"
+          )"
+          if [[ -z "${resolved_ref}" ]]; then
+            echo "github.com/smartcontractkit/chainlink-ccv not found in ${CCV_REF_GO_MOD}" >&2
+            exit 1
+          fi
+          echo "ref=${resolved_ref}" >> "${GITHUB_OUTPUT}"
+        else
+          # Fall back to explicit input for callers not using go.mod-based pinning.
+          echo "ref=${CCV_REF}" >> "${GITHUB_OUTPUT}"
+        fi
+
     - name: Check out chainlink-ccv
       uses: actions/checkout@v6
       with:
         repository: smartcontractkit/chainlink-ccv
         path: ${{ inputs.ccv-path }}
-        ref: ${{ inputs.ccv-ref }}
+        ref: ${{ steps.resolve-ccv-ref.outputs.ref }}
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
