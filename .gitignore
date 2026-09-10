@@ -30,3 +30,6 @@ scripts/prod_mainnet/.env.example
 
 contracts/dependencies/utility/*.dar
 contracts/dependencies/utility/.cache/
+
+config.yaml
+config.*.yaml

@@ -17,8 +17,12 @@ type UserConfig struct {
 }
 
 type CantonConfig struct {
+	Disabled                    bool   `mapstructure:"disabled"`
+	AuthType                    string `mapstructure:"authType"`
 	AuthServerURL               string `mapstructure:"authServerURL"`
 	AuthClientID                string `mapstructure:"authClientID"`
+	AuthClientSecret            string `mapstructure:"authClientSecret"`
+	AuthJWT                     string `mapstructure:"authJWT"`
 	ParticipantGRPCLedgerAPIURL string `mapstructure:"participantGRPCLedgerAPIURL"`
 	ValidatorAPIURL             string `mapstructure:"validatorAPIURL"`
 	UserID                      string `mapstructure:"userID"`
@@ -67,8 +71,6 @@ func (c *UserConfig) validate() error {
 		return nil
 	}
 	for _, e := range []error{
-		missing("canton.authServerURL", c.Canton.AuthServerURL),
-		missing("canton.authClientID", c.Canton.AuthClientID),
 		missing("canton.participantGRPCLedgerAPIURL", c.Canton.ParticipantGRPCLedgerAPIURL),
 		missing("canton.validatorAPIURL", c.Canton.ValidatorAPIURL),
 		missing("canton.userID", c.Canton.UserID),

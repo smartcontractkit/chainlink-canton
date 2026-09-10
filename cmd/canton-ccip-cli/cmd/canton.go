@@ -2,16 +2,18 @@ package cmd
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/google/uuid"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
@@ -20,6 +22,10 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/cantonops"
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/clients"
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/finality"
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/input"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
@@ -29,10 +35,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/finality"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
@@ -70,8 +72,11 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 	c.AddCommand(newCantonSyncReceiverCCVCmd(g))
 	c.AddCommand(newCantonListEventsCmd(g))
 	c.AddCommand(newCantonListHoldingsCmd(g))
+	c.AddCommand(newCantonListTransferInstructionsCmd(g))
 	c.AddCommand(newCantonCreateTransferCmd(g))
 	c.AddCommand(newCantonAcceptTransferCmd(g))
+
+	c.AddCommand(newCantonExternalPartyCommand(g))
 
 	return c
 }
@@ -96,7 +101,7 @@ func newCantonListEventsCmd(g *Globals) *cobra.Command {
 		Short: "List active CCIPMessageSent or ExecutionStateChanged contracts",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -172,15 +177,11 @@ func newCantonListHoldingsCmd(g *Globals) *cobra.Command {
 		Short: "List all token holdings for the configured party",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
-			holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, b.Participant, &apiv2.Identifier{
-				PackageId:  "#splice-api-token-holding-v1",
-				ModuleName: "Splice.Api.Token.HoldingV1",
-				EntityName: "Holding",
-			})
+			holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, b.Participant, contracts.MustTemplateIDFromString(splice_api_token_holding_v1.IHoldingInterfaceID()).ToLedgerIdentifier())
 			if err != nil {
 				return fmt.Errorf("list holdings: %w", err)
 			}
@@ -189,9 +190,9 @@ func newCantonListHoldingsCmd(g *Globals) *cobra.Command {
 			tw.Style().Title.Align = text.AlignCenter
 			tw.SetAutoIndex(true)
 			if withContractId {
-				tw.AppendHeader(table.Row{"Instrument ID", "Admin", "Owner", "Amount", "Contract ID"})
+				tw.AppendHeader(table.Row{"Instrument ID", "Owner", "Amount", "Locked", "Contract ID"})
 			} else {
-				tw.AppendHeader(table.Row{"Instrument ID", "Admin", "Owner", "Amount"})
+				tw.AppendHeader(table.Row{"Instrument ID", "Owner", "Amount", "Locked"})
 			}
 			for _, h := range holdings {
 				for _, view := range h.GetCreatedEvent().GetInterfaceViews() {
@@ -200,9 +201,9 @@ func newCantonListHoldingsCmd(g *Globals) *cobra.Command {
 						return fmt.Errorf("decode holding view: %w", err)
 					}
 					if withContractId {
-						tw.AppendRow(table.Row{hv.InstrumentId.Id, hv.InstrumentId.Admin, hv.Owner, hv.Amount, h.GetCreatedEvent().GetContractId()})
+						tw.AppendRow(table.Row{fmt.Sprintf("%s@%s", hv.InstrumentId.Id, hv.InstrumentId.Admin), hv.InstrumentId.Admin, hv.Owner, hv.Amount, hv.Lock != nil, h.GetCreatedEvent().GetContractId()})
 					} else {
-						tw.AppendRow(table.Row{hv.InstrumentId.Id, hv.InstrumentId.Admin, hv.Owner, hv.Amount})
+						tw.AppendRow(table.Row{fmt.Sprintf("%s@%s", hv.InstrumentId.Id, hv.InstrumentId.Admin), hv.Owner, hv.Amount, hv.Lock != nil})
 					}
 				}
 			}
@@ -216,6 +217,45 @@ func newCantonListHoldingsCmd(g *Globals) *cobra.Command {
 	return c
 }
 
+// ---------------- canton list-transfer-instructions ----------------
+
+func newCantonListTransferInstructionsCmd(g *Globals) *cobra.Command {
+	c := &cobra.Command{
+		Use:   "list-transfer-instructions",
+		Short: "List all transfer instructions for the configured party",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			b, err := g.Resolve(ctx, false)
+			if err != nil {
+				return err
+			}
+			holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, b.Participant, contracts.MustTemplateIDFromString(splice_api_token_transfer_instruction_v1.ITransferInstructionInterfaceID()).ToLedgerIdentifier())
+			if err != nil {
+				return fmt.Errorf("list holdings: %w", err)
+			}
+			tw := table.NewWriter()
+			tw.SetStyle(table.StyleLight)
+			tw.Style().Title.Align = text.AlignCenter
+			tw.SetAutoIndex(true)
+			tw.AppendHeader(table.Row{"Instrument ID", "Admin", "Sender", "Receiver", "Amount", "Requested At", "Execute Before", "ContractId"})
+			for _, h := range holdings {
+				for _, view := range h.GetCreatedEvent().GetInterfaceViews() {
+					var tiv splice_api_token_transfer_instruction_v1.TransferInstructionView
+					if err := ledger.RecordToStruct(view.GetViewValue(), &tiv); err != nil {
+						return fmt.Errorf("decode transfer instruction view: %w", err)
+					}
+					tw.AppendRow(table.Row{fmt.Sprintf("%s@%s", tiv.Transfer.InstrumentId.Id, tiv.Transfer.InstrumentId.Admin), tiv.Transfer.Sender, tiv.Transfer.Receiver, tiv.Transfer.Amount, time.Time(tiv.Transfer.RequestedAt).String(), time.Time(tiv.Transfer.ExecuteBefore).String(), h.GetCreatedEvent().GetContractId()})
+				}
+			}
+			fmt.Println(tw.Render())
+
+			return nil
+		},
+	}
+
+	return c
+}
+
 // ---------------- canton create transfer ----------------
 func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 	var (
@@ -223,13 +263,14 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 		receiverParty    string
 		inputHoldingCids []string
 		amount           string
+		useLedger        string
 	)
 	c := &cobra.Command{
 		Use:   "create-transfer",
 		Short: "Create an outgoing TransferInstruction",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -250,7 +291,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 					inputHoldings = append(inputHoldings, types.CONTRACT_ID(cid))
 				}
 			} else {
-				holdings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, instrumentId)
+				holdings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, instrumentId, testhelpers.WithUnlockedHoldingsOnly())
 				if err != nil {
 					return fmt.Errorf("list holdings: %w", err)
 				}
@@ -279,42 +320,75 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 				return fmt.Errorf("unmarshal choice context: %w", err)
 			}
 
+			// Ask for confirmation
+			inputHoldingStrings := make([]string, len(inputHoldings))
+			for i, cid := range inputHoldings {
+				inputHoldingStrings[i] = string(cid)
+			}
+			fmt.Println("About to send transfer:")
+			tw := table.NewWriter()
+			tw.SetStyle(table.StyleLight)
+			tw.AppendHeader(table.Row{"Field", "Value"})
+			tw.AppendRow(table.Row{"Sender", transfer.Sender})
+			tw.AppendRow(table.Row{"Receiver", transfer.Receiver})
+			tw.AppendRow(table.Row{"Amount", transfer.Amount})
+			tw.AppendRow(table.Row{"Instrument ID", fmt.Sprintf("%s@%s", transfer.InstrumentId.Id, transfer.InstrumentId.Admin)})
+			tw.AppendRow(table.Row{"Requested at", time.Time(transfer.RequestedAt).String()})
+			tw.AppendRow(table.Row{"Execute before", time.Time(transfer.ExecuteBefore).String()})
+			tw.AppendRow(table.Row{"Input Holdings", strings.Join(inputHoldingStrings, ",")})
+			fmt.Println(tw.Render())
+			fmt.Println("Confirm? (Y/N)")
+			if !input.Confirm() {
+				return fmt.Errorf("cancel sending message")
+			}
+
 			// Create Transfer
-			resp, err := b.Participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-				Commands: &apiv2.Commands{
-					CommandId: uuid.NewString(),
-					Commands: []*apiv2.Command{{
-						Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-							TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferFactory"},
-							ContractId: transferFactory.FactoryID,
-							Choice:     "TransferFactory_Transfer",
-							ChoiceArgument: ledger.MapToValue(splice_api_token_transfer_instruction_v1.TransferFactoryTransfer{
-								ExpectedAdmin: instrumentId.Admin,
-								Transfer:      transfer,
-								ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-									Context: choiceContext,
-								},
-							}),
-						}},
+			tx, err := cantonops.CantonSubmit(
+				ctx,
+				b.Participant,
+				useLedger,
+				[]*apiv2.Command{{
+					Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+						TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferFactory"},
+						ContractId: transferFactory.FactoryID,
+						Choice:     "TransferFactory_Transfer",
+						ChoiceArgument: ledger.MapToValue(splice_api_token_transfer_instruction_v1.TransferFactoryTransfer{
+							ExpectedAdmin: instrumentId.Admin,
+							Transfer:      transfer,
+							ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+								Context: choiceContext,
+							},
+						}),
 					}},
-					ActAs:              []string{b.Participant.PartyID},
-					DisclosedContracts: transferFactory.DisclosedContracts,
-				},
-				TransactionFormat: &apiv2.TransactionFormat{
+				}},
+				transferFactory.DisclosedContracts,
+				&apiv2.TransactionFormat{
 					EventFormat: &apiv2.EventFormat{
 						FiltersByParty: map[string]*apiv2.Filters{
-							b.Participant.PartyID: {Cumulative: []*apiv2.CumulativeFilter{{IdentifierFilter: &apiv2.CumulativeFilter_WildcardFilter{WildcardFilter: &apiv2.WildcardFilter{}}}}},
+							b.Participant.PartyID: &apiv2.Filters{Cumulative: []*apiv2.CumulativeFilter{
+								{
+									IdentifierFilter: &apiv2.CumulativeFilter_InterfaceFilter{InterfaceFilter: &apiv2.InterfaceFilter{
+										InterfaceId:          contracts.MustTemplateIDFromString(splice_api_token_transfer_instruction_v1.ITransferInstructionInterfaceID()).ToLedgerIdentifier(),
+										IncludeInterfaceView: true,
+									}},
+								},
+							}},
 						},
 						Verbose: true,
 					},
 					TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_LEDGER_EFFECTS,
 				},
-			})
+			)
 			if err != nil {
 				return fmt.Errorf("submit transfer: %w", err)
 			}
-			fmt.Printf("Submitted transfer in update: %s\n", resp.GetTransaction().GetUpdateId())
-			fmt.Println(b.CantonExplorerLink(resp.GetTransaction().GetUpdateId()))
+			fmt.Printf("✅ Submitted transfer in update: %s\n", tx.GetUpdateId())
+			fmt.Println(b.CantonExplorerLink(tx.GetUpdateId()))
+
+			_, ce, err := testhelpers.GetCreatedInterfaceViewFromTransaction[splice_api_token_transfer_instruction_v1.TransferInstructionView](tx, contracts.MustTemplateIDFromString(splice_api_token_transfer_instruction_v1.ITransferInstructionInterfaceIDWithPackageID(splice_api_token_transfer_instruction_v1.PackageID)).ToLedgerIdentifier())
+			if err == nil {
+				fmt.Printf("📑 Pending TransferInstruction created: %s\n", ce.GetContractId())
+			}
 
 			return nil
 		},
@@ -323,6 +397,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&receiverParty, "receiver", "", "party to receive the transfer (defaults to own party)")
 	c.Flags().StringArrayVar(&inputHoldingCids, "input", nil, "the holding(s) to be used as an input for the transfer. If unspecified, all current holdings will be used.")
 	c.Flags().StringVar(&amount, "amount", "", "the amount to transfer (required)")
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 	_ = c.MarkFlagRequired("amount")
 
 	return c
@@ -332,13 +407,14 @@ func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 	var (
 		contractID string
 		tokenName  string
+		useLedger  string
 	)
 	c := &cobra.Command{
 		Use:   "accept-transfer",
 		Short: "Accept an incoming TransferInstruction by contract ID",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -348,17 +424,69 @@ func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 				return err
 			}
 
-			return testhelpers.AcceptPendingTransferInstruction(
+			acceptContextResp, err := transferInstructionClient.GetTransferInstructionAcceptContextWithResponse(ctx, contractID, oapiTransferInstruction.GetChoiceContextRequest{})
+			if err != nil {
+				return fmt.Errorf("get transfer instruction accept context: %w", err)
+			}
+			if acceptContextResp.StatusCode() != http.StatusOK || acceptContextResp.JSON200 == nil {
+				return fmt.Errorf("unexpected transfer instruction accept context status=%d", acceptContextResp.StatusCode())
+			}
+
+			disclosedContracts := make([]*apiv2.DisclosedContract, 0, len(acceptContextResp.JSON200.DisclosedContracts))
+			for _, contract := range acceptContextResp.JSON200.DisclosedContracts {
+				id, err := testhelpers.TemplateIdFromString(contract.TemplateId)
+				if err != nil {
+					return fmt.Errorf("parse accept-context template id: %w", err)
+				}
+				createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
+				if err != nil {
+					return fmt.Errorf("decode accept-context created event blob: %w", err)
+				}
+				disclosedContracts = append(disclosedContracts, &apiv2.DisclosedContract{
+					TemplateId:       id,
+					ContractId:       contract.ContractId,
+					CreatedEventBlob: createdEventBlob,
+					SynchronizerId:   contract.SynchronizerId,
+				})
+			}
+
+			acceptContext, err := contracts.ChoiceContextFromData(acceptContextResp.JSON200.ChoiceContextData)
+			if err != nil {
+				return fmt.Errorf("convert transfer instruction accept context: %w", err)
+			}
+
+			// Accept Transfer
+			tx, err := cantonops.CantonSubmit(
 				ctx,
 				b.Participant,
-				transferInstructionClient,
-				b.Participant.PartyID,
-				contractID,
+				useLedger,
+				[]*apiv2.Command{{
+					Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+						TemplateId: &apiv2.Identifier{PackageId: "#splice-api-token-transfer-instruction-v1", ModuleName: "Splice.Api.Token.TransferInstructionV1", EntityName: "TransferInstruction"},
+						ContractId: contractID,
+						Choice:     "TransferInstruction_Accept",
+						ChoiceArgument: ledger.MapToValue(splice_api_token_transfer_instruction_v1.TransferInstructionAccept{
+							ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
+								Context: acceptContext,
+							},
+						}),
+					}},
+				}},
+				disclosedContracts,
+				nil,
 			)
+			if err != nil {
+				return fmt.Errorf("submit accept transfer: %w", err)
+			}
+			fmt.Println("✅ Transfer accepted in update:", tx.GetUpdateId())
+			fmt.Println(b.CantonExplorerLink(tx.GetUpdateId()))
+
+			return nil
 		},
 	}
 	c.Flags().StringVar(&contractID, "contract-id", "", "TransferInstruction contract ID to accept (required)")
 	c.Flags().StringVar(&tokenName, "token", "link", "token of the transfer instruction (link|native)")
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 	_ = c.MarkFlagRequired("contract-id")
 
 	return c
@@ -371,13 +499,14 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 		messageIDHex string
 		wait         time.Duration
 		finalityName string
+		useLedger    string
 	)
 	c := &cobra.Command{
 		Use:   "execute",
 		Short: "Execute on Canton a message sent from EVM",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -393,12 +522,13 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 			}
 			fmt.Printf("Verifier results for %s successfully retrieved.\n", messageId.Hex())
 
-			return cantonExecute(ctx, b, resp.Results[0].VerifierResult, fin)
+			return cantonExecute(ctx, b, resp.Results[0].VerifierResult, fin, useLedger)
 		},
 	}
 	c.Flags().StringVar(&messageIDHex, "message-id", "", "CCIP message id (0x-prefixed hex) (required)")
 	c.Flags().DurationVar(&wait, "wait", 15*time.Minute, "max time to wait for verifier results")
 	c.Flags().StringVar(&finalityName, "finality", "finality", "must match the send: finality (full), safe, or block depth 1-65535")
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 	_ = c.MarkFlagRequired("message-id")
 
 	return c
@@ -408,13 +538,14 @@ func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 	var (
 		requiredCCV  string
 		finalityName string
+		useLedger    string
 	)
 	c := &cobra.Command{
 		Use:   "sync-receiver-ccv",
 		Short: "Deploy or update CCIPReceiver required CCVs (run once before inbound load/e2e on prod)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -427,19 +558,20 @@ func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 				return fmt.Errorf("parse --required-ccv: %w", err)
 			}
 
-			_, err = cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, raw)
+			_, err = cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, raw, useLedger)
 
 			return err
 		},
 	}
 	c.Flags().StringVar(&requiredCCV, "required-ccv", "", "Canton committee verifier raw address (instanceId@owner)")
 	c.Flags().StringVar(&finalityName, "finality", "1", "receiver finality profile: finality|safe|1-65535")
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 	_ = c.MarkFlagRequired("required-ccv")
 
 	return c
 }
 
-func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierResult, fin finality.Parsed) error {
+func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierResult, fin finality.Parsed, useLedger string) error {
 	withToken := vr.Message.TokenTransfer != nil
 
 	encodedMessage, err := vr.Message.Encode()
@@ -462,11 +594,11 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		return fmt.Errorf("CCV execute disclosure: %w", err)
 	}
 
-	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, b.CCIPEDS)
+	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, b.CCIPEDS, useLedger)
 	if err != nil {
 		return err
 	}
-	receiverCid, err := cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, verifierRawAddress)
+	receiverCid, err := cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, verifierRawAddress, useLedger)
 	if err != nil {
 		return err
 	}
@@ -512,26 +644,26 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 	}
 
 	fmt.Println("⏳ Executing message...")
-	resp, err := b.Participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
-					ContractId:     receiverCid,
-					Choice:         "Execute",
-					ChoiceArgument: ledger.MapToValue(executeArgs),
-				}},
+	tx, err := cantonops.CantonSubmit(
+		ctx,
+		b.Participant,
+		useLedger,
+		[]*apiv2.Command{{
+			Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+				TemplateId:     contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
+				ContractId:     receiverCid,
+				Choice:         "Execute",
+				ChoiceArgument: ledger.MapToValue(executeArgs),
 			}},
-			ActAs:              []string{string(receiverParty)},
-			DisclosedContracts: allDisclosures,
-		},
-	})
+		}},
+		allDisclosures,
+		nil,
+	)
 	if err != nil {
 		return fmt.Errorf("submit Execute: %w", err)
 	}
-	fmt.Printf("✅ Message executed in Update: %s\n", resp.GetTransaction().GetUpdateId())
-	fmt.Println(b.CantonExplorerLink(resp.GetTransaction().GetUpdateId()))
+	fmt.Printf("✅ Message executed in Update: %s\n", tx.GetUpdateId())
+	fmt.Println(b.CantonExplorerLink(tx.GetUpdateId()))
 
 	return nil
 }
@@ -546,13 +678,14 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 		executor     string
 		feeTokenName string
 		feeInput     []string
+		useLedger    string
 	)
 	c := &cobra.Command{
 		Use:   "send-message",
 		Short: "Send a message-only CCIP message from Canton to EVM",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -571,7 +704,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 				msgReceiver = b.Profile.CCIPReceiverContract
 			}
 
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, "", nil, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, "", nil, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to a CCIP Receiver contract)")
@@ -580,6 +713,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&executor, "executor", "default", "executor mode (default|none)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
 	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 
 	return c
 }
@@ -594,13 +728,14 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 		feeTokenName string
 		feeInput     []string
 		tokenInput   []string
+		useLedger    string
 	)
 	c := &cobra.Command{
 		Use:   "send-token",
 		Short: "Send a LINK token transfer CCIP message from Canton to EVM",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, false)
 			if err != nil {
 				return err
 			}
@@ -619,7 +754,7 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 				msgReceiver = b.ETHAddress
 			}
 
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, amountStr, tokenInput, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, amountStr, tokenInput, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to own address)")
@@ -630,6 +765,7 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&feeTokenName, "fee-token", "native", "fee token (link|native)")
 	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
 	c.Flags().StringArrayVar(&tokenInput, "token-input", nil, "the holding(s) to be used as an input for the token transfer. If unspecified, all current holdings will be used.")
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 	_ = c.MarkFlagRequired("amount")
 
 	return c
@@ -649,6 +785,7 @@ func cantonSend(
 	feeTokenInstrumentId *splice_api_token_holding_v1.InstrumentId,
 	feeTokenTransferInstructionClient oapiTransferInstruction.ClientWithResponsesInterface,
 	feeInputHoldings []string,
+	useLedger string,
 ) error {
 	withToken := amountStr != ""
 
@@ -716,11 +853,11 @@ func cantonSend(
 	}
 
 	// --- Resolve router + sender ---
-	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, b.CCIPEDS)
+	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, b.CCIPEDS, useLedger)
 	if err != nil {
 		return err
 	}
-	senderCid, err := cantonops.GetOrCreateSender(ctx, b.Participant)
+	senderCid, err := cantonops.GetOrCreateSender(ctx, b.Participant, useLedger)
 	if err != nil {
 		return err
 	}
@@ -916,28 +1053,28 @@ func cantonSend(
 
 	// --- Submit ---
 	fmt.Println("⏳ Sending message...")
-	resp, err := b.Participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
-					ContractId:     senderCid,
-					Choice:         "Send",
-					ChoiceArgument: ledger.MapToValue(sendArgs),
-				}},
+	tx, err := cantonops.CantonSubmit(
+		ctx,
+		b.Participant,
+		useLedger,
+		[]*apiv2.Command{{
+			Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+				TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
+				ContractId:     senderCid,
+				Choice:         "Send",
+				ChoiceArgument: ledger.MapToValue(sendArgs),
 			}},
-			ActAs:              []string{b.Participant.PartyID},
-			DisclosedContracts: allDisclosures,
-		},
-	})
+		}},
+		allDisclosures,
+		nil,
+	)
 	if err != nil {
-		return fmt.Errorf("submit Send: %w", err)
+		return fmt.Errorf("execute: %w", err)
 	}
-	fmt.Printf("Message sent in Update: %s\n", resp.GetTransaction().GetUpdateId())
-	fmt.Println(b.CantonExplorerLink(resp.GetTransaction().GetUpdateId()))
+	fmt.Printf("Message sent in Update: %s\n", tx.GetUpdateId())
+	fmt.Println(b.CantonExplorerLink(tx.GetUpdateId()))
 
-	messageId, err := cantonops.GetMessageIdFromTransaction(resp.GetTransaction())
+	messageId, err := cantonops.GetMessageIdFromTransaction(tx)
 	if err != nil {
 		return err
 	}
