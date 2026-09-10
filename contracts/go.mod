@@ -12,7 +12,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/stretchr/testify v1.12.1
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/exp v0.0.0-20260820142414-ca536658362e
 	gopkg.in/yaml.v3 v3.0.1
 )
