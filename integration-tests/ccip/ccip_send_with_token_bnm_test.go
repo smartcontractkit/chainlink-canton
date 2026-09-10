@@ -437,9 +437,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 			PoolReceiveContext: splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}},
-			TransferTimeout: burnminttokenpool.TransferTimeout{
-				RelativeHours: func(v types.INT64) *types.INT64 { return &v }(types.INT64(24)),
-			},
 			Deps: burnminttokenpool.BurnMintTokenPoolDeps{
 				TokenAdminRegistry: tokenAdminRegistryAddress.Binding(),
 				RmnRemote:          rmnRemoteAddress.Binding(),
