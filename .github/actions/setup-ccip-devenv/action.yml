@@ -85,9 +85,11 @@ runs:
             echo "github.com/smartcontractkit/chainlink-ccv not found in ${CCV_REF_GO_MOD}" >&2
             exit 1
           fi
+          echo "Using chainlink-ccv ref '${resolved_ref}' resolved from go.mod: ${CCV_REF_GO_MOD}"
           echo "ref=${resolved_ref}" >> "${GITHUB_OUTPUT}"
         else
           # Fall back to explicit input for callers not using go.mod-based pinning.
+          echo "Using chainlink-ccv ref '${CCV_REF}' from input: ccv-ref"
           echo "ref=${CCV_REF}" >> "${GITHUB_OUTPUT}"
         fi
 
