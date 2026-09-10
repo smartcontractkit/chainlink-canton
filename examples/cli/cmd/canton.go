@@ -662,7 +662,15 @@ func cantonSend(
 		}
 	}
 
-	linkInstrumentId := b.Profile.LinkInstrumentID
+	// Transferred token: profile's LINK instrument by default, or the configured
+	// self-issued instrument (admin = own party) when canton.tokenInstrumentId is set.
+	tokenInstrumentId := b.Profile.LinkInstrumentID
+	if id := b.Config.Canton.TokenInstrumentID; id != "" {
+		tokenInstrumentId = &splice_api_token_holding_v1.InstrumentId{
+			Admin: types.PARTY(b.Participant.PartyID),
+			Id:    types.TEXT(id),
+		}
+	}
 
 	// --- Resolve fee token holdings ---
 	var feeTokenInputCids []types.CONTRACT_ID
@@ -705,7 +713,7 @@ func cantonSend(
 				tokenTransferInputCids = append(tokenTransferInputCids, types.CONTRACT_ID(holding))
 			}
 		} else {
-			tokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, linkInstrumentId)
+			tokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, tokenInstrumentId)
 			if err != nil {
 				return fmt.Errorf("list LINK holdings: %w", err)
 			}
@@ -759,8 +767,8 @@ func cantonSend(
 		msg.TokenTransfer = &oapiCommon.TokenTransfer{
 			Amount: normalizedAmount,
 			Token: oapiCommon.InstrumentId{
-				Admin: oapiCommon.PartyId(linkInstrumentId.Admin),
-				Id:    string(linkInstrumentId.Id),
+				Admin: oapiCommon.PartyId(tokenInstrumentId.Admin),
+				Id:    string(tokenInstrumentId.Id),
 			},
 			HoldingContractIds: new(tokenTransferHoldings),
 		}
@@ -772,7 +780,7 @@ func cantonSend(
 		requiredCCVs            []string
 	)
 	if withToken {
-		tokenPoolAddress, err := eds.GetTokenPoolForToken(ctx, b.CCIPEDS, contracts.EncodeInstrumentID(*linkInstrumentId))
+		tokenPoolAddress, err := eds.GetTokenPoolForToken(ctx, b.CCIPEDS, contracts.EncodeInstrumentID(*tokenInstrumentId))
 		if err != nil {
 			return fmt.Errorf("get LINK token pool: %w", err)
 		}
@@ -848,7 +856,7 @@ func cantonSend(
 	}
 	if withToken {
 		canton2Any.TokenTransfer = &clientapi.TokenTransfer{
-			Token:  *linkInstrumentId,
+			Token:  *tokenInstrumentId,
 			Amount: types.NUMERIC(msg.TokenTransfer.Amount),
 		}
 	}
