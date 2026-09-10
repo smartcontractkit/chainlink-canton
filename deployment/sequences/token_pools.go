@@ -543,9 +543,8 @@ var DeployTokenPoolForToken = operations.NewSequence(
 					RemoteChainConfigs:      map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{},
 					TokenTransferFeeConfigs: map[types.NUMERIC]burnminttokenpool.TokenTransferFeeConfig{},
 					PoolReceiveContext:      poolReceiveContext,
-					TransferTimeout: burnminttokenpool.TransferTimeout{
-						RelativeHours: new(types.INT64(24)),
-					},
+					// TransferTimeout is deprecated and unused
+					TransferTimeout: burnminttokenpool.TransferTimeout{RelativeHours: new(types.INT64(0))},
 					Deps: burnminttokenpool.BurnMintTokenPoolDeps{
 						TokenAdminRegistry: tokenAdminRegistryRaw.Binding(),
 						RmnRemote:          rmnRemoteRaw.Binding(),

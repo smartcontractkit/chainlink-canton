@@ -364,6 +364,12 @@ template SendingMessage
                     caller
                 assertMsg "sendingMessage: duplicate CCV fee"
                     (all (\fee -> not (fee.ccvInstanceId == ccvInstanceId && fee.ccvOwner == caller)) ccvFees)
+                assertMsg ("sendingMessage: AddCCVFee invalid destGasLimit: " <> show destGasLimit)
+                    (destGasLimit >= 0)
+                assertMsg ("sendingMessage: AddCCVFee invalid destBytesOverhead: " <> show destBytesOverhead)
+                    (destBytesOverhead >= 0)
+                assertMsg ("sendingMessage: AddCCVFee invalid feeUSDCents: " <> show feeUSDCents)
+                    (feeUSDCents >= 0.0)
 
                 let fee = CCVFee with
                         ccvInstanceId, ccvOwner = caller

@@ -137,7 +137,7 @@ var ReleasedVersions map[Package][]string = map[Package][]string{
 	CCIPTicketsV2:              []string{"2.0.0"},
 	CCIPUtilsV2:                []string{"2.0.0", "2.1.0"},
 	ChainlinkAPI:               []string{"2.0.0"},
-	Link:                       []string{"2.0.0"},
+	Link:                       []string{"2.0.0", "2.1.0"},
 	MCMSAPI:                    []string{"1.0.0"},
 	MCMSCore:                   []string{"2.0.0"},
 }

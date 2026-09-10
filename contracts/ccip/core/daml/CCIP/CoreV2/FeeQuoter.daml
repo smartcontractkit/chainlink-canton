@@ -282,6 +282,10 @@ template FeeQuoter
                         ("No dest chain config found for " <> show destChainSelector)
                         (Map.lookup destChainSelector destChainConfigs)
                 assertMsg "feequoter: destination chain disabled" destChainConfig.isEnabled
+                assertMsg ("feequoter: nonCalldataGas must be nonnegative: " <> show nonCalldataGas)
+                    (nonCalldataGas >= 0)
+                assertMsg ("feequoter: calldataSize must be nonnegative: " <> show calldataSize)
+                    (calldataSize >= 0)
 
                 let totalGas =
                         nonCalldataGas + calldataSize * destChainConfig.destGasPerPayloadByteBase

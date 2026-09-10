@@ -48,7 +48,6 @@ import CCIP.BurnMintTokenPoolV2CodecGen (
     decodeApplyTokenTransferFeeConfigUpdatesParamsAt,
     decodeSetRateLimiterReferencesParamsAt,
     decodeSetRateLimitConfigParamsAt,
-    decodeSetTransferTimeoutParamsAt,
     decodeAddPoolReceiveContextNonContractValueParamsAt,
     decodeAddPoolReceiveContextContractValueParamsAt,
     decodeRemovePoolReceiveContextValueParamsAt,
@@ -296,7 +295,7 @@ template BurnMintTokenPool
         -- (e.g., "transfer-preapproval"). Converted to Splice ChoiceContext at the
         -- TransferFactory boundary.
         poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
-        -- Timeout for pending TransferInstructions created by this pool.
+        -- Deprecated, unused
         transferTimeout : TransferTimeout
         deps : BurnMintTokenPoolDeps
     where
@@ -609,15 +608,13 @@ template BurnMintTokenPool
             controller poolOwner
             do create this with poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
-        -- Set the transfer timeout for pending TransferInstructions.
-        -- Use Indefinite for tokens without expiry, RelativeHours for tokens with expiry constraints.
-        --
-        -- Callable by poolOwner
+        -- Deprecated, will revert if called
         choice SetTransferTimeout : ContractId BurnMintTokenPool
             with
                 newTransferTimeout : TransferTimeout
             controller poolOwner
-            do create this with transferTimeout = newTransferTimeout
+            do
+                abort "SetTransferTimeout is deprecated and cannot be called"
 
         -- Get required CCV raw instance addresses based on chain and direction.
         nonconsuming choice GetRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
@@ -1286,12 +1283,4 @@ template BurnMintTokenPool
                     assertMsg "E_TRAILING_BYTES: ClearPoolReceiveContext" (byteCount operationData == 0)
                     newCid <- exercise selfCid ClearPoolReceiveContext
                     pure (Map.insert instAddr (coerceContractId newCid) contractIds)
-                "SetTransferTimeout" -> do
-                    case decodeSetTransferTimeoutParamsAt operationData 0 of
-                        None -> abort "E_INVALID_PARAMS: SetTransferTimeout"
-                        Some (SetTransferTimeoutParams{..}, finalOffset) -> do
-                            assertMsg "E_TRAILING_BYTES: SetTransferTimeout" (finalOffset == byteCount operationData)
-                            newCid <- exercise selfCid SetTransferTimeout with
-                                newTransferTimeout = transferTimeout
-                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
