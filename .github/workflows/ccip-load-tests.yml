@@ -105,6 +105,7 @@ jobs:
         if: inputs.ccip_env == 'devenv'
         uses: ./.github/actions/setup-ccip-devenv
         with:
+          ccv-ref-go-mod: go.mod
           ccip_env: ${{ inputs.ccip_env }}
           direction: ${{ inputs.direction }}
           message_rate: ${{ steps.prod_defaults.outputs.message_rate }}
