@@ -8,7 +8,7 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 
-	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
+	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/transferInstructionV1"
 )
 
 func ActiveContractToDisclosedContract(activeContract *apiv2.ActiveContract, includeDebugFields bool) oapiTransferInstruction.DisclosedContract {

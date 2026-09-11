@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	authConfig "github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
@@ -189,8 +189,8 @@ chain_selector = "8706591216959472610"
 							Factory: &Factory{
 								Type:             FactoryTypeURL,
 								TokenStandardURL: new("localhost:8545"),
-								TokenStandardAuthConfig: &commonconfig.AuthConfig{
-									Type: commonconfig.AuthTypeInsecureStatic,
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type: authConfig.AuthTypeInsecureStatic,
 									JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 								},
 							},
@@ -232,8 +232,8 @@ chain_selector = "8706591216959472610"
 				},
 				Node: NodeConfig{
 					URL: "localhost:8545",
-					AuthConfig: commonconfig.AuthConfig{
-						Type:   commonconfig.AuthTypeInsecureStatic,
+					AuthConfig: authConfig.AuthConfig{
+						Type:   authConfig.AuthTypeInsecureStatic,
 						UserID: "local-user",
 						JWT:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 					},
@@ -347,8 +347,8 @@ func TestConfig_Merge(t *testing.T) {
 								InstanceAddress: poolAddrA,
 							},
 							Factory: &Factory{
-								TokenStandardAuthConfig: &commonconfig.AuthConfig{
-									Type: commonconfig.AuthTypeInsecureStatic,
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type: authConfig.AuthTypeInsecureStatic,
 									JWT:  "jwt-token-pool-a",
 								},
 							},
@@ -397,8 +397,8 @@ func TestConfig_Merge(t *testing.T) {
 							Factory: &Factory{
 								Type:             FactoryTypeURL,
 								TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
-								TokenStandardAuthConfig: &commonconfig.AuthConfig{
-									Type: commonconfig.AuthTypeInsecureStatic,
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type: authConfig.AuthTypeInsecureStatic,
 									JWT:  "jwt-token-pool-a",
 								},
 							},

@@ -9,8 +9,8 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/eds/api/global"
 )
 
 func DisclosedContractToProto(contract oapiCommon.DisclosedContract) (*apiv2.DisclosedContract, error) {

@@ -1,0 +1,8 @@
+package: tokenMetadataV1
+output: tokenMetadataV1.gen.go
+generate:
+  models: true
+  client: true
+  gin-server: true
+output-options:
+  response-type-suffix: Resp

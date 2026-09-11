@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
+	"github.com/smartcontractkit/chainlink-canton/eds/api/common"
 )
 
 func must[T any](v T, err error) T {

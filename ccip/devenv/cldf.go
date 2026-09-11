@@ -10,7 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	"google.golang.org/grpc"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	authConfig "github.com/smartcontractkit/chainlink-canton/authentication/config"
 )
 
 func NewCLDF(ctx context.Context, b *blockchain.Input) (cldf_chain.BlockChain, uint64, error) {
@@ -34,7 +34,7 @@ func NewCLDF(ctx context.Context, b *blockchain.Input) (cldf_chain.BlockChain, u
 		}
 
 		userID := resolveUserID(config.UserID)
-		if userID == "" && authCfg.Type == commonconfig.AuthTypeAuthorizationCode {
+		if userID == "" && authCfg.Type == authConfig.AuthTypeAuthorizationCode {
 			userID, err = userIDFromToken(ctx, authProvider)
 			if err != nil {
 				return nil, 0, fmt.Errorf("resolve user id for Canton participant %d: %w", i+1, err)
