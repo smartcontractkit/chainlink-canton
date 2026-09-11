@@ -1,0 +1,38 @@
+name: Publish Release Artifacts
+
+on:
+  push:
+    tags:
+      # Plain release tags, e.g. v1.0.0 (job-level conditions decide what to publish)
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      # Sub-module release tags, e.g. eds/v1.0.0, contracts/v1.0.0
+      - '*/v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  publish-eds:
+    name: Build, sign & publish public chainlink-canton-eds image
+    # Only publish the EDS image for eds/ release tags
+    if: startsWith(github.ref_name, 'eds/')
+    permissions:
+      contents: read
+      id-token: write
+    uses: smartcontractkit/.github/.github/workflows/reusable-docker-build-publish.yml@f4ff50d0f4713ed7b247dbd8a58316484907f958 # 2026-01-13
+    with:
+      aws-ecr-name: chainlink-canton-eds
+      aws-region-ecr: us-east-1
+      build-arm64-image: 'true'
+      dockerfile: eds/eds.Dockerfile
+      docker-build-context: .
+      docker-build-args: ''
+      docker-manifest-sign: 'true'
+      docker-registry-url-override: public.ecr.aws/chainlink
+      # Strip the module prefix so eds/v1.0.0 produces the image tag v1.0.0
+      docker-image-tag-strip-prefix: 'eds/'
+      git-sha: ${{ github.sha }}
+      github-event-name: ${{ github.event_name }}
+      github-ref-name: ${{ github.ref_name }}
+      github-ref-type: ${{ github.ref_type }}
+      github-workflow-repository: ${{ github.repository }}
+    secrets:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID_SDLC }}
+      AWS_ROLE_PUBLISH_ARN: ${{ secrets.CANTON_IAM_ROLE_SDLC }}
