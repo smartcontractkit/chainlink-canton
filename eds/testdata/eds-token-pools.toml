@@ -22,3 +22,5 @@ chain_selector = "9268731218649498074"
 [registry_api]
   enabled = true
   party_id = "chainlink-registry-observer::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
+  # Discovered pools get a URL-mode factory resolved against this token-standard backend.
+  token_standard_url = "https://api.utilities.digitalasset-staging.com"

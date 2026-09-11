@@ -116,7 +116,11 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 	if err != nil {
 		return nil, fmt.Errorf("create executor EDS client: %w", err)
 	}
-	tokenPoolEds, err := oapiTokenPool.NewClientWithResponses(profile.EDSURL)
+	tokenPoolEDSURL := profile.EDSURL
+	if cfg.Canton.TokenPoolEDSURL != "" {
+		tokenPoolEDSURL = cfg.Canton.TokenPoolEDSURL
+	}
+	tokenPoolEds, err := oapiTokenPool.NewClientWithResponses(tokenPoolEDSURL)
 	if err != nil {
 		return nil, fmt.Errorf("create token pool EDS client: %w", err)
 	}
