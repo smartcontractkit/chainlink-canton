@@ -11,7 +11,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
-	internalparse "github.com/smartcontractkit/chainlink-canton/internal/parse"
 )
 
 type PerPartyRouterFactory struct {
@@ -60,7 +59,7 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 
 	sourceChainConfigs := make(map[uint64]SourceChainConfig, len(boundContract.SourceChainConfigs))
 	for chainSelectorString, sourceChainConfig := range boundContract.SourceChainConfigs {
-		chainSelector, err := internalparse.Uint64Checked(string(chainSelectorString))
+		chainSelector, err := parse.Uint64Checked(string(chainSelectorString))
 		if err != nil {
 			return nil, fmt.Errorf("invalid source chain config selector %q: %w", chainSelectorString, err)
 		}
@@ -73,7 +72,7 @@ func ParseGlobalConfig(createdEvent *apiv2.CreatedEvent) (*GlobalConfig, error) 
 
 	destChainConfigs := make(map[uint64]DestChainConfig, len(boundContract.DestChainConfigs))
 	for chainSelectorString, destChainConfig := range boundContract.DestChainConfigs {
-		chainSelector, err := internalparse.Uint64Checked(string(chainSelectorString))
+		chainSelector, err := parse.Uint64Checked(string(chainSelectorString))
 		if err != nil {
 			return nil, fmt.Errorf("invalid dest chain config selector %q: %w", chainSelectorString, err)
 		}

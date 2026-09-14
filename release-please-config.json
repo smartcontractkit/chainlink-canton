@@ -8,11 +8,19 @@
   "bump-minor-pre-major": true,
   "pull-request-title-pattern": "chore: release ${component} ${version}",
   "packages": {
+    "authentication": {
+      "release-type": "go",
+      "package-name": "authentication"
+    },
     "contracts": {
       "release-type": "go",
       "package-name": "contracts",
       "draft": true,
       "force-tag-creation": true
+    },
+    "eds": {
+      "release-type": "go",
+      "package-name": "eds"
     }
   },
   "plugins": [
