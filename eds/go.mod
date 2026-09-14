@@ -29,7 +29,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv v0.9.0
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260909170844-aaa8dc536936
 	github.com/smartcontractkit/chainlink-deployments-framework v0.122.0
-	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
+	github.com/smartcontractkit/go-daml v0.6.0
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/otel v1.46.0
 	go.opentelemetry.io/otel/metric v1.46.0
