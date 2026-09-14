@@ -4,8 +4,6 @@ go 1.26.7
 
 replace github.com/smartcontractkit/chainlink-canton => ../
 
-replace github.com/smartcontractkit/chainlink-canton/authentication => ../authentication
-
 replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../contracts
 
 replace github.com/smartcontractkit/chainlink-canton/eds => ../eds
