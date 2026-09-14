@@ -353,6 +353,8 @@ github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab h1:rvv6MJ
 github.com/ethereum/go-bigmodexpfix v0.0.0-20250911101455-f9e208c548ab/go.mod h1:IuLm4IsPipXKF7CW5Lzf68PIbZ5yl7FFd74l/E0o9A8=
 github.com/ethereum/go-ethereum v1.17.4 h1:uA4q+qiLp7QImBsjdRbINu8iX6OEVmj4DPc5/E5Fsxc=
 github.com/ethereum/go-ethereum v1.17.4/go.mod h1:qMdgwqqRAen+aT8P7KKQKi0Qt6RzG4cfejVAbCpJgqA=
+github.com/ethereum/hid v1.0.1-0.20260421154323-c2ab8d9bf68a h1:eIFUceK3U/z9UV0D/kAI6cxA27eH7MPqt2ks7fbzj/k=
+github.com/ethereum/hid v1.0.1-0.20260421154323-c2ab8d9bf68a/go.mod h1:nABYy4hsKZpuN0mu0uybdjrIOuGb1eE7b1lci/ezUAo=
 github.com/evanphx/json-patch/v5 v5.9.11 h1:/8HVnzMq13/3x9TPvjG08wUGqBTmZBsCWzjTM0wiaDU=
 github.com/evanphx/json-patch/v5 v5.9.11/go.mod h1:3j+LviiESTElxA4p3EMKAB9HXj3/XEtnUf6OZxqIQTM=
 github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb h1:IT4JYU7k4ikYg1SCxNI1/Tieq/NFvh6dzLdgi7eu0tM=
@@ -800,8 +802,6 @@ github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d/go.mod h1:2PavIy+JPci
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
 github.com/julienschmidt/httprouter v1.3.0 h1:U0609e9tgbseu3rBINet9P48AI/D3oJs4dN7jwJOQ1U=
 github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
-github.com/karalabe/hid v1.0.1-0.20260315100226-f5d04adeffeb h1:Ag83At00qa4FLkcdMgrwHVSakqky/eZczOlxd4q336E=
-github.com/karalabe/hid v1.0.1-0.20260315100226-f5d04adeffeb/go.mod h1:qk1sX/IBgppQNcGCRoj90u6EGC056EBoIc1oEjCWla8=
 github.com/keybase/go-keychain v0.0.1 h1:way+bWYa6lDppZoZcgMbYsvC7GxljxrskdNInRtuthU=
 github.com/keybase/go-keychain v0.0.1/go.mod h1:PdEILRW3i9D8JcdM+FmY6RwkHGnhHxXwkPPMeUgOK1k=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
@@ -1269,8 +1269,8 @@ github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 h1:12i
 github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7/go.mod h1:FX7/bVdoep147QQhsOPkYsPEXhGZjeYx6lBSaSXtZOA=
 github.com/smartcontractkit/libocr v0.0.0-20260810200708-618b5bf7f342 h1:pEcgcjTGA83MzpqbTbyIg9AJrOs62s77SooDdJGIg9w=
 github.com/smartcontractkit/libocr v0.0.0-20260810200708-618b5bf7f342/go.mod h1:5JPtsRwjugpyfsdEALC4RopfvohqK/G+3DHaR8uv+Bc=
-github.com/smartcontractkit/mcms v0.55.0 h1:wTTuTconDaTn23vS0v4y8lubW6J8muPqrhICcX8S+Mc=
-github.com/smartcontractkit/mcms v0.55.0/go.mod h1:2tnYW1Atvpla1CjzzOC/1u7yIOBKje5VSSJy6PDhnNY=
+github.com/smartcontractkit/mcms v0.55.1 h1:DRBMl+P4IxxH1GO3YHpyhi6i0oqU/Vk3GKvI1JkbO9c=
+github.com/smartcontractkit/mcms v0.55.1/go.mod h1:7Dipcj6NGBNWLW0AvNUP4EsSziHSw21awtGqJ/tE7dQ=
 github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945 h1:zxcODLrFytOKmAd8ty8S/XK6WcIEJEgRBaL7sY/7l4Y=
 github.com/smartcontractkit/wsrpc v0.8.5-0.20250502134807-c57d3d995945/go.mod h1:m3pdp17i4bD50XgktkzWetcV5yaLsi7Gunbv4ZgN6qg=
 github.com/sony/gobreaker/v2 v2.1.0 h1:av2BnjtRmVPWBvy5gSFPytm1J8BmN5AGhq875FfGKDM=
