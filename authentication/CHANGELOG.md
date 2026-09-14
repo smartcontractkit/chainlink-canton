@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.10.0](https://github.com/smartcontractkit/chainlink-canton/compare/authentication/v0.9.0...authentication/v0.10.0) (2026-09-14)
+## 1.0.0 (2026-09-14)
 
 
 ### Features
