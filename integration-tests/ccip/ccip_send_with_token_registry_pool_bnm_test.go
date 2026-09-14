@@ -34,7 +34,7 @@ import (
 	damlledger "github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	authConfig "github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
@@ -503,8 +503,8 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 			},
 			Node: config.NodeConfig{
 				URL: ccipParticipant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
+				AuthConfig: authConfig.AuthConfig{
+					Type:   authConfig.AuthTypeInsecureStatic,
 					UserID: ccipParticipant.UserID,
 					JWT:    ccipEDSToken.AccessToken,
 				},
