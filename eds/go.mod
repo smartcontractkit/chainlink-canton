@@ -4,9 +4,6 @@ go 1.26.7
 
 tool github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 
-// Remove once released
-replace github.com/smartcontractkit/chainlink-canton/authentication => ../authentication
-
 replace (
 	// Coming from chainlink-deployments-framework
 	github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014124537-af6b1684fe15
@@ -24,9 +21,9 @@ require (
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/rs/zerolog v1.35.1
 	github.com/smartcontractkit/chain-selectors v1.0.109
-	github.com/smartcontractkit/chainlink-canton/authentication v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-canton/authentication v1.0.0
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.0
-	github.com/smartcontractkit/chainlink-ccv v0.9.0
+	github.com/smartcontractkit/chainlink-ccv v0.11.0
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260909170844-aaa8dc536936
 	github.com/smartcontractkit/chainlink-deployments-framework v0.122.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
