@@ -12,11 +12,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 	"google.golang.org/grpc"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
-	"github.com/smartcontractkit/chainlink-canton/deployment/authentication/authorizationcode"
+	"github.com/smartcontractkit/chainlink-canton/authentication/config"
+	"github.com/smartcontractkit/chainlink-canton/authentication/providers/authorizationcode"
 )
 
-func resolveAuthConfig(tomlJWT, tomlUserID string) commonconfig.AuthConfig {
+func resolveAuthConfig(tomlJWT, tomlUserID string) config.AuthConfig {
 	jwt := envTrim("CANTON_JWT")
 	if jwt == "" {
 		jwt = tomlJWT
@@ -25,19 +25,19 @@ func resolveAuthConfig(tomlJWT, tomlUserID string) commonconfig.AuthConfig {
 	authType := envTrim("CANTON_AUTH_TYPE")
 	switch {
 	case authType == "" && jwt != "":
-		authType = commonconfig.AuthTypeInsecureStatic
+		authType = config.AuthTypeInsecureStatic
 	case authType == "":
-		authType = commonconfig.AuthTypeAuthorizationCode
+		authType = config.AuthTypeAuthorizationCode
 	}
 
 	authURL := envTrim("CANTON_AUTH_URL")
 	clientID := envTrim("CANTON_CLIENT_ID")
 	clientSecret := envTrim("CANTON_CLIENT_SECRET")
-	if authType != commonconfig.AuthTypeClientCredentials {
+	if authType != config.AuthTypeClientCredentials {
 		clientSecret = ""
 	}
 
-	return commonconfig.AuthConfig{
+	return config.AuthConfig{
 		Type:         authType,
 		UserID:       resolveUserID(tomlUserID),
 		JWT:          jwt,
@@ -75,8 +75,8 @@ func resolveValidatorAPIURL(tomlURL string) string {
 	return tomlURL
 }
 
-func newAuthProvider(ctx context.Context, authCfg commonconfig.AuthConfig) (authentication.Provider, error) {
-	if authCfg.Type == commonconfig.AuthTypeAuthorizationCode && authCfg.UserID == "" {
+func newAuthProvider(ctx context.Context, authCfg config.AuthConfig) (authentication.Provider, error) {
+	if authCfg.Type == config.AuthTypeAuthorizationCode && authCfg.UserID == "" {
 		return authorizationcode.NewDiscoveryProvider(ctx, authCfg.AuthURL, authCfg.ClientID)
 	}
 

@@ -94,7 +94,8 @@ func DeployBurnMintPoolForOwner(
 		Decimals:                types.INT64(10),
 		RemoteChainConfigs:      remoteChainConfigs,
 		TokenTransferFeeConfigs: tokenTransferFeeConfigs,
-		TransferTimeout:         burnminttokenpool.TransferTimeout{RelativeHours: new(types.INT64(24))},
+		// TransferTimeout is deprecated and unused
+		TransferTimeout: burnminttokenpool.TransferTimeout{RelativeHours: new(types.INT64(0))},
 		Deps: burnminttokenpool.BurnMintTokenPoolDeps{
 			TokenAdminRegistry: deps.TokenAdminRegistry.Binding(),
 			RmnRemote:          deps.RMNRemote.Binding(),

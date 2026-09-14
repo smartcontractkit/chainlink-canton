@@ -25,13 +25,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/testhelpers"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
 const RequestSizeLimit = 100_000
