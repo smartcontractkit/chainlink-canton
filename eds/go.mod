@@ -26,7 +26,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.109
 	github.com/smartcontractkit/chainlink-canton/authentication v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.0
-	github.com/smartcontractkit/chainlink-ccv v0.9.0
+	github.com/smartcontractkit/chainlink-ccv v0.11.0
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260909170844-aaa8dc536936
 	github.com/smartcontractkit/chainlink-deployments-framework v0.122.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
