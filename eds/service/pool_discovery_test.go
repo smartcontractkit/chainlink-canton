@@ -13,8 +13,8 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
@@ -52,7 +52,7 @@ func TestPoolDiscoveryService_CheckForNewPools(t *testing.T) {
 	server, err := tokenpool.NewServer(t.Context(), zerolog.Nop(), mockStore, mockInstrumentHoldingStore, config.TokenPoolAPIConfig{})
 	require.NoError(t, err)
 
-	svc := NewPoolDiscoveryService(zerolog.Nop(), mockStore, server, observerParty)
+	svc := NewPoolDiscoveryService(zerolog.Nop(), mockStore, server, config.RegistryAPIConfig{Enabled: true, PartyID: observerParty, TokenStandardURL: "https://token-standard.example.com"})
 
 	mockStore.EXPECT().
 		GetByTemplateId(types.PARTY(observerParty), contracts.TemplateIDFromBinding(burnminttokenpool.BurnMintTokenPool{})).
@@ -105,7 +105,7 @@ func TestPoolDiscoveryService_CheckForNewPools_LockRelease(t *testing.T) {
 	server, err := tokenpool.NewServer(t.Context(), zerolog.Nop(), mockStore, mockInstrumentHoldingStore, config.TokenPoolAPIConfig{})
 	require.NoError(t, err)
 
-	svc := NewPoolDiscoveryService(zerolog.Nop(), mockStore, server, observerParty)
+	svc := NewPoolDiscoveryService(zerolog.Nop(), mockStore, server, config.RegistryAPIConfig{Enabled: true, PartyID: observerParty, TokenStandardURL: "https://token-standard.example.com"})
 
 	mockStore.EXPECT().
 		GetByTemplateId(types.PARTY(observerParty), contracts.TemplateIDFromBinding(burnminttokenpool.BurnMintTokenPool{})).

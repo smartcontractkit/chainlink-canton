@@ -144,7 +144,10 @@ func (f URLBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapi
 			Id:    instrumentId.Id,
 		},
 		InputHoldingCids: inputHoldingCids,
-		Outputs:          nil, // TODO: technically, this should contain the created change
+		// The registry API rejects null where an array is expected (422
+		// DownField(outputs)). Nothing is minted on the burn/send side, so the
+		// list is empty. TODO: technically, this should contain the created change.
+		Outputs: []daRegistry.MintOutput{},
 	})
 	if err != nil {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("failed to call GetBurnMintFactory: %w", err)
