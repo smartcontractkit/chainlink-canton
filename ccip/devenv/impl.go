@@ -42,6 +42,7 @@ import (
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/simple_node_set"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	chainlink_canton "github.com/smartcontractkit/chainlink-canton"
 	"github.com/smartcontractkit/chainlink-canton/ccip/devenv/ledgertarget"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
@@ -805,6 +806,9 @@ func (c *Chain) DeployLocalNetwork(ctx context.Context, bcs *blockchain.Input) (
 		Info().
 		Int("NumberOfCantonValidators", bcs.NumberOfCantonValidators).
 		Msg("Deploying Canton network")
+	if bcs.Image == "" {
+		bcs.Image = chainlink_canton.GetSpliceVersion()
+	}
 	out, err := blockchain.NewBlockchainNetwork(bcs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create blockchain network: %w", err)

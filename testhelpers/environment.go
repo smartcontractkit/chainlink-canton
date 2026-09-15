@@ -11,6 +11,7 @@ import (
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	chainlink_canton "github.com/smartcontractkit/chainlink-canton"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -21,9 +22,6 @@ import (
 )
 
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
-
-// SpliceVersion overrides the default version specified by CTF
-const SpliceVersion = "0.8.1"
 
 type TestEnvironment struct {
 	Logger zerolog.Logger
@@ -110,7 +108,7 @@ func LoadChainWithCTF(t *testing.T, numberOfValidators int) (*canton.Chain, erro
 	bc, err := cantonProvider.NewCTFChainProvider(t, chainsel.CANTON_LOCALNET.Selector, cantonProvider.CTFChainProviderConfig{
 		NumberOfValidators: numberOfValidators,
 		Once:               defaultNetworkOnce,
-		Image:              SpliceVersion,
+		Image:              chainlink_canton.GetSpliceVersion(),
 	}).Initialize(t.Context())
 	require.NoError(t, err, "Failed to initialize CTF chain provider")
 
