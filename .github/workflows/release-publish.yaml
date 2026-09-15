@@ -35,4 +35,4 @@ jobs:
       github-workflow-repository: ${{ github.repository }}
     secrets:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID_SDLC }}
-      AWS_ROLE_PUBLISH_ARN: ${{ secrets.CANTON_IAM_ROLE_SDLC }}
+      AWS_ROLE_PUBLISH_ARN: ${{ secrets.CANTON_IAM_ROLE_SDLC_EDS }}
