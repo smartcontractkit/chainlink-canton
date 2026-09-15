@@ -23,6 +23,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
+	config2 "github.com/smartcontractkit/chainlink-canton/authentication/config"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -35,7 +37,6 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
@@ -65,14 +66,14 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/eds/api/global"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/service"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
-	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 	edsTesthelpers "github.com/smartcontractkit/chainlink-canton/testhelpers/eds"
 
@@ -467,8 +468,8 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			},
 			Node: config.NodeConfig{
 				URL: ccipParticipant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
+				AuthConfig: config2.AuthConfig{
+					Type:   config2.AuthTypeInsecureStatic,
 					UserID: ccipParticipant.UserID,
 					JWT:    ccipEDSToken.AccessToken,
 				},
@@ -553,8 +554,8 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 			},
 			Node: config.NodeConfig{
 				URL: senderParticipant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
+				AuthConfig: config2.AuthConfig{
+					Type:   config2.AuthTypeInsecureStatic,
 					UserID: senderParticipant.UserID,
 					JWT:    poolEDSToken.AccessToken,
 				},
@@ -582,8 +583,8 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 						Factory: &config.Factory{
 							Type:             config.FactoryTypeURL,
 							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
-							TokenStandardAuthConfig: &commonconfig.AuthConfig{
-								Type: commonconfig.AuthTypeInsecureStatic,
+							TokenStandardAuthConfig: &config2.AuthConfig{
+								Type: config2.AuthTypeInsecureStatic,
 								JWT:  ccipEDSToken.AccessToken,
 							},
 						},

@@ -1,8 +1,8 @@
 package ccip
 
 import (
+	"github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 )
 
 const DefaultCantonConfigPath = "/etc/canton/config.toml"
@@ -18,6 +18,6 @@ type Config struct {
 // BlockchainInfo holds the network-specific data for a canton chain.
 // It will be present in submitted job specs for canton chains, mapped to a specific chain selector.
 type BlockchainInfo struct {
-	GRPCLedgerAPIURL string                  `toml:"grpc_ledger_api_url"`
-	Auth             commonconfig.AuthConfig `toml:"auth,omitempty"`
+	GRPCLedgerAPIURL string            `toml:"grpc_ledger_api_url"`
+	Auth             config.AuthConfig `toml:"auth,omitempty"`
 }

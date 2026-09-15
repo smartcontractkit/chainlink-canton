@@ -18,18 +18,17 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 
-	"github.com/smartcontractkit/chainlink-canton/deployment/authentication/clientcredentials"
-
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	indexerclient "github.com/smartcontractkit/chainlink-ccv/indexer/pkg/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 
-	"github.com/smartcontractkit/chainlink-canton/deployment/authentication/authorizationcode"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
+	"github.com/smartcontractkit/chainlink-canton/authentication/providers/authorizationcode"
+	"github.com/smartcontractkit/chainlink-canton/authentication/providers/clientcredentials"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
