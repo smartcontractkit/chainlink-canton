@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.1.0...contracts/v2.2.0) (2026-09-15)
+
+
+### Features
+
+* **contracts:** New TPs family with atomic Initialize ([#925](https://github.com/smartcontractkit/chainlink-canton/issues/925)) ([c05332d](https://github.com/smartcontractkit/chainlink-canton/commit/c05332d51a5481d8157c07485cf4ee22530bb25a))
+
 ## [2.1.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.0.0...contracts/v2.1.0) (2026-09-10)
 
 
