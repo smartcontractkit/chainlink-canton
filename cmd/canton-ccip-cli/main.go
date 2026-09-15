@@ -6,13 +6,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	cmdpkg "github.com/smartcontractkit/chainlink-canton/examples/cli/cmd"
+	cmdpkg "github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/cmd"
 )
 
 func main() {
 	root := &cobra.Command{
-		Use:           "ccip-demo",
-		Short:         "CCIP Canton <-> EVM demo CLI",
+		Use:           "canton-ccip-cli",
+		Short:         "CCIP Canton <-> EVM CLI",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
