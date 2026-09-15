@@ -11,7 +11,6 @@ import (
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	chainlink_canton "github.com/smartcontractkit/chainlink-canton"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
@@ -19,6 +18,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
+
+	chainlink_canton "github.com/smartcontractkit/chainlink-canton"
 )
 
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
