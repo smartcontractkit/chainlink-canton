@@ -11,9 +11,9 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/burnminttokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/lockreleasetokenpool"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
@@ -26,6 +26,7 @@ type PoolDiscoveryService struct {
 	activeContractStore store.ActiveContractStoreInterface
 	tokenPoolServer     *tokenpool.Server
 	observerParty       types.PARTY
+	tokenStandardURL    string
 	// discoveredPools tracks the ledger offset of the contract currently registered for each
 	// address. InstanceIds aren't guaranteed unique, so two distinct contracts can derive the
 	// same address; the offset lets a later-created contract always win, regardless of the
@@ -36,12 +37,15 @@ type PoolDiscoveryService struct {
 
 // NewPoolDiscoveryService creates a new pool discovery service.
 // It must be created BEFORE activeContractStore.Run() is called.
-// observerPartyID is EDS's own party, named as an observer on discoverable pool contracts.
+// cfg.party_id is EDS's own party, named as an observer on discoverable pool contracts.
+// cfg.token_standard_url is used to wire a URL-mode factory for each discovered pool,
+// so send/execute disclosures include the token's burn-mint/transfer factory without
+// any per-pool static config.
 func NewPoolDiscoveryService(
 	logger zerolog.Logger,
 	activeContractStore store.ActiveContractStoreInterface,
 	tokenPoolServer *tokenpool.Server,
-	observerPartyID string,
+	cfg config.RegistryAPIConfig,
 ) *PoolDiscoveryService {
 	logger = logger.With().Str("component", "PoolDiscoveryService").Logger()
 
@@ -49,20 +53,20 @@ func NewPoolDiscoveryService(
 	// discovered pool's rate limiters resolve when serving send/execute. RegisterDiscoveredPool
 	// cannot register these later, as RegisterTemplates must run before activeContractStore.Run.
 	//
-	// TODO: RateLimiter currently has poolOwner as its only stakeholder, so it only resolves while
-	// the observer party is also the pool owner. Depends on RateLimiter gaining an observer field.
+	// RateLimiter has `observer observers`, so this resolves as long as the observer party is
+	// named in the RateLimiter's own observers field (not just the pool's).
 	activeContractStore.RegisterTemplates(
 		store.RegisteredTemplate{
 			TemplateID: contracts.TemplateIDFromBinding(burnminttokenpool.BurnMintTokenPool{}),
-			PartyID:    observerPartyID,
+			PartyID:    cfg.PartyID,
 		},
 		store.RegisteredTemplate{
 			TemplateID: contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{}),
-			PartyID:    observerPartyID,
+			PartyID:    cfg.PartyID,
 		},
 		store.RegisteredTemplate{
 			TemplateID: contracts.TemplateIDFromBinding(ratelimiter.RateLimiter{}),
-			PartyID:    observerPartyID,
+			PartyID:    cfg.PartyID,
 		},
 	)
 
@@ -70,7 +74,8 @@ func NewPoolDiscoveryService(
 		logger:              logger,
 		activeContractStore: activeContractStore,
 		tokenPoolServer:     tokenPoolServer,
-		observerParty:       types.PARTY(observerPartyID),
+		observerParty:       types.PARTY(cfg.PartyID),
+		tokenStandardURL:    cfg.TokenStandardURL,
 		discoveredPools:     make(map[contracts.InstanceAddress]int64),
 	}
 }
@@ -153,6 +158,9 @@ func (s *PoolDiscoveryService) registerIfNewer(ctx context.Context, rawAddress c
 // registerPool registers a discovered pool with the tokenpool server. PartyID stays the
 // observer party (it's what EDS has rights to query the ledger with); owner is the pool's
 // actual owner, read off its own instance address rather than the observer party.
+// The factory is always wired in URL mode against the configured token-standard backend:
+// the pool's LockOrBurn/ReleaseFromTicket require the factory CID in the choice context,
+// and URL mode resolves it over HTTP, so EDS needs no ledger visibility into the factory.
 func (s *PoolDiscoveryService) registerPool(ctx context.Context, address contracts.InstanceAddress, owner string, poolType config.TokenPoolType) error {
 	poolConfig := config.TokenPool{
 		ContractIdentifier: config.ContractIdentifier{
@@ -161,6 +169,10 @@ func (s *PoolDiscoveryService) registerPool(ctx context.Context, address contrac
 		},
 		Type:      poolType,
 		PoolOwner: owner,
+		Factory: &config.Factory{
+			Type:             config.FactoryTypeURL,
+			TokenStandardURL: &s.tokenStandardURL,
+		},
 	}
 
 	if err := s.tokenPoolServer.RegisterDiscoveredPool(ctx, poolConfig); err != nil {

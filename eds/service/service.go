@@ -166,7 +166,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		// Registry-observer party discovers pools that name it as an observer - it is never
 		// a pool's owner party, which is separate and per-pool.
 		if cfg.RegistryAPIConfig.Enabled {
-			poolDiscoveryService = NewPoolDiscoveryService(logger, activeContractStore, tokenPoolAPIServer, cfg.RegistryAPIConfig.PartyID)
+			poolDiscoveryService = NewPoolDiscoveryService(logger, activeContractStore, tokenPoolAPIServer, cfg.RegistryAPIConfig)
 		}
 
 		// Run instrument holding store in the background

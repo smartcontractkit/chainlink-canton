@@ -52,4 +52,5 @@ func TestPoolDiscoveryConfig(t *testing.T) {
 	assert.Empty(t, got.TokenPoolAPIConfig.TokenPools)
 	assert.True(t, got.RegistryAPIConfig.Enabled)
 	assert.NotEmpty(t, got.RegistryAPIConfig.PartyID)
+	assert.NotEmpty(t, got.RegistryAPIConfig.TokenStandardURL)
 }
