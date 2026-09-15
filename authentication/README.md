@@ -109,6 +109,30 @@ provider, err := clientcredentials.NewProvider(
 Additional options are available via the functional options pattern (see package documentation for `WithScopes`,
 `WithTransportCredentials`, etc).
 
+## Static Providers
+
+For cases where you already have an access token and don't need OAuth flows:
+
+```go
+import "github.com/smartcontractkit/chainlink-canton/authentication/providers/static"
+
+provider := static.NewStaticProvider("access-token")
+```
+
+The static provider enforces TLS transport security and is suitable for remote environments.
+
+### Insecure Static Provider
+
+For testing against LocalNet or other non-production environments only:
+
+```go
+import "github.com/smartcontractkit/chainlink-canton/authentication/providers/static"
+
+provider := static.NewInsecureStaticProvider("access-token")
+```
+
+The insecure static provider does not enforce transport security and must not be used in production.
+
 ## Token Management
 
 Both providers automatically handle token lifecycle management: caching, automatic refresh, and thread-safe operations.

@@ -30,6 +30,11 @@ packages:
   - ccip/tickets
   - ccip/utils
 
+  - ccip/registry-pools/burn-mint-token-pool
+  - ccip/registry-pools/lock-release-token-pool
+  - ccip/registry-pools/rate-limiter
+  - ccip/registry-pools/test
+
   - test/interfaces
   - test/proxy
   - test/receiver
