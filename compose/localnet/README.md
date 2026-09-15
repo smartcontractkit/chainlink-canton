@@ -3,15 +3,15 @@
 This contains a Docker compose setup to quickly start a localnet environment including an SV and 5 participant nodes.
 
 ## Start
-To start:
+The Splice version is read from the repo-root `.SPLICE-VERSION` file, which is the single place to bump it (the Go code in `splice.go` reads the same file). Pass both env files explicitly:
 ```
-docker compose up -d
+docker compose --env-file ../../.SPLICE-VERSION --env-file .env up -d
 ```
 
 ## Console
 To open the console:
 ```
-docker compose run --rm console
+docker compose --env-file ../../.SPLICE-VERSION --env-file .env run --rm console
 ```
 
 ## Access APIs

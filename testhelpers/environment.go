@@ -18,12 +18,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
+
+	chainlink_canton "github.com/smartcontractkit/chainlink-canton"
 )
 
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
-
-// SpliceVersion overrides the default version specified by CTF
-const SpliceVersion = "0.8.1"
 
 type TestEnvironment struct {
 	Logger zerolog.Logger
@@ -110,7 +109,7 @@ func LoadChainWithCTF(t *testing.T, numberOfValidators int) (*canton.Chain, erro
 	bc, err := cantonProvider.NewCTFChainProvider(t, chainsel.CANTON_LOCALNET.Selector, cantonProvider.CTFChainProviderConfig{
 		NumberOfValidators: numberOfValidators,
 		Once:               defaultNetworkOnce,
-		Image:              SpliceVersion,
+		Image:              chainlink_canton.GetSpliceVersion(),
 	}).Initialize(t.Context())
 	require.NoError(t, err, "Failed to initialize CTF chain provider")
 
