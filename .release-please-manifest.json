@@ -1,4 +1,5 @@
 {
   "authentication": "1.0.0",
-  "contracts": "2.1.0"
+  "contracts": "2.1.0",
+  "eds": "1.0.0"
 }
