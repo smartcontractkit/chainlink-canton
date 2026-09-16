@@ -88,6 +88,7 @@ func resolveCantonFeeToken(b *clients.Bundle, name string) (*splice_api_token_ho
 		if err != nil {
 			return nil, nil, fmt.Errorf("get link EDS clients: %w", err)
 		}
+
 		return b.Profile.LinkInstrumentID, linkEdsClients.TransferInstructionClient, nil
 	case "native":
 		return b.Profile.AmuletInstrumentID, b.AmuletTransferClient, nil
