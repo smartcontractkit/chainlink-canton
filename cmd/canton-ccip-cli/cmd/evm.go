@@ -109,6 +109,7 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 	var (
 		receiverParty string
+		token         string
 		amountStr     string
 		feeTokenName  string
 		finalityName  string
@@ -134,11 +135,10 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// Transferred token: profile's test token by default, or the configured
-			// override (evm.tokenAddress) for self-issued tokens.
+
 			tokenAddress := b.Profile.EthTokenAddress
-			if a := b.Config.EVM.TokenAddress; a != "" {
-				tokenAddress = common.HexToAddress(a)
+			if token != "" {
+				tokenAddress = common.HexToAddress(token)
 			}
 			tokenAmounts := []routerwrapper.ClientEVMTokenAmount{{
 				Token:  tokenAddress,
@@ -153,6 +153,7 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&receiverParty, "receiver-party", "", "destination Canton party id (defaults to own party)")
+	c.Flags().StringVar(&token, "token", "", "address of the token to send (defaults to LINK)")
 	c.Flags().StringVar(&amountStr, "amount", "", "token amount in wei (required; supports exponents, e.g. 1e18)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
 	c.Flags().StringVar(&finalityName, "finality", "finality", "source finality: finality (full), safe, or block depth 1-65535")

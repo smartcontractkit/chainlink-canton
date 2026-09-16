@@ -17,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	indexerclient "github.com/smartcontractkit/chainlink-ccv/indexer/pkg/client"
@@ -40,16 +41,10 @@ type Bundle struct {
 	Profile *cfgpkg.NetworkProfile
 	Config  *cfgpkg.UserConfig
 
-	Participant canton.Participant
-
-	// EDS clients
-	CCIPEDS              oapiCCIP.ClientWithResponsesInterface
-	CCVEDS               oapiCCV.ClientWithResponsesInterface
-	ExecutorEDS          oapiExecutor.ClientWithResponsesInterface
-	TokenPoolEDS         oapiTokenPool.ClientWithResponsesInterface
+	// Canton
+	Participant          canton.Participant
 	AmuletTransferClient oapiTransferInstruction.ClientWithResponsesInterface
-	LinkTransferClient   oapiTransferInstruction.ClientWithResponsesInterface
-	IndexerClient        *indexerclient.IndexerClient
+	edsURLs              map[types.PARTY]string
 
 	// EVM
 	ETHClient  *ethclient.Client
@@ -57,10 +52,20 @@ type Bundle struct {
 	EthAuth    *bind.TransactOpts
 	EthChainID *big.Int
 
+	IndexerClient *indexerclient.IndexerClient
+
 	// Explorers
 	CCIPExplorerURL   string
 	EVMExplorerURL    string
 	CantonExplorerURL string
+}
+
+type EDSClients struct {
+	CCIPEDS                   oapiCCIP.ClientWithResponsesInterface
+	CCVEDS                    oapiCCV.ClientWithResponsesInterface
+	ExecutorEDS               oapiExecutor.ClientWithResponsesInterface
+	TokenPoolEDS              oapiTokenPool.ClientWithResponsesInterface
+	TransferInstructionClient oapiTransferInstruction.ClientWithResponsesInterface
 }
 
 // New builds a Bundle for the given profile + user config.
@@ -126,30 +131,13 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 			return nil, fmt.Errorf("create validator API clients: %w", err)
 		}
 
-		// --- EDS clients ---
-		bundle.CCIPEDS, err = oapiCCIP.NewClientWithResponses(profile.EDSURL)
-		if err != nil {
-			return nil, fmt.Errorf("create CCIP EDS client: %w", err)
+		// --- EDS URLs ---
+		bundle.edsURLs = make(map[types.PARTY]string)
+		for party, url := range profile.EDSURLs {
+			bundle.edsURLs[types.PARTY(party)] = url
 		}
-		bundle.CCVEDS, err = oapiCCV.NewClientWithResponses(profile.EDSURL)
-		if err != nil {
-			return nil, fmt.Errorf("create CCV EDS client: %w", err)
-		}
-		bundle.ExecutorEDS, err = oapiExecutor.NewClientWithResponses(profile.EDSURL)
-		if err != nil {
-			return nil, fmt.Errorf("create executor EDS client: %w", err)
-		}
-		tokenPoolEDSURL := profile.EDSURL
-		if cfg.Canton.TokenPoolEDSURL != "" {
-			tokenPoolEDSURL = cfg.Canton.TokenPoolEDSURL
-		}
-		bundle.TokenPoolEDS, err = oapiTokenPool.NewClientWithResponses(tokenPoolEDSURL)
-		if err != nil {
-			return nil, fmt.Errorf("create token pool EDS client: %w", err)
-		}
-		bundle.LinkTransferClient, err = oapiTransferInstruction.NewClientWithResponses(profile.EDSURL)
-		if err != nil {
-			return nil, fmt.Errorf("create transferInstruction EDS client: %w", err)
+		for party, url := range cfg.Canton.EDSURLs {
+			bundle.edsURLs[types.PARTY(party)] = url
 		}
 	}
 
@@ -213,4 +201,38 @@ func (b *Bundle) EVMExplorerLink(tx string) string {
 
 func (b *Bundle) CantonExplorerLink(update string) string {
 	return fmt.Sprintf("%s/transactions/%s", strings.TrimSuffix(b.CantonExplorerURL, "/"), strings.TrimPrefix(update, "0x"))
+}
+
+func (b *Bundle) GetEDSClients(party types.PARTY) (EDSClients, error) {
+	url, ok := b.edsURLs[party]
+	if !ok {
+		return EDSClients{}, fmt.Errorf("no EDS URL found for party %q", party)
+	}
+
+	var (
+		clients EDSClients
+		err     error
+	)
+	clients.CCIPEDS, err = oapiCCIP.NewClientWithResponses(url)
+	if err != nil {
+		return EDSClients{}, fmt.Errorf("create CCIP EDS client: %w", err)
+	}
+	clients.CCVEDS, err = oapiCCV.NewClientWithResponses(url)
+	if err != nil {
+		return EDSClients{}, fmt.Errorf("create CCV EDS client: %w", err)
+	}
+	clients.ExecutorEDS, err = oapiExecutor.NewClientWithResponses(url)
+	if err != nil {
+		return EDSClients{}, fmt.Errorf("create executor EDS client: %w", err)
+	}
+	clients.TokenPoolEDS, err = oapiTokenPool.NewClientWithResponses(url)
+	if err != nil {
+		return EDSClients{}, fmt.Errorf("create token pool EDS client: %w", err)
+	}
+	clients.TransferInstructionClient, err = oapiTransferInstruction.NewClientWithResponses(url)
+	if err != nil {
+		return EDSClients{}, fmt.Errorf("create transferInstruction EDS client: %w", err)
+	}
+
+	return clients, nil
 }

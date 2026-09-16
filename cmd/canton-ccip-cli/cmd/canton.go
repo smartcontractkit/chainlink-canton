@@ -84,7 +84,11 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 func resolveCantonFeeToken(b *clients.Bundle, name string) (*splice_api_token_holding_v1.InstrumentId, oapiTransferInstruction.ClientWithResponsesInterface, error) {
 	switch name {
 	case "link":
-		return b.Profile.LinkInstrumentID, b.LinkTransferClient, nil
+		linkEdsClients, err := b.GetEDSClients(b.Profile.LinkInstrumentID.Admin)
+		if err != nil {
+			return nil, nil, fmt.Errorf("get link EDS clients: %w", err)
+		}
+		return b.Profile.LinkInstrumentID, linkEdsClients.TransferInstructionClient, nil
 	case "native":
 		return b.Profile.AmuletInstrumentID, b.AmuletTransferClient, nil
 	default:
@@ -313,7 +317,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 			}
 			transferFactory, err := testhelpers.GetTransferFactoryV2(ctx, transferInstructionClient, string(instrumentId.Admin), transfer)
 			if err != nil {
-				return fmt.Errorf("get transfer factory: %w", err)
+				return fmt.Errorf("get transfer factory for token: %w", err)
 			}
 			choiceContext, err := contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
 			if err != nil {
@@ -584,17 +588,27 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		return fmt.Errorf("parse VerifierDestAddress: %w", err)
 	}
 
+	// Get the ccipOwner party's EDS clients
+	ccipEdsClients, err := b.GetEDSClients(b.Profile.CCIPOwnerPartyID)
+	if err != nil {
+		return fmt.Errorf("get CCIP EDS clients: %w", err)
+	}
+	ccvEdsClients, err := b.GetEDSClients(types.PARTY(verifierRawAddress.Owner()))
+	if err != nil {
+		return fmt.Errorf("get CCV EDS clients: %w", err)
+	}
+
 	receiverParty := types.PARTY(b.Participant.PartyID)
-	ccipExecuteDisclosure, err := eds.GetCCIPExecuteDisclosure(ctx, b.CCIPEDS, encodedHex, receiverParty)
+	ccipExecuteDisclosure, err := eds.GetCCIPExecuteDisclosure(ctx, ccipEdsClients.CCIPEDS, encodedHex, receiverParty)
 	if err != nil {
 		return fmt.Errorf("CCIP execute disclosure: %w", err)
 	}
-	ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, b.CCVEDS, encodedHex, verifierRawAddress.InstanceAddress(), receiverParty)
+	ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, ccvEdsClients.CCVEDS, encodedHex, verifierRawAddress.InstanceAddress(), receiverParty)
 	if err != nil {
 		return fmt.Errorf("CCV execute disclosure: %w", err)
 	}
 
-	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, b.CCIPEDS, useLedger)
+	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, ccipEdsClients.CCIPEDS, useLedger)
 	if err != nil {
 		return err
 	}
@@ -612,11 +626,15 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 
 	if withToken {
 		targetInstrumentId := contracts.BytesToEncodedInstrumentID(vr.Message.TokenTransfer.DestTokenAddress)
-		tokenPoolAddress, err := eds.GetTokenPoolForToken(ctx, b.CCIPEDS, targetInstrumentId)
+		tokenPoolAddress, err := eds.GetTokenPoolForToken(ctx, ccipEdsClients.CCIPEDS, targetInstrumentId)
 		if err != nil {
 			return fmt.Errorf("get token pool: %w", err)
 		}
-		tokenPoolExecuteDisclosure, err := eds.GetTokenPoolExecuteDisclosure(ctx, b.TokenPoolEDS, encodedHex, tokenPoolAddress.InstanceAddress(), receiverParty)
+		tokenPoolEdsClients, err := b.GetEDSClients(types.PARTY(tokenPoolAddress.Owner()))
+		if err != nil {
+			return fmt.Errorf("get token pool EDS clients: %w", err)
+		}
+		tokenPoolExecuteDisclosure, err := eds.GetTokenPoolExecuteDisclosure(ctx, tokenPoolEdsClients.TokenPoolEDS, encodedHex, tokenPoolAddress.InstanceAddress(), receiverParty)
 		if err != nil {
 			return fmt.Errorf("token pool execute disclosure: %w", err)
 		}
@@ -704,7 +722,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 				msgReceiver = b.Profile.CCIPReceiverContract
 			}
 
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, "", nil, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, nil, "", nil, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to a CCIP Receiver contract)")
@@ -722,6 +740,7 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 	var (
 		receiverHex  string
 		gasLimit     int
+		token        string
 		amountStr    string
 		payload      string
 		executor     string
@@ -740,6 +759,18 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 				return err
 			}
 
+			tokenTransferInstrumentId := b.Profile.LinkInstrumentID
+			if token != "" {
+				split := strings.Split(token, "@")
+				if len(split) != 2 || split[0] == "" || split[1] == "" {
+					return fmt.Errorf("invalid --token %q (must be in the format of <id>@<admin>)", token)
+				}
+				tokenTransferInstrumentId = &splice_api_token_holding_v1.InstrumentId{
+					Id:    types.TEXT(split[0]),
+					Admin: types.PARTY(split[1]),
+				}
+			}
+
 			if executor != "default" && executor != "none" {
 				return fmt.Errorf("invalid --executor %q (default|none)", executor)
 			}
@@ -754,10 +785,11 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 				msgReceiver = b.ETHAddress
 			}
 
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, amountStr, tokenInput, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, tokenTransferInstrumentId, amountStr, tokenInput, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to own address)")
+	c.Flags().StringVar(&token, "token", "", "instrumentId of the token to transfer, in the format of <id>@<admin> (defaults to LINK)")
 	c.Flags().StringVar(&amountStr, "amount", "", "LINK token transfer amount as decimal (e.g. 0.12345, 1e-2); (required)")
 	c.Flags().StringVar(&payload, "payload", "", "optional message payload (text) to attach to the token transfer")
 	c.Flags().IntVar(&gasLimit, "gas-limit", -1, fmt.Sprintf("gas limit for EVM execution, defaults to %v for message transfers", defaultGasLimit))
@@ -779,9 +811,13 @@ func cantonSend(
 	receiver common.Address,
 	payload []byte,
 	gasLimit int,
+	// token transfers
+	tokenTransferInstrumentId *splice_api_token_holding_v1.InstrumentId,
 	amountStr string,
 	tokenInputHoldings []string,
+	// executor
 	executorMode string,
+	// fee token
 	feeTokenInstrumentId *splice_api_token_holding_v1.InstrumentId,
 	feeTokenTransferInstructionClient oapiTransferInstruction.ClientWithResponsesInterface,
 	feeInputHoldings []string,
@@ -796,16 +832,6 @@ func cantonSend(
 		normalizedAmount, err = parseDecimalAmount(amountStr)
 		if err != nil {
 			return fmt.Errorf("invalid --amount %q (supports exponents, e.g. 1e-2): %w", amountStr, err)
-		}
-	}
-
-	// Transferred token: profile's LINK instrument by default, or the configured
-	// self-issued instrument (admin = own party) when canton.tokenInstrumentId is set.
-	tokenInstrumentId := b.Profile.LinkInstrumentID
-	if id := b.Config.Canton.TokenInstrumentID; id != "" {
-		tokenInstrumentId = &splice_api_token_holding_v1.InstrumentId{
-			Admin: types.PARTY(b.Participant.PartyID),
-			Id:    types.TEXT(id),
 		}
 	}
 
@@ -835,7 +861,7 @@ func cantonSend(
 		Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 	})
 	if err != nil {
-		return fmt.Errorf("get transfer factory: %w", err)
+		return fmt.Errorf("get transfer factory for fee token: %w", err)
 	}
 	feeChoiceContext, err := contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
 	if err != nil {
@@ -850,7 +876,7 @@ func cantonSend(
 				tokenTransferInputCids = append(tokenTransferInputCids, types.CONTRACT_ID(holding))
 			}
 		} else {
-			tokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, tokenInstrumentId)
+			tokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, tokenTransferInstrumentId, testhelpers.WithUnlockedHoldingsOnly())
 			if err != nil {
 				return fmt.Errorf("list LINK holdings: %w", err)
 			}
@@ -860,8 +886,14 @@ func cantonSend(
 		}
 	}
 
+	// Get the ccipOwner party's EDS clients
+	ccipEdsClients, err := b.GetEDSClients(b.Profile.CCIPOwnerPartyID)
+	if err != nil {
+		return fmt.Errorf("get CCIP EDS clients: %w", err)
+	}
+
 	// --- Resolve router + sender ---
-	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, b.CCIPEDS, useLedger)
+	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, ccipEdsClients.CCIPEDS, useLedger)
 	if err != nil {
 		return err
 	}
@@ -904,8 +936,8 @@ func cantonSend(
 		msg.TokenTransfer = &oapiCommon.TokenTransfer{
 			Amount: normalizedAmount,
 			Token: oapiCommon.InstrumentId{
-				Admin: oapiCommon.PartyId(tokenInstrumentId.Admin),
-				Id:    string(tokenInstrumentId.Id),
+				Admin: oapiCommon.PartyId(tokenTransferInstrumentId.Admin),
+				Id:    string(tokenTransferInstrumentId.Id),
 			},
 			HoldingContractIds: new(tokenTransferHoldings),
 		}
@@ -917,11 +949,15 @@ func cantonSend(
 		requiredCCVs            []string
 	)
 	if withToken {
-		tokenPoolAddress, err := eds.GetTokenPoolForToken(ctx, b.CCIPEDS, contracts.EncodeInstrumentID(*tokenInstrumentId))
+		tokenPoolAddress, err := eds.GetTokenPoolForToken(ctx, ccipEdsClients.CCIPEDS, contracts.EncodeInstrumentID(*tokenTransferInstrumentId))
 		if err != nil {
 			return fmt.Errorf("get LINK token pool: %w", err)
 		}
-		tps, err := eds.GetTokenPoolSendDisclosure(ctx, b.TokenPoolEDS, msg, tokenPoolAddress.InstanceAddress())
+		tokenPoolEdsClients, err := b.GetEDSClients(types.PARTY(tokenPoolAddress.Owner()))
+		if err != nil {
+			return fmt.Errorf("get token pool EDS clients: %w", err)
+		}
+		tps, err := eds.GetTokenPoolSendDisclosure(ctx, tokenPoolEdsClients.TokenPoolEDS, msg, tokenPoolAddress.InstanceAddress())
 		if err != nil {
 			return fmt.Errorf("token pool send disclosure: %w", err)
 		}
@@ -930,7 +966,7 @@ func cantonSend(
 	}
 
 	// --- CCIP send disclosure (resolves default CCV + default executor) ---
-	ccipSendDisclosure, err := eds.GetCCIPSendDisclosure(ctx, b.CCIPEDS, msg, nil, requiredCCVs)
+	ccipSendDisclosure, err := eds.GetCCIPSendDisclosure(ctx, ccipEdsClients.CCIPEDS, msg, nil, requiredCCVs)
 	if err != nil {
 		return fmt.Errorf("CCIP send disclosure: %w", err)
 	}
@@ -938,7 +974,11 @@ func cantonSend(
 	if err != nil {
 		return fmt.Errorf("parse default CCV address: %w", err)
 	}
-	ccvSendDisclosure, err := eds.GetCCVSendDisclosure(ctx, b.CCVEDS, msg, defaultCCVAddress.InstanceAddress())
+	ccvEdsClients, err := b.GetEDSClients(types.PARTY(defaultCCVAddress.Owner()))
+	if err != nil {
+		return fmt.Errorf("get CCV EDS clients: %w", err)
+	}
+	ccvSendDisclosure, err := eds.GetCCVSendDisclosure(ctx, ccvEdsClients.CCVEDS, msg, defaultCCVAddress.InstanceAddress())
 	if err != nil {
 		return fmt.Errorf("CCV send disclosure: %w", err)
 	}
@@ -955,7 +995,11 @@ func cantonSend(
 		if err != nil {
 			return fmt.Errorf("parse default executor address: %w", err)
 		}
-		execDisc, err := eds.GetExecutorSendDisclosure(ctx, b.ExecutorEDS, msg, defaultExecutorAddress.InstanceAddress(), ccipSendDisclosure.CCVs)
+		executorEdsClients, err := b.GetEDSClients(types.PARTY(defaultExecutorAddress.Owner()))
+		if err != nil {
+			return fmt.Errorf("get executor EDS clients: %w", err)
+		}
+		execDisc, err := eds.GetExecutorSendDisclosure(ctx, executorEdsClients.ExecutorEDS, msg, defaultExecutorAddress.InstanceAddress(), ccipSendDisclosure.CCVs)
 		if err != nil {
 			return fmt.Errorf("executor send disclosure: %w", err)
 		}
@@ -993,7 +1037,7 @@ func cantonSend(
 	}
 	if withToken {
 		canton2Any.TokenTransfer = &clientapi.TokenTransfer{
-			Token:  *tokenInstrumentId,
+			Token:  *tokenTransferInstrumentId,
 			Amount: types.NUMERIC(msg.TokenTransfer.Amount),
 		}
 	}
