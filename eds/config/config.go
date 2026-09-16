@@ -166,6 +166,12 @@ type TokenPoolAPIConfig struct {
 type RegistryAPIConfig struct {
 	Enabled bool   `toml:"enabled"`
 	PartyID string `toml:"party_id" validate:"required_if=Enabled true"`
+	// TokenStandardURL is the base URL of the token-standard (DA registry) backend used to
+	// resolve burn-mint/transfer factories for discovered pools (URL factory mode — resolved
+	// over HTTP at serve time, so EDS needs no ledger visibility into the factory contract).
+	// Required when enabled: without it, discovered pools get no factory and send/execute
+	// aborts on-ledger (the pool requires the factory CID in the choice context).
+	TokenStandardURL string `toml:"token_standard_url" validate:"required_if=Enabled true,omitempty,url"`
 }
 
 // Token Standard API

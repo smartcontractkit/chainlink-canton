@@ -791,11 +791,19 @@ func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.T
 		Owner: types.PARTY(poolConfig.PoolOwner),
 	}
 
-	// Handle factory if configured
+	// Handle factory if configured — burn-mint pools use a BurnMintFactory,
+	// lock-release pools a TransferFactory.
 	if poolConfig.Factory != nil {
-		disclosureFactory, err := factory.NewBurnMintFactory(ctx, types.PARTY(poolConfig.PoolOwner), s.activeContractStore, *poolConfig.Factory)
+		var disclosureFactory factory.DisclosureFactory
+		var err error
+		switch poolConfig.Type {
+		case config.TokenPoolTypeBurnMint:
+			disclosureFactory, err = factory.NewBurnMintFactory(ctx, types.PARTY(poolConfig.PoolOwner), s.activeContractStore, *poolConfig.Factory)
+		case config.TokenPoolTypeLockRelease:
+			disclosureFactory, err = factory.NewTransferFactory(ctx, types.PARTY(poolConfig.PoolOwner), s.activeContractStore, *poolConfig.Factory)
+		}
 		if err != nil {
-			return fmt.Errorf("failed to get burn mint factory for token pool with address %s: %w", poolConfig.InstanceAddress, err)
+			return fmt.Errorf("failed to get %s factory for token pool with address %s: %w", poolConfig.Type, poolConfig.InstanceAddress, err)
 		}
 		contractConfig.disclosureFactory = disclosureFactory
 	}
