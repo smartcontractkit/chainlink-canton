@@ -17,12 +17,12 @@ import (
 	"github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings/latest/ccip_offramp"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/evm"
 
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/cantonops"
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/clients"
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/evmops"
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/finality"
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/input"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/cantonops"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/clients"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/evmops"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/finality"
-	"github.com/smartcontractkit/chainlink-canton/examples/cli/internal/input"
 )
 
 // parseAmount parses an amount string that may include exponents (e.g. "1e18")
@@ -78,7 +78,7 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 		Short: "Send a message-only CCIP message from EVM to Canton",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, true) // Disable Canton initialization
 			if err != nil {
 				return err
 			}
@@ -92,7 +92,7 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 			}
 			receiverPartyHashed := contracts.HashedPartyFromString(receiverParty)
 			if receiverParty == "" {
-				receiverPartyHashed = contracts.HashedPartyFromString(b.Participant.PartyID)
+				receiverPartyHashed = contracts.HashedPartyFromString(b.Config.Canton.PartyID)
 			}
 
 			return evmSend(ctx, b, receiverPartyHashed, []byte(payload), feeToken, nil, fin)
@@ -109,6 +109,7 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 	var (
 		receiverParty string
+		token         string
 		amountStr     string
 		feeTokenName  string
 		finalityName  string
@@ -118,7 +119,7 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 		Short: "Send a LINK token transfer CCIP message from EVM to Canton",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, true) // Disable Canton initialization
 			if err != nil {
 				return err
 			}
@@ -134,11 +135,10 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			// Transferred token: profile's test token by default, or the configured
-			// override (evm.tokenAddress) for self-issued tokens.
+
 			tokenAddress := b.Profile.EthTokenAddress
-			if a := b.Config.EVM.TokenAddress; a != "" {
-				tokenAddress = common.HexToAddress(a)
+			if token != "" {
+				tokenAddress = common.HexToAddress(token)
 			}
 			tokenAmounts := []routerwrapper.ClientEVMTokenAmount{{
 				Token:  tokenAddress,
@@ -146,13 +146,14 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 			}}
 			receiverPartyHashed := contracts.HashedPartyFromString(receiverParty)
 			if receiverParty == "" {
-				receiverPartyHashed = contracts.HashedPartyFromString(b.Participant.PartyID)
+				receiverPartyHashed = contracts.HashedPartyFromString(b.Config.Canton.PartyID)
 			}
 
 			return evmSend(ctx, b, receiverPartyHashed, nil, feeToken, tokenAmounts, fin)
 		},
 	}
 	c.Flags().StringVar(&receiverParty, "receiver-party", "", "destination Canton party id (defaults to own party)")
+	c.Flags().StringVar(&token, "token", "", "address of the token to send (defaults to LINK)")
 	c.Flags().StringVar(&amountStr, "amount", "", "token amount in wei (required; supports exponents, e.g. 1e18)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
 	c.Flags().StringVar(&finalityName, "finality", "finality", "source finality: finality (full), safe, or block depth 1-65535")
@@ -309,7 +310,7 @@ func newEVMExecuteCmd(g *Globals) *cobra.Command {
 		Short: "Execute on EVM a message sent from Canton (used with --executor none)",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
-			b, err := g.Resolve(ctx)
+			b, err := g.Resolve(ctx, true)
 			if err != nil {
 				return err
 			}

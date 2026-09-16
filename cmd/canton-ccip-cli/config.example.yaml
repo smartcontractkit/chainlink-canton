@@ -1,13 +1,16 @@
-# Example configuration for the CCIP demo CLI.
-# All canton and evm fields are required.
+# Example configuration for the Canton CCIP CLI.
 
 canton:
+  authType: "authorizationCode"
   authServerURL: "https://auth.example.com"
   authClientID: "my-client-id"
   participantGRPCLedgerAPIURL: "participant.example.com:5001"
   validatorAPIURL: "https://validator.example.com"
   userID: "my-user"
   partyID: "myParty::1220..."
+  # Additional, optional Party ID to EDS URL mappings.
+  edsURLs:
+    tokenPoolOwner:1220...: "https://token-pool-eds.example.com"
 
 evm:
   rpcURL: "https://eth-sepolia.example.com"

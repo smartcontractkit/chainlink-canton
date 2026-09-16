@@ -18,8 +18,8 @@ type NetworkProfile struct {
 	Name string
 
 	// Service URLs
-	EDSURL     string
 	IndexerURL string
+	EDSURLs    map[string]string
 
 	// Canton
 	CantonSelector   uint64
@@ -65,7 +65,10 @@ func Get(name string) (*NetworkProfile, error) {
 var Mainnet = &NetworkProfile{
 	Name: "mainnet",
 
-	EDSURL:     "https://eds.ccip.chain.link",
+	EDSURLs: map[string]string{
+		"ccipOwner::122012714685760dc1927c4cfe119ce2126c48756154e95c06f5c181da05a5519093": "https://eds.ccip.chain.link",
+		"ccvOwner::122096accf0a84fc7d80d5fce5ea3135317a03eb22e62e0d8cdd7548865f984f11ff":  "https://eds.ccip.chain.link",
+	},
 	IndexerURL: "https://indexer-1.ccip.chain.link",
 
 	CantonSelector:   chainsel.CANTON_MAINNET.Selector,
@@ -98,7 +101,10 @@ var Mainnet = &NetworkProfile{
 var Testnet = &NetworkProfile{
 	Name: "testnet",
 
-	EDSURL:     "https://eds.testnet.ccip.chain.link",
+	EDSURLs: map[string]string{
+		"ccipOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551": "https://eds.testnet.ccip.chain.link",
+		"ccvOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551":  "https://eds.testnet.ccip.chain.link",
+	},
 	IndexerURL: "https://indexer-1.testnet.ccip.chain.link",
 
 	CantonSelector: chainsel.CANTON_TESTNET.Selector,
