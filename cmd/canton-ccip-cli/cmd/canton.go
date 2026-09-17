@@ -88,12 +88,14 @@ func resolveCantonToken(b *clients.Bundle, token string) (*splice_api_token_hold
 		if err != nil {
 			return nil, nil, fmt.Errorf("get link EDS clients: %w", err)
 		}
+
 		return b.Profile.LinkInstrumentID, linkEdsClients.TransferInstructionClient, nil
 	case "native":
 		nativeEdsClients, err := b.GetTokenStandardClients(b.Profile.AmuletInstrumentID.Admin)
 		if err != nil {
 			return nil, nil, fmt.Errorf("get native EDS clients: %w", err)
 		}
+
 		return b.Profile.AmuletInstrumentID, nativeEdsClients.TransferInstructionClient, nil
 	default:
 		// Try to parse InstrumentId, should be in format <ID>@<ADMIN>

@@ -274,5 +274,4 @@ func (b *Bundle) GetTokenStandardClients(party types.PARTY) (TokenStandardClient
 	}
 
 	return TokenStandardClients{}, fmt.Errorf("no Token Standard URL found for party %q", party)
-
 }
