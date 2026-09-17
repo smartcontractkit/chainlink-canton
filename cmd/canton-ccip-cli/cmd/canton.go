@@ -292,45 +292,6 @@ func newCantonListTransferInstructionsCmd(g *Globals) *cobra.Command {
 	return c
 }
 
-// ---------------- canton list-transfer-instructions ----------------
-
-func newCantonListTransferInstructionsCmd(g *Globals) *cobra.Command {
-	c := &cobra.Command{
-		Use:   "list-transfer-instructions",
-		Short: "List all transfer instructions for the configured party",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			ctx := cmd.Context()
-			b, err := g.Resolve(ctx, false)
-			if err != nil {
-				return err
-			}
-			holdings, err := testhelpers.ListActiveContractsByInterfaceId(ctx, b.Participant, contracts.MustTemplateIDFromString(splice_api_token_transfer_instruction_v1.ITransferInstructionInterfaceID()).ToLedgerIdentifier())
-			if err != nil {
-				return fmt.Errorf("list holdings: %w", err)
-			}
-			tw := table.NewWriter()
-			tw.SetStyle(table.StyleLight)
-			tw.Style().Title.Align = text.AlignCenter
-			tw.SetAutoIndex(true)
-			tw.AppendHeader(table.Row{"Instrument ID", "Admin", "Sender", "Receiver", "Amount", "Requested At", "Execute Before", "ContractId"})
-			for _, h := range holdings {
-				for _, view := range h.GetCreatedEvent().GetInterfaceViews() {
-					var tiv splice_api_token_transfer_instruction_v1.TransferInstructionView
-					if err := ledger.RecordToStruct(view.GetViewValue(), &tiv); err != nil {
-						return fmt.Errorf("decode transfer instruction view: %w", err)
-					}
-					tw.AppendRow(table.Row{fmt.Sprintf("%s@%s", tiv.Transfer.InstrumentId.Id, tiv.Transfer.InstrumentId.Admin), tiv.Transfer.Sender, tiv.Transfer.Receiver, tiv.Transfer.Amount, time.Time(tiv.Transfer.RequestedAt).String(), time.Time(tiv.Transfer.ExecuteBefore).String(), h.GetCreatedEvent().GetContractId()})
-				}
-			}
-			fmt.Println(tw.Render())
-
-			return nil
-		},
-	}
-
-	return c
-}
-
 // ---------------- canton create transfer ----------------
 func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 	var (
