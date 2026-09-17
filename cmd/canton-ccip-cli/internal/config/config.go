@@ -33,7 +33,9 @@ type CantonConfig struct {
 }
 
 type EVMConfig struct {
-	RPCURL        string `yaml:"rpcURL"`
+	RPCURL string `yaml:"rpcURL"`
+	// PrivateKeyHex is optional. When it is not set, EVM transactions must be signed
+	// with a Ledger device via the --ledger flag on the signing commands.
 	PrivateKeyHex string `yaml:"privateKeyHex"`
 }
 
@@ -77,7 +79,6 @@ func (c *UserConfig) validate() error {
 		missing("canton.userID", c.Canton.UserID),
 		missing("canton.partyID", c.Canton.PartyID),
 		missing("evm.rpcURL", c.EVM.RPCURL),
-		missing("evm.privateKeyHex", c.EVM.PrivateKeyHex),
 	} {
 		if e != nil {
 			return e

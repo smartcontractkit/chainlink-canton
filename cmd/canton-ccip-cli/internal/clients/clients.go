@@ -16,16 +16,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	indexerclient "github.com/smartcontractkit/chainlink-ccv/indexer/pkg/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
+	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/authentication/providers/authorizationcode"
 	"github.com/smartcontractkit/chainlink-canton/authentication/providers/clientcredentials"
+	cfgpkg "github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/config"
+	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/evmledger"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
@@ -33,8 +35,6 @@ import (
 	oapiTokenMetadata "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
-
-	cfgpkg "github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/config"
 )
 
 // Bundle holds every constructed client/handle used by the commands.
@@ -169,19 +169,23 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 	if err != nil {
 		return nil, fmt.Errorf("dial EVM rpc: %w", err)
 	}
-	pk, err := crypto.HexToECDSA(strings.TrimPrefix(cfg.EVM.PrivateKeyHex, "0x"))
-	if err != nil {
-		return nil, fmt.Errorf("parse EVM private key: %w", err)
-	}
-	publicKeyECDSA, ok := pk.Public().(*ecdsa.PublicKey)
-	if !ok {
-		return nil, fmt.Errorf("invalid EVM private key")
-	}
-	bundle.ETHAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
 	bundle.EthChainID = new(big.Int).SetUint64(chainID)
-	bundle.EthAuth, err = bind.NewKeyedTransactorWithChainID(pk, bundle.EthChainID)
-	if err != nil {
-		return nil, fmt.Errorf("create EVM transactor: %w", err)
+	// The private key is optional: when it is not configured, EVM transactions
+	// must be signed with a Ledger device via the --ledger flag on the commands.
+	if cfg.EVM.PrivateKeyHex != "" {
+		pk, err := crypto.HexToECDSA(strings.TrimPrefix(cfg.EVM.PrivateKeyHex, "0x"))
+		if err != nil {
+			return nil, fmt.Errorf("parse EVM private key: %w", err)
+		}
+		publicKeyECDSA, ok := pk.Public().(*ecdsa.PublicKey)
+		if !ok {
+			return nil, fmt.Errorf("invalid EVM private key")
+		}
+		bundle.ETHAddress = crypto.PubkeyToAddress(*publicKeyECDSA)
+		bundle.EthAuth, err = bind.NewKeyedTransactorWithChainID(pk, bundle.EthChainID)
+		if err != nil {
+			return nil, fmt.Errorf("create EVM transactor: %w", err)
+		}
 	}
 
 	// --- Explorers ---
@@ -199,6 +203,20 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 	}
 
 	return bundle, nil
+}
+
+// UseLedgerEVM connects to a Ledger device, derives the account at the given
+// derivation path and replaces the EVM signer with one that signs transactions
+// using the Ledger. The returned function closes the device connection.
+func (b *Bundle) UseLedgerEVM(ctx context.Context, pathOrIndex string) (func(), error) {
+	auth, address, closeLedger, err := evmledger.NewTransactor(ctx, pathOrIndex, b.EthChainID)
+	if err != nil {
+		return nil, err
+	}
+	b.EthAuth = auth
+	b.ETHAddress = address
+
+	return closeLedger, nil
 }
 
 func (b *Bundle) CCIPExplorerLink(msgId string) string {

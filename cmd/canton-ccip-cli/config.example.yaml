@@ -17,6 +17,7 @@ canton:
 
 evm:
   rpcURL: "https://eth-sepolia.example.com"
+  # Optional; can be omitted when signing with a Ledger via the --ledger flag.
   privateKeyHex: "0xabc123..."
 
 ccip_explorer_url: ""

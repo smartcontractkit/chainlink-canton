@@ -66,12 +66,29 @@ func resolveEthFeeToken(b *clients.Bundle, name string) (common.Address, error) 
 	}
 }
 
+// setupEVMSigner ensures the bundle has an EVM transaction signer. If the
+// --ledger flag is set, the signer signs with a connected Ledger device;
+// otherwise the signer derived from the configured private key is required.
+// The returned function closes the Ledger connection, if one was opened.
+func setupEVMSigner(ctx context.Context, b *clients.Bundle, ledgerFlag string) (func(), error) {
+	if ledgerFlag == "" {
+		if b.EthAuth == nil {
+			return nil, fmt.Errorf("no EVM signer configured: set evm.privateKeyHex in the config or pass --ledger to sign with a Ledger")
+		}
+
+		return func() {}, nil
+	}
+
+	return b.UseLedgerEVM(ctx, ledgerFlag)
+}
+
 func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 	var (
 		receiverParty string
 		payload       string
 		feeTokenName  string
 		finalityName  string
+		useLedger     string
 	)
 	c := &cobra.Command{
 		Use:   "send-message",
@@ -82,6 +99,11 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			closeLedger, err := setupEVMSigner(ctx, b, useLedger)
+			if err != nil {
+				return err
+			}
+			defer closeLedger()
 			fin, err := finality.Parse(finalityName)
 			if err != nil {
 				return err
@@ -102,6 +124,7 @@ func newEVMSendMessageCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&payload, "payload", "Hello, Canton!", "message payload (text)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
 	c.Flags().StringVar(&finalityName, "finality", "finality", "source finality: finality (full), safe, or block depth 1-65535")
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/60'/0'/0/0 or a depth like 42 in which case it will replace the hardened account component, e.g. m/44'/60'/42'/0/0")
 
 	return c
 }
@@ -113,6 +136,7 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 		amountStr     string
 		feeTokenName  string
 		finalityName  string
+		useLedger     string
 	)
 	c := &cobra.Command{
 		Use:   "send-token",
@@ -123,6 +147,11 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			closeLedger, err := setupEVMSigner(ctx, b, useLedger)
+			if err != nil {
+				return err
+			}
+			defer closeLedger()
 			fin, err := finality.Parse(finalityName)
 			if err != nil {
 				return err
@@ -157,6 +186,7 @@ func newEVMSendTokenCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&amountStr, "amount", "", "token amount in wei (required; supports exponents, e.g. 1e18)")
 	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
 	c.Flags().StringVar(&finalityName, "finality", "finality", "source finality: finality (full), safe, or block depth 1-65535")
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/60'/0'/0/0 or a depth like 42 in which case it will replace the hardened account component, e.g. m/44'/60'/42'/0/0")
 	_ = c.MarkFlagRequired("amount")
 
 	return c
@@ -304,6 +334,7 @@ func newEVMExecuteCmd(g *Globals) *cobra.Command {
 	var (
 		messageIDHex string
 		wait         time.Duration
+		useLedger    string
 	)
 	c := &cobra.Command{
 		Use:   "execute",
@@ -314,6 +345,11 @@ func newEVMExecuteCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			closeLedger, err := setupEVMSigner(ctx, b, useLedger)
+			if err != nil {
+				return err
+			}
+			defer closeLedger()
 			messageId := common.HexToHash(messageIDHex)
 
 			fmt.Printf("Waiting for verifier results for %s (timeout %s)...\n", messageId.Hex(), wait)
@@ -372,6 +408,7 @@ func newEVMExecuteCmd(g *Globals) *cobra.Command {
 	}
 	c.Flags().StringVar(&messageIDHex, "message-id", "", "CCIP message id (0x-prefixed hex) (required)")
 	c.Flags().DurationVar(&wait, "wait", 15*time.Minute, "max time to wait for verifier results")
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/60'/0'/0/0 or a depth like 42 in which case it will replace the hardened account component, e.g. m/44'/60'/42'/0/0")
 	_ = c.MarkFlagRequired("message-id")
 
 	return c
