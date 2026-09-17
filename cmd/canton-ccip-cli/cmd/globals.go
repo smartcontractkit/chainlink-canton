@@ -21,7 +21,13 @@ func (g *Globals) Resolve(ctx context.Context, disableCanton bool) (*clients.Bun
 	if err != nil {
 		return nil, err
 	}
-	profile, err := cfgpkg.Get(*g.Network)
+
+	// If the network is specified in the config, use that value instead of the flag
+	network := cfgpkg.Network(*g.Network)
+	if cfg.Network != "" {
+		network = cfgpkg.Network(cfg.Network)
+	}
+	profile, err := cfgpkg.Get(network)
 	if err != nil {
 		return nil, err
 	}
