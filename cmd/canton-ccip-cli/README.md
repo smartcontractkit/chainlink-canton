@@ -25,7 +25,7 @@ go run ./examples/cli --network testnet <command>
 
 ## Config file
 
-See [`config.example.yaml`](./config.example.yaml). All `canton.*` and `evm.*` fields are required; the optional
+See [`config.example.yaml`](./config.example.yaml). All `canton.*` and `evm.rpcURL` fields are required; `evm.privateKeyHex` is optional when signing with a Ledger (see below); the optional
 explorer URL fields can be left empty.
 
 ```yaml
@@ -40,7 +40,7 @@ canton:
 
 evm:
   rpcURL: "https://eth-sepolia.example.com"
-  privateKeyHex: "0xabc..."
+  privateKeyHex: "0xabc..." # optional; omit to sign with a Ledger via --ledger
 
 ccip_explorer_url: ""
 evm_explorer_url: ""
@@ -53,13 +53,20 @@ canton_explorer_url: ""
 
 | Command                                                                                                                  | Description                                                                                                  |
 |--------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| `evm send-message --receiver-party <p> [--payload <text>] [--fee-token {link\|native}] [--finality {finality\|safe\|N}]` | Send a message from EVM to Canton with no token transfer.                                                    |
-| `evm send-token   --receiver-party <p> --amount <wei> [--fee-token {link\|native}] [--finality {finality\|safe\|N}]`     | Send a token-only transfer (LINK) from EVM to Canton.                                                        |
-| `evm execute      --message-id <0xhash> [--wait <duration>]`                                                             | Execute on EVM a message that was sent from Canton with the `noneExecution` executor.                        |
+| `evm send-message --receiver-party <p> [--payload <text>] [--fee-token {link\|native}] [--finality {finality\|safe\|N}] [--ledger <path-or-index>]` | Send a message from EVM to Canton with no token transfer.                                                    |
+| `evm send-token   --receiver-party <p> --amount <wei> [--fee-token {link\|native}] [--finality {finality\|safe\|N}] [--ledger <path-or-index>]`     | Send a token-only transfer (LINK) from EVM to Canton.                                                        |
+| `evm execute      --message-id <0xhash> [--wait <duration>] [--ledger <path-or-index>]`                                  | Execute on EVM a message that was sent from Canton with the `noneExecution` executor.                        |
 | `canton execute   --message-id <0xhash> [--finality {finality\|safe\|N}] [--wait <duration>]`                            | Execute on Canton a message sent from EVM. Must use matching `--finality` if send used faster-than-finality. |
 
 Because no executor currently supports Canton as a destination, the EVM-side send commands always use the `noExecution`
 tag in extraArgs.
+
+**Ledger signing (`--ledger`):** all EVM commands that sign transactions (`evm send-message`, `evm send-token`,
+`evm execute`) accept a `--ledger` flag. When set, transactions are signed with a connected Ledger device (with the
+Ethereum app open) instead of the configured private key, including the ERC20 allowance approval. The flag accepts a
+derivation path value, either a full path like `m/44'/60'/0'/0/0` or a depth like `42` in which case it will replace
+the hardened account component, e.g. `m/44'/60'/42'/0/0`. The sender address is read from the device, so `evm.privateKeyHex` can
+be omitted from the config when using a Ledger.
 
 **Finality (`--finality`):** defaults to `finality` (wait for full Sepolia finalization, slowest). Use `1` for one block
 confirmation (~12s), `safe` for Ethereum safe head, or any depth `1`–`65535`. When using faster finality, pass the same
@@ -96,7 +103,7 @@ device and the Canton admin APIs.
 | `canton external-party submit-topology [--synchronizer-id <id>] '<signed-topology-json>'`           | Calls `AllocateExternalParty` with the signed topology payload and verifies the party was created.                                                              |
 
 `--derivation-path` defaults to `m/44'/6767'/0'/0'/0'`. You can also pass just an index (for example `42`), which maps
-to `m/44'/6767'/0'/0'/42'`.
+to `m/44'/6767'/42'/0'/0'`.
 
 ## Notes
 
