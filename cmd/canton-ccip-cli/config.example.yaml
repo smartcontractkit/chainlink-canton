@@ -1,5 +1,5 @@
 # Example configuration for the Canton CCIP CLI.
-
+network: mainnet
 canton:
   authType: "authorizationCode"
   authServerURL: "https://auth.example.com"
@@ -11,6 +11,9 @@ canton:
   # Additional, optional Party ID to EDS URL mappings.
   edsURLs:
     tokenPoolOwner:1220...: "https://token-pool-eds.example.com"
+  # Additional, optional Party ID to Token Standard API URL mappings.
+  tokenStandardURLs:
+    tokenOwner:1220...: "https://token-standard-eds.example.com"
 
 evm:
   rpcURL: "https://eth-sepolia.example.com"

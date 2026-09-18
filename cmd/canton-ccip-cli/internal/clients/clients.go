@@ -30,6 +30,7 @@ import (
 	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
 	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
+	oapiTokenMetadata "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 
@@ -42,9 +43,11 @@ type Bundle struct {
 	Config  *cfgpkg.UserConfig
 
 	// Canton
-	Participant          canton.Participant
-	AmuletTransferClient oapiTransferInstruction.ClientWithResponsesInterface
-	edsURLs              map[types.PARTY]string
+	Participant canton.Participant
+	// Mapping of owner party -> URL for CCIP EDS APIs
+	edsURLs map[types.PARTY]string
+	// Mapping of owner party -> URL for CIP-56 Token Standard APIs
+	tokenStandardURLs map[types.PARTY]string
 
 	// EVM
 	ETHClient  *ethclient.Client
@@ -61,11 +64,15 @@ type Bundle struct {
 }
 
 type EDSClients struct {
-	CCIPEDS                   oapiCCIP.ClientWithResponsesInterface
-	CCVEDS                    oapiCCV.ClientWithResponsesInterface
-	ExecutorEDS               oapiExecutor.ClientWithResponsesInterface
-	TokenPoolEDS              oapiTokenPool.ClientWithResponsesInterface
+	CCIPEDS      oapiCCIP.ClientWithResponsesInterface
+	CCVEDS       oapiCCV.ClientWithResponsesInterface
+	ExecutorEDS  oapiExecutor.ClientWithResponsesInterface
+	TokenPoolEDS oapiTokenPool.ClientWithResponsesInterface
+}
+
+type TokenStandardClients struct {
 	TransferInstructionClient oapiTransferInstruction.ClientWithResponsesInterface
+	MetadataClient            oapiTokenMetadata.ClientWithResponsesInterface
 }
 
 // New builds a Bundle for the given profile + user config.
@@ -125,12 +132,6 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 		}
 		bundle.Participant = cantonChain.Participants[0]
 
-		// --- Validator API clients ---
-		_, _, bundle.AmuletTransferClient, err = testhelpers.NewValidatorAPIClients(bundle.Participant)
-		if err != nil {
-			return nil, fmt.Errorf("create validator API clients: %w", err)
-		}
-
 		// --- EDS URLs ---
 		bundle.edsURLs = make(map[types.PARTY]string)
 		for party, url := range profile.EDSURLs {
@@ -138,6 +139,15 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 		}
 		for party, url := range cfg.Canton.EDSURLs {
 			bundle.edsURLs[types.PARTY(party)] = url
+		}
+
+		// --- Token Standard URLs ---
+		bundle.tokenStandardURLs = make(map[types.PARTY]string)
+		for party, url := range profile.TokenStandardURLs {
+			bundle.tokenStandardURLs[types.PARTY(party)] = url
+		}
+		for party, url := range cfg.Canton.TokenStandardURLs {
+			bundle.tokenStandardURLs[types.PARTY(party)] = url
 		}
 	}
 
@@ -229,10 +239,39 @@ func (b *Bundle) GetEDSClients(party types.PARTY) (EDSClients, error) {
 	if err != nil {
 		return EDSClients{}, fmt.Errorf("create token pool EDS client: %w", err)
 	}
-	clients.TransferInstructionClient, err = oapiTransferInstruction.NewClientWithResponses(url)
-	if err != nil {
-		return EDSClients{}, fmt.Errorf("create transferInstruction EDS client: %w", err)
-	}
 
 	return clients, nil
+}
+
+func (b *Bundle) GetTokenStandardClients(party types.PARTY) (TokenStandardClients, error) {
+	var (
+		clients TokenStandardClients
+		err     error
+	)
+
+	url, ok := b.tokenStandardURLs[party]
+	if ok {
+		clients.TransferInstructionClient, err = oapiTransferInstruction.NewClientWithResponses(url)
+		if err != nil {
+			return TokenStandardClients{}, fmt.Errorf("create transferInstruction EDS client: %w", err)
+		}
+		clients.MetadataClient, err = oapiTokenMetadata.NewClientWithResponses(url)
+		if err != nil {
+			return TokenStandardClients{}, fmt.Errorf("create metadata EDS client: %w", err)
+		}
+
+		return clients, nil
+	}
+
+	// If no override is found and party is DSO, use Validator API
+	if party == b.Profile.DSOPartyID {
+		_, clients.MetadataClient, clients.TransferInstructionClient, err = testhelpers.NewValidatorAPIClients(b.Participant)
+		if err != nil {
+			return TokenStandardClients{}, fmt.Errorf("create validator API clients: %w", err)
+		}
+
+		return clients, nil
+	}
+
+	return TokenStandardClients{}, fmt.Errorf("no Token Standard URL found for party %q", party)
 }

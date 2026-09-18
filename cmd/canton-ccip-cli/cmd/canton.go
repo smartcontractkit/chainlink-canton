@@ -81,19 +81,38 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 	return c
 }
 
-func resolveCantonFeeToken(b *clients.Bundle, name string) (*splice_api_token_holding_v1.InstrumentId, oapiTransferInstruction.ClientWithResponsesInterface, error) {
-	switch name {
+func resolveCantonToken(b *clients.Bundle, token string) (*splice_api_token_holding_v1.InstrumentId, oapiTransferInstruction.ClientWithResponsesInterface, error) {
+	switch token {
 	case "link":
-		linkEdsClients, err := b.GetEDSClients(b.Profile.LinkInstrumentID.Admin)
+		linkEdsClients, err := b.GetTokenStandardClients(b.Profile.LinkInstrumentID.Admin)
 		if err != nil {
 			return nil, nil, fmt.Errorf("get link EDS clients: %w", err)
 		}
 
 		return b.Profile.LinkInstrumentID, linkEdsClients.TransferInstructionClient, nil
 	case "native":
-		return b.Profile.AmuletInstrumentID, b.AmuletTransferClient, nil
+		nativeEdsClients, err := b.GetTokenStandardClients(b.Profile.AmuletInstrumentID.Admin)
+		if err != nil {
+			return nil, nil, fmt.Errorf("get native EDS clients: %w", err)
+		}
+
+		return b.Profile.AmuletInstrumentID, nativeEdsClients.TransferInstructionClient, nil
 	default:
-		return nil, nil, fmt.Errorf("invalid --fee-token %q (link|native)", name)
+		// Try to parse InstrumentId, should be in format <ID>@<ADMIN>
+		if split := strings.Split(token, "@"); len(split) == 2 {
+			instrumentId := &splice_api_token_holding_v1.InstrumentId{
+				Id:    types.TEXT(split[0]),
+				Admin: types.PARTY(split[1]),
+			}
+			tokenEdsClients, err := b.GetTokenStandardClients(instrumentId.Admin)
+			if err != nil {
+				return nil, nil, fmt.Errorf("no Token Standard URL found for token %q: %w", token, err)
+			}
+
+			return instrumentId, tokenEdsClients.TransferInstructionClient, nil
+		}
+
+		return nil, nil, fmt.Errorf("invalid token %q, allowed values: (link|native|<InstrumentId>)", token)
 	}
 }
 
@@ -195,9 +214,9 @@ func newCantonListHoldingsCmd(g *Globals) *cobra.Command {
 			tw.Style().Title.Align = text.AlignCenter
 			tw.SetAutoIndex(true)
 			if withContractId {
-				tw.AppendHeader(table.Row{"Instrument ID", "Owner", "Amount", "Locked", "Contract ID"})
+				tw.AppendHeader(table.Row{"Instrument ID", "Owner", "Amount", "Locked", "Symbol", "Name", "Contract ID"})
 			} else {
-				tw.AppendHeader(table.Row{"Instrument ID", "Owner", "Amount", "Locked"})
+				tw.AppendHeader(table.Row{"Instrument ID", "Owner", "Amount", "Locked", "Symbol", "Name"})
 			}
 			for _, h := range holdings {
 				for _, view := range h.GetCreatedEvent().GetInterfaceViews() {
@@ -205,10 +224,24 @@ func newCantonListHoldingsCmd(g *Globals) *cobra.Command {
 					if err := ledger.RecordToStruct(view.GetViewValue(), &hv); err != nil {
 						return fmt.Errorf("decode holding view: %w", err)
 					}
+
+					// Query TokenMetadata API
+					var (
+						tokenName, tokenSymbol string
+					)
+					if edsClients, err := b.GetTokenStandardClients(hv.InstrumentId.Admin); err == nil {
+						instrumentInfo, err := edsClients.MetadataClient.GetInstrumentWithResponse(ctx, string(hv.InstrumentId.Id))
+						if err == nil {
+							if instrumentInfo.StatusCode() == http.StatusOK && instrumentInfo.JSON200 != nil {
+								tokenName, tokenSymbol = instrumentInfo.JSON200.Name, instrumentInfo.JSON200.Symbol
+							}
+						}
+					}
+
 					if withContractId {
-						tw.AppendRow(table.Row{fmt.Sprintf("%s@%s", hv.InstrumentId.Id, hv.InstrumentId.Admin), hv.InstrumentId.Admin, hv.Owner, hv.Amount, hv.Lock != nil, h.GetCreatedEvent().GetContractId()})
+						tw.AppendRow(table.Row{fmt.Sprintf("%s@%s", hv.InstrumentId.Id, hv.InstrumentId.Admin), hv.InstrumentId.Admin, hv.Owner, hv.Amount, hv.Lock != nil, tokenSymbol, tokenName, h.GetCreatedEvent().GetContractId()})
 					} else {
-						tw.AppendRow(table.Row{fmt.Sprintf("%s@%s", hv.InstrumentId.Id, hv.InstrumentId.Admin), hv.Owner, hv.Amount, hv.Lock != nil})
+						tw.AppendRow(table.Row{fmt.Sprintf("%s@%s", hv.InstrumentId.Id, hv.InstrumentId.Admin), hv.Owner, hv.Amount, hv.Lock != nil, tokenSymbol, tokenName})
 					}
 				}
 			}
@@ -264,7 +297,7 @@ func newCantonListTransferInstructionsCmd(g *Globals) *cobra.Command {
 // ---------------- canton create transfer ----------------
 func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 	var (
-		tokenName        string
+		token            string
 		receiverParty    string
 		inputHoldingCids []string
 		amount           string
@@ -280,7 +313,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 				return err
 			}
 
-			instrumentId, transferInstructionClient, err := resolveCantonFeeToken(b, tokenName)
+			instrumentId, transferInstructionClient, err := resolveCantonToken(b, token)
 			if err != nil {
 				return err
 			}
@@ -344,7 +377,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 			fmt.Println(tw.Render())
 			fmt.Println("Confirm? (Y/N)")
 			if !input.Confirm() {
-				return fmt.Errorf("cancel sending message")
+				return fmt.Errorf("cancel creating transfer")
 			}
 
 			// Create Transfer
@@ -398,7 +431,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringVar(&tokenName, "token", "link", "token to transfer (link|native)")
+	c.Flags().StringVar(&token, "token", "link", "token to transfer (link|native|<InstrumentId>)")
 	c.Flags().StringVar(&receiverParty, "receiver", "", "party to receive the transfer (defaults to own party)")
 	c.Flags().StringArrayVar(&inputHoldingCids, "input", nil, "the holding(s) to be used as an input for the transfer. If unspecified, all current holdings will be used.")
 	c.Flags().StringVar(&amount, "amount", "", "the amount to transfer (required)")
@@ -411,7 +444,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 	var (
 		contractID string
-		tokenName  string
+		token      string
 		useLedger  string
 	)
 	c := &cobra.Command{
@@ -424,7 +457,7 @@ func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 				return err
 			}
 
-			_, transferInstructionClient, err := resolveCantonFeeToken(b, tokenName)
+			_, transferInstructionClient, err := resolveCantonToken(b, token)
 			if err != nil {
 				return err
 			}
@@ -490,7 +523,7 @@ func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&contractID, "contract-id", "", "TransferInstruction contract ID to accept (required)")
-	c.Flags().StringVar(&tokenName, "token", "link", "token of the transfer instruction (link|native)")
+	c.Flags().StringVar(&token, "token", "link", "token of the transfer instruction (link|native|<InstrumentId>)")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 	_ = c.MarkFlagRequired("contract-id")
 
@@ -691,13 +724,13 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 
 func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 	var (
-		receiverHex  string
-		gasLimit     int
-		payload      string
-		executor     string
-		feeTokenName string
-		feeInput     []string
-		useLedger    string
+		receiverHex string
+		gasLimit    int
+		payload     string
+		executor    string
+		feeToken    string
+		feeInput    []string
+		useLedger   string
 	)
 	c := &cobra.Command{
 		Use:   "send-message",
@@ -713,7 +746,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 				return fmt.Errorf("invalid --executor %q (default|none)", executor)
 			}
 
-			feeTokenInstrumentId, feeTokenTransferClient, err := resolveCantonFeeToken(b, feeTokenName)
+			feeTokenInstrumentId, feeTokenTransferClient, err := resolveCantonToken(b, feeToken)
 			if err != nil {
 				return err
 			}
@@ -730,7 +763,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&payload, "payload", "Hello, EVM from Canton!", "message payload (text)")
 	c.Flags().IntVar(&gasLimit, "gas-limit", -1, fmt.Sprintf("gas limit for EVM execution, defaults to %v for message transfers", defaultGasLimit))
 	c.Flags().StringVar(&executor, "executor", "default", "executor mode (default|none)")
-	c.Flags().StringVar(&feeTokenName, "fee-token", "link", "fee token (link|native)")
+	c.Flags().StringVar(&feeToken, "fee-token", "link", "fee token (link|native|<InstrumentId>)")
 	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 
@@ -739,16 +772,16 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 
 func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 	var (
-		receiverHex  string
-		gasLimit     int
-		token        string
-		amountStr    string
-		payload      string
-		executor     string
-		feeTokenName string
-		feeInput     []string
-		tokenInput   []string
-		useLedger    string
+		receiverHex string
+		gasLimit    int
+		token       string
+		amountStr   string
+		payload     string
+		executor    string
+		feeToken    string
+		feeInput    []string
+		tokenInput  []string
+		useLedger   string
 	)
 	c := &cobra.Command{
 		Use:   "send-token",
@@ -776,7 +809,7 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 				return fmt.Errorf("invalid --executor %q (default|none)", executor)
 			}
 
-			feeTokenInstrumentId, feeTokenTransferClient, err := resolveCantonFeeToken(b, feeTokenName)
+			feeTokenInstrumentId, feeTokenTransferClient, err := resolveCantonToken(b, feeToken)
 			if err != nil {
 				return err
 			}
@@ -795,7 +828,7 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&payload, "payload", "", "optional message payload (text) to attach to the token transfer")
 	c.Flags().IntVar(&gasLimit, "gas-limit", -1, fmt.Sprintf("gas limit for EVM execution, defaults to %v for message transfers", defaultGasLimit))
 	c.Flags().StringVar(&executor, "executor", "default", "executor mode (default|none)")
-	c.Flags().StringVar(&feeTokenName, "fee-token", "native", "fee token (link|native)")
+	c.Flags().StringVar(&feeToken, "fee-token", "native", "fee token (link|native)")
 	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
 	c.Flags().StringArrayVar(&tokenInput, "token-input", nil, "the holding(s) to be used as an input for the token transfer. If unspecified, all current holdings will be used.")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")

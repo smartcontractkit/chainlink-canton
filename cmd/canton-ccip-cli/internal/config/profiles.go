@@ -11,6 +11,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 )
 
+type Network string
+
+const (
+	NetworkMainnet = Network("mainnet")
+	NetworkTestnet = Network("testnet")
+)
+
 // NetworkProfile contains all static, in-code configuration that differs
 // between mainnet and testnet (chain selectors, well-known addresses,
 // well-known Daml party IDs, instrument IDs).
@@ -18,8 +25,9 @@ type NetworkProfile struct {
 	Name string
 
 	// Service URLs
-	IndexerURL string
-	EDSURLs    map[string]string
+	IndexerURL        string
+	EDSURLs           map[string]string
+	TokenStandardURLs map[string]string
 
 	// Canton
 	CantonSelector   uint64
@@ -46,13 +54,13 @@ type NetworkProfile struct {
 }
 
 // Networks holds all supported network profiles.
-var Networks = map[string]*NetworkProfile{
-	"mainnet": Mainnet,
-	"testnet": Testnet,
+var Networks = map[Network]*NetworkProfile{
+	NetworkMainnet: Mainnet,
+	NetworkTestnet: Testnet,
 }
 
 // Get returns the profile for the given network name or an error.
-func Get(name string) (*NetworkProfile, error) {
+func Get(name Network) (*NetworkProfile, error) {
 	p, ok := Networks[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown network %q (supported: mainnet, testnet)", name)
@@ -68,6 +76,9 @@ var Mainnet = &NetworkProfile{
 	EDSURLs: map[string]string{
 		"ccipOwner::122012714685760dc1927c4cfe119ce2126c48756154e95c06f5c181da05a5519093": "https://eds.ccip.chain.link",
 		"ccvOwner::122096accf0a84fc7d80d5fce5ea3135317a03eb22e62e0d8cdd7548865f984f11ff":  "https://eds.ccip.chain.link",
+	},
+	TokenStandardURLs: map[string]string{
+		"ccipOwner::122012714685760dc1927c4cfe119ce2126c48756154e95c06f5c181da05a5519093": "https://eds.ccip.chain.link",
 	},
 	IndexerURL: "https://indexer-1.ccip.chain.link",
 
@@ -104,6 +115,9 @@ var Testnet = &NetworkProfile{
 	EDSURLs: map[string]string{
 		"ccipOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551": "https://eds.testnet.ccip.chain.link",
 		"ccvOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551":  "https://eds.testnet.ccip.chain.link",
+	},
+	TokenStandardURLs: map[string]string{
+		"ccipOwner::1220e382f4e57b0815e6be737006e381e6b7de448e06bd033ece6df498017879f551": "https://eds.testnet.ccip.chain.link",
 	},
 	IndexerURL: "https://indexer-1.testnet.ccip.chain.link",
 

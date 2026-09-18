@@ -9,6 +9,7 @@ import (
 
 // UserConfig holds the user-supplied configuration loaded from a YAML file.
 type UserConfig struct {
+	Network           string       `yaml:"network"`
 	Canton            CantonConfig `yaml:"canton"`
 	EVM               EVMConfig    `yaml:"evm"`
 	CCIPExplorerURL   string       `yaml:"ccip_explorer_url"`
@@ -28,6 +29,7 @@ type CantonConfig struct {
 	UserID                      string            `yaml:"userID"`
 	PartyID                     string            `yaml:"partyID"`
 	EDSURLs                     map[string]string `yaml:"edsURLs"`
+	TokenStandardURLs           map[string]string `yaml:"tokenStandardURLs"`
 }
 
 type EVMConfig struct {
