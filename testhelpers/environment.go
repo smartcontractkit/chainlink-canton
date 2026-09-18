@@ -17,9 +17,9 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 
 	chainlink_canton "github.com/smartcontractkit/chainlink-canton"
+	"github.com/smartcontractkit/chainlink-canton/authentication/providers/static"
 )
 
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
@@ -65,7 +65,7 @@ func LoadChainFromFile(t *testing.T, path string) (*canton.Chain, error) {
 
 		if party == "" {
 			// If no party is specified, use UserManagement service to get the primary party for the user
-			authProvider := authentication.NewInsecureStaticProvider(config.JWT)
+			authProvider := static.NewInsecureStaticProvider(config.JWT)
 			ledgerApiConn, err := grpc.NewClient(
 				config.GRPCLedgerAPIURL,
 				grpc.WithTransportCredentials(authProvider.TransportCredentials()),
@@ -83,7 +83,7 @@ func LoadChainFromFile(t *testing.T, path string) (*canton.Chain, error) {
 			_ = ledgerApiConn.Close()
 		}
 
-		authProvider := authentication.NewInsecureStaticProvider(config.JWT)
+		authProvider := static.NewInsecureStaticProvider(config.JWT)
 		providerConfig.Participants[i] = cantonProvider.ParticipantConfig{
 			Endpoints: cantonProvider.Endpoints{
 				JSONLedgerAPIURL: config.JSONLedgerAPIURL,

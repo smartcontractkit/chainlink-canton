@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 	"google.golang.org/grpc"
 
+	"github.com/smartcontractkit/chainlink-canton/authentication"
 	"github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/authentication/providers/authorizationcode"
 )
