@@ -9,6 +9,7 @@ import (
 
 // UserConfig holds the user-supplied configuration loaded from a YAML file.
 type UserConfig struct {
+	Network           string       `yaml:"network"`
 	Canton            CantonConfig `yaml:"canton"`
 	EVM               EVMConfig    `yaml:"evm"`
 	CCIPExplorerURL   string       `yaml:"ccip_explorer_url"`
@@ -28,10 +29,13 @@ type CantonConfig struct {
 	UserID                      string            `yaml:"userID"`
 	PartyID                     string            `yaml:"partyID"`
 	EDSURLs                     map[string]string `yaml:"edsURLs"`
+	TokenStandardURLs           map[string]string `yaml:"tokenStandardURLs"`
 }
 
 type EVMConfig struct {
-	RPCURL        string `yaml:"rpcURL"`
+	RPCURL string `yaml:"rpcURL"`
+	// PrivateKeyHex is optional. When it is not set, EVM transactions must be signed
+	// with a Ledger device via the --ledger flag on the signing commands.
 	PrivateKeyHex string `yaml:"privateKeyHex"`
 }
 
@@ -75,7 +79,6 @@ func (c *UserConfig) validate() error {
 		missing("canton.userID", c.Canton.UserID),
 		missing("canton.partyID", c.Canton.PartyID),
 		missing("evm.rpcURL", c.EVM.RPCURL),
-		missing("evm.privateKeyHex", c.EVM.PrivateKeyHex),
 	} {
 		if e != nil {
 			return e
