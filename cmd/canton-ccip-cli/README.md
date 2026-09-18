@@ -109,7 +109,7 @@ Because no executor currently supports Canton as a destination, the EVM-side sen
 use the `noExecution` tag in extraArgs.
 
 #### Example
-`go run ./cmd/canton-ccip-cli  --config  ./cmd/canton-ccip-cli/config.test.yaml --network testnet evm send-message --receiver-party u_5da1d5aca0c7::1220c250c23c55120f7c758bccc5cbc739629015ab921594e1c29656981f985bffa7 --payload "test-message-evm-canton" --fee-token native --finality 1`
+`go run ./cmd/canton-ccip-cli  --config  ./cmd/canton-ccip-cli/config.test.yaml --network testnet evm send-message --receiver-party u_5da1d5aca0c7::1220c250c23c55120f7c758bccc5cbc739629015ab921594e1c29656981f985bffa7 --payload "test-message-evm-to-canton" --fee-token native --finality 1`
 
 ### Canton → EVM
 
@@ -131,7 +131,7 @@ Command-specific flags:
 * `evm execute`: `--message-id <0xhash>` (**required**).
 
 #### Example
-`go run ./cmd/canton-ccip-cli  --config  ./cmd/canton-ccip-cli/config.test.yaml --network testnet canton send-message --receiver 0x15a8a0831a7FEdda5CFabF66452b92a980d204A1 --payload "test-message-canton-evm" --executor default --fee-token native`
+`go run ./cmd/canton-ccip-cli  --config  ./cmd/canton-ccip-cli/config.test.yaml --network testnet canton send-message --receiver 0x15a8a0831a7FEdda5CFabF66452b92a980d204A1 --payload "test-message-canton-to-evm" --executor default --fee-token native`
 
 ### Canton utilities
 
