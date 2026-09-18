@@ -26,12 +26,12 @@ import (
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework"
 	"github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain"
 	ctfcanton "github.com/smartcontractkit/chainlink-testing-framework/framework/components/blockchain/canton"
 	"github.com/smartcontractkit/freeport"
 
+	"github.com/smartcontractkit/chainlink-canton/authentication/providers/static"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
@@ -357,7 +357,7 @@ func buildCantonChain(ctx context.Context, t *testing.T, numberOfValidators int,
 			return nil, err
 		}
 
-		authProvider := authentication.NewInsecureStaticProvider(endpoints.JWT)
+		authProvider := static.NewInsecureStaticProvider(endpoints.JWT)
 		tokenSource := authProvider.TokenSource()
 		transportCredentials := authProvider.TransportCredentials()
 		perRPCCredentials := authProvider.PerRPCCredentials()

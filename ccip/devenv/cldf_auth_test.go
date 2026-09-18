@@ -4,13 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
 
 	"github.com/smartcontractkit/chainlink-canton/authentication/config"
+	"github.com/smartcontractkit/chainlink-canton/authentication/providers/static"
 )
 
 // validJWT is a well-formed JWT with sub "1234567890".
@@ -195,7 +195,7 @@ func (p testAuthProvider) TokenSource() oauth2.TokenSource {
 }
 
 func (p testAuthProvider) TransportCredentials() credentials.TransportCredentials {
-	return authentication.NewInsecureStaticProvider(p.token).TransportCredentials()
+	return static.NewInsecureStaticProvider(p.token).TransportCredentials()
 }
 
 func (p testAuthProvider) PerRPCCredentials() credentials.PerRPCCredentials {

@@ -21,11 +21,12 @@ import (
 	indexerclient "github.com/smartcontractkit/chainlink-ccv/indexer/pkg/client"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/authentication"
 	"github.com/smartcontractkit/chainlink-canton/authentication/providers/authorizationcode"
 	"github.com/smartcontractkit/chainlink-canton/authentication/providers/clientcredentials"
+	"github.com/smartcontractkit/chainlink-canton/authentication/providers/static"
 	cfgpkg "github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/config"
 	"github.com/smartcontractkit/chainlink-canton/cmd/canton-ccip-cli/internal/evmledger"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
@@ -88,7 +89,7 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 		var authProvider authentication.Provider
 		switch cfg.Canton.AuthType {
 		case "static":
-			authProvider = authentication.NewInsecureStaticProvider(cfg.Canton.AuthJWT)
+			authProvider = static.NewInsecureStaticProvider(cfg.Canton.AuthJWT)
 		case "clientCredentials":
 			authProvider, err = clientcredentials.NewDiscoveryProvider(ctx, cfg.Canton.AuthServerURL, cfg.Canton.AuthClientID, cfg.Canton.AuthClientSecret)
 			if err != nil {
