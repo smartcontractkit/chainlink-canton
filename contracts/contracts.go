@@ -128,7 +128,7 @@ const CurrentVersion = "current"
 // is therefore updated without its version being bumped, CI is expected to fail.
 var ReleasedVersions map[Package][]string = map[Package][]string{
 	CCIPAPIV2:                  []string{"2.0.0"},
-	CCIPBurnMintTokenPoolV2:    []string{"2.0.0", "2.1.0", "2.1.1"},
+	CCIPBurnMintTokenPoolV2:    []string{"2.0.0", "2.1.0", "2.1.1", "2.1.2"},
 	CCIPClientAPIV2:            []string{"2.0.0"},
 	CCIPCodecV2:                []string{"2.0.0"},
 	CCIPCommitteeVerifierV2:    []string{"2.0.0"},
@@ -137,8 +137,8 @@ var ReleasedVersions map[Package][]string = map[Package][]string{
 	CCIPExecutorV2:             []string{"2.0.0"},
 	CCIPExtensionAPIV2:         []string{"2.0.0"},
 	CCIPFactoryV2:              []string{"2.0.0", "2.1.0", "2.1.1"},
-	CCIPLockReleaseTokenPoolV2: []string{"2.0.0", "2.1.0", "2.1.1"},
-	CCIPRateLimiterV2:          []string{"2.0.0", "2.0.1"},
+	CCIPLockReleaseTokenPoolV2: []string{"2.0.0", "2.1.0", "2.1.1", "2.1.2"},
+	CCIPRateLimiterV2:          []string{"2.0.0", "2.0.1", "2.0.2"},
 	CCIPReceiverV2:             []string{"2.0.0", "2.1.0"},
 	CCIPRuntimeV2:              []string{"2.0.0", "2.1.0", "2.1.1"},
 	CCIPSenderV2:               []string{"2.0.0", "2.1.0"},
