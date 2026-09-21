@@ -4453,6 +4453,7 @@ testLockReleaseTokenPool_SetRateLimiterReferences = script do
             newIsEnabled = True
             newCapacity = 99.0
             newRate = 9.0
+            newLastUpdated = None
 
     updatedInbound456Cid <- submit owner do
         exerciseCmd tokenPoolCid CCIP.LockReleaseTokenPoolV2.SetRateLimitConfig with

@@ -513,6 +513,7 @@ template LockReleaseTokenPool
                     newIsEnabled
                     newCapacity
                     newRate
+                    newLastUpdated = None
 
         -- Updates which RateLimiter contract identities the pool references per remote chain (Canton instance swap).
         -- Callable by poolOwner only.
