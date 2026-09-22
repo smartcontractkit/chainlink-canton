@@ -4,7 +4,7 @@ import Daml.Script
 
 import DA.Assert
 import DA.Optional (fromSome)
-import DA.Time (milliseconds)
+import DA.Time (addRelTime, milliseconds)
 
 import qualified CCIP.RateLimiterV2
 
@@ -90,16 +90,19 @@ testRateLimiterSetConfigResetsBucket = script do
             tokens = 20.0
             lastUpdated = now
 
+    let newLastUpdated = addRelTime now (milliseconds 1000)
     limiter <- submit poolOwner do
         exerciseCmd limiter CCIP.RateLimiterV2.SetConfig with
             newIsEnabled = True
             newCapacity = 200.0
             newRate = 10.0
+            newLastUpdated = Some newLastUpdated
 
     limiterState <- fromSome <$> queryContractId poolOwner limiter
     limiterState.tokens === 200.0
     limiterState.capacity === 200.0
     limiterState.rate === 10.0
+    limiterState.lastUpdated === newLastUpdated
 
     debug "testRateLimiterSetConfigResetsBucket: PASSED"
 
@@ -183,6 +186,7 @@ testRateLimiterRejectsNegativeConfig = script do
             newIsEnabled = True
             newCapacity = -1.0
             newRate = 0.0
+            newLastUpdated = None
 
     -- Negative rate must be rejected by SetConfig
     submitMustFail poolOwner do
@@ -190,5 +194,6 @@ testRateLimiterRejectsNegativeConfig = script do
             newIsEnabled = True
             newCapacity = 100.0
             newRate = -5.0
+            newLastUpdated = None
 
     debug "testRateLimiterRejectsNegativeConfig: PASSED"

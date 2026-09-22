@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-burn-mint-token-pool-v2"
-	PackageID   = "a4a07fc1d1d686f778821a78c795c8df6dc3896dd3f171d991bfa5f374f86662"
+	PackageID   = "ec3f9dfd165eb6c838e53b858eded660f58395ccebea7a3dab0503ebae366541"
 	SDKVersion  = "3.4.11"
 )
 
