@@ -384,21 +384,6 @@ func receiverInstanceID(cfg ccipcodec.FinalityConfig) contracts.InstanceID {
 	}
 }
 
-func rawInstanceAddressValue(addr contracts.RawInstanceAddress) *apiv2.Value {
-	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Label: "unpack", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: addr.String()}}},
-	}}}}
-}
-
-func requiredCCVsListValue(requiredCCVs []contracts.RawInstanceAddress) *apiv2.Value {
-	elements := make([]*apiv2.Value, len(requiredCCVs))
-	for i, ccv := range requiredCCVs {
-		elements[i] = rawInstanceAddressValue(ccv)
-	}
-
-	return &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: elements}}}
-}
-
 func receiverRequiredCCVConfigured(recv *receiver.CCIPReceiver, requiredCCVs []contracts.RawInstanceAddress) bool {
 	if len(recv.RequiredCCVs) != len(requiredCCVs) {
 		return false
@@ -536,33 +521,6 @@ func waitForReceiverWithFinality(
 	}
 }
 
-func receiverFinalityField(cfg ccipcodec.FinalityConfig) *apiv2.Value {
-	switch cfg.GetVariantTag() {
-	case "WaitForFinality":
-		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-			Constructor: "WaitForFinality",
-			Value:       &apiv2.Value{Sum: &apiv2.Value_Unit{}},
-		}}}
-	case "WaitForSafe":
-		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-			Constructor: "WaitForSafe",
-			Value:       &apiv2.Value{Sum: &apiv2.Value_Unit{}},
-		}}}
-	case "BlockDepth":
-		depth, ok := cfg.GetVariantValue().(*types.INT64)
-		if !ok || depth == nil {
-			panic("invalid BlockDepth finality config")
-		}
-
-		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-			Constructor: "BlockDepth",
-			Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(*depth)}},
-		}}}
-	default:
-		panic(fmt.Sprintf("unsupported receiver finality config %q", cfg.GetVariantTag()))
-	}
-}
-
 // GetOrCreateReceiver returns the CCIPReceiver contract id for the party with
 // the requested finality config and attesting CCV, creating or updating one as
 // needed. Multiple receivers per party are supported (e.g. full finality and FTF).
@@ -573,7 +531,6 @@ func GetOrCreateReceiver(
 	requiredCCVs []contracts.RawInstanceAddress,
 	useLedger string,
 ) (string, error) {
-
 	receiverCid, recv, err := findActiveReceiverByFinality(ctx, participant, receiverFinality)
 	if err != nil {
 		return "", err

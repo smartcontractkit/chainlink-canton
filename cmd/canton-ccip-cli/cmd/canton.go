@@ -611,6 +611,7 @@ func newCantonListReceiversCmd(g *Globals) *cobra.Command {
 					for i, ccv := range ccvs {
 						out[i] = string(ccv.Unpack)
 					}
+
 					return strings.Join(out, ",")
 				}
 				if withContractId {
