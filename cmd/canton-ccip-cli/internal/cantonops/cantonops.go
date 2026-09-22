@@ -352,7 +352,7 @@ func finalityConfigEqual(a, b ccipcodec.FinalityConfig) bool {
 	}
 }
 
-func receiverFinalityLabel(cfg ccipcodec.FinalityConfig) string {
+func ReceiverFinalityLabel(cfg ccipcodec.FinalityConfig) string {
 	switch cfg.GetVariantTag() {
 	case "BlockDepth":
 		depth, ok := cfg.GetVariantValue().(*types.INT64)
@@ -435,7 +435,7 @@ func findActiveReceiverByFinality(
 	return "", nil, nil
 }
 
-func updateReceiverRequiredCCVs(
+func UpdateReceiverRequiredCCVs(
 	ctx context.Context,
 	participant canton.Participant,
 	receiverCid string,
@@ -511,7 +511,7 @@ func waitForReceiverWithFinality(
 			return "", fmt.Errorf(
 				"timed out after %s waiting for CCIPReceiver with %s finality",
 				propagationTimeout,
-				receiverFinalityLabel(receiverFinality),
+				ReceiverFinalityLabel(receiverFinality),
 			)
 		}
 		select {
@@ -570,7 +570,7 @@ func GetOrCreateReceiver(
 			fmt.Printf(
 				"Using CCIPReceiver %s (%s finality, CCV %s)\n",
 				receiverCid,
-				receiverFinalityLabel(receiverFinality),
+				ReceiverFinalityLabel(receiverFinality),
 				requiredCCV,
 			)
 
@@ -583,12 +583,12 @@ func GetOrCreateReceiver(
 			requiredCCV,
 		)
 
-		return updateReceiverRequiredCCVs(ctx, participant, receiverCid, requiredCCVs, useLedger)
+		return UpdateReceiverRequiredCCVs(ctx, participant, receiverCid, requiredCCVs, useLedger)
 	}
 
 	fmt.Printf(
 		"⚠️ No CCIPReceiver with %s finality found for party %s, deploying one (CCV %s)...\n",
-		receiverFinalityLabel(receiverFinality),
+		ReceiverFinalityLabel(receiverFinality),
 		participant.PartyID,
 		requiredCCV,
 	)

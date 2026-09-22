@@ -45,10 +45,10 @@ func TestReceiverInstanceID(t *testing.T) {
 func TestReceiverFinalityLabel(t *testing.T) {
 	t.Parallel()
 
-	require.Equal(t, "WaitForFinality", receiverFinalityLabel(ccipcodec.FinalityConfig{
+	require.Equal(t, "WaitForFinality", ReceiverFinalityLabel(ccipcodec.FinalityConfig{
 		WaitForFinality: &types.UNIT{},
 	}))
-	require.Equal(t, "BlockDepth(1)", receiverFinalityLabel(ccipcodec.FinalityConfig{
+	require.Equal(t, "BlockDepth(1)", ReceiverFinalityLabel(ccipcodec.FinalityConfig{
 		BlockDepth: new(types.INT64(1)),
 	}))
 }

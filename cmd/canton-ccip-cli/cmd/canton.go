@@ -32,6 +32,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/events"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
@@ -70,7 +71,10 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 	c.AddCommand(newCantonSendTokenCmd(g))
 	c.AddCommand(newCantonExecuteCmd(g))
 	c.AddCommand(newCantonSyncReceiverCCVCmd(g))
+	c.AddCommand(newCantonSetReceiverRequiredCCVsCmd(g))
+	c.AddCommand(newCantonArchiveReceiverCmd(g))
 	c.AddCommand(newCantonListEventsCmd(g))
+	c.AddCommand(newCantonListReceiversCmd(g))
 	c.AddCommand(newCantonListHoldingsCmd(g))
 	c.AddCommand(newCantonListTransferInstructionsCmd(g))
 	c.AddCommand(newCantonCreateTransferCmd(g))
@@ -568,6 +572,151 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&finalityName, "finality", "finality", "must match the send: finality (full), safe, or block depth 1-65535")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 	_ = c.MarkFlagRequired("message-id")
+
+	return c
+}
+
+func newCantonListReceiversCmd(g *Globals) *cobra.Command {
+	var withContractId bool
+	c := &cobra.Command{
+		Use:   "list-receivers",
+		Short: "List all CCIPReceiver contracts visible to the configured party",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ctx := cmd.Context()
+			b, err := g.Resolve(ctx, false)
+			if err != nil {
+				return err
+			}
+			active, err := testhelpers.ListActiveContractsByTemplateId(ctx, b.Participant, contracts.IdentifierFromBinding(receiver.CCIPReceiver{}))
+			if err != nil {
+				return fmt.Errorf("list receivers: %w", err)
+			}
+			tw := table.NewWriter()
+			tw.SetStyle(table.StyleLight)
+			tw.Style().Title.Align = text.AlignCenter
+			tw.SetAutoIndex(true)
+			tw.SetTitle("CCIPReceivers")
+			if withContractId {
+				tw.AppendHeader(table.Row{"Instance ID", "Owner", "Finality", "Required CCVs", "Optional CCVs", "Optional Threshold", "Contract ID"})
+			} else {
+				tw.AppendHeader(table.Row{"Instance ID", "Owner", "Finality", "Required CCVs", "Optional CCVs", "Optional Threshold"})
+			}
+			for _, ac := range active {
+				recv, err := bindings.UnmarshalCreatedEvent[receiver.CCIPReceiver](ac.GetCreatedEvent())
+				if err != nil {
+					return fmt.Errorf("unmarshal CCIPReceiver: %w", err)
+				}
+				ccvStrings := func(ccvs []chainlinkapi.RawInstanceAddress) string {
+					out := make([]string, len(ccvs))
+					for i, ccv := range ccvs {
+						out[i] = string(ccv.Unpack)
+					}
+					return strings.Join(out, ",")
+				}
+				if withContractId {
+					tw.AppendRow(table.Row{
+						recv.InstanceId,
+						recv.Owner,
+						cantonops.ReceiverFinalityLabel(recv.ReceiverFinalityConfig),
+						ccvStrings(recv.RequiredCCVs),
+						ccvStrings(recv.OptionalCCVs),
+						recv.OptionalThreshold,
+						ac.GetCreatedEvent().GetContractId(),
+					})
+				} else {
+					tw.AppendRow(table.Row{
+						recv.InstanceId,
+						recv.Owner,
+						cantonops.ReceiverFinalityLabel(recv.ReceiverFinalityConfig),
+						ccvStrings(recv.RequiredCCVs),
+						ccvStrings(recv.OptionalCCVs),
+						recv.OptionalThreshold,
+					})
+				}
+			}
+			tw.AppendFooter(table.Row{"Total", len(active)})
+			fmt.Println(tw.Render())
+
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&withContractId, "cid", false, "include contract IDs in the output")
+
+	return c
+}
+
+func newCantonSetReceiverRequiredCCVsCmd(g *Globals) *cobra.Command {
+	var useLedger string
+	c := &cobra.Command{
+		Use:   "set-receiver-required-ccvs <contract-id> <ccv> [ccv...]",
+		Short: "Update a CCIPReceiver's required CCVs by contract ID",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			b, err := g.Resolve(ctx, false)
+			if err != nil {
+				return err
+			}
+			receiverCid := args[0]
+			requiredCCVs := make([]contracts.RawInstanceAddress, 0, len(args)-1)
+			for _, ccv := range args[1:] {
+				// intentionally not doing validation here to be able to set invalid CCVs for testing purposes
+				requiredCCVs = append(requiredCCVs, contracts.RawInstanceAddress(ccv))
+			}
+
+			newCid, err := cantonops.UpdateReceiverRequiredCCVs(ctx, b.Participant, receiverCid, requiredCCVs, useLedger)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("New CCIPReceiver CID: %s\n", newCid)
+
+			return nil
+		},
+	}
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
+
+	return c
+}
+
+func newCantonArchiveReceiverCmd(g *Globals) *cobra.Command {
+	var useLedger string
+	c := &cobra.Command{
+		Use:   "archive-receiver <contract-id>",
+		Short: "Archive a CCIPReceiver contract by contract ID",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			b, err := g.Resolve(ctx, false)
+			if err != nil {
+				return err
+			}
+			receiverCid := args[0]
+
+			tx, err := cantonops.CantonSubmit(
+				ctx,
+				b.Participant,
+				useLedger,
+				[]*apiv2.Command{{
+					Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+						TemplateId:     contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
+						ContractId:     receiverCid,
+						Choice:         "Archive",
+						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{}}},
+					}},
+				}},
+				nil,
+				nil,
+			)
+			if err != nil {
+				return fmt.Errorf("submit Archive: %w", err)
+			}
+			fmt.Println("✅ CCIPReceiver archived in update:", tx.GetUpdateId())
+			fmt.Println(b.CantonExplorerLink(tx.GetUpdateId()))
+
+			return nil
+		},
+	}
+	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 
 	return c
 }
