@@ -366,7 +366,7 @@ func ReceiverFinalityLabel(cfg ccipcodec.FinalityConfig) string {
 	}
 }
 
-func receiverInstanceID(cfg ccipcodec.FinalityConfig) string {
+func receiverInstanceID(cfg ccipcodec.FinalityConfig) contracts.InstanceID {
 	switch cfg.GetVariantTag() {
 	case "WaitForFinality":
 		return "ccipreceiver-WaitForFinality"
@@ -378,9 +378,9 @@ func receiverInstanceID(cfg ccipcodec.FinalityConfig) string {
 			return "ccipreceiver-BlockDepth"
 		}
 
-		return fmt.Sprintf("ccipreceiver-BlockDepth-%d", int64(*depth))
+		return contracts.InstanceID(fmt.Sprintf("ccipreceiver-BlockDepth-%d", int64(*depth)))
 	default:
-		return fmt.Sprintf("ccipreceiver-%s", cfg.GetVariantTag())
+		return contracts.InstanceID(fmt.Sprintf("ccipreceiver-%s", cfg.GetVariantTag()))
 	}
 }
 
@@ -399,14 +399,28 @@ func requiredCCVsListValue(requiredCCVs []contracts.RawInstanceAddress) *apiv2.V
 	return &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: elements}}}
 }
 
-func receiverRequiredCCVConfigured(recv *receiver.CCIPReceiver, requiredCCV contracts.RawInstanceAddress) bool {
+func receiverRequiredCCVConfigured(recv *receiver.CCIPReceiver, requiredCCVs []contracts.RawInstanceAddress) bool {
+	if len(recv.RequiredCCVs) != len(requiredCCVs) {
+		return false
+	}
+
+	// Match like ElementsMatch: every CCV must pair with a unique required CCV, in any order.
+	matched := make([]bool, len(requiredCCVs))
 	for _, ccv := range recv.RequiredCCVs {
-		if string(ccv.Unpack) == requiredCCV.String() {
-			return true
+		found := false
+		for i, requiredCCV := range requiredCCVs {
+			if !matched[i] && string(ccv.Unpack) == requiredCCV.String() {
+				matched[i] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
 		}
 	}
 
-	return false
+	return true
 }
 
 func findActiveReceiverByFinality(
@@ -556,22 +570,21 @@ func GetOrCreateReceiver(
 	ctx context.Context,
 	participant canton.Participant,
 	receiverFinality ccipcodec.FinalityConfig,
-	requiredCCV contracts.RawInstanceAddress,
+	requiredCCVs []contracts.RawInstanceAddress,
 	useLedger string,
 ) (string, error) {
-	requiredCCVs := []contracts.RawInstanceAddress{requiredCCV}
 
 	receiverCid, recv, err := findActiveReceiverByFinality(ctx, participant, receiverFinality)
 	if err != nil {
 		return "", err
 	}
 	if receiverCid != "" {
-		if receiverRequiredCCVConfigured(recv, requiredCCV) {
+		if receiverRequiredCCVConfigured(recv, requiredCCVs) {
 			fmt.Printf(
-				"Using CCIPReceiver %s (%s finality, CCV %s)\n",
+				"Using CCIPReceiver %s (%s finality, CCVs=%s)\n",
 				receiverCid,
 				ReceiverFinalityLabel(receiverFinality),
-				requiredCCV,
+				requiredCCVs,
 			)
 
 			return receiverCid, nil
@@ -580,17 +593,17 @@ func GetOrCreateReceiver(
 		fmt.Printf(
 			"⚠️ Updating CCIPReceiver %s required CCVs to %s...\n",
 			receiverCid,
-			requiredCCV,
+			requiredCCVs,
 		)
 
 		return UpdateReceiverRequiredCCVs(ctx, participant, receiverCid, requiredCCVs, useLedger)
 	}
 
 	fmt.Printf(
-		"⚠️ No CCIPReceiver with %s finality found for party %s, deploying one (CCV %s)...\n",
+		"⚠️ No CCIPReceiver with %s finality found for party %s, deploying one (CCVs=%s)...\n",
 		ReceiverFinalityLabel(receiverFinality),
 		participant.PartyID,
-		requiredCCV,
+		requiredCCVs,
 	)
 	tx, err := CantonSubmit(
 		ctx,
@@ -599,14 +612,14 @@ func GetOrCreateReceiver(
 		[]*apiv2.Command{{
 			Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 				TemplateId: ccipReceiverTemplateID,
-				CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-					{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: receiverInstanceID(receiverFinality)}}},
-					{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: participant.PartyID}}},
-					{Label: "receiverFinalityConfig", Value: receiverFinalityField(receiverFinality)},
-					{Label: "requiredCCVs", Value: requiredCCVsListValue(requiredCCVs)},
-					{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-					{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-				}},
+				CreateArguments: bindings.MarshalTemplateToRecord(receiver.CCIPReceiver{
+					InstanceId:             types.TEXT(receiverInstanceID(receiverFinality)),
+					Owner:                  types.PARTY(participant.PartyID),
+					RequiredCCVs:           contracts.RawInstanceAddressListToBindings(requiredCCVs),
+					OptionalCCVs:           nil,
+					OptionalThreshold:      0,
+					ReceiverFinalityConfig: receiverFinality,
+				}),
 			}},
 		}},
 		nil,

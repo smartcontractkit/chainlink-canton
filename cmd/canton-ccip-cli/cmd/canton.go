@@ -18,7 +18,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/spf13/cobra"
 
-	"github.com/smartcontractkit/chainlink-ccv/protocol"
+	indexerCommon "github.com/smartcontractkit/chainlink-ccv/indexer/pkg/common"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -564,7 +564,7 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 			}
 			fmt.Printf("Verifier results for %s successfully retrieved.\n", messageId.Hex())
 
-			return cantonExecute(ctx, b, resp.Results[0].VerifierResult, fin, useLedger)
+			return cantonExecute(ctx, b, resp.Results, fin, useLedger)
 		},
 	}
 	c.Flags().StringVar(&messageIDHex, "message-id", "", "CCIP message id (0x-prefixed hex) (required)")
@@ -745,7 +745,7 @@ func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 				return fmt.Errorf("parse --required-ccv: %w", err)
 			}
 
-			_, err = cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, raw, useLedger)
+			_, err = cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, []contracts.RawInstanceAddress{raw}, useLedger)
 
 			return err
 		},
@@ -758,57 +758,71 @@ func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 	return c
 }
 
-func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierResult, fin finality.Parsed, useLedger string) error {
-	withToken := vr.Message.TokenTransfer != nil
+// execute a message on Canton
+// verifierResults must be non-empty
+func cantonExecute(ctx context.Context, b *clients.Bundle, verifierResults []indexerCommon.VerifierResultWithMetadata, fin finality.Parsed, useLedger string) error {
+	message := verifierResults[0].VerifierResult.Message
+	withToken := message.TokenTransfer != nil
+	receiverParty := types.PARTY(b.Participant.PartyID)
 
-	encodedMessage, err := vr.Message.Encode()
+	encodedMessage, err := message.Encode()
 	if err != nil {
 		return fmt.Errorf("encode message: %w", err)
 	}
 	encodedHex := hex.EncodeToString(encodedMessage)
-	verifierRawAddress, err := contracts.RawInstanceAddressFromString(string(vr.VerifierDestAddress))
-	if err != nil {
-		return fmt.Errorf("parse VerifierDestAddress: %w", err)
-	}
 
-	// Get the ccipOwner party's EDS clients
+	// Get CCIP disclosures
 	ccipEdsClients, err := b.GetEDSClients(b.Profile.CCIPOwnerPartyID)
 	if err != nil {
 		return fmt.Errorf("get CCIP EDS clients: %w", err)
 	}
-	ccvEdsClients, err := b.GetEDSClients(types.PARTY(verifierRawAddress.Owner()))
-	if err != nil {
-		return fmt.Errorf("get CCV EDS clients: %w", err)
-	}
-
-	receiverParty := types.PARTY(b.Participant.PartyID)
 	ccipExecuteDisclosure, err := eds.GetCCIPExecuteDisclosure(ctx, ccipEdsClients.CCIPEDS, encodedHex, receiverParty)
 	if err != nil {
 		return fmt.Errorf("CCIP execute disclosure: %w", err)
 	}
-	ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, ccvEdsClients.CCVEDS, encodedHex, verifierRawAddress.InstanceAddress(), receiverParty)
-	if err != nil {
-		return fmt.Errorf("CCV execute disclosure: %w", err)
+	allDisclosures := ccipExecuteDisclosure.DisclosedContracts
+
+	// Get CCV disclosures
+	verifierAddresses := make([]contracts.RawInstanceAddress, len(verifierResults))
+	ccvInputs := make([]receiver.CCVInput, len(verifierResults))
+	for i, result := range verifierResults {
+		verifierRawAddress, err := contracts.RawInstanceAddressFromString(string(result.VerifierResult.VerifierDestAddress))
+		if err != nil {
+			return fmt.Errorf("parse VerifierDestAddress: %w", err)
+		}
+		verifierAddresses[i] = verifierRawAddress
+		ccvEdsClients, err := b.GetEDSClients(types.PARTY(verifierRawAddress.Owner()))
+		if err != nil {
+			return fmt.Errorf("get CCV EDS clients: %w", err)
+		}
+		ccvExecuteDisclosure, err := eds.GetCCVExecuteDisclosure(ctx, ccvEdsClients.CCVEDS, encodedHex, verifierRawAddress.InstanceAddress(), receiverParty)
+		if err != nil {
+			return fmt.Errorf("CCV execute disclosure: %w", err)
+		}
+
+		fmt.Printf("Got CCV disclosure for %s: CID: %v, %d disclosed contract(s)\n", verifierRawAddress, ccvExecuteDisclosure.ContractId, len(ccvExecuteDisclosure.DisclosedContracts))
+		allDisclosures = append(allDisclosures, ccvExecuteDisclosure.DisclosedContracts...)
+		ccvInputs[i] = receiver.CCVInput{
+			CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
+			VerifierResults: types.TEXT(hex.EncodeToString(result.VerifierResult.CCVData)),
+			Context:         ccvExecuteDisclosure.ChoiceContext,
+		}
 	}
 
 	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, ccipEdsClients.CCIPEDS, useLedger)
 	if err != nil {
 		return err
 	}
-	receiverCid, err := cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, verifierRawAddress, useLedger)
+	receiverCid, err := cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, verifierAddresses, useLedger)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("PerPartyRouter CID: %s\nCCIPReceiver CID: %s\n", routerCid, receiverCid)
 
 	var tokenTransferInput *receiver.TokenTransferInput
-	allDisclosures := slices.Concat(
-		ccipExecuteDisclosure.DisclosedContracts,
-		ccvExecuteDisclosure.DisclosedContracts,
-	)
 
 	if withToken {
-		targetInstrumentId := contracts.BytesToEncodedInstrumentID(vr.Message.TokenTransfer.DestTokenAddress)
+		targetInstrumentId := contracts.BytesToEncodedInstrumentID(message.TokenTransfer.DestTokenAddress)
 		tokenPoolAddress, err := eds.GetTokenPoolForToken(ctx, ccipEdsClients.CCIPEDS, targetInstrumentId)
 		if err != nil {
 			return fmt.Errorf("get token pool: %w", err)
@@ -837,11 +851,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, vr protocol.VerifierR
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedHex),
 		TokenTransfer:  tokenTransferInput,
-		CcvInputs: []receiver.CCVInput{{
-			CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
-			VerifierResults: types.TEXT(hex.EncodeToString(vr.CCVData)),
-			Context:         ccvExecuteDisclosure.ChoiceContext,
-		}},
+		CcvInputs:      ccvInputs,
 	}
 
 	fmt.Println("⏳ Executing message...")
