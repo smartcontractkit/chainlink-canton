@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-rate-limiter"
-	PackageID   = "414118a4b497a1ceb71223d44b43fe6d3da12202b1fb875d3d10b95e4606a4bf"
+	PackageID   = "ff31b4e98a26d9927ccfeff1472b7c5af75e60eb6af9a29199a6a7ca9ece228c"
 	SDKVersion  = "3.4.11"
 )
 
@@ -499,9 +499,10 @@ var _ api.IMCMSReceiver = (*RateLimiter)(nil)
 
 // SetConfig is a Record type
 type SetConfig struct {
-	NewIsEnabled types.BOOL    `json:"newIsEnabled"`
-	NewCapacity  types.NUMERIC `json:"newCapacity"`
-	NewRate      types.NUMERIC `json:"newRate"`
+	NewIsEnabled   types.BOOL       `json:"newIsEnabled"`
+	NewCapacity    types.NUMERIC    `json:"newCapacity"`
+	NewRate        types.NUMERIC    `json:"newRate"`
+	NewLastUpdated *types.TIMESTAMP `json:"newLastUpdated" hex:"optional"`
 }
 
 // ToMap converts SetConfig to a map for DAML arguments
@@ -513,6 +514,18 @@ func (t SetConfig) ToMap() map[string]any {
 	m["newCapacity"] = t.NewCapacity
 
 	m["newRate"] = t.NewRate
+
+	if t.NewLastUpdated != nil {
+		m["newLastUpdated"] = map[string]any{
+			"_type": "optional",
+			"value": *t.NewLastUpdated,
+		}
+	} else {
+		m["newLastUpdated"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	return m
 }

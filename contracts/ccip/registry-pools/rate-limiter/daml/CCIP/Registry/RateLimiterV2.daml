@@ -118,6 +118,7 @@ template RateLimiter
                 newIsEnabled : Bool
                 newCapacity : Numeric 0
                 newRate : Numeric 0
+                newLastUpdated : Optional Time
             controller poolOwner
             do
                 assertMsg "RateLimiter: capacity must be non-negative"
@@ -128,13 +129,15 @@ template RateLimiter
                     (not newIsEnabled || newRate <= newCapacity)
                 assertMsg "RateLimiter: disabled config must have zero capacity and zero rate"
                     (newIsEnabled || (newCapacity == 0.0 && newRate == 0.0))
-                now <- getTime
+                lastUpdated <- case newLastUpdated of
+                    Some t -> pure t
+                    None -> getTime
                 create this with
                     isEnabled = newIsEnabled
                     capacity = newCapacity
                     rate = newRate
                     tokens = newCapacity
-                    lastUpdated = now
+                    lastUpdated = lastUpdated
 
         -- Sets the EDS observers for this rate limiter.
         --
@@ -202,6 +205,7 @@ template RateLimiter
                       newIsEnabled
                       newCapacity
                       newRate
+                      newLastUpdated = None
                     pure (Map.insert selfAddress (coerceContractId newCid) contractIds)
               "SetObservers" -> do
                 case decodeSetObserversParams operationData of
