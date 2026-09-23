@@ -39,7 +39,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv v0.11.0
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.6.0
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260910195529-801eb99e80b2
-	github.com/smartcontractkit/chainlink-deployments-framework v0.123.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.123.3
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/smartcontractkit/mcms v0.55.2
