@@ -29,7 +29,11 @@ func WaitForVerifierResult(
 			fmt.Printf("indexer query error (retrying): %v\n", err)
 		} else if status != http.StatusOK {
 			fmt.Printf("indexer status %d (retrying)\n", status)
-		} else if len(resp.Results) > 0 {
+		} else if !resp.Success {
+			fmt.Printf("indexer response not successful (retrying): %+v\n", resp)
+		} else if len(resp.Results) == 0 {
+			fmt.Printf("no verifier results yet for message %s (retrying)\n", messageID)
+		} else {
 			return resp, nil
 		}
 		select {

@@ -56,6 +56,15 @@ func (r RawInstanceAddress) Binding() chainlinkapi.RawInstanceAddress {
 	}
 }
 
+func RawInstanceAddressListToBindings(addrs []RawInstanceAddress) []chainlinkapi.RawInstanceAddress {
+	bindings := make([]chainlinkapi.RawInstanceAddress, len(addrs))
+	for i, addr := range addrs {
+		bindings[i] = addr.Binding()
+	}
+
+	return bindings
+}
+
 // InstanceAddressLength is the length in bytes of an InstanceAddress.
 const InstanceAddressLength = 32
 

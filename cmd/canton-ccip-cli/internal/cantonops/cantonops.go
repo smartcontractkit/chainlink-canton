@@ -352,7 +352,7 @@ func finalityConfigEqual(a, b ccipcodec.FinalityConfig) bool {
 	}
 }
 
-func receiverFinalityLabel(cfg ccipcodec.FinalityConfig) string {
+func ReceiverFinalityLabel(cfg ccipcodec.FinalityConfig) string {
 	switch cfg.GetVariantTag() {
 	case "BlockDepth":
 		depth, ok := cfg.GetVariantValue().(*types.INT64)
@@ -366,7 +366,7 @@ func receiverFinalityLabel(cfg ccipcodec.FinalityConfig) string {
 	}
 }
 
-func receiverInstanceID(cfg ccipcodec.FinalityConfig) string {
+func receiverInstanceID(cfg ccipcodec.FinalityConfig) contracts.InstanceID {
 	switch cfg.GetVariantTag() {
 	case "WaitForFinality":
 		return "ccipreceiver-WaitForFinality"
@@ -378,35 +378,34 @@ func receiverInstanceID(cfg ccipcodec.FinalityConfig) string {
 			return "ccipreceiver-BlockDepth"
 		}
 
-		return fmt.Sprintf("ccipreceiver-BlockDepth-%d", int64(*depth))
+		return contracts.InstanceID(fmt.Sprintf("ccipreceiver-BlockDepth-%d", int64(*depth)))
 	default:
-		return fmt.Sprintf("ccipreceiver-%s", cfg.GetVariantTag())
+		return contracts.InstanceID(fmt.Sprintf("ccipreceiver-%s", cfg.GetVariantTag()))
 	}
 }
 
-func rawInstanceAddressValue(addr contracts.RawInstanceAddress) *apiv2.Value {
-	return &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-		{Label: "unpack", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: addr.String()}}},
-	}}}}
-}
-
-func requiredCCVsListValue(requiredCCVs []contracts.RawInstanceAddress) *apiv2.Value {
-	elements := make([]*apiv2.Value, len(requiredCCVs))
-	for i, ccv := range requiredCCVs {
-		elements[i] = rawInstanceAddressValue(ccv)
+func receiverRequiredCCVConfigured(recv *receiver.CCIPReceiver, requiredCCVs []contracts.RawInstanceAddress) bool {
+	if len(recv.RequiredCCVs) != len(requiredCCVs) {
+		return false
 	}
 
-	return &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: elements}}}
-}
-
-func receiverRequiredCCVConfigured(recv *receiver.CCIPReceiver, requiredCCV contracts.RawInstanceAddress) bool {
+	// Match like ElementsMatch: every CCV must pair with a unique required CCV, in any order.
+	matched := make([]bool, len(requiredCCVs))
 	for _, ccv := range recv.RequiredCCVs {
-		if string(ccv.Unpack) == requiredCCV.String() {
-			return true
+		found := false
+		for i, requiredCCV := range requiredCCVs {
+			if !matched[i] && string(ccv.Unpack) == requiredCCV.String() {
+				matched[i] = true
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
 		}
 	}
 
-	return false
+	return true
 }
 
 func findActiveReceiverByFinality(
@@ -435,7 +434,7 @@ func findActiveReceiverByFinality(
 	return "", nil, nil
 }
 
-func updateReceiverRequiredCCVs(
+func UpdateReceiverRequiredCCVs(
 	ctx context.Context,
 	participant canton.Participant,
 	receiverCid string,
@@ -511,7 +510,7 @@ func waitForReceiverWithFinality(
 			return "", fmt.Errorf(
 				"timed out after %s waiting for CCIPReceiver with %s finality",
 				propagationTimeout,
-				receiverFinalityLabel(receiverFinality),
+				ReceiverFinalityLabel(receiverFinality),
 			)
 		}
 		select {
@@ -522,33 +521,6 @@ func waitForReceiverWithFinality(
 	}
 }
 
-func receiverFinalityField(cfg ccipcodec.FinalityConfig) *apiv2.Value {
-	switch cfg.GetVariantTag() {
-	case "WaitForFinality":
-		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-			Constructor: "WaitForFinality",
-			Value:       &apiv2.Value{Sum: &apiv2.Value_Unit{}},
-		}}}
-	case "WaitForSafe":
-		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-			Constructor: "WaitForSafe",
-			Value:       &apiv2.Value{Sum: &apiv2.Value_Unit{}},
-		}}}
-	case "BlockDepth":
-		depth, ok := cfg.GetVariantValue().(*types.INT64)
-		if !ok || depth == nil {
-			panic("invalid BlockDepth finality config")
-		}
-
-		return &apiv2.Value{Sum: &apiv2.Value_Variant{Variant: &apiv2.Variant{
-			Constructor: "BlockDepth",
-			Value:       &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: int64(*depth)}},
-		}}}
-	default:
-		panic(fmt.Sprintf("unsupported receiver finality config %q", cfg.GetVariantTag()))
-	}
-}
-
 // GetOrCreateReceiver returns the CCIPReceiver contract id for the party with
 // the requested finality config and attesting CCV, creating or updating one as
 // needed. Multiple receivers per party are supported (e.g. full finality and FTF).
@@ -556,22 +528,20 @@ func GetOrCreateReceiver(
 	ctx context.Context,
 	participant canton.Participant,
 	receiverFinality ccipcodec.FinalityConfig,
-	requiredCCV contracts.RawInstanceAddress,
+	requiredCCVs []contracts.RawInstanceAddress,
 	useLedger string,
 ) (string, error) {
-	requiredCCVs := []contracts.RawInstanceAddress{requiredCCV}
-
 	receiverCid, recv, err := findActiveReceiverByFinality(ctx, participant, receiverFinality)
 	if err != nil {
 		return "", err
 	}
 	if receiverCid != "" {
-		if receiverRequiredCCVConfigured(recv, requiredCCV) {
+		if receiverRequiredCCVConfigured(recv, requiredCCVs) {
 			fmt.Printf(
-				"Using CCIPReceiver %s (%s finality, CCV %s)\n",
+				"Using CCIPReceiver %s (%s finality, CCVs=%s)\n",
 				receiverCid,
-				receiverFinalityLabel(receiverFinality),
-				requiredCCV,
+				ReceiverFinalityLabel(receiverFinality),
+				requiredCCVs,
 			)
 
 			return receiverCid, nil
@@ -580,17 +550,17 @@ func GetOrCreateReceiver(
 		fmt.Printf(
 			"⚠️ Updating CCIPReceiver %s required CCVs to %s...\n",
 			receiverCid,
-			requiredCCV,
+			requiredCCVs,
 		)
 
-		return updateReceiverRequiredCCVs(ctx, participant, receiverCid, requiredCCVs, useLedger)
+		return UpdateReceiverRequiredCCVs(ctx, participant, receiverCid, requiredCCVs, useLedger)
 	}
 
 	fmt.Printf(
-		"⚠️ No CCIPReceiver with %s finality found for party %s, deploying one (CCV %s)...\n",
-		receiverFinalityLabel(receiverFinality),
+		"⚠️ No CCIPReceiver with %s finality found for party %s, deploying one (CCVs=%s)...\n",
+		ReceiverFinalityLabel(receiverFinality),
 		participant.PartyID,
-		requiredCCV,
+		requiredCCVs,
 	)
 	tx, err := CantonSubmit(
 		ctx,
@@ -599,14 +569,14 @@ func GetOrCreateReceiver(
 		[]*apiv2.Command{{
 			Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
 				TemplateId: ccipReceiverTemplateID,
-				CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-					{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: receiverInstanceID(receiverFinality)}}},
-					{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: participant.PartyID}}},
-					{Label: "receiverFinalityConfig", Value: receiverFinalityField(receiverFinality)},
-					{Label: "requiredCCVs", Value: requiredCCVsListValue(requiredCCVs)},
-					{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-					{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-				}},
+				CreateArguments: bindings.MarshalTemplateToRecord(receiver.CCIPReceiver{
+					InstanceId:             types.TEXT(receiverInstanceID(receiverFinality)),
+					Owner:                  types.PARTY(participant.PartyID),
+					RequiredCCVs:           contracts.RawInstanceAddressListToBindings(requiredCCVs),
+					OptionalCCVs:           nil,
+					OptionalThreshold:      0,
+					ReceiverFinalityConfig: receiverFinality,
+				}),
 			}},
 		}},
 		nil,
