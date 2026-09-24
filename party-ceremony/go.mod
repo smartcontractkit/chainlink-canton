@@ -8,10 +8,10 @@ require (
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/aws/aws-sdk-go-v2/config v1.33.5
-	github.com/aws/aws-sdk-go-v2/service/kms v1.60.0
+	github.com/aws/aws-sdk-go-v2/service/kms v1.61.0
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/google/uuid v1.6.0
-	github.com/smartcontractkit/chainlink-deployments-framework v0.123.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.123.3
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/zap v1.28.0

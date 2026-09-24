@@ -11,14 +11,14 @@ replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlin
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.5
-	github.com/aws/aws-sdk-go-v2/service/kms v1.60.0
+	github.com/aws/aws-sdk-go-v2/service/kms v1.61.0
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/smartcontractkit/chain-selectors v1.0.111
 	github.com/smartcontractkit/chainlink-canton/authentication v1.0.0
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0-00010101000000-000000000000
-	github.com/smartcontractkit/chainlink-deployments-framework v0.123.1
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.8
+	github.com/smartcontractkit/chainlink-deployments-framework v0.123.3
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.9
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
