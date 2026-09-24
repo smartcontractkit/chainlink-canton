@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "mcms-test"
-	PackageID   = "28f13e36fa5c2f40808f7887fd273596a023d99a51be6d9b4dc4c92b8e7b322f"
+	PackageID   = "2b6c72137e994710832cb2e796dbc86d3444de926c7b2604c81752e8dc20f014"
 	SDKVersion  = "3.4.11"
 )
 
@@ -36,6 +36,7 @@ type Template interface {
 const (
 	TimelockTestInstanceAddress = types.TEXT("mcms-daml-test@ccip_owner-9cefe94d")
 	TimelockScheduleRoot        = types.TEXT("a562ea5617f1ad48ba3712119a12ca1c2f7736e1f8f02d6c7c319653a8663cd4")
+	TimelockCancelRoot          = types.TEXT("060e3e6c30458b490f448108ef183ef323fe18d95f1cae9ef2fbdd9ac14b927c")
 	TimelockBypasserRoot        = types.TEXT("03d506aeaffd933a56d3572797fa69aa96db825fa7c1c0bdaefc22cc40c51df7")
 	SelfDispatchTestBaseMcmsId  = types.TEXT("mcms-daml-test")
 	OverrideRoot                = types.TEXT("d618cc847a2ef8f4b445dd8328a05e64576d637d560f4d8caf2b34d34d8ff740")
