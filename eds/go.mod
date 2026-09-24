@@ -21,7 +21,7 @@ require (
 	github.com/BurntSushi/toml v1.6.0
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/gin-gonic/gin v1.12.0
-	github.com/go-playground/validator/v10 v10.30.4
+	github.com/go-playground/validator/v10 v10.30.5
 	github.com/jpillora/backoff v1.0.0
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/rs/zerolog v1.35.1
