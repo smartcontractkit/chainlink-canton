@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.1.1...contracts/v2.2.0) (2026-09-25)
+
+
+### Features
+
+* **cli:** Add CCIPReceiver administration commands ([#1066](https://github.com/smartcontractkit/chainlink-canton/issues/1066)) ([a73abfa](https://github.com/smartcontractkit/chainlink-canton/commit/a73abfa549238e32b97d009d948229971742877e))
+
 ## [2.1.1](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.1.0...contracts/v2.1.1) (2026-09-22)
 
 
