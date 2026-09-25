@@ -673,7 +673,7 @@ func newCantonSetReceiverRequiredCCVsCmd(g *Globals) *cobra.Command {
 				requiredCCVs = append(requiredCCVs, contracts.RawInstanceAddress(ccv))
 			}
 
-			newCid, err := cantonops.UpdateReceiverRequiredCCVs(ctx, b.Participant, receiverCid, requiredCCVs, useLedger)
+			newCid, err := cantonops.UpdateReceiverRequiredCCVs(ctx, b.Participant, receiverCid, requiredCCVs, useLedger, nil)
 			if err != nil {
 				return err
 			}
@@ -713,6 +713,7 @@ func newCantonArchiveReceiverCmd(g *Globals) *cobra.Command {
 						ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{}}},
 					}},
 				}},
+				nil,
 				nil,
 				nil,
 			)
