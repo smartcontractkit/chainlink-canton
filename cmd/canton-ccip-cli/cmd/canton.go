@@ -301,11 +301,12 @@ func newCantonListTransferInstructionsCmd(g *Globals) *cobra.Command {
 // ---------------- canton create transfer ----------------
 func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 	var (
-		token            string
-		receiverParty    string
-		inputHoldingCids []string
-		amount           string
-		useLedger        string
+		token                       string
+		receiverParty               string
+		inputHoldingCids            []string
+		amount                      string
+		useLedger                   string
+		packageSelectionPreferences []string
 	)
 	c := &cobra.Command{
 		Use:   "create-transfer",
@@ -420,6 +421,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 					},
 					TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_LEDGER_EFFECTS,
 				},
+				packageSelectionPreferences,
 			)
 			if err != nil {
 				return fmt.Errorf("submit transfer: %w", err)
@@ -440,6 +442,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 	c.Flags().StringArrayVar(&inputHoldingCids, "input", nil, "the holding(s) to be used as an input for the transfer. If unspecified, all current holdings will be used.")
 	c.Flags().StringVar(&amount, "amount", "", "the amount to transfer (required)")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
+	c.Flags().StringSliceVar(&packageSelectionPreferences, "package-selection-preferences", nil, "comma-separated list of package IDs for package selection preference")
 	_ = c.MarkFlagRequired("amount")
 
 	return c
@@ -447,9 +450,10 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 
 func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 	var (
-		contractID string
-		token      string
-		useLedger  string
+		contractID                  string
+		token                       string
+		useLedger                   string
+		packageSelectionPreferences []string
 	)
 	c := &cobra.Command{
 		Use:   "accept-transfer",
@@ -516,6 +520,7 @@ func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 				}},
 				disclosedContracts,
 				nil,
+				packageSelectionPreferences,
 			)
 			if err != nil {
 				return fmt.Errorf("submit accept transfer: %w", err)
@@ -529,6 +534,7 @@ func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&contractID, "contract-id", "", "TransferInstruction contract ID to accept (required)")
 	c.Flags().StringVar(&token, "token", "link", "token of the transfer instruction (link|native|<InstrumentId>)")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
+	c.Flags().StringSliceVar(&packageSelectionPreferences, "package-selection-preferences", nil, "comma-separated list of package IDs for package selection preference")
 	_ = c.MarkFlagRequired("contract-id")
 
 	return c
@@ -538,10 +544,11 @@ func newCantonAcceptTransferCmd(g *Globals) *cobra.Command {
 
 func newCantonExecuteCmd(g *Globals) *cobra.Command {
 	var (
-		messageIDHex string
-		wait         time.Duration
-		finalityName string
-		useLedger    string
+		messageIDHex                string
+		wait                        time.Duration
+		finalityName                string
+		useLedger                   string
+		packageSelectionPreferences []string
 	)
 	c := &cobra.Command{
 		Use:   "execute",
@@ -564,13 +571,14 @@ func newCantonExecuteCmd(g *Globals) *cobra.Command {
 			}
 			fmt.Printf("Verifier results for %s successfully retrieved.\n", messageId.Hex())
 
-			return cantonExecute(ctx, b, resp.Results, fin, useLedger)
+			return cantonExecute(ctx, b, resp.Results, fin, useLedger, packageSelectionPreferences)
 		},
 	}
 	c.Flags().StringVar(&messageIDHex, "message-id", "", "CCIP message id (0x-prefixed hex) (required)")
 	c.Flags().DurationVar(&wait, "wait", 15*time.Minute, "max time to wait for verifier results")
 	c.Flags().StringVar(&finalityName, "finality", "finality", "must match the send: finality (full), safe, or block depth 1-65535")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
+	c.Flags().StringSliceVar(&packageSelectionPreferences, "package-selection-preferences", nil, "comma-separated list of package IDs for package selection preference")
 	_ = c.MarkFlagRequired("message-id")
 
 	return c
@@ -665,7 +673,7 @@ func newCantonSetReceiverRequiredCCVsCmd(g *Globals) *cobra.Command {
 				requiredCCVs = append(requiredCCVs, contracts.RawInstanceAddress(ccv))
 			}
 
-			newCid, err := cantonops.UpdateReceiverRequiredCCVs(ctx, b.Participant, receiverCid, requiredCCVs, useLedger)
+			newCid, err := cantonops.UpdateReceiverRequiredCCVs(ctx, b.Participant, receiverCid, requiredCCVs, useLedger, nil)
 			if err != nil {
 				return err
 			}
@@ -707,6 +715,7 @@ func newCantonArchiveReceiverCmd(g *Globals) *cobra.Command {
 				}},
 				nil,
 				nil,
+				nil,
 			)
 			if err != nil {
 				return fmt.Errorf("submit Archive: %w", err)
@@ -724,9 +733,10 @@ func newCantonArchiveReceiverCmd(g *Globals) *cobra.Command {
 
 func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 	var (
-		requiredCCV  string
-		finalityName string
-		useLedger    string
+		requiredCCV                 string
+		finalityName                string
+		useLedger                   string
+		packageSelectionPreferences []string
 	)
 	c := &cobra.Command{
 		Use:   "sync-receiver-ccv",
@@ -746,7 +756,7 @@ func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 				return fmt.Errorf("parse --required-ccv: %w", err)
 			}
 
-			_, err = cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, []contracts.RawInstanceAddress{raw}, useLedger)
+			_, err = cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, []contracts.RawInstanceAddress{raw}, useLedger, packageSelectionPreferences)
 
 			return err
 		},
@@ -754,6 +764,7 @@ func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&requiredCCV, "required-ccv", "", "Canton committee verifier raw address (instanceId@owner)")
 	c.Flags().StringVar(&finalityName, "finality", "1", "receiver finality profile: finality|safe|1-65535")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
+	c.Flags().StringSliceVar(&packageSelectionPreferences, "package-selection-preferences", nil, "comma-separated list of package IDs for package selection preference")
 	_ = c.MarkFlagRequired("required-ccv")
 
 	return c
@@ -761,7 +772,7 @@ func newCantonSyncReceiverCCVCmd(g *Globals) *cobra.Command {
 
 // execute a message on Canton
 // verifierResults must be non-empty
-func cantonExecute(ctx context.Context, b *clients.Bundle, verifierResults []indexerCommon.VerifierResultWithMetadata, fin finality.Parsed, useLedger string) error {
+func cantonExecute(ctx context.Context, b *clients.Bundle, verifierResults []indexerCommon.VerifierResultWithMetadata, fin finality.Parsed, useLedger string, packageSelectionPreferences []string) error {
 	message := verifierResults[0].VerifierResult.Message
 	withToken := message.TokenTransfer != nil
 	receiverParty := types.PARTY(b.Participant.PartyID)
@@ -810,11 +821,11 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, verifierResults []ind
 		}
 	}
 
-	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, ccipEdsClients.CCIPEDS, useLedger)
+	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, ccipEdsClients.CCIPEDS, useLedger, packageSelectionPreferences)
 	if err != nil {
 		return err
 	}
-	receiverCid, err := cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, verifierAddresses, useLedger)
+	receiverCid, err := cantonops.GetOrCreateReceiver(ctx, b.Participant, fin.Receiver, verifierAddresses, useLedger, packageSelectionPreferences)
 	if err != nil {
 		return err
 	}
@@ -870,6 +881,7 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, verifierResults []ind
 		}},
 		allDisclosures,
 		nil,
+		packageSelectionPreferences,
 	)
 	if err != nil {
 		return fmt.Errorf("submit Execute: %w", err)
@@ -884,13 +896,14 @@ func cantonExecute(ctx context.Context, b *clients.Bundle, verifierResults []ind
 
 func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 	var (
-		receiverHex string
-		gasLimit    int
-		payload     string
-		executor    string
-		feeToken    string
-		feeInput    []string
-		useLedger   string
+		receiverHex                 string
+		gasLimit                    int
+		payload                     string
+		executor                    string
+		feeToken                    string
+		feeInput                    []string
+		useLedger                   string
+		packageSelectionPreferences []string
 	)
 	c := &cobra.Command{
 		Use:   "send-message",
@@ -916,7 +929,7 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 				msgReceiver = b.Profile.CCIPReceiverContract
 			}
 
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, nil, "", nil, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, nil, "", nil, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger, packageSelectionPreferences)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to a CCIP Receiver contract)")
@@ -926,22 +939,24 @@ func newCantonSendMessageCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&feeToken, "fee-token", "link", "fee token (link|native|<InstrumentId>)")
 	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
+	c.Flags().StringSliceVar(&packageSelectionPreferences, "package-selection-preferences", nil, "comma-separated list of package IDs for package selection preference")
 
 	return c
 }
 
 func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 	var (
-		receiverHex string
-		gasLimit    int
-		token       string
-		amountStr   string
-		payload     string
-		executor    string
-		feeToken    string
-		feeInput    []string
-		tokenInput  []string
-		useLedger   string
+		receiverHex                 string
+		gasLimit                    int
+		token                       string
+		amountStr                   string
+		payload                     string
+		executor                    string
+		feeToken                    string
+		feeInput                    []string
+		tokenInput                  []string
+		useLedger                   string
+		packageSelectionPreferences []string
 	)
 	c := &cobra.Command{
 		Use:   "send-token",
@@ -979,7 +994,7 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 				msgReceiver = b.ETHAddress
 			}
 
-			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, tokenTransferInstrumentId, amountStr, tokenInput, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger)
+			return cantonSend(ctx, b, msgReceiver, []byte(payload), gasLimit, tokenTransferInstrumentId, amountStr, tokenInput, executor, feeTokenInstrumentId, feeTokenTransferClient, feeInput, useLedger, packageSelectionPreferences)
 		},
 	}
 	c.Flags().StringVar(&receiverHex, "receiver", "", "destination EVM receiver address (0x-prefixed) (defaults to own address)")
@@ -992,6 +1007,7 @@ func newCantonSendTokenCmd(g *Globals) *cobra.Command {
 	c.Flags().StringArrayVar(&feeInput, "fee-input", nil, "the holding(s) to be used as an input for the fee payment. If unspecified, all current holdings will be used.")
 	c.Flags().StringArrayVar(&tokenInput, "token-input", nil, "the holding(s) to be used as an input for the token transfer. If unspecified, all current holdings will be used.")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
+	c.Flags().StringSliceVar(&packageSelectionPreferences, "package-selection-preferences", nil, "comma-separated list of package IDs for package selection preference")
 	_ = c.MarkFlagRequired("amount")
 
 	return c
@@ -1016,6 +1032,7 @@ func cantonSend(
 	feeTokenTransferInstructionClient oapiTransferInstruction.ClientWithResponsesInterface,
 	feeInputHoldings []string,
 	useLedger string,
+	packageSelectionPreferences []string,
 ) error {
 	withToken := amountStr != ""
 
@@ -1087,11 +1104,11 @@ func cantonSend(
 	}
 
 	// --- Resolve router + sender ---
-	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, ccipEdsClients.CCIPEDS, useLedger)
+	routerCid, err := cantonops.GetOrCreateRouter(ctx, b.Participant, ccipEdsClients.CCIPEDS, useLedger, packageSelectionPreferences)
 	if err != nil {
 		return err
 	}
-	senderCid, err := cantonops.GetOrCreateSender(ctx, b.Participant, useLedger)
+	senderCid, err := cantonops.GetOrCreateSender(ctx, b.Participant, useLedger, packageSelectionPreferences)
 	if err != nil {
 		return err
 	}
@@ -1313,6 +1330,7 @@ func cantonSend(
 		}},
 		allDisclosures,
 		nil,
+		packageSelectionPreferences,
 	)
 	if err != nil {
 		return fmt.Errorf("execute: %w", err)
