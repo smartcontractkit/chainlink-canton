@@ -93,16 +93,18 @@ func CantonSubmit(
 	commands []*apiv2.Command,
 	disclosedContracts []*apiv2.DisclosedContract,
 	transactionFormat *apiv2.TransactionFormat,
+	packageSelectionPreferences []string,
 ) (*apiv2.Transaction, error) {
 	// Parse ledger flag to determine submission path
 	if ledgerFlag == "" {
 		// Direct submission using local party
 		resp, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(ctx, &apiv2.SubmitAndWaitForTransactionRequest{
 			Commands: &apiv2.Commands{
-				CommandId:          uuid.NewString(),
-				Commands:           commands,
-				ActAs:              []string{participant.PartyID},
-				DisclosedContracts: disclosedContracts,
+				CommandId:                    uuid.NewString(),
+				Commands:                     commands,
+				ActAs:                        []string{participant.PartyID},
+				DisclosedContracts:           disclosedContracts,
+				PackageIdSelectionPreference: packageSelectionPreferences,
 			},
 			TransactionFormat: transactionFormat,
 		})
@@ -161,11 +163,12 @@ func CantonSubmit(
 
 	// Prepare transaction
 	preparedSubmission, err := participant.LedgerServices.InteractiveSubmission.PrepareSubmission(ctx, &interactive.PrepareSubmissionRequest{
-		CommandId:          uuid.NewString(),
-		Commands:           commands,
-		ActAs:              []string{participant.PartyID},
-		ReadAs:             []string{participant.PartyID},
-		DisclosedContracts: disclosedContracts,
+		CommandId:                    uuid.NewString(),
+		Commands:                     commands,
+		ActAs:                        []string{participant.PartyID},
+		ReadAs:                       []string{participant.PartyID},
+		DisclosedContracts:           disclosedContracts,
+		PackageIdSelectionPreference: packageSelectionPreferences,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("prepareSubmission: %w", err)
@@ -246,7 +249,7 @@ func signPreparedTransaction(
 
 // GetOrCreateRouter returns the PerPartyRouter contract id for the
 // participant's party, creating one via the factory if it doesn't exist.
-func GetOrCreateRouter(ctx context.Context, participant canton.Participant, ccipEdsClient oapiCCIP.ClientWithResponsesInterface, useLedger string) (string, error) {
+func GetOrCreateRouter(ctx context.Context, participant canton.Participant, ccipEdsClient oapiCCIP.ClientWithResponsesInterface, useLedger string, packageSelectionPreferences []string) (string, error) {
 	active, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, perPartyRouterTemplateID)
 	if err != nil {
 		return "", fmt.Errorf("list PerPartyRouter: %w", err)
@@ -278,6 +281,7 @@ func GetOrCreateRouter(ctx context.Context, participant canton.Participant, ccip
 		}},
 		disclosures.DisclosedContracts,
 		nil,
+		packageSelectionPreferences,
 	)
 	if err != nil {
 		return "", fmt.Errorf("submit CreateRouter: %w", err)
@@ -294,7 +298,7 @@ func GetOrCreateRouter(ctx context.Context, participant canton.Participant, ccip
 
 // GetOrCreateSender returns the CCIPSender contract id for the party,
 // creating one if missing.
-func GetOrCreateSender(ctx context.Context, participant canton.Participant, useLedger string) (string, error) {
+func GetOrCreateSender(ctx context.Context, participant canton.Participant, useLedger string, packageSelectionPreferences []string) (string, error) {
 	active, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, ccipSenderTemplateID)
 	if err != nil {
 		return "", fmt.Errorf("list CCIPSender: %w", err)
@@ -319,6 +323,7 @@ func GetOrCreateSender(ctx context.Context, participant canton.Participant, useL
 		}},
 		nil,
 		nil,
+		packageSelectionPreferences,
 	)
 	if err != nil {
 		return "", fmt.Errorf("submit Create CCIPSender: %w", err)
@@ -441,6 +446,7 @@ func updateReceiverRequiredCCVs(
 	receiverCid string,
 	requiredCCVs []contracts.RawInstanceAddress,
 	useLedger string,
+	packageSelectionPreferences []string,
 ) (string, error) {
 	bindingCCVs := make([]chainlinkapi.RawInstanceAddress, len(requiredCCVs))
 	for i, ccv := range requiredCCVs {
@@ -463,6 +469,7 @@ func updateReceiverRequiredCCVs(
 		}},
 		nil,
 		nil,
+		packageSelectionPreferences,
 	)
 	if err != nil {
 		return "", fmt.Errorf("submit UpdateRequiredCCVs: %w", err)
@@ -558,6 +565,7 @@ func GetOrCreateReceiver(
 	receiverFinality ccipcodec.FinalityConfig,
 	requiredCCV contracts.RawInstanceAddress,
 	useLedger string,
+	packageSelectionPreferences []string,
 ) (string, error) {
 	requiredCCVs := []contracts.RawInstanceAddress{requiredCCV}
 
@@ -583,7 +591,7 @@ func GetOrCreateReceiver(
 			requiredCCV,
 		)
 
-		return updateReceiverRequiredCCVs(ctx, participant, receiverCid, requiredCCVs, useLedger)
+		return updateReceiverRequiredCCVs(ctx, participant, receiverCid, requiredCCVs, useLedger, packageSelectionPreferences)
 	}
 
 	fmt.Printf(
@@ -611,6 +619,7 @@ func GetOrCreateReceiver(
 		}},
 		nil,
 		nil,
+		packageSelectionPreferences,
 	)
 	if err != nil {
 		return "", fmt.Errorf("submit Create CCIPReceiver: %w", err)
