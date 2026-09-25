@@ -45,10 +45,10 @@ func TestReceiverInstanceID(t *testing.T) {
 func TestReceiverFinalityLabel(t *testing.T) {
 	t.Parallel()
 
-	require.Equal(t, "WaitForFinality", receiverFinalityLabel(ccipcodec.FinalityConfig{
+	require.Equal(t, "WaitForFinality", ReceiverFinalityLabel(ccipcodec.FinalityConfig{
 		WaitForFinality: &types.UNIT{},
 	}))
-	require.Equal(t, "BlockDepth(1)", receiverFinalityLabel(ccipcodec.FinalityConfig{
+	require.Equal(t, "BlockDepth(1)", ReceiverFinalityLabel(ccipcodec.FinalityConfig{
 		BlockDepth: new(types.INT64(1)),
 	}))
 }
@@ -56,14 +56,22 @@ func TestReceiverFinalityLabel(t *testing.T) {
 func TestReceiverRequiredCCVConfigured(t *testing.T) {
 	t.Parallel()
 
-	ccv := contracts.RawInstanceAddress("committeeverifier-tqkny@ccvOwner::1220abc")
+	ccv1 := contracts.RawInstanceAddress("committeeverifier-tqkny@ccvOwner::1220abc")
+	ccv2 := contracts.RawInstanceAddress("committeeverifier-abcde@ccvOwner::1220abc")
 	recv := &receiver.CCIPReceiver{
 		RequiredCCVs: []chainlinkapi.RawInstanceAddress{
-			{Unpack: types.TEXT(ccv.String())},
+			{Unpack: types.TEXT(ccv1.String())},
+			{Unpack: types.TEXT(ccv2.String())},
 		},
 	}
 
-	require.True(t, receiverRequiredCCVConfigured(recv, ccv))
-	require.False(t, receiverRequiredCCVConfigured(recv, contracts.RawInstanceAddress("other@ccvOwner::1220abc")))
-	require.False(t, receiverRequiredCCVConfigured(&receiver.CCIPReceiver{}, ccv))
+	require.True(t, receiverRequiredCCVConfigured(recv, []contracts.RawInstanceAddress{ccv1, ccv2}))
+	// Order doesn't matter.
+	require.True(t, receiverRequiredCCVConfigured(recv, []contracts.RawInstanceAddress{ccv2, ccv1}))
+	require.False(t, receiverRequiredCCVConfigured(recv, []contracts.RawInstanceAddress{ccv1}))
+	require.False(t, receiverRequiredCCVConfigured(recv, []contracts.RawInstanceAddress{
+		ccv1, contracts.RawInstanceAddress("other@ccvOwner::1220abc"),
+	}))
+	require.False(t, receiverRequiredCCVConfigured(&receiver.CCIPReceiver{}, []contracts.RawInstanceAddress{ccv1}))
+	require.True(t, receiverRequiredCCVConfigured(&receiver.CCIPReceiver{}, nil))
 }

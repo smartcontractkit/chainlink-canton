@@ -211,7 +211,7 @@ func evmSend(
 
 	extraArgs, err := evm.NewV3ExtraArgs(
 		fin.EVM,
-		uint32(0),
+		uint32(200_000),
 		b.Profile.NoExecutionTag.Hex(),
 		nil, nil, nil, nil,
 	)
