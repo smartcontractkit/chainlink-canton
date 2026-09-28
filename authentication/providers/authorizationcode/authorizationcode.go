@@ -43,6 +43,8 @@ type authorizationCodeProviderConfig struct {
 	callbackURL          string
 	openBrowser          bool
 	timeout              time.Duration
+	// store persists tokens across CLI invocations; nil disables persistence.
+	store tokenStore
 }
 
 func defaultAuthorizationCodeProviderConfig() *authorizationCodeProviderConfig {
@@ -144,10 +146,52 @@ func WithOpenBrowser(openBrowser bool) ProviderOption {
 	}
 }
 
-// WithTimeout configures a timeout for the overall authorization flow, including callback receipt.
+// WithTimeout configures a timeout for the interactive authorization flow, including callback
+// receipt. It does not bound the returned token source: token refreshes keep working after
+// the flow has completed.
 func WithTimeout(timeout time.Duration) ProviderOption {
 	return func(config *authorizationCodeProviderConfig) {
 		config.timeout = timeout
+	}
+}
+
+// WithKeyring enables token persistence in the operating system's native keyring
+// (e.g. macOS Keychain, Windows Credential Manager, or the Secret Service on Linux),
+// so that users do not have to log in again for every CLI invocation.
+//
+// When enabled, the Provider first looks up a cached token for the same authorization
+// server and client before starting the interactive login flow:
+//   - If a token is found and is still valid (or can be renewed via its refresh token),
+//     it is used directly and the login flow is skipped entirely.
+//   - If no usable token is found, the login flow runs as usual and the fetched token
+//     (including its refresh token) is stored in the keyring afterwards.
+//
+// Tokens are keyed by the token endpoint URL and client ID, so different authorization
+// servers or clients never share cached tokens. Tokens are refreshed transparently by the
+// returned Provider, and refreshed tokens are written back to the keyring to stay in sync
+// with authorization servers that rotate refresh tokens.
+//
+// A broken or unavailable keyring never fails the flow: it only prints a warning and
+// falls back to the interactive login.
+//
+// Example:
+//
+//	WithKeyring(true)
+func WithKeyring(enabled bool) ProviderOption {
+	return func(config *authorizationCodeProviderConfig) {
+		if enabled {
+			config.store = keyringStore{}
+		} else {
+			config.store = nil
+		}
+	}
+}
+
+// withTokenStore overrides the token store used by WithKeyring. It is intended for tests
+// to inject a fake store instead of accessing the OS keyring.
+func withTokenStore(store tokenStore) ProviderOption {
+	return func(config *authorizationCodeProviderConfig) {
+		config.store = store
 	}
 }
 
@@ -159,7 +203,8 @@ func WithTimeout(timeout time.Duration) ProviderOption {
 // advertise support for S256.
 //
 // Parameters:
-//   - ctx: Context for metadata discovery and the token exchange
+//   - ctx: Context for metadata discovery, the interactive login flow, and the returned
+//     token source (token refreshes use it for the provider's entire lifetime)
 //   - authorizationServerURL: The base URL of the authorization server (e.g., "https://auth.example.com")
 //   - clientID: The OAuth2 client identifier issued by the authorization server
 //   - options: Optional configuration parameters (scopes, transport credentials, callback URL, timeout, etc.)
@@ -187,7 +232,10 @@ func NewDiscoveryProvider(ctx context.Context, authorizationServerURL, clientID 
 // PKCE with the S256 challenge method is REQUIRED for this flow.
 //
 // Parameters:
-//   - ctx: Context for the overall flow; can be configured with a timeout via WithTimeout
+//   - ctx: Context for the interactive login flow and the returned token source. A timeout
+//     configured via WithTimeout bounds only the login flow; token refreshes keep using this
+//     context for the entire lifetime of the provider, so it must not be canceled while the
+//     provider is in use.
 //   - authURL: The OAuth2 authorization endpoint URL
 //   - tokenURL: The OAuth2 token endpoint URL
 //   - clientID: The OAuth2 client identifier issued by the authorization server
@@ -212,12 +260,6 @@ func NewProvider(ctx context.Context, authURL, tokenURL, clientID string, option
 		return nil, fmt.Errorf("clientID cannot be empty")
 	}
 
-	if cfg.timeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, cfg.timeout)
-		defer cancel()
-	}
-
 	callbackURL, err := url.Parse(cfg.callbackURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse callback URL: %w", err)
@@ -228,6 +270,23 @@ func NewProvider(ctx context.Context, authURL, tokenURL, clientID string, option
 		RedirectURL: callbackURL.String(),
 		Scopes:      cfg.scopes,
 		Endpoint:    oauth2.Endpoint{AuthURL: authURL, TokenURL: tokenURL},
+	}
+
+	// Reuse a token persisted in the keyring instead of starting the interactive login.
+	if cfg.store != nil {
+		if provider, ok := providerFromKeyring(ctx, cfg, oauthCfg); ok {
+			return provider, nil
+		}
+	}
+
+	// The flow timeout bounds the interactive login only. The token source returned to the
+	// caller must keep working (i.e. refreshing tokens) after the flow has completed, so it
+	// is built from the parent context instead of the timeout-bounded flow context.
+	flowCtx := ctx
+	if cfg.timeout > 0 {
+		var cancel context.CancelFunc
+		flowCtx, cancel = context.WithTimeout(ctx, cfg.timeout)
+		defer cancel()
 	}
 
 	// Generate cryptographically secure random state
@@ -266,7 +325,7 @@ func NewProvider(ctx context.Context, authURL, tokenURL, clientID string, option
 		}
 
 		// Use built-in VerifierOption for PKCE
-		token, err := oauthCfg.Exchange(ctx, code, oauth2.VerifierOption(verifier))
+		token, err := oauthCfg.Exchange(flowCtx, code, oauth2.VerifierOption(verifier))
 		if err != nil {
 			http.Error(w, "Token exchange failed", http.StatusInternalServerError)
 			fmt.Printf("ERROR: Token exchange failed: %v\n", err)
@@ -301,7 +360,7 @@ func NewProvider(ctx context.Context, authURL, tokenURL, clientID string, option
 		WriteTimeout:      5 * time.Second,
 	}
 	// Create listener to fail fast if port is unavailable
-	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", server.Addr)
+	listener, err := new(net.ListenConfig).Listen(flowCtx, "tcp", server.Addr)
 	if err != nil {
 		return nil, fmt.Errorf("creating listener: %w", err)
 	}
@@ -322,19 +381,25 @@ func NewProvider(ctx context.Context, authURL, tokenURL, clientID string, option
 
 	select {
 	case err := <-serverErr:
-		_ = server.Shutdown(ctx)
+		_ = server.Shutdown(flowCtx)
 		return nil, fmt.Errorf("callback server error: %w", err)
 	case token := <-callbackChan:
 		fmt.Println("Authentication completed")
-		tokenSource := oauthCfg.TokenSource(ctx, token)
+
+		var tokenSource oauth2.TokenSource = oauthCfg.TokenSource(ctx, token)
+		if cfg.store != nil {
+			key := keyringKeyFor(tokenURL, clientID)
+			persistToken(cfg.store, key, token)
+			tokenSource = newKeyringTokenSource(tokenSource, cfg.store, key, token)
+		}
 
 		return &Provider{
 			tokenSource:          oauth.TokenSource{TokenSource: tokenSource},
 			transportCredentials: cfg.transportCredentials,
-		}, server.Shutdown(ctx)
-	case <-ctx.Done():
-		_ = server.Shutdown(ctx)
-		return nil, ctx.Err()
+		}, server.Shutdown(flowCtx)
+	case <-flowCtx.Done():
+		_ = server.Shutdown(flowCtx)
+		return nil, flowCtx.Err()
 	}
 }
 
