@@ -386,7 +386,7 @@ func NewProvider(ctx context.Context, authURL, tokenURL, clientID string, option
 	case token := <-callbackChan:
 		fmt.Println("Authentication completed")
 
-		var tokenSource oauth2.TokenSource = oauthCfg.TokenSource(ctx, token)
+		var tokenSource = oauthCfg.TokenSource(ctx, token)
 		if cfg.store != nil {
 			key := keyringKeyFor(tokenURL, clientID)
 			persistToken(cfg.store, key, token)

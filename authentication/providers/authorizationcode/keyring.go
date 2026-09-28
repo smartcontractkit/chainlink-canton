@@ -66,7 +66,7 @@ func keyringKeyFor(tokenURL, clientID string) tokenKey {
 
 // marshalToken serializes a token (including its refresh token and expiry) into a storable secret.
 func marshalToken(token *oauth2.Token) (string, error) {
-	data, err := json.Marshal(token)
+	data, err := json.Marshal(token) //nolint:gosec // only used to persist token to keyring
 	if err != nil {
 		return "", fmt.Errorf("marshaling token: %w", err)
 	}

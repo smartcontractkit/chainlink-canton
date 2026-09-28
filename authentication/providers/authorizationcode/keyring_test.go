@@ -222,13 +222,13 @@ func TestNewProvider_KeyringExpiredToken_RenewsAndPersists(t *testing.T) {
 		Expiry:       time.Now().Add(-time.Hour),
 	})
 	require.NoError(t, err, "marshaling token")
-	store.secrets[storeKey(tokenURL, "client-id")] = secret
+	store.secrets[storeKey(tokenURL, "client-id-123")] = secret
 
 	provider, err := NewProvider(
 		t.Context(),
 		tokenServer.URL+"/auth",
 		tokenURL,
-		"client-id",
+		"client-id-123",
 		withTokenStore(store),
 	)
 	require.NoError(t, err, "cached refresh token should skip the login flow")
@@ -237,7 +237,7 @@ func TestNewProvider_KeyringExpiredToken_RenewsAndPersists(t *testing.T) {
 	require.NoError(t, err, "requesting token")
 	require.Equal(t, "renewed-token", token.AccessToken)
 
-	stored, err := unmarshalToken(store.secrets[storeKey(tokenURL, "client-id")])
+	stored, err := unmarshalToken(store.secrets[storeKey(tokenURL, "client-id-123")])
 	require.NoError(t, err, "unmarshaling persisted token")
 	require.Equal(t, "renewed-token", stored.AccessToken)
 	require.Equal(t, "refresh-token-2", stored.RefreshToken)
