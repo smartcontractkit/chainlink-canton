@@ -70,7 +70,6 @@ func NewBurnMintFactory(ctx context.Context, poolOwner types.PARTY, acs store.Ac
 			return nil, fmt.Errorf("failed to create DARegistry client with URL %q: %w", *cfg.TokenStandardURL, err)
 		}
 
-		//nolint:exhaustive // these are the only two possible types
 		switch cfg.Type {
 		case config.FactoryTypeURL:
 			return URLBurnMintFactory{
