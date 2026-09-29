@@ -32,9 +32,9 @@ require (
 	github.com/prometheus/client_golang v1.24.1
 	github.com/rs/zerolog v1.35.1
 	github.com/smartcontractkit/chain-selectors v1.0.111
-	github.com/smartcontractkit/chainlink-canton/authentication v1.0.0
-	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.0
-	github.com/smartcontractkit/chainlink-canton/eds v0.0.0-00010101000000-000000000000
+	github.com/smartcontractkit/chainlink-canton/authentication v1.1.0
+	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.1
+	github.com/smartcontractkit/chainlink-canton/eds v1.0.0
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20260908164107-3de1349d970b
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20260908164107-3de1349d970b
@@ -154,6 +154,7 @@ require (
 	github.com/crate-crypto/go-eth-kzg v1.5.0 // indirect
 	github.com/creachadair/jrpc2 v1.2.0 // indirect
 	github.com/creachadair/mds v0.13.4 // indirect
+	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dchest/siphash v1.2.3 // indirect
 	github.com/deckarep/golang-set/v2 v2.9.0 // indirect
@@ -222,6 +223,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
+	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -470,6 +472,7 @@ require (
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/xssnick/tonutils-go v1.14.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+	github.com/zalando/go-keyring v0.2.8 // indirect
 	github.com/zksync-sdk/zksync2-go v1.1.1-0.20250620124214-2c742ee399c6 // indirect
 	go.etcd.io/etcd/api/v3 v3.5.14 // indirect
 	go.etcd.io/etcd/client/pkg/v3 v3.5.14 // indirect

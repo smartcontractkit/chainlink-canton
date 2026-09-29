@@ -19,7 +19,7 @@ require (
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/google/uuid v1.6.0
 	github.com/smartcontractkit/chainlink-canton v0.0.0
-	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.0
+	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.1
 	github.com/smartcontractkit/chainlink-deployments-framework v0.123.3
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 )
@@ -216,7 +216,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartcontractkit/chain-selectors v1.0.111 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc // indirect
-	github.com/smartcontractkit/chainlink-canton/authentication v1.0.0 // indirect
+	github.com/smartcontractkit/chainlink-canton/authentication v1.1.0 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260915214759-02f2214d5823 // indirect
