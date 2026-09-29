@@ -316,16 +316,19 @@ template LockReleaseTokenPool
         -- (e.g., "transfer-preapproval"). Converted to Splice ChoiceContext at the
         -- TransferFactory boundary.
         poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
+        -- Timeout for pending TransferInstructions created by this pool.
+        transferTimeout : TransferTimeout
+        deps : LockReleaseTokenPoolDeps
 
         -- Metadata labels set on the pool-owned holdings created by LockOrBurn, so
         -- DA's holdings disclosure API (which selects holdings by these labels) can
         -- disclose them to the CCIP bridge. Set at deploy (expected default:
         -- "cip-112/receiver.id" -> "ccip-public") and maintained by the pool owner
-        -- via SetPoolReceiveMetadata. LockOrBurn fails closed if this is empty.
-        poolReceiveMetadata : Splice.Api.Token.MetadataV1.Metadata
-        -- Timeout for pending TransferInstructions created by this pool.
-        transferTimeout : TransferTimeout
-        deps : LockReleaseTokenPoolDeps
+        -- via SetPoolReceiveMetadata. Optional for upgrade compatibility (a plain
+        -- added field would be incompatible with existing contracts); LockOrBurn
+        -- aborts if it is None. MUST stay last — new fields in an upgraded template
+        -- are only allowed at the end of the definition.
+        poolReceiveMetadata : Optional Splice.Api.Token.MetadataV1.Metadata
     where
         signatory poolOwner
         observer optional [] pure rateLimitAdmin <> observers
@@ -727,12 +730,12 @@ template LockReleaseTokenPool
         -- Set (full replacement) the metadata labels stamped on pool-owned holdings
         -- created by LockOrBurn — see poolReceiveMetadata. Maintained by the pool
         -- owner so the labels DA's holdings disclosure API filters on can be updated
-        -- without redeploying the pool. LockOrBurn refuses to run with an empty map.
+        -- without redeploying the pool.
         choice SetPoolReceiveMetadata : ContractId LockReleaseTokenPool
             with
                 metadata : Splice.Api.Token.MetadataV1.Metadata
             controller poolOwner
-            do create this with poolReceiveMetadata = metadata
+            do create this with poolReceiveMetadata = Some metadata
 
         -- Set the transfer timeout for pending TransferInstructions.
         -- Use Indefinite for tokens without expiry, RelativeHours for tokens with expiry constraints.
@@ -1326,13 +1329,6 @@ template LockReleaseTokenPool
                         -- Indefinite is bounded by Splice's tokenStandardMaxTTL default (90 days).
                         Indefinite -> addRelTime now (hours 2160)
                         RelativeHours h -> addRelTime now (hours h)
-                -- Fail closed: never create unlabeled pool-owned holdings — DA's
-                -- holdings disclosure API selects holdings by these labels, so an
-                -- unlabeled holding could never be disclosed to the bridge and its
-                -- tokens never released.
-                assertMsg
-                    "LockOrBurn: poolReceiveMetadata must not be empty (holdings disclosure labels — see SetPoolReceiveMetadata)"
-                    (not (null (TextMap.toList poolReceiveMetadata.values)))
                 let transfer = Splice.Api.Token.TransferInstructionV1.Transfer with
                         sender = caller
                         receiver = poolOwner
@@ -1345,7 +1341,9 @@ template LockReleaseTokenPool
                         -- poolReceiveMetadata (pool-controlled; callers cannot
                         -- omit or override). Caller-supplied labels still flow
                         -- through extraArgs.meta unchanged.
-                        meta = poolReceiveMetadata
+                        meta = fromSomeNote
+                            "LockOrBurn: poolReceiveMetadata is not set (see SetPoolReceiveMetadata)"
+                            poolReceiveMetadata
 
                 transferResult <- exercise transferFactory
                     Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
