@@ -72,6 +72,27 @@ provider, err := authorizationcode.NewProvider(
 Additional options are available via the functional options pattern (see package documentation for `WithScopes`,
 `WithCallbackURL`, `WithOpenBrowser`, etc).
 
+### Token Persistence (Keyring)
+
+CLIs can persist tokens in the operating system's native keyring (macOS Keychain, Windows Credential Manager, or the
+Secret Service on Linux) so users don't have to log in again for every invocation:
+
+```go
+provider, err := authorizationcode.NewDiscoveryProvider(
+    ctx,
+    "https://auth.example.com",
+    "client-id",
+    authorizationcode.WithScopes("daml_ledger_api", "offline_access"),
+    authorizationcode.WithKeyring(true),
+)
+```
+
+When enabled, the provider first checks the keyring for a token from a previous login. If a usable token is found
+(still valid, or renewable via its refresh token), the interactive login is skipped entirely. Otherwise, the login
+flow runs and the fetched token is stored in the keyring afterward. Tokens are keyed by token endpoint and client
+ID, and refreshed tokens are written back automatically. A broken or unavailable keyring only prints a warning and
+falls back to the interactive login.
+
 ## Client Credentials Flow
 
 For server-to-server authentication. Ideal for automated systems, CI/CD pipelines, and service-to-service communication.
