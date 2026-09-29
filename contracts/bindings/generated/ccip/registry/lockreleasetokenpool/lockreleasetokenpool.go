@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-lock-release-token-pool"
-	PackageID   = "59c18ca65a5bfcb404e4e9f469db1e85160eef00283afbf126efaa79a4ebdbe5"
+	PackageID   = "eceec0069e13f4d06e8d26a8874d23a15234eb9b0104279906da67bafb37a5fe"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1028,6 +1028,7 @@ type LockReleaseTokenPool struct {
 	RemoteChainConfigs      map[types.NUMERIC]RemoteChainConfig        `json:"remoteChainConfigs"`
 	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig2  `json:"tokenTransferFeeConfigs"`
 	PoolReceiveContext      splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
+	PoolReceiveMetadata     splice_api_token_metadata_v1.Metadata      `json:"poolReceiveMetadata"`
 	TransferTimeout         TransferTimeout                            `json:"transferTimeout"`
 	Deps                    LockReleaseTokenPoolDeps                   `json:"deps"`
 }
@@ -1102,6 +1103,9 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 	args["poolReceiveContext"] = model.NestedToDAMLValue(t.PoolReceiveContext)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolReceiveMetadata"] = model.NestedToDAMLValue(t.PoolReceiveMetadata)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["transferTimeout"] = model.NestedToDAMLValue(t.TransferTimeout)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -1171,6 +1175,9 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["poolReceiveContext"] = model.NestedToDAMLValue(t.PoolReceiveContext)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolReceiveMetadata"] = model.NestedToDAMLValue(t.PoolReceiveMetadata)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["transferTimeout"] = model.NestedToDAMLValue(t.TransferTimeout)
@@ -1477,6 +1484,27 @@ func (t LockReleaseTokenPool) ClearPoolReceiveContextWithPackageID(contractID st
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Registry.LockReleaseTokenPoolV2", "LockReleaseTokenPool"),
 		ContractID: contractID,
 		Choice:     "ClearPoolReceiveContext",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetPoolReceiveMetadata exercises the SetPoolReceiveMetadata choice on this LockReleaseTokenPool contract
+// This method uses the package name in the template ID
+func (t LockReleaseTokenPool) SetPoolReceiveMetadata(contractID string, args SetPoolReceiveMetadata) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.Registry.LockReleaseTokenPoolV2", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetPoolReceiveMetadata",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetPoolReceiveMetadataWithPackageID exercises the SetPoolReceiveMetadata choice using the provided package ID instead of package name
+func (t LockReleaseTokenPool) SetPoolReceiveMetadataWithPackageID(contractID string, packageID string, args SetPoolReceiveMetadata) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.Registry.LockReleaseTokenPoolV2", "LockReleaseTokenPool"),
+		ContractID: contractID,
+		Choice:     "SetPoolReceiveMetadata",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -2326,6 +2354,42 @@ func (t *SetObserversParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetPoolReceiveMetadata is a Record type
+type SetPoolReceiveMetadata struct {
+	Metadata splice_api_token_metadata_v1.Metadata `json:"metadata"`
+}
+
+// ToMap converts SetPoolReceiveMetadata to a map for DAML arguments
+func (t SetPoolReceiveMetadata) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["metadata"] = model.NestedToDAMLValue(t.Metadata)
+
+	return m
+}
+
+func (t SetPoolReceiveMetadata) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetPoolReceiveMetadata) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetPoolReceiveMetadata to hex string (Canton MCMS format)
+func (t SetPoolReceiveMetadata) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetPoolReceiveMetadata from hex string (Canton MCMS format)
+func (t *SetPoolReceiveMetadata) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetRateLimitConfig is a Record type
 type SetRateLimitConfig struct {
 	Caller         types.PARTY       `json:"caller"`
@@ -2922,6 +2986,7 @@ type MCMSEncoder interface {
 	SetDynamicConfigParams(args SetDynamicConfigParams) (*bind.EncodedChoice, error)
 	SetObservers(args SetObservers) (*bind.EncodedChoice, error)
 	SetObserversParams(args SetObserversParams) (*bind.EncodedChoice, error)
+	SetPoolReceiveMetadata(args SetPoolReceiveMetadata) (*bind.EncodedChoice, error)
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
@@ -3090,6 +3155,11 @@ func (e *encoder) SetObservers(args SetObservers) (*bind.EncodedChoice, error) {
 // SetObserversParams encodes parameters for the SetObservers choice.
 func (e *encoder) SetObserversParams(args SetObserversParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetObservers", args)
+}
+
+// SetPoolReceiveMetadata encodes parameters for the SetPoolReceiveMetadata choice.
+func (e *encoder) SetPoolReceiveMetadata(args SetPoolReceiveMetadata) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetPoolReceiveMetadata", args)
 }
 
 // SetRateLimitConfig encodes parameters for the SetRateLimitConfig choice.
