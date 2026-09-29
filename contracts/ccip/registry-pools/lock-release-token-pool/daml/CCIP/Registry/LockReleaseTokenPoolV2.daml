@@ -320,14 +320,8 @@ template LockReleaseTokenPool
         transferTimeout : TransferTimeout
         deps : LockReleaseTokenPoolDeps
 
-        -- Metadata labels set on the pool-owned holdings created by LockOrBurn, so
-        -- DA's holdings disclosure API (which selects holdings by these labels) can
-        -- disclose them to the CCIP bridge. Set at deploy (expected default:
-        -- "cip-112/receiver.id" -> "ccip-public") and maintained by the pool owner
-        -- via SetPoolReceiveMetadata. Optional for upgrade compatibility (a plain
-        -- added field would be incompatible with existing contracts); LockOrBurn
-        -- aborts if it is None. MUST stay last — new fields in an upgraded template
-        -- are only allowed at the end of the definition.
+        -- Labels on pool-owned holdings, so DA's holdings disclosure API can select
+        -- them. Optional for upgrade compatibility; must stay LAST. See SetPoolReceiveMetadata.
         poolReceiveMetadata : Optional Splice.Api.Token.MetadataV1.Metadata
     where
         signatory poolOwner
@@ -727,10 +721,7 @@ template LockReleaseTokenPool
             controller poolOwner
             do create this with poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
-        -- Set (full replacement) the metadata labels stamped on pool-owned holdings
-        -- created by LockOrBurn — see poolReceiveMetadata. Maintained by the pool
-        -- owner so the labels DA's holdings disclosure API filters on can be updated
-        -- without redeploying the pool.
+        -- Set the holdings-disclosure labels — see poolReceiveMetadata.
         choice SetPoolReceiveMetadata : ContractId LockReleaseTokenPool
             with
                 metadata : Splice.Api.Token.MetadataV1.Metadata
@@ -1337,10 +1328,7 @@ template LockReleaseTokenPool
                         requestedAt = now
                         executeBefore
                         inputHoldingCids = senderInputCids
-                        -- Labels the pool stamps on its own holdings, from
-                        -- poolReceiveMetadata (pool-controlled; callers cannot
-                        -- omit or override). Caller-supplied labels still flow
-                        -- through extraArgs.meta unchanged.
+                        -- Pool-controlled labels; caller labels still flow through extraArgs.meta.
                         meta = fromSomeNote
                             "LockOrBurn: poolReceiveMetadata is not set (see SetPoolReceiveMetadata)"
                             poolReceiveMetadata
