@@ -681,8 +681,8 @@ github.com/smartcontractkit/chain-selectors v1.0.111 h1:urb/qOyRanxDn+Wras+LULHE
 github.com/smartcontractkit/chain-selectors v1.0.111/go.mod h1:qy7whtgG5g+7z0jt0nRyii9bLND9m15NZTzuQPkMZ5w=
 github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc h1:Um9FBcf0JNSFuGbxgccDG1vM3cNrMGy0SdJ7r6VbX0o=
 github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc/go.mod h1:zfE2R7887kiwXkGTHKPe5NBgwhFwIC3pnA2uAxrbvig=
-github.com/smartcontractkit/chainlink-canton/authentication v1.0.0 h1:oCgOHdTA7y/cIhTomSK2mc9ARyANF7zXng+0jyCmsKQ=
-github.com/smartcontractkit/chainlink-canton/authentication v1.0.0/go.mod h1:5J2EGdvEbeddbgEkYBzn/BCMKILs+UUYJglCP2VOFGE=
+github.com/smartcontractkit/chainlink-canton/authentication v1.1.0 h1:trl4fc3gczzR6UjippsAUg3upUU5lpuLVpocMq4Sy/I=
+github.com/smartcontractkit/chainlink-canton/authentication v1.1.0/go.mod h1:HrdHd+4liEZpSW88BWDQvTWdFtH5SqO4LDHsgACAivE=
 github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260624154507-ea7ff77a0ddb h1:uSXBvj/idCBg7hMLmek8YYNa0JKggqlTkHYdtIooeNM=
 github.com/smartcontractkit/chainlink-ccip v0.1.1-solana.0.20260624154507-ea7ff77a0ddb/go.mod h1:2xVZJ3o9udYFeJhwyHXAMlNhptJ99uoiGjzfOicYNX8=
 github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 h1:jkChf04hhdiMBApbb+lLDxHMY62Md6UeM7v++GSw3K8=

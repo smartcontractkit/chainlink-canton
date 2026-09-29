@@ -18,8 +18,10 @@ type UserConfig struct {
 }
 
 type CantonConfig struct {
-	Disabled                    bool              `yaml:"disabled"`
-	AuthType                    string            `yaml:"authType"`
+	Disabled bool   `yaml:"disabled"`
+	AuthType string `yaml:"authType"`
+	// Enable keyring to persist tokens between CLI runs. Only applies to authorizationCode type.
+	AuthEnableKeyring           bool              `yaml:"authEnableKeyring"`
 	AuthServerURL               string            `yaml:"authServerURL"`
 	AuthClientID                string            `yaml:"authClientID"`
 	AuthClientSecret            string            `yaml:"authClientSecret"`

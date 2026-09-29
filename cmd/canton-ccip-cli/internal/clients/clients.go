@@ -98,7 +98,11 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 		case "authorizationCode":
 			fallthrough
 		default:
-			authProvider, err = authorizationcode.NewDiscoveryProvider(ctx, cfg.Canton.AuthServerURL, cfg.Canton.AuthClientID)
+			var providerOptions []authorizationcode.ProviderOption
+			if cfg.Canton.AuthEnableKeyring {
+				providerOptions = append(providerOptions, authorizationcode.WithKeyring(true))
+			}
+			authProvider, err = authorizationcode.NewDiscoveryProvider(ctx, cfg.Canton.AuthServerURL, cfg.Canton.AuthClientID, providerOptions...)
 			if err != nil {
 				return nil, fmt.Errorf("create authorizationCode provider: %w", err)
 			}
