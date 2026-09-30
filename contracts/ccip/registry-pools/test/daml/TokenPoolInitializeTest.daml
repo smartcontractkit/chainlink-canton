@@ -9,6 +9,7 @@ import Daml.Script
 import DA.Foldable (mapA_)
 import DA.Assert ((===))
 import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1
@@ -159,6 +160,8 @@ testInitializeLockReleasePool_SelfIssued = script do
                 remoteChainConfigs = Map.empty
                 tokenTransferFeeConfigs = Map.empty
                 poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                poolReceiveMetadata = Splice.Api.Token.MetadataV1.Metadata with
+                    values = TextMap.fromList [("cip-112/receiver.id", "ccip-public")]
                 transferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.Indefinite
                 deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
                     tokenAdminRegistry = dummyAddr "dummy-tar"
