@@ -316,13 +316,11 @@ template LockReleaseTokenPool
         -- (e.g., "transfer-preapproval"). Converted to Splice ChoiceContext at the
         -- TransferFactory boundary.
         poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
+        -- Labels on pool-owned holdings, so DA's holdings disclosure API can select them.
+        poolReceiveMetadata : Splice.Api.Token.MetadataV1.Metadata
         -- Timeout for pending TransferInstructions created by this pool.
         transferTimeout : TransferTimeout
         deps : LockReleaseTokenPoolDeps
-
-        -- Labels on pool-owned holdings, so DA's holdings disclosure API can select
-        -- them. Optional for upgrade compatibility; must stay LAST. See SetPoolReceiveMetadata.
-        poolReceiveMetadata : Optional Splice.Api.Token.MetadataV1.Metadata
     where
         signatory poolOwner
         observer optional [] pure rateLimitAdmin <> observers
@@ -726,7 +724,7 @@ template LockReleaseTokenPool
             with
                 metadata : Splice.Api.Token.MetadataV1.Metadata
             controller poolOwner
-            do create this with poolReceiveMetadata = Some metadata
+            do create this with poolReceiveMetadata = metadata
 
         -- Set the transfer timeout for pending TransferInstructions.
         -- Use Indefinite for tokens without expiry, RelativeHours for tokens with expiry constraints.
@@ -1328,10 +1326,8 @@ template LockReleaseTokenPool
                         requestedAt = now
                         executeBefore
                         inputHoldingCids = senderInputCids
-                        -- Pool-controlled labels; caller labels still flow through extraArgs.meta.
-                        meta = fromSomeNote
-                            "LockOrBurn: poolReceiveMetadata is not set (see SetPoolReceiveMetadata)"
-                            poolReceiveMetadata
+                        -- Add the pool-controlled metadata to the transfer
+                        meta = poolReceiveMetadata
 
                 transferResult <- exercise transferFactory
                     Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with

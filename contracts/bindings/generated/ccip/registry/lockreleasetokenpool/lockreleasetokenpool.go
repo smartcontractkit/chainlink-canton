@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-lock-release-token-pool"
-	PackageID   = "8603e518a389fef15e6c38d53ad5be9114709ba68abad2ee6f67cc98f9b0df31"
+	PackageID   = "dea9f7a2d1ce77df731377e30766da0ba5a26f408f34934cf463c72db61261cf"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1028,9 +1028,9 @@ type LockReleaseTokenPool struct {
 	RemoteChainConfigs      map[types.NUMERIC]RemoteChainConfig        `json:"remoteChainConfigs"`
 	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig2  `json:"tokenTransferFeeConfigs"`
 	PoolReceiveContext      splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
+	PoolReceiveMetadata     splice_api_token_metadata_v1.Metadata      `json:"poolReceiveMetadata"`
 	TransferTimeout         TransferTimeout                            `json:"transferTimeout"`
 	Deps                    LockReleaseTokenPoolDeps                   `json:"deps"`
-	PoolReceiveMetadata     *splice_api_token_metadata_v1.Metadata     `json:"poolReceiveMetadata" hex:"optional"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1103,22 +1103,13 @@ func (t LockReleaseTokenPool) CreateCommand() *model.CreateCommand {
 	args["poolReceiveContext"] = model.NestedToDAMLValue(t.PoolReceiveContext)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolReceiveMetadata"] = model.NestedToDAMLValue(t.PoolReceiveMetadata)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["transferTimeout"] = model.NestedToDAMLValue(t.TransferTimeout)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = model.NestedToDAMLValue(t.Deps)
-
-	if t.PoolReceiveMetadata != nil {
-		args["poolReceiveMetadata"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.PoolReceiveMetadata),
-		}
-	} else {
-		args["poolReceiveMetadata"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -1186,22 +1177,13 @@ func (t LockReleaseTokenPool) CreateCommandWithPackageID(packageID string) *mode
 	args["poolReceiveContext"] = model.NestedToDAMLValue(t.PoolReceiveContext)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["poolReceiveMetadata"] = model.NestedToDAMLValue(t.PoolReceiveMetadata)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["transferTimeout"] = model.NestedToDAMLValue(t.TransferTimeout)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["deps"] = model.NestedToDAMLValue(t.Deps)
-
-	if t.PoolReceiveMetadata != nil {
-		args["poolReceiveMetadata"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.PoolReceiveMetadata),
-		}
-	} else {
-		args["poolReceiveMetadata"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
