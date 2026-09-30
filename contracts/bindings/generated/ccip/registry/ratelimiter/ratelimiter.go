@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-rate-limiter"
-	PackageID   = "98a50c17cbd60b3640bf3f580e4318ef9eef231cb7d838750a407d48bdf5bf72"
+	PackageID   = "825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a"
 	SDKVersion  = "3.4.11"
 )
 
