@@ -63,7 +63,7 @@ func argsToMap(args any) map[string]any {
 type HoldingView struct {
 	Owner        types.PARTY                           `json:"owner"`
 	InstrumentId InstrumentId                          `json:"instrumentId"`
-	Amount       types.NUMERIC                         `json:"amount"`
+	Amount       types.NUMERIC                         `json:"amount" hex:"decimal"`
 	Lock         *Lock                                 `json:"lock" hex:"optional"`
 	Meta         splice_api_token_metadata_v1.Metadata `json:"meta"`
 }

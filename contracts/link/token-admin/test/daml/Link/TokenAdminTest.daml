@@ -1,0 +1,1099 @@
+-- | Tests for Link.TokenAdmin: the MCMS-governed admin surface for
+-- | registry-issued LINK.
+-- |
+-- | The MCMSReceiver_Entrypoint is exercised directly (as the pool MCMS tests
+-- | do) rather than standing up a full MCMS instance. Link.Token.LinkRegistry
+-- | serves as the CIP-56 burn-mint/transfer factory double; a minimal stub
+-- | covers the allocation factory, which LinkRegistry does not implement.
+module Link.TokenAdminTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Foldable (forA_)
+import DA.Map qualified as Map
+import DA.Optional (fromSome)
+import DA.TextMap qualified as TextMap
+import DA.Time (seconds)
+
+import Link.Token
+import Link.TokenAdmin
+import Link.TokenAdminTypes
+import Link.TokenAdminCodecGen qualified as CodecGen
+
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+import Splice.Api.Token.BurnMintV1 qualified as BurnMintV1
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
+
+import Chainlink.InstanceAddress qualified as InstanceAddress
+
+-- ========================================================
+-- |          Minimal allocation factory stub              |
+-- ========================================================
+
+-- | Stub allocation implementing the direct-completion path: archives the
+-- | funding holdings and creates the allocation in one step. The unsupported
+-- | lifecycle choices abort, which is all the governor's Execute relies on.
+template StubAllocation
+  with
+    stubAdmin : Party
+    stubAllocation : AllocationV1.AllocationSpecification
+    stubMeta : MetadataV1.Metadata
+  where
+    signatory stubAdmin
+
+    interface instance AllocationV1.Allocation for StubAllocation where
+      view = AllocationV1.AllocationView with
+        allocation = stubAllocation
+        holdingCids = []
+        meta = stubMeta
+
+      allocation_executeTransferImpl _self _arg =
+        abort "StubAllocation: Allocation_ExecuteTransfer not supported"
+      allocation_cancelImpl _self _arg =
+        abort "StubAllocation: Allocation_Cancel not supported"
+      allocation_withdrawImpl _self _arg =
+        abort "StubAllocation: Allocation_Withdraw not supported"
+
+template StubAllocationFactory
+  with
+    stubFactoryAdmin : Party
+    stubFactoryInstanceId : Text
+  where
+    signatory stubFactoryAdmin
+    ensure InstanceAddress.assertValidInstanceId stubFactoryInstanceId
+
+    interface instance AllocationInstructionV1.AllocationFactory for StubAllocationFactory where
+      view = AllocationInstructionV1.AllocationFactoryView with
+        admin = stubFactoryAdmin
+        meta = MetadataV1.emptyMetadata
+
+      allocationFactory_allocateImpl _self arg = do
+        assertMsg "StubAllocationFactory.Allocate: expectedAdmin mismatch"
+          (arg.expectedAdmin == stubFactoryAdmin)
+        let leg = arg.allocation.transferLeg
+        forA_ arg.inputHoldingCids \holdingCid -> do
+          holding <- fetch holdingCid
+          let hv = view holding
+          assertMsg "StubAllocationFactory.Allocate: holding owner mismatch"
+            (hv.owner == leg.sender)
+          assertMsg "StubAllocationFactory.Allocate: holding instrumentId mismatch"
+            (hv.instrumentId == leg.instrumentId)
+          archive holdingCid
+        allocationCid <- create StubAllocation with
+          stubAdmin = stubFactoryAdmin
+          stubAllocation = arg.allocation
+          stubMeta = MetadataV1.emptyMetadata
+        pure AllocationInstructionV1.AllocationInstructionResult with
+          output = AllocationInstructionV1.AllocationInstructionResult_Completed with
+            allocationCid = toInterfaceContractId @AllocationV1.Allocation allocationCid
+          senderChangeCids = []
+          meta = MetadataV1.emptyMetadata
+
+      allocationFactory_publicFetchImpl _self arg = do
+        assertMsg "StubAllocationFactory.PublicFetch: expectedAdmin mismatch"
+          (arg.expectedAdmin == stubFactoryAdmin)
+        pure AllocationInstructionV1.AllocationFactoryView with
+          admin = stubFactoryAdmin
+          meta = MetadataV1.emptyMetadata
+
+-- ========================================================
+-- |                 Shared test fixtures                  |
+-- ========================================================
+
+toAnyContractId : ContractId a -> ContractId ()
+toAnyContractId = coerceContractId
+
+-- | A LinkRegistry acting as the DA registry factory double, created with the
+-- | same party as ccipOwner (self-hosted registrar model).
+mkRegistry : Party -> HoldingV1.InstrumentId -> Text -> Script (ContractId LinkRegistry)
+mkRegistry admin instrumentId registryInstanceId =
+  submit admin do
+    createCmd LinkRegistry with
+      registryAdmin = admin
+      registryInstrumentId = instrumentId
+      instanceId = registryInstanceId
+      registryMeta = MetadataV1.emptyMetadata
+
+-- | Mint holdings to `owner` directly through the registry factory, as the
+-- | operator would when seeding the flow.
+mintViaRegistry
+  : Party
+  -> ContractId LinkRegistry
+  -> HoldingV1.InstrumentId
+  -> Party
+  -> Decimal
+  -> Script [ContractId HoldingV1.Holding]
+mintViaRegistry admin registryCid instrumentId owner amount = do
+  result <- submit (actAs admin <> actAs owner) do
+    exerciseCmd (toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid)
+      BurnMintV1.BurnMintFactory_BurnMint with
+      expectedAdmin = admin
+      instrumentId = instrumentId
+      inputHoldingCids = []
+      outputs =
+        [ BurnMintV1.BurnMintOutput with
+            owner = owner
+            amount = amount
+            context = MetadataV1.emptyChoiceContext
+        ]
+      extraActors = if owner == admin then [] else [owner]
+      extraArgs = MetadataV1.ExtraArgs with
+        context = MetadataV1.emptyChoiceContext
+        meta = MetadataV1.emptyMetadata
+  pure result.outputCids
+
+-- | Exercise the entrypoint as MCMS would (ccipOwner authority only).
+exerciseEntrypoint
+  : Party
+  -> ContractId LinkTokenAdmin
+  -> Text
+  -> Text
+  -> Map.Map Text (ContractId ())
+  -> Script (Map.Map Text (ContractId ()))
+exerciseEntrypoint admin adminCid functionName operationData contractIds =
+  submit admin do
+    exerciseCmd (toInterfaceContractId @MCMSReceiver adminCid) MCMSReceiver_Entrypoint with
+      functionName
+      operationData
+      contractIds
+
+-- | The freshly created authorization contract for a given recipient.
+findMintAuthorization : Party -> Party -> Decimal -> Script (ContractId LinkMintAuthorization)
+findMintAuthorization admin recipient amount = do
+  authorizations <- query @LinkMintAuthorization admin
+  case [cid | (cid, auth) <- authorizations, auth.recipient == recipient, auth.amount == amount] of
+    [cid] -> pure cid
+    _ -> abort "expected exactly one matching LinkMintAuthorization"
+
+findBurnAuthorization : Party -> Party -> Decimal -> Script (ContractId LinkBurnAuthorization)
+findBurnAuthorization admin holder maxAmount = do
+  authorizations <- query @LinkBurnAuthorization admin
+  case [cid | (cid, auth) <- authorizations, auth.holder == holder, auth.maxAmount == maxAmount] of
+    [cid] -> pure cid
+    _ -> abort "expected exactly one matching LinkBurnAuthorization"
+
+findTransferAuthorization : Party -> Party -> Decimal -> Script (ContractId LinkTransferAuthorization)
+findTransferAuthorization admin receiver amount = do
+  authorizations <- query @LinkTransferAuthorization admin
+  case [cid | (cid, auth) <- authorizations, auth.receiver == receiver, auth.amount == amount] of
+    [cid] -> pure cid
+    _ -> abort "expected exactly one matching LinkTransferAuthorization"
+
+findAllocateAuthorization : Party -> Party -> Decimal -> Script (ContractId LinkAllocationAuthorization)
+findAllocateAuthorization admin receiver amount = do
+  authorizations <- query @LinkAllocationAuthorization admin
+  case [cid | (cid, auth) <- authorizations, auth.receiver == receiver, auth.amount == amount] of
+    [cid] -> pure cid
+    _ -> abort "expected exactly one matching LinkAllocationAuthorization"
+
+-- ========================================================
+-- |          MCMS Entrypoint - ApproveMint + Execute      |
+-- ========================================================
+
+testTokenAdminMintViaEntrypoint : Script ()
+testTokenAdminMintViaEntrypoint = script do
+  admin <- allocateParty "token-admin-owner"
+  alice <- allocateParty "token-admin-alice"
+
+  let instanceId = "link-token-admin-mint"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  newContractIds <- exerciseEntrypoint admin adminCid "ApproveMint"
+    (CodecGen.encodeApproveMintParams ApproveMintParams with
+      recipient = alice
+      amount = 1000.0
+      reference = "mint-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  -- ApproveMint is nonconsuming: the returned map is unchanged.
+  newContractIds === contractIds
+
+  mintAuthCid <- findMintAuthorization admin alice 1000.0
+
+  outputCids <- submit (actAs admin <> actAs alice) do
+    exerciseCmd mintAuthCid ExecuteMint with
+      tokenAdminCid = adminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  case outputCids of
+    [outputCid] -> do
+      Some holding <- queryContractId alice (fromInterfaceContractId @LinkHolding outputCid)
+      holding.holdingOwner === alice
+      holding.holdingAdmin === admin
+      holding.holdingInstrumentId === instrumentId
+      holding.holdingAmount === 1000.0
+    _ -> abort "expected exactly one output holding"
+
+-- ========================================================
+-- |          MCMS Entrypoint - ApproveBurn + Execute      |
+-- ========================================================
+
+-- Note: the locked-holding rejection in ExecuteBurn (isNone hv.lock) is not
+-- exercised here — the LinkHolding double always exposes lock = None, so the
+-- branch is unreachable with it. The check remains as defense for real DA
+-- Registry holdings, which can carry locks.
+
+testTokenAdminBurnViaEntrypoint : Script ()
+testTokenAdminBurnViaEntrypoint = script do
+  admin <- allocateParty "token-admin-owner-burn"
+  alice <- allocateParty "token-admin-alice-burn"
+
+  let instanceId = "link-token-admin-burn"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-burn"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveBurn"
+    (CodecGen.encodeApproveBurnParams ApproveBurnParams with
+      holder = alice
+      maxAmount = 100.0
+      reference = "burn-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  inputCids <- mintViaRegistry admin registryCid instrumentId alice 50.0
+
+  burnAuthCid <- findBurnAuthorization admin alice 100.0
+
+  submit (actAs admin <> actAs alice) do
+    exerciseCmd burnAuthCid ExecuteBurn with
+      tokenAdminCid = adminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid
+      inputHoldingCids = inputCids
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  -- The burned holding is gone.
+  [inputCid] <- pure inputCids
+  None <- queryContractId alice (fromInterfaceContractId @LinkHolding inputCid)
+  pure ()
+
+-- ========================================================
+-- |        MCMS Entrypoint - ApproveTransfer + Execute    |
+-- ========================================================
+
+testTokenAdminTransferViaEntrypoint : Script ()
+testTokenAdminTransferViaEntrypoint = script do
+  admin <- allocateParty "token-admin-owner-transfer"
+  alice <- allocateParty "token-admin-alice-transfer"
+
+  let instanceId = "link-token-admin-transfer"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-transfer"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  -- Fund ccipOwner itself: the governor only moves ccipOwner-held LINK.
+  inputCids <- mintViaRegistry admin registryCid instrumentId admin 20.0
+
+  -- A receiver preapproval lets the registry settle the transfer directly.
+  disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
+  preapprovalCid <- submit (disclose disclosedRegistry <> actAs alice) do
+    exerciseCmd registryCid CreateTransferPreapproval with
+      receiver = alice
+      existingPreapprovalCid = None
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveTransfer"
+    (CodecGen.encodeApproveTransferParams ApproveTransferParams with
+      receiver = alice
+      amount = 12.0
+      reference = "transfer-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  transferAuthCid <- findTransferAuthorization admin alice 12.0
+
+  -- actAs both parties: the nested preapproval Send exercise is jointly
+  -- authorized by the preapproval signatories (admin, alice).
+  transferResult <- submit (actAs admin <> actAs alice) do
+    exerciseCmd transferAuthCid ExecuteTransfer with
+      tokenAdminCid = adminCid
+      transferFactoryCid = toInterfaceContractId @TransferV1.TransferFactory registryCid
+      inputHoldingCids = inputCids
+      transferTimeoutHours = None
+      registryContext = MetadataV1.ChoiceContext with
+        values = TextMap.fromList
+          [(transferPreapprovalContextKey, MetadataV1.AV_ContractId (coerceContractId preapprovalCid))]
+      meta = MetadataV1.emptyMetadata
+
+  [senderChangeCid] <- pure transferResult.senderChangeCids
+  Some senderChange <- queryContractId admin (fromInterfaceContractId @LinkHolding senderChangeCid)
+  senderChange.holdingOwner === admin
+  senderChange.holdingAmount === 8.0
+
+  case transferResult.output of
+    TransferV1.TransferInstructionResult_Completed receiverHoldingCids -> do
+      [receiverHoldingCid] <- pure receiverHoldingCids
+      Some receiverHolding <- queryContractId alice (fromInterfaceContractId @LinkHolding receiverHoldingCid)
+      receiverHolding.holdingOwner === alice
+      receiverHolding.holdingAmount === 12.0
+    _ -> abort "expected direct transfer completion"
+
+-- ========================================================
+-- |        MCMS Entrypoint - ApproveAllocate + Execute    |
+-- ========================================================
+
+testTokenAdminAllocateViaEntrypoint : Script ()
+testTokenAdminAllocateViaEntrypoint = script do
+  admin <- allocateParty "token-admin-owner-allocate"
+  alice <- allocateParty "token-admin-alice-allocate"
+  executor <- allocateParty "token-admin-executor"
+
+  let instanceId = "link-token-admin-allocate"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-allocate"
+  factoryCid <- submit admin do
+    createCmd StubAllocationFactory with
+      stubFactoryAdmin = admin
+      stubFactoryInstanceId = "stub-allocation-factory"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  inputCids <- mintViaRegistry admin registryCid instrumentId admin 15.0
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveAllocate"
+    (CodecGen.encodeApproveAllocateParams ApproveAllocateParams with
+      receiver = alice
+      amount = 15.0
+      transferLegId = "leg-1"
+      reference = "allocate-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  allocateAuthCid <- findAllocateAuthorization admin alice 15.0
+
+  allocateResult <- submit admin do
+    exerciseCmd allocateAuthCid ExecuteAllocate with
+      tokenAdminCid = adminCid
+      allocationFactoryCid = toInterfaceContractId @AllocationInstructionV1.AllocationFactory factoryCid
+      settlementExecutor = executor
+      settlementRefId = "settlement-1"
+      inputHoldingCids = inputCids
+      allocateBeforeHours = 1
+      settleBeforeHours = 2
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  case allocateResult.output of
+    AllocationInstructionV1.AllocationInstructionResult_Completed allocationCid -> do
+      Some allocation <- queryContractId admin (fromInterfaceContractId @StubAllocation allocationCid)
+      allocation.stubAllocation.transferLeg.receiver === alice
+      allocation.stubAllocation.transferLeg.amount === 15.0
+      allocation.stubAllocation.transferLegId === "leg-1"
+    _ -> abort "expected completed allocation"
+
+  -- The funding holdings were archived with the allocation.
+  [inputCid] <- pure inputCids
+  None <- queryContractId admin (fromInterfaceContractId @LinkHolding inputCid)
+  pure ()
+
+-- ========================================================
+-- |                    Failure paths                      |
+-- ========================================================
+
+-- | Burn inputs summing above the approved maxAmount are rejected outright.
+testTokenAdminBurnRejectsOverMax : Script ()
+testTokenAdminBurnRejectsOverMax = script do
+  admin <- allocateParty "token-admin-owner-overmax"
+  alice <- allocateParty "token-admin-alice-overmax"
+
+  let instanceId = "link-token-admin-overmax"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-overmax"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveBurn"
+    (CodecGen.encodeApproveBurnParams ApproveBurnParams with
+      holder = alice
+      maxAmount = 100.0
+      reference = "burn-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  inputCids1 <- mintViaRegistry admin registryCid instrumentId alice 60.0
+  inputCids2 <- mintViaRegistry admin registryCid instrumentId alice 50.0
+
+  burnAuthCid <- findBurnAuthorization admin alice 100.0
+
+  submitMustFail (actAs admin <> actAs alice) do
+    exerciseCmd burnAuthCid ExecuteBurn with
+      tokenAdminCid = adminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid
+      inputHoldingCids = inputCids1 <> inputCids2
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  pure ()
+
+-- | Burn with a holding owned by another party is rejected.
+testTokenAdminBurnRejectsWrongOwner : Script ()
+testTokenAdminBurnRejectsWrongOwner = script do
+  admin <- allocateParty "token-admin-owner-wrongowner"
+  alice <- allocateParty "token-admin-alice-wrongowner"
+  bob <- allocateParty "token-admin-bob-wrongowner"
+
+  let instanceId = "link-token-admin-wrongowner"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-wrongowner"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveBurn"
+    (CodecGen.encodeApproveBurnParams ApproveBurnParams with
+      holder = alice
+      maxAmount = 100.0
+      reference = "burn-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  bobCids <- mintViaRegistry admin registryCid instrumentId bob 50.0
+
+  burnAuthCid <- findBurnAuthorization admin alice 100.0
+
+  submitMustFail (actAs admin <> actAs alice <> actAs bob) do
+    exerciseCmd burnAuthCid ExecuteBurn with
+      tokenAdminCid = adminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid
+      inputHoldingCids = bobCids
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  pure ()
+
+-- | Burn with a holding of a different instrument is rejected.
+testTokenAdminBurnRejectsWrongInstrument : Script ()
+testTokenAdminBurnRejectsWrongInstrument = script do
+  admin <- allocateParty "token-admin-owner-wronginst"
+  alice <- allocateParty "token-admin-alice-wronginst"
+
+  let linkInstrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+      otherInstrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "OTHER"
+
+  linkRegistryCid <- mkRegistry admin linkInstrumentId "token-admin-registry-link"
+  otherRegistryCid <- mkRegistry admin otherInstrumentId "token-admin-registry-other"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-wronginst"
+      instrumentId = linkInstrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText "link-token-admin-wronginst" admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveBurn"
+    (CodecGen.encodeApproveBurnParams ApproveBurnParams with
+      holder = alice
+      maxAmount = 100.0
+      reference = "burn-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  otherCids <- mintViaRegistry admin otherRegistryCid otherInstrumentId alice 50.0
+
+  burnAuthCid <- findBurnAuthorization admin alice 100.0
+
+  submitMustFail (actAs admin <> actAs alice) do
+    exerciseCmd burnAuthCid ExecuteBurn with
+      tokenAdminCid = adminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory linkRegistryCid
+      inputHoldingCids = otherCids
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  pure ()
+
+-- | Execute after the authorization expired is rejected.
+testTokenAdminExecuteRejectsExpired : Script ()
+testTokenAdminExecuteRejectsExpired = script do
+  admin <- allocateParty "token-admin-owner-expired"
+  alice <- allocateParty "token-admin-alice-expired"
+
+  let instanceId = "link-token-admin-expired"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-expired"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveMint"
+    (CodecGen.encodeApproveMintParams ApproveMintParams with
+      recipient = alice
+      amount = 1000.0
+      reference = "mint-ref"
+      validForSeconds = 1)
+    contractIds
+
+  passTime (seconds 2)
+
+  mintAuthCid <- findMintAuthorization admin alice 1000.0
+
+  submitMustFail (actAs admin <> actAs alice) do
+    exerciseCmd mintAuthCid ExecuteMint with
+      tokenAdminCid = adminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  pure ()
+
+-- | A factory administered by a different party than instrumentId.admin fails
+-- | the PublicFetch pin before anything is minted.
+testTokenAdminExecuteRejectsForeignFactory : Script ()
+testTokenAdminExecuteRejectsForeignFactory = script do
+  admin <- allocateParty "token-admin-owner-foreign"
+  alice <- allocateParty "token-admin-alice-foreign"
+  eve <- allocateParty "token-admin-eve-foreign"
+
+  let instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+      eveInstrumentId = HoldingV1.InstrumentId with
+        admin = eve
+        id = "LINK"
+
+  eveRegistryCid <- mkRegistry eve eveInstrumentId "token-admin-registry-eve"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-foreign"
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText "link-token-admin-foreign" admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveMint"
+    (CodecGen.encodeApproveMintParams ApproveMintParams with
+      recipient = alice
+      amount = 1000.0
+      reference = "mint-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  mintAuthCid <- findMintAuthorization admin alice 1000.0
+
+  submitMustFail (actAs admin <> actAs alice <> actAs eve) do
+    exerciseCmd mintAuthCid ExecuteMint with
+      tokenAdminCid = adminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory eveRegistryCid
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  pure ()
+
+-- ========================================================
+-- |                 Admin state changes                   |
+-- ========================================================
+
+-- | SetPaused stops new approvals and re-keys the contractIds map.
+testTokenAdminSetPausedBlocksApprovals : Script ()
+testTokenAdminSetPausedBlocksApprovals = script do
+  admin <- allocateParty "token-admin-owner-paused"
+  alice <- allocateParty "token-admin-alice-paused"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-paused"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText "link-token-admin-paused" admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  newContractIds <- exerciseEntrypoint admin adminCid "SetPaused"
+    (CodecGen.encodeSetPausedParams SetPausedParams with
+      paused = True)
+    contractIds
+
+  -- Consuming choice: the map carries the new admin CID.
+  case Map.lookup instAddr newContractIds of
+    Some newCid -> assertMsg "expected new admin CID after SetPaused" (newCid /= toAnyContractId adminCid)
+    None -> abort "expected admin CID in returned map"
+
+  submitMustFail admin do
+    exerciseCmd (toInterfaceContractId @MCMSReceiver adminCid) MCMSReceiver_Entrypoint with
+      functionName = "ApproveMint"
+      operationData = CodecGen.encodeApproveMintParams ApproveMintParams with
+        recipient = alice
+        amount = 1000.0
+        reference = "mint-ref"
+        validForSeconds = 3600
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  pure ()
+
+-- | SetObservers keeps the observer set governable and re-keys the map.
+testTokenAdminSetObservers : Script ()
+testTokenAdminSetObservers = script do
+  admin <- allocateParty "token-admin-owner-observers"
+  edsObserver <- allocateParty "token-admin-eds-observer"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-observers"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText "link-token-admin-observers" admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  newContractIds <- exerciseEntrypoint admin adminCid "SetObservers"
+    (CodecGen.encodeSetObserversParams SetObserversParams with
+      observers = [edsObserver])
+    contractIds
+
+  case Map.lookup instAddr newContractIds of
+    Some newCid -> do
+      assertMsg "expected new admin CID after SetObservers" (newCid /= toAnyContractId adminCid)
+      Some pausedAdmin <- queryContractId admin (coerceContractId newCid : ContractId LinkTokenAdmin)
+      pausedAdmin.observers === [edsObserver]
+    None -> abort "expected admin CID in returned map"
+
+-- ========================================================
+-- |                Entrypoint hardening                   |
+-- ========================================================
+
+-- | Unknown function names and malformed operationData are rejected.
+testTokenAdminUnknownFunctionAndBadParams : Script ()
+testTokenAdminUnknownFunctionAndBadParams = script do
+  admin <- allocateParty "token-admin-owner-unknown"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-unknown"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText "link-token-admin-unknown" admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+      targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver adminCid
+
+  -- Unknown function name.
+  submitMustFail admin do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Nope"
+      operationData = ""
+      contractIds
+
+  -- Invalid hex fails decoding.
+  submitMustFail admin do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "ApproveMint"
+      operationData = "zz"
+      contractIds
+
+  -- Valid encoding with a trailing byte.
+  let encoded = CodecGen.encodeApproveMintParams ApproveMintParams with
+        recipient = admin
+        amount = 1.0
+        reference = "ref"
+        validForSeconds = 60
+  submitMustFail admin do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "ApproveMint"
+      operationData = encoded <> "00"
+      contractIds
+
+  -- Empty contractIds map.
+  submitMustFail admin do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "ApproveMint"
+      operationData = encoded
+      contractIds = Map.empty
+
+  pure ()
+
+-- | The MCMS dispatcher precondition: the target must have exactly one
+-- | signatory, equal to the party encoded in targetInstanceAddress.
+testTokenAdminSingleSignatory : Script ()
+testTokenAdminSingleSignatory = script do
+  admin <- allocateParty "token-admin-owner-signatory"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-signatory"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+      paused = False
+      observers = []
+
+  Some fetched <- queryContractId admin adminCid
+  signatory fetched === [admin]
+
+-- | Only ccipOwner authority can drive the entrypoint.
+testTokenAdminEntrypointRequiresCcipOwner : Script ()
+testTokenAdminEntrypointRequiresCcipOwner = script do
+  admin <- allocateParty "token-admin-owner-auth"
+  alice <- allocateParty "token-admin-alice-auth"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-auth"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText "link-token-admin-auth" admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  let encoded = CodecGen.encodeApproveMintParams ApproveMintParams with
+        recipient = alice
+        amount = 1000.0
+        reference = "mint-ref"
+        validForSeconds = 3600
+
+  submitMustFail alice do
+    exerciseCmd (toInterfaceContractId @MCMSReceiver adminCid) MCMSReceiver_Entrypoint with
+      functionName = "ApproveMint"
+      operationData = encoded
+      contractIds
+
+  pure ()
+
+-- ========================================================
+-- |          Execute* pause enforcement                   |
+-- ========================================================
+
+-- | A paused admin contract blocks Execute even for a live, unexpired
+-- | authorization: pause stops outstanding operations, not just approvals.
+testTokenAdminExecuteBlockedWhenPaused : Script ()
+testTokenAdminExecuteBlockedWhenPaused = script do
+  admin <- allocateParty "token-admin-owner-exec-paused"
+  alice <- allocateParty "token-admin-alice-exec-paused"
+
+  let instanceId = "link-token-admin-exec-paused"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-exec-paused"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveMint"
+    (CodecGen.encodeApproveMintParams ApproveMintParams with
+      recipient = alice
+      amount = 1000.0
+      reference = "mint-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  pausedContractIds <- exerciseEntrypoint admin adminCid "SetPaused"
+    (CodecGen.encodeSetPausedParams SetPausedParams with
+      paused = True)
+    contractIds
+
+  pausedAdminCid <- case Map.lookup instAddr pausedContractIds of
+    Some cid -> pure (coerceContractId cid : ContractId LinkTokenAdmin)
+    None -> abort "expected admin CID in returned map"
+
+  mintAuthCid <- findMintAuthorization admin alice 1000.0
+
+  submitMustFail (actAs admin <> actAs alice) do
+    exerciseCmd mintAuthCid ExecuteMint with
+      tokenAdminCid = pausedAdminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  pure ()
+
+-- | The admin CID rotates on every consuming choice, so a pre-rotation CID is
+-- | archived and fails the fetch inside Execute.
+testTokenAdminExecuteRejectsStaleAdminCid : Script ()
+testTokenAdminExecuteRejectsStaleAdminCid = script do
+  admin <- allocateParty "token-admin-owner-stale"
+  alice <- allocateParty "token-admin-alice-stale"
+
+  let instanceId = "link-token-admin-stale"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-stale"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveMint"
+    (CodecGen.encodeApproveMintParams ApproveMintParams with
+      recipient = alice
+      amount = 1000.0
+      reference = "mint-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  -- SetObservers rotates the admin without pausing it, isolating the fetch
+  -- failure from the paused assert.
+  _ <- exerciseEntrypoint admin adminCid "SetObservers"
+    (CodecGen.encodeSetObserversParams SetObserversParams with
+      observers = [])
+    contractIds
+
+  mintAuthCid <- findMintAuthorization admin alice 1000.0
+
+  submitMustFail (actAs admin <> actAs alice) do
+    exerciseCmd mintAuthCid ExecuteMint with
+      tokenAdminCid = adminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  pure ()
+
+-- | Execute with an admin contract from a different admin instance fails the
+-- | mismatch assert even though ccipOwner and instrumentId agree.
+testTokenAdminExecuteRejectsForeignAdmin : Script ()
+testTokenAdminExecuteRejectsForeignAdmin = script do
+  admin <- allocateParty "token-admin-owner-foreign-admin"
+  alice <- allocateParty "token-admin-alice-foreign-admin"
+
+  let instanceId = "link-token-admin-foreign-admin"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-foreign-admin"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  otherAdminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-other-instance"
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveMint"
+    (CodecGen.encodeApproveMintParams ApproveMintParams with
+      recipient = alice
+      amount = 1000.0
+      reference = "mint-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  mintAuthCid <- findMintAuthorization admin alice 1000.0
+
+  submitMustFail (actAs admin <> actAs alice) do
+    exerciseCmd mintAuthCid ExecuteMint with
+      tokenAdminCid = otherAdminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  pure ()
+
+-- | Unpausing restores Execute: pause is a stop, not a kill switch.
+testTokenAdminUnpauseAllowsExecute : Script ()
+testTokenAdminUnpauseAllowsExecute = script do
+  admin <- allocateParty "token-admin-owner-unpause"
+  alice <- allocateParty "token-admin-alice-unpause"
+
+  let instanceId = "link-token-admin-unpause"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-unpause"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveMint"
+    (CodecGen.encodeApproveMintParams ApproveMintParams with
+      recipient = alice
+      amount = 1000.0
+      reference = "mint-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  pausedContractIds <- exerciseEntrypoint admin adminCid "SetPaused"
+    (CodecGen.encodeSetPausedParams SetPausedParams with
+      paused = True)
+    contractIds
+
+  pausedAdminCid <- case Map.lookup instAddr pausedContractIds of
+    Some cid -> pure (coerceContractId cid : ContractId LinkTokenAdmin)
+    None -> abort "expected admin CID in returned map"
+
+  unpausedContractIds <- exerciseEntrypoint admin pausedAdminCid "SetPaused"
+    (CodecGen.encodeSetPausedParams SetPausedParams with
+      paused = False)
+    pausedContractIds
+
+  liveAdminCid <- case Map.lookup instAddr unpausedContractIds of
+    Some cid -> pure (coerceContractId cid : ContractId LinkTokenAdmin)
+    None -> abort "expected admin CID in returned map"
+
+  mintAuthCid <- findMintAuthorization admin alice 1000.0
+
+  outputCids <- submit (actAs admin <> actAs alice) do
+    exerciseCmd mintAuthCid ExecuteMint with
+      tokenAdminCid = liveAdminCid
+      burnMintFactoryCid = toInterfaceContractId @BurnMintV1.BurnMintFactory registryCid
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  case outputCids of
+    [outputCid] -> do
+      Some holding <- queryContractId alice (fromInterfaceContractId @LinkHolding outputCid)
+      holding.holdingOwner === alice
+      holding.holdingAmount === 1000.0
+    _ -> abort "expected exactly one output holding"

@@ -1,0 +1,578 @@
+-- | MCMS-governed admin surface for registry-issued LINK.
+-- |
+-- | LINK is issued through the DA Registry (Canton Network Utility DARs), so the
+-- | privileged token operations — mint, burn, transfer and allocation — are
+-- | exercises of the registry factory's CIP-56 interface choices. Those operations
+-- | must sit behind MCMS governance like every other privileged CCIP surface.
+-- |
+-- | The admin is deliberately two-phase:
+-- |
+-- |   * MCMS exercises MCMSReceiver_Entrypoint on LinkTokenAdmin, which creates an
+-- |     authorization contract fixing the economics of the operation (recipient,
+-- |     amount, instrument, validity window). The MCMS wire carries only
+-- |     serializable params: MCMS cannot transport ContractIds or ChoiceContexts.
+-- |   * The operator exercises Execute on the authorization contract, supplying
+-- |     only plumbing (factory CID, input holding CIDs, registry choice context,
+-- |     disclosures). It cannot alter what was approved.
+-- |
+-- | ccipOwner is the sole signatory of every template here: the MCMS dispatcher
+-- | rejects targets with more than one signatory, and Daml authority does not
+-- | survive the MCMSReceiver_Entrypoint boundary, so the factory's admin must be
+-- | reachable through ccipOwner itself.
+-- |
+-- | Execute* takes the live admin contract id and re-checks it: the fetched
+-- | admin must match this authorization's ccipOwner / adminInstanceId /
+-- | instrumentId and must not be paused. SetPaused and SetObservers archive and
+-- | recreate the admin, so a stale admin cid fails the fetch — the operator is
+-- | forced to supply the current one, making pause an effective stop on
+-- | outstanding authorizations, not just new approvals.
+module Link.TokenAdmin where
+
+import DA.Action (foldlA)
+import DA.Crypto.Text (byteCount)
+import DA.Map qualified as Map
+import DA.Optional (isNone)
+import DA.Time (addRelTime, hours, seconds)
+
+import Splice.Api.Token.HoldingV1 qualified as HoldingV1
+import Splice.Api.Token.MetadataV1 qualified as MetadataV1
+import Splice.Api.Token.BurnMintV1 qualified as BurnMintV1
+import Splice.Api.Token.TransferInstructionV1 qualified as TransferV1
+import Splice.Api.Token.AllocationInstructionV1 qualified as AllocationInstructionV1
+import Splice.Api.Token.AllocationV1 qualified as AllocationV1
+
+import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
+
+import Chainlink.InstanceAddress qualified as InstanceAddress
+
+import Link.TokenAdminTypes (
+    ApproveMintParams(..),
+    ApproveBurnParams(..),
+    ApproveTransferParams(..),
+    ApproveAllocateParams(..),
+    SetPausedParams(..),
+    SetObserversParams(..),
+    )
+import Link.TokenAdminCodecGen (
+    decodeApproveMintParamsAt,
+    decodeApproveBurnParamsAt,
+    decodeApproveTransferParamsAt,
+    decodeApproveAllocateParamsAt,
+    decodeSetPausedParamsAt,
+    decodeSetObserversParamsAt,
+    )
+
+-- | Maximum transfer lifetime when no explicit timeout is supplied. Splice
+-- | enforces tokenStandardMaxTTL (default 90 days) on transfer lifetimes, so
+-- | executeBefore cannot be unbounded.
+indefiniteTransferHours : Int
+indefiniteTransferHours = 2160
+
+template LinkTokenAdmin
+  with
+    ccipOwner : Party                      -- sole signatory; also the DA Registry registrar for LINK
+    instanceId : Text                      -- MCMS target id, e.g. "link-token-admin-mainnet-v1"
+    instrumentId : HoldingV1.InstrumentId  -- registry-issued LINK
+    paused : Bool                          -- emergency stop: blocks new approvals and Execute*
+    observers : [Party]                    -- EDS/off-chain visibility
+  where
+    signatory ccipOwner
+    observer observers
+
+    ensure InstanceAddress.assertValidInstanceId instanceId
+      && instrumentId.admin == ccipOwner
+      && instrumentId.id /= ""
+
+    -- | Governed mint approval: authorizes minting `amount` to `recipient`.
+    -- | functionName = "ApproveMint"
+    nonconsuming choice ApproveMint : ContractId LinkMintAuthorization
+      with
+        recipient : Party
+        amount : Decimal
+        reference : Text
+        validForSeconds : Int
+      controller ccipOwner
+      do
+        assertMsg "LinkTokenAdmin.ApproveMint: paused" (not paused)
+        assertMsg "LinkTokenAdmin.ApproveMint: amount must be positive" (amount > 0.0)
+        assertMsg "LinkTokenAdmin.ApproveMint: validForSeconds must be positive" (validForSeconds > 0)
+        now <- getTime
+        create LinkMintAuthorization with
+          ccipOwner
+          adminInstanceId = instanceId
+          instrumentId
+          recipient
+          amount
+          reference
+          expiresAt = addRelTime now (seconds validForSeconds)
+
+    -- | Governed burn approval: authorizes burning up to `maxAmount` of `holder`'s LINK.
+    -- | functionName = "ApproveBurn"
+    nonconsuming choice ApproveBurn : ContractId LinkBurnAuthorization
+      with
+        holder : Party
+        maxAmount : Decimal
+        reference : Text
+        validForSeconds : Int
+      controller ccipOwner
+      do
+        assertMsg "LinkTokenAdmin.ApproveBurn: paused" (not paused)
+        assertMsg "LinkTokenAdmin.ApproveBurn: maxAmount must be positive" (maxAmount > 0.0)
+        assertMsg "LinkTokenAdmin.ApproveBurn: validForSeconds must be positive" (validForSeconds > 0)
+        now <- getTime
+        create LinkBurnAuthorization with
+          ccipOwner
+          adminInstanceId = instanceId
+          instrumentId
+          holder
+          maxAmount
+          reference
+          expiresAt = addRelTime now (seconds validForSeconds)
+
+    -- | Governed transfer approval: authorizes transferring `amount` of
+    -- | ccipOwner-held LINK to `receiver`. Transfers of user-held LINK are plain
+    -- | wallet flows and stay outside the governor.
+    -- | functionName = "ApproveTransfer"
+    nonconsuming choice ApproveTransfer : ContractId LinkTransferAuthorization
+      with
+        receiver : Party
+        amount : Decimal
+        reference : Text
+        validForSeconds : Int
+      controller ccipOwner
+      do
+        assertMsg "LinkTokenAdmin.ApproveTransfer: paused" (not paused)
+        assertMsg "LinkTokenAdmin.ApproveTransfer: amount must be positive" (amount > 0.0)
+        assertMsg "LinkTokenAdmin.ApproveTransfer: validForSeconds must be positive" (validForSeconds > 0)
+        now <- getTime
+        create LinkTransferAuthorization with
+          ccipOwner
+          adminInstanceId = instanceId
+          instrumentId
+          receiver
+          amount
+          reference
+          expiresAt = addRelTime now (seconds validForSeconds)
+
+    -- | Governed allocation approval: authorizes allocating `amount` of
+    -- | ccipOwner-held LINK to `receiver` for leg `transferLegId` of a settlement.
+    -- | functionName = "ApproveAllocate"
+    nonconsuming choice ApproveAllocate : ContractId LinkAllocationAuthorization
+      with
+        receiver : Party
+        amount : Decimal
+        transferLegId : Text
+        reference : Text
+        validForSeconds : Int
+      controller ccipOwner
+      do
+        assertMsg "LinkTokenAdmin.ApproveAllocate: paused" (not paused)
+        assertMsg "LinkTokenAdmin.ApproveAllocate: amount must be positive" (amount > 0.0)
+        assertMsg "LinkTokenAdmin.ApproveAllocate: validForSeconds must be positive" (validForSeconds > 0)
+        now <- getTime
+        create LinkAllocationAuthorization with
+          ccipOwner
+          adminInstanceId = instanceId
+          instrumentId
+          receiver
+          amount
+          transferLegId
+          reference
+          expiresAt = addRelTime now (seconds validForSeconds)
+
+    -- | Emergency stop on new approvals. functionName = "SetPaused"
+    choice SetPaused : ContractId LinkTokenAdmin
+      with
+        paused : Bool
+      controller ccipOwner
+      do
+        create this with paused
+
+    -- | Keeps the EDS observer set governable rather than write-once at create time.
+    -- | functionName = "SetObservers"
+    choice SetObservers : ContractId LinkTokenAdmin
+      with
+        observers : [Party]
+      controller ccipOwner
+      do
+        create this with observers
+
+    -- ==========================================
+    -- |         MCMSReceiver Interface         |
+    -- ==========================================
+    interface instance MCMSReceiver for LinkTokenAdmin where
+      view = MCMSReceiverView with
+        mcmsController = ccipOwner
+        instanceId
+
+      mcmsEntrypoint functionName operationData contractIds = do
+        let instAddr = instanceId <> "@" <> partyToText ccipOwner
+        selfCid <- case Map.lookup instAddr contractIds of
+          None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+          Some cid -> pure (coerceContractId cid : ContractId LinkTokenAdmin)
+
+        case functionName of
+          "ApproveMint" -> do
+            case decodeApproveMintParamsAt operationData 0 of
+              None -> abort "E_INVALID_PARAMS: ApproveMint"
+              Some (ApproveMintParams{..}, finalOffset) -> do
+                assertMsg "E_TRAILING_BYTES: ApproveMint" (finalOffset == byteCount operationData)
+                _ <- exercise selfCid ApproveMint with
+                  recipient
+                  amount
+                  reference
+                  validForSeconds
+                pure contractIds            -- nonconsuming: self CID unchanged
+
+          "ApproveBurn" -> do
+            case decodeApproveBurnParamsAt operationData 0 of
+              None -> abort "E_INVALID_PARAMS: ApproveBurn"
+              Some (ApproveBurnParams{..}, finalOffset) -> do
+                assertMsg "E_TRAILING_BYTES: ApproveBurn" (finalOffset == byteCount operationData)
+                _ <- exercise selfCid ApproveBurn with
+                  holder
+                  maxAmount
+                  reference
+                  validForSeconds
+                pure contractIds
+
+          "ApproveTransfer" -> do
+            case decodeApproveTransferParamsAt operationData 0 of
+              None -> abort "E_INVALID_PARAMS: ApproveTransfer"
+              Some (ApproveTransferParams{..}, finalOffset) -> do
+                assertMsg "E_TRAILING_BYTES: ApproveTransfer" (finalOffset == byteCount operationData)
+                _ <- exercise selfCid ApproveTransfer with
+                  receiver
+                  amount
+                  reference
+                  validForSeconds
+                pure contractIds
+
+          "ApproveAllocate" -> do
+            case decodeApproveAllocateParamsAt operationData 0 of
+              None -> abort "E_INVALID_PARAMS: ApproveAllocate"
+              Some (ApproveAllocateParams{..}, finalOffset) -> do
+                assertMsg "E_TRAILING_BYTES: ApproveAllocate" (finalOffset == byteCount operationData)
+                _ <- exercise selfCid ApproveAllocate with
+                  receiver
+                  amount
+                  transferLegId
+                  reference
+                  validForSeconds
+                pure contractIds
+
+          "SetPaused" -> do
+            case decodeSetPausedParamsAt operationData 0 of
+              None -> abort "E_INVALID_PARAMS: SetPaused"
+              Some (SetPausedParams{..}, finalOffset) -> do
+                assertMsg "E_TRAILING_BYTES: SetPaused" (finalOffset == byteCount operationData)
+                newCid <- exercise selfCid SetPaused with
+                  paused
+                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+          "SetObservers" -> do
+            case decodeSetObserversParamsAt operationData 0 of
+              None -> abort "E_INVALID_PARAMS: SetObservers"
+              Some (SetObserversParams{..}, finalOffset) -> do
+                assertMsg "E_TRAILING_BYTES: SetObservers" (finalOffset == byteCount operationData)
+                newCid <- exercise selfCid SetObservers with
+                  observers
+                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
+          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+-- | Authorization to mint LINK to a recipient via the registry burn-mint
+-- | factory. Execute is submitted by the operator as a root command with
+-- | actAs [ccipOwner, recipient]: root-level actAs is what supplies the
+-- | counterparty authority the factory demands via extraActors.
+template LinkMintAuthorization
+  with
+    ccipOwner : Party
+    adminInstanceId : Text                 -- provenance: which admin approved this
+    instrumentId : HoldingV1.InstrumentId
+    recipient : Party
+    amount : Decimal
+    reference : Text
+    expiresAt : Time
+  where
+    signatory ccipOwner
+    observer recipient
+
+    ensure amount > 0.0
+      && instrumentId.admin == ccipOwner
+
+    choice ExecuteMint : [ContractId HoldingV1.Holding]
+      with
+        tokenAdminCid : ContractId LinkTokenAdmin     -- live admin; stale cid fails fetch
+        burnMintFactoryCid : ContractId BurnMintV1.BurnMintFactory
+        registryContext : MetadataV1.ChoiceContext   -- instrument-configuration + issuer-credentials
+        meta : MetadataV1.Metadata
+      controller ccipOwner, recipient
+      do
+        tokenAdmin <- fetch tokenAdminCid
+        assertMsg "LinkMintAuthorization.Execute: token admin mismatch"
+          (tokenAdmin.ccipOwner == ccipOwner
+            && tokenAdmin.instanceId == adminInstanceId
+            && tokenAdmin.instrumentId == instrumentId)
+        assertMsg "LinkMintAuthorization.Execute: token admin paused" (not tokenAdmin.paused)
+
+        now <- getTime
+        assertMsg "LinkMintAuthorization.Execute: authorization expired" (now <= expiresAt)
+
+        -- Pin the factory to the instrument's admin before touching it.
+        factoryView <- exercise burnMintFactoryCid BurnMintV1.BurnMintFactory_PublicFetch with
+          expectedAdmin = instrumentId.admin
+          actor = ccipOwner
+        assertMsg "LinkMintAuthorization.Execute: factory admin mismatch"
+          (factoryView.admin == instrumentId.admin)
+
+        result <- exercise burnMintFactoryCid BurnMintV1.BurnMintFactory_BurnMint with
+          expectedAdmin = instrumentId.admin
+          instrumentId = instrumentId
+          inputHoldingCids = []
+          outputs =
+            [ BurnMintV1.BurnMintOutput with
+                owner = recipient
+                amount = amount
+                context = MetadataV1.emptyChoiceContext
+            ]
+          extraActors = if recipient == instrumentId.admin then [] else [recipient]
+          extraArgs = MetadataV1.ExtraArgs with
+            context = registryContext
+            meta = meta
+        pure result.outputCids
+
+    choice CancelMint : ()
+      controller ccipOwner
+      do pure ()
+
+-- | Authorization to burn up to `maxAmount` of `holder`'s LINK via the registry
+-- | burn-mint factory. Inputs summing above maxAmount are rejected rather than
+-- | partially burned with change: the operator selects or splits holdings first,
+-- | keeping the approved ceiling a hard bound with no change-output logic to audit.
+template LinkBurnAuthorization
+  with
+    ccipOwner : Party
+    adminInstanceId : Text
+    instrumentId : HoldingV1.InstrumentId
+    holder : Party
+    maxAmount : Decimal
+    reference : Text
+    expiresAt : Time
+  where
+    signatory ccipOwner
+    observer holder
+
+    ensure maxAmount > 0.0
+      && instrumentId.admin == ccipOwner
+
+    choice ExecuteBurn : ()
+      with
+        tokenAdminCid : ContractId LinkTokenAdmin     -- live admin; stale cid fails fetch
+        burnMintFactoryCid : ContractId BurnMintV1.BurnMintFactory
+        inputHoldingCids : [ContractId HoldingV1.Holding]
+        registryContext : MetadataV1.ChoiceContext
+        meta : MetadataV1.Metadata
+      controller ccipOwner, holder
+      do
+        tokenAdmin <- fetch tokenAdminCid
+        assertMsg "LinkBurnAuthorization.Execute: token admin mismatch"
+          (tokenAdmin.ccipOwner == ccipOwner
+            && tokenAdmin.instanceId == adminInstanceId
+            && tokenAdmin.instrumentId == instrumentId)
+        assertMsg "LinkBurnAuthorization.Execute: token admin paused" (not tokenAdmin.paused)
+
+        now <- getTime
+        assertMsg "LinkBurnAuthorization.Execute: authorization expired" (now <= expiresAt)
+        assertMsg "LinkBurnAuthorization.Execute: no input holdings" (not (null inputHoldingCids))
+
+        total <- foldlA
+          (\acc cid -> do
+             holding <- fetch cid
+             let hv = view holding
+             assertMsg "LinkBurnAuthorization.Execute: holding owner mismatch"
+               (hv.owner == holder)
+             assertMsg "LinkBurnAuthorization.Execute: holding instrumentId mismatch"
+               (hv.instrumentId == instrumentId)
+             assertMsg "LinkBurnAuthorization.Execute: holding is locked"
+               (isNone hv.lock)
+             pure (acc + hv.amount))
+          0.0
+          inputHoldingCids
+        assertMsg "LinkBurnAuthorization.Execute: inputs exceed approved maxAmount"
+          (total <= maxAmount)
+
+        factoryView <- exercise burnMintFactoryCid BurnMintV1.BurnMintFactory_PublicFetch with
+          expectedAdmin = instrumentId.admin
+          actor = ccipOwner
+        assertMsg "LinkBurnAuthorization.Execute: factory admin mismatch"
+          (factoryView.admin == instrumentId.admin)
+
+        _ <- exercise burnMintFactoryCid BurnMintV1.BurnMintFactory_BurnMint with
+          expectedAdmin = instrumentId.admin
+          instrumentId = instrumentId
+          inputHoldingCids = inputHoldingCids
+          outputs = []
+          extraActors = if holder == instrumentId.admin then [] else [holder]
+          extraArgs = MetadataV1.ExtraArgs with
+            context = registryContext
+            meta = meta
+        pure ()
+
+    choice CancelBurn : ()
+      controller ccipOwner
+      do pure ()
+
+-- | Authorization to transfer ccipOwner-held LINK to a receiver via the
+-- | registry transfer factory. The sender is always ccipOwner: the transfer
+-- | interface choice is controlled by transfer.sender, and under the MCMS
+-- | authority boundary the only sender the governor can authorize is its own
+-- | signatory.
+template LinkTransferAuthorization
+  with
+    ccipOwner : Party
+    adminInstanceId : Text
+    instrumentId : HoldingV1.InstrumentId
+    receiver : Party
+    amount : Decimal
+    reference : Text
+    expiresAt : Time
+  where
+    signatory ccipOwner
+    observer receiver
+
+    ensure amount > 0.0
+      && instrumentId.admin == ccipOwner
+
+    choice ExecuteTransfer : TransferV1.TransferInstructionResult
+      with
+        tokenAdminCid : ContractId LinkTokenAdmin     -- live admin; stale cid fails fetch
+        transferFactoryCid : ContractId TransferV1.TransferFactory
+        inputHoldingCids : [ContractId HoldingV1.Holding]     -- ccipOwner's holdings
+        transferTimeoutHours : Optional Int                    -- None = Splice max TTL
+        registryContext : MetadataV1.ChoiceContext
+        meta : MetadataV1.Metadata
+      controller ccipOwner
+      do
+        tokenAdmin <- fetch tokenAdminCid
+        assertMsg "LinkTransferAuthorization.Execute: token admin mismatch"
+          (tokenAdmin.ccipOwner == ccipOwner
+            && tokenAdmin.instanceId == adminInstanceId
+            && tokenAdmin.instrumentId == instrumentId)
+        assertMsg "LinkTransferAuthorization.Execute: token admin paused" (not tokenAdmin.paused)
+
+        now <- getTime
+        assertMsg "LinkTransferAuthorization.Execute: authorization expired" (now <= expiresAt)
+        assertMsg "LinkTransferAuthorization.Execute: no input holdings" (not (null inputHoldingCids))
+
+        factoryView <- exercise transferFactoryCid TransferV1.TransferFactory_PublicFetch with
+          expectedAdmin = instrumentId.admin
+          actor = ccipOwner
+        assertMsg "LinkTransferAuthorization.Execute: factory admin mismatch"
+          (factoryView.admin == instrumentId.admin)
+
+        let executeBefore = case transferTimeoutHours of
+              None -> addRelTime now (hours indefiniteTransferHours)
+              Some h -> addRelTime now (hours h)
+        exercise transferFactoryCid TransferV1.TransferFactory_Transfer with
+          expectedAdmin = instrumentId.admin
+          transfer = TransferV1.Transfer with
+            sender = ccipOwner
+            receiver = receiver
+            amount = amount
+            instrumentId = instrumentId
+            requestedAt = now
+            executeBefore = executeBefore
+            inputHoldingCids = inputHoldingCids
+            meta = MetadataV1.emptyMetadata
+          extraArgs = MetadataV1.ExtraArgs with
+            context = registryContext
+            meta = meta
+
+    choice CancelTransfer : ()
+      controller ccipOwner
+      do pure ()
+
+-- | Authorization to allocate ccipOwner-held LINK to a settlement leg via the
+-- | registry allocation factory. Governance pins the economics (receiver,
+-- | amount, transfer leg); the operator supplies the settlement plumbing
+-- | (executor, reference, deadlines). The sender of the transfer leg is always
+-- | ccipOwner, mirroring the transfer authorization.
+template LinkAllocationAuthorization
+  with
+    ccipOwner : Party
+    adminInstanceId : Text
+    instrumentId : HoldingV1.InstrumentId
+    receiver : Party
+    amount : Decimal
+    transferLegId : Text
+    reference : Text
+    expiresAt : Time
+  where
+    signatory ccipOwner
+    observer receiver
+
+    ensure amount > 0.0
+      && instrumentId.admin == ccipOwner
+
+    choice ExecuteAllocate : AllocationInstructionV1.AllocationInstructionResult
+      with
+        tokenAdminCid : ContractId LinkTokenAdmin     -- live admin; stale cid fails fetch
+        allocationFactoryCid : ContractId AllocationInstructionV1.AllocationFactory
+        settlementExecutor : Party                          -- plumbing (operator chooses executor)
+        settlementRefId : Text
+        inputHoldingCids : [ContractId HoldingV1.Holding]   -- ccipOwner's holdings
+        allocateBeforeHours : Int
+        settleBeforeHours : Int
+        registryContext : MetadataV1.ChoiceContext
+        meta : MetadataV1.Metadata
+      controller ccipOwner
+      do
+        tokenAdmin <- fetch tokenAdminCid
+        assertMsg "LinkAllocationAuthorization.Execute: token admin mismatch"
+          (tokenAdmin.ccipOwner == ccipOwner
+            && tokenAdmin.instanceId == adminInstanceId
+            && tokenAdmin.instrumentId == instrumentId)
+        assertMsg "LinkAllocationAuthorization.Execute: token admin paused" (not tokenAdmin.paused)
+
+        now <- getTime
+        assertMsg "LinkAllocationAuthorization.Execute: authorization expired" (now <= expiresAt)
+        assertMsg "LinkAllocationAuthorization.Execute: settleBefore must exceed allocateBefore"
+          (settleBeforeHours > allocateBeforeHours)
+        assertMsg "LinkAllocationAuthorization.Execute: no input holdings" (not (null inputHoldingCids))
+
+        factoryView <- exercise allocationFactoryCid
+          AllocationInstructionV1.AllocationFactory_PublicFetch with
+          expectedAdmin = instrumentId.admin
+          actor = ccipOwner
+        assertMsg "LinkAllocationAuthorization.Execute: factory admin mismatch"
+          (factoryView.admin == instrumentId.admin)
+
+        exercise allocationFactoryCid AllocationInstructionV1.AllocationFactory_Allocate with
+          expectedAdmin = instrumentId.admin
+          allocation = AllocationV1.AllocationSpecification with
+            settlement = AllocationV1.SettlementInfo with
+              executor = settlementExecutor
+              settlementRef = AllocationV1.Reference with
+                id = settlementRefId
+                cid = None                        -- no contract settlement ref; extend params if needed
+              requestedAt = now
+              allocateBefore = addRelTime now (hours allocateBeforeHours)
+              settleBefore = addRelTime now (hours settleBeforeHours)
+              meta = MetadataV1.emptyMetadata
+            transferLegId = transferLegId
+            transferLeg = AllocationV1.TransferLeg with
+              sender = ccipOwner
+              receiver = receiver
+              amount = amount
+              instrumentId = instrumentId
+              meta = MetadataV1.emptyMetadata
+          requestedAt = now
+          inputHoldingCids = inputHoldingCids
+          extraArgs = MetadataV1.ExtraArgs with
+            context = registryContext
+            meta = meta
+
+    choice CancelAllocate : ()
+      controller ccipOwner
+      do pure ()
