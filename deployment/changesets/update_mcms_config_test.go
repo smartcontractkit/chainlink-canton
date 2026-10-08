@@ -28,8 +28,8 @@ const (
 	mcmsUnitSignerPrefix = "00000000000000000000000000000000000000"
 )
 
-func mcmsUnitTestSigners(prefix string, count int64) []mcmsApi.SignerInfo {
-	signers := make([]mcmsApi.SignerInfo, count)
+func mcmsUnitTestSigners(prefix string) []mcmsApi.SignerInfo {
+	signers := make([]mcmsApi.SignerInfo, 3)
 	for i := range signers {
 		signers[i] = mcmsApi.SignerInfo{
 			SignerAddress: types.TEXT(fmt.Sprintf("%s%c%c", mcmsUnitSignerPrefix, prefix[0], 'a'+byte(i))),
@@ -68,7 +68,7 @@ func TestUpdateMCMSConfig_VerifyPreconditions(t *testing.T) {
 	t.Parallel()
 
 	validConfig := MCMSConfigParams{
-		Signers:      mcmsUnitTestSigners("aa", 3),
+		Signers:      mcmsUnitTestSigners("aa"),
 		GroupQuorums: []types.INT64{2},
 		GroupParents: []types.INT64{0},
 	}
@@ -99,7 +99,7 @@ func TestUpdateMCMSConfig_VerifyPreconditions(t *testing.T) {
 			roleConfigs: []MCMSRoleConfigParams{{
 				Role: mcmsApi.RoleProposer,
 				Config: MCMSConfigParams{
-					Signers:      mcmsUnitTestSigners("aa", 3),
+					Signers:      mcmsUnitTestSigners("aa"),
 					GroupQuorums: make([]types.INT64, mcmsGroupCount+1),
 					GroupParents: []types.INT64{0},
 				},
@@ -158,7 +158,7 @@ func TestUpdateMCMSConfig_DirectExecution(t *testing.T) {
 
 	uploadDARs(t, participant, contracts.MCMSCore)
 
-	initialSigners := mcmsUnitTestSigners("aa", 3)
+	initialSigners := mcmsUnitTestSigners("aa")
 	initialConfig := MCMSConfigParams{
 		Signers:      initialSigners,
 		GroupQuorums: []types.INT64{2},
@@ -189,7 +189,7 @@ func TestUpdateMCMSConfig_DirectExecution(t *testing.T) {
 	rawInstanceAddress, err := dsutils.MCMSRawInstanceAddress(updatedEnv.DataStore, chainsel.CANTON_LOCALNET.Selector, "CLLCCIP")
 	require.NoError(t, err, "resolve deployed MCMS raw instance address")
 
-	newSigners := mcmsUnitTestSigners("bb", 3)
+	newSigners := mcmsUnitTestSigners("bb")
 	deps := CantonCSDeps[UpdateMCMSConfigConfig]{
 		ChainSelector: chainsel.CANTON_LOCALNET.Selector,
 		Participant:   0,
