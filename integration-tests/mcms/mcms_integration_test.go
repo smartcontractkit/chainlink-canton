@@ -2105,6 +2105,117 @@ func TestMCMS_GenerateDamlTestValues(t *testing.T) {
 	t.Log("  ]")
 	t.Log("")
 
+	// ======================================================================
+	// Canceller vectors: CancelBatch (SelfDispatchTest.daml testCancelBatch)
+	// Cancels the operation scheduled by the Proposer ScheduleBatch vectors
+	// above (same calls/predecessor/salt, hence the same opId).
+	// overridePreviousRoot=true is required because the scheduled op is
+	// still pending when the canceller sets a new root.
+	// ======================================================================
+
+	cancellerMultisigId := MakeMcmsId(timelockInstanceAddr, MCMSRoleCanceller)
+	cancelBatchOpId := HashTimelockOpId(UnwrapTimelockCalls(scheduleInnerCalls), ZeroHash, string(scheduleParams.Salt))
+	cancelBatchParams := mcmsApi.CancelBatchParams{OpId: types.TEXT(cancelBatchOpId)}
+	cancelBatchChoice := MustEncodeCancelBatch(t, mcmsEncoder, cancelBatchParams)
+
+	cancelProposal := NewMCMSProposal(chainId, cancellerMultisigId, 0, true).
+		AddOperation(timelockInstanceAddr, cancelBatchChoice.Choice, cancelBatchChoice.OperationData).
+		Build()
+	cancelRoot := cancelProposal.GetRoot()
+	cancelMetadataProof, err := cancelProposal.GetMetadataProof()
+	require.NoError(t, err)
+	cancelOpProof, err := cancelProposal.GetOpProof(0)
+	require.NoError(t, err)
+	cancelSignatures, err := cancelProposal.Sign(validUntil, sortedSigners[:2])
+	require.NoError(t, err)
+
+	t.Log("-- ===========================================================================")
+	t.Log("-- CANCELLER SELF-DISPATCH VECTORS (Canceller -> CancelBatch)")
+	t.Log("-- Copy/paste into SelfDispatchTest.daml")
+	t.Log("-- ===========================================================================")
+	t.Log("")
+	t.Logf("-- OpId cancelled by this operation (from ScheduleBatch vectors): %s", cancelBatchOpId)
+	t.Log("")
+	t.Log("timelockCancelOp : Op")
+	t.Log("timelockCancelOp = Op")
+	t.Logf("  { chainId = %d", cancelProposal.Operations[0].ChainId)
+	t.Logf("  , multisigId = \"%s\"", cancelProposal.Operations[0].MultisigId)
+	t.Logf("  , nonce = %d", cancelProposal.Operations[0].Nonce)
+	t.Logf("  , targetInstanceAddress = \"%s\"", cancelProposal.Operations[0].TargetInstanceAddress)
+	t.Logf("  , functionName = \"%s\"", cancelProposal.Operations[0].FunctionName)
+	t.Logf("  , operationData = \"%s\"", cancelProposal.Operations[0].OperationData)
+	t.Log("  }")
+	t.Log("")
+	t.Log("timelockCancelMetadata : RootMetadata")
+	t.Log("timelockCancelMetadata = RootMetadata")
+	t.Logf("  { chainId = %d", cancelProposal.Metadata.ChainId)
+	t.Logf("  , multisigId = \"%s\"", cancelProposal.Metadata.MultisigId)
+	t.Logf("  , preOpCount = %d", cancelProposal.Metadata.PreOpCount)
+	t.Logf("  , postOpCount = %d", cancelProposal.Metadata.PostOpCount)
+	t.Logf("  , overridePreviousRoot = %v", cancelProposal.Metadata.OverridePreviousRoot)
+	t.Log("  }")
+	t.Log("")
+	t.Logf("timelockCancelRoot : Text")
+	t.Logf("timelockCancelRoot = \"%s\"", cancelRoot)
+	t.Log("")
+	t.Log("timelockCancelMetadataProof : [Text]")
+	if len(cancelMetadataProof) == 0 {
+		t.Log("timelockCancelMetadataProof = []")
+	} else {
+		t.Log("timelockCancelMetadataProof =")
+		for i, p := range cancelMetadataProof {
+			comma := ","
+			if i == len(cancelMetadataProof)-1 {
+				comma = ""
+			}
+			bracket := " "
+			if i == 0 {
+				bracket = "["
+			}
+			t.Logf("  %s \"%s\"%s", bracket, p, comma)
+		}
+		t.Log("  ]")
+	}
+	t.Log("")
+	t.Log("timelockCancelOpProof : [Text]")
+	if len(cancelOpProof) == 0 {
+		t.Log("timelockCancelOpProof = []")
+	} else {
+		t.Log("timelockCancelOpProof =")
+		for i, p := range cancelOpProof {
+			comma := ","
+			if i == len(cancelOpProof)-1 {
+				comma = ""
+			}
+			bracket := " "
+			if i == 0 {
+				bracket = "["
+			}
+			t.Logf("  %s \"%s\"%s", bracket, p, comma)
+		}
+		t.Log("  ]")
+	}
+	t.Log("")
+	t.Log("timelockCancelSignatures : [RawSignature]")
+	t.Log("timelockCancelSignatures =")
+	for i, sig := range cancelSignatures {
+		comma := ","
+		if i == len(cancelSignatures)-1 {
+			comma = ""
+		}
+		bracket := " "
+		if i == 0 {
+			bracket = "["
+		}
+		t.Logf("  %s RawSignature", bracket)
+		t.Logf("      { publicKey = \"%s\"", sig.PublicKey)
+		t.Logf("      , r = \"%s\"", sig.R)
+		t.Logf("      , s = \"%s\"", sig.S)
+		t.Logf("      }%s", comma)
+	}
+	t.Log("  ]")
+	t.Log("")
+
 	t.Log("=======================================================================")
 	t.Log("END OF DAML TEST VALUES")
 	t.Log("=======================================================================")
