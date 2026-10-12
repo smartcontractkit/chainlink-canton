@@ -18,12 +18,8 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v6
         with:
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
-      - name: Ensure branch is checked out
-        if: steps.commit.outputs.has_changes == 'true'
-        run: |
-          git fetch origin "${{ github.head_ref }}":"refs/remotes/origin/${{ github.head_ref }}"
-          git checkout -B "${{ github.head_ref }}" "origin/${{ github.head_ref }}"
       - name: Install Go
         uses: actions/setup-go@v6
         with:
