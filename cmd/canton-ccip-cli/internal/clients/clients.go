@@ -114,14 +114,12 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 
 		rpcCfg := provider.RPCChainProviderConfig{
 			Participants: []provider.ParticipantConfig{{
-				Endpoints: provider.Endpoints{
-					JSONLedgerAPIURL: "json",
-					GRPCLedgerAPIURL: cfg.Canton.ParticipantGRPCLedgerAPIURL,
-					ValidatorAPIURL:  cfg.Canton.ValidatorAPIURL,
-				},
-				UserID:       cfg.Canton.UserID,
-				PartyID:      cfg.Canton.PartyID,
-				AuthProvider: authProvider,
+				JSONLedgerAPIURL: "json",
+				GRPCLedgerAPIURL: cfg.Canton.ParticipantGRPCLedgerAPIURL,
+				ValidatorAPIURL:  cfg.Canton.ValidatorAPIURL,
+				UserID:           cfg.Canton.UserID,
+				PartyID:          cfg.Canton.PartyID,
+				AuthProvider:     authProvider,
 			}},
 		}
 		ch, err := provider.NewRPCChainProvider(profile.CantonSelector, rpcCfg).Initialize(ctx)

@@ -39,9 +39,7 @@ func NewCantonTransaction(
 	opData, _ := hex.DecodeString(encodedChoice.OperationData)
 
 	return mcms_types.Transaction{
-		OperationMetadata: mcms_types.OperationMetadata{
-			ContractType: string(contractType),
-		},
+		ContractType:     string(contractType),
 		To:               instanceAddress.Hex(),
 		Data:             opData,
 		AdditionalFields: af,

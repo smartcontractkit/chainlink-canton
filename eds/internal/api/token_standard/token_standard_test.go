@@ -66,14 +66,12 @@ func makeRegistries(size int) map[string]config.Registry {
 		name := fmt.Sprintf("Token Name %v", i+1)
 		symbol := fmt.Sprintf("TKN%v", i+1)
 		registries[id] = config.Registry{
-			ContractIdentifier: config.ContractIdentifier{
-				PartyID:         "owner",
-				InstanceAddress: contracts.HexToInstanceAddress(fmt.Sprintf("0x%v", i+1)),
-			},
-			TokenType:   config.TokenTypeLINK,
-			TokenId:     id,
-			TokenName:   name,
-			TokenSymbol: symbol,
+			PartyID:         "owner",
+			InstanceAddress: contracts.HexToInstanceAddress(fmt.Sprintf("0x%v", i+1)),
+			TokenType:       config.TokenTypeLINK,
+			TokenId:         id,
+			TokenName:       name,
+			TokenSymbol:     symbol,
 		}
 	}
 
