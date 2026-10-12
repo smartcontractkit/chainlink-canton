@@ -163,12 +163,10 @@ func (s *PoolDiscoveryService) registerIfNewer(ctx context.Context, rawAddress c
 // and URL mode resolves it over HTTP, so EDS needs no ledger visibility into the factory.
 func (s *PoolDiscoveryService) registerPool(ctx context.Context, address contracts.InstanceAddress, owner string, poolType config.TokenPoolType) error {
 	poolConfig := config.TokenPool{
-		ContractIdentifier: config.ContractIdentifier{
-			PartyID:         string(s.observerParty),
-			InstanceAddress: address,
-		},
-		Type:      poolType,
-		PoolOwner: owner,
+		PartyID:         string(s.observerParty),
+		InstanceAddress: address,
+		Type:            poolType,
+		PoolOwner:       owner,
 		Factory: &config.Factory{
 			Type:             config.FactoryTypeURL,
 			TokenStandardURL: &s.tokenStandardURL,

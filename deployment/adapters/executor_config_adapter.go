@@ -7,7 +7,6 @@ import (
 	dsutils "github.com/smartcontractkit/chainlink-ccip/deployment/utils/datastore"
 	ccvadapters "github.com/smartcontractkit/chainlink-ccv/deployment/adapters"
 	ccvexecutor "github.com/smartcontractkit/chainlink-ccv/executor"
-	"github.com/smartcontractkit/chainlink-ccv/pkg/chainaccess"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
@@ -91,10 +90,8 @@ func (a *CantonExecutorConfigAdapter) BuildChainConfig(ds datastore.DataStore, c
 	}
 
 	return ccvexecutor.ChainConfiguration{
-		DestinationChainConfig: chainaccess.DestinationChainConfig{
-			OffRampAddress: offRampAddr,
-			RmnAddress:     rmnRemoteAddr,
-		},
+		OffRampAddress:         offRampAddr,
+		RmnAddress:             rmnRemoteAddr,
 		DefaultExecutorAddress: executorAddr,
 	}, nil
 }

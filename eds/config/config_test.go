@@ -166,10 +166,8 @@ chain_selector = "8706591216959472610"
 					Enabled: true,
 					CCVs: []CCV{
 						{
-							ContractIdentifier: ContractIdentifier{
-								PartyID:         "ccvOwner",
-								InstanceAddress: contracts.HexToInstanceAddress("0xad5d98a90ea7dbba634111605ccc4e5c1dca73a460c403070b49284e950aebf2"),
-							},
+							PartyID:         "ccvOwner",
+							InstanceAddress: contracts.HexToInstanceAddress("0xad5d98a90ea7dbba634111605ccc4e5c1dca73a460c403070b49284e950aebf2"),
 						},
 					},
 				},
@@ -298,10 +296,8 @@ func TestConfig_Merge(t *testing.T) {
 				CCVAPIConfig: CCVAPIConfig{
 					CCVs: []CCV{
 						{
-							ContractIdentifier: ContractIdentifier{
-								PartyID:         "ccvOwner1",
-								InstanceAddress: contracts.HexToInstanceAddress("0x1"),
-							},
+							PartyID:         "ccvOwner1",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1"),
 						},
 					},
 				},
@@ -377,10 +373,8 @@ func TestConfig_Merge(t *testing.T) {
 				CCVAPIConfig: CCVAPIConfig{
 					CCVs: []CCV{
 						{
-							ContractIdentifier: ContractIdentifier{
-								PartyID:         "ccvOwner1",
-								InstanceAddress: contracts.HexToInstanceAddress("0x1"),
-							},
+							PartyID:         "ccvOwner1",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1"),
 						},
 					},
 				},
