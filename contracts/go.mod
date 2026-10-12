@@ -7,7 +7,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/fatih/color v1.19.0
 	github.com/google/go-cmp v0.7.0
-	github.com/nao1215/markdown v1.1.0
+	github.com/nao1215/markdown v1.1.1
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
