@@ -46,6 +46,11 @@ jobs:
           aws-role-arn: ${{ secrets.GATI_AWS_ROLE_CANTON_CICD }}
           aws-lambda-url: ${{ secrets.GATI_AWS_LABDA_URL_INTEGRATIONS }}
           aws-region: ${{ secrets.GATI_AWS_REGION }}
+      - name: Ensure branch is checked out
+        if: steps.commit.outputs.has_changes == 'true'
+        run: |
+          git fetch origin "${{ github.head_ref }}":"refs/remotes/origin/${{ github.head_ref }}"
+          git checkout -B "${{ github.head_ref }}" "origin/${{ github.head_ref }}"
       - name: Push signed commits
         if: steps.commit.outputs.has_changes == 'true'
         uses: asana/push-signed-commits@d615ca88d8e1a946734c24970d1e7a6c56f34897 # v1
