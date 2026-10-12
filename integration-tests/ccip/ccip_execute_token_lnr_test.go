@@ -528,10 +528,8 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 				Enabled: true,
 				CCVs: []config.CCV{
 					{
-						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         partyCCIP,
-							InstanceAddress: committeeVerifierAddress.InstanceAddress(),
-						},
+						PartyID:         partyCCIP,
+						InstanceAddress: committeeVerifierAddress.InstanceAddress(),
 					},
 				},
 			},

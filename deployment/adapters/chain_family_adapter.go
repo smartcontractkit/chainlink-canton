@@ -782,7 +782,7 @@ func dataStoreFromConfigureChainForLanesInput(input ccipadapters.ConfigureChainF
 
 	v := reflect.ValueOf(input)
 	if f := v.FieldByName("DataStore"); f.IsValid() && !f.IsZero() {
-		if ds, ok := f.Interface().(datastore.DataStore); ok && ds != nil {
+		if ds, ok := reflect.TypeAssert[datastore.DataStore](f); ok && ds != nil {
 			return ds, nil
 		}
 	}

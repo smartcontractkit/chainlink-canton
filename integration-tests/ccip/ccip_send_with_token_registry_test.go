@@ -472,10 +472,8 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 				Enabled: true,
 				CCVs: []config.CCV{
 					{
-						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         partyCCIP,
-							InstanceAddress: committeeVerifierAddress.InstanceAddress(),
-						},
+						PartyID:         partyCCIP,
+						InstanceAddress: committeeVerifierAddress.InstanceAddress(),
 					},
 				},
 			},
@@ -483,10 +481,8 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 				Enabled: true,
 				Executors: []config.Executor{
 					{
-						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         partyCCIP,
-							InstanceAddress: executorAddress.InstanceAddress(),
-						},
+						PartyID:         partyCCIP,
+						InstanceAddress: executorAddress.InstanceAddress(),
 					},
 				},
 			},

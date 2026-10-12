@@ -83,12 +83,10 @@ func NewCLDF(ctx context.Context, b *blockchain.Input) (cldf_chain.BlockChain, u
 		}
 
 		providerConfig.Participants[i] = cldf_canton_provider.ParticipantConfig{
-			Endpoints: cldf_canton_provider.Endpoints{
-				JSONLedgerAPIURL: config.JSONLedgerAPIURL,
-				GRPCLedgerAPIURL: grpcURL,
-				AdminAPIURL:      config.AdminAPIURL,
-				ValidatorAPIURL:  resolveValidatorAPIURL(config.ValidatorAPIURL),
-			},
+			JSONLedgerAPIURL:  config.JSONLedgerAPIURL,
+			GRPCLedgerAPIURL:  grpcURL,
+			AdminAPIURL:       config.AdminAPIURL,
+			ValidatorAPIURL:   resolveValidatorAPIURL(config.ValidatorAPIURL),
 			InternalEndpoints: internalEndpoints,
 			UserID:            userID,
 			PartyID:           party,

@@ -19,10 +19,19 @@ func NewMockActiveContractStore(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockActiveContractStore {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockActiveContractStore{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -75,7 +84,7 @@ type MockActiveContractStore_Get_Call struct {
 
 // Get is a helper method to define mock.On call
 //   - address contracts.InstanceAddress
-func (_e *MockActiveContractStore_Expecter) Get(address interface{}) *MockActiveContractStore_Get_Call {
+func (_e *MockActiveContractStore_Expecter) Get(address any) *MockActiveContractStore_Get_Call {
 	return &MockActiveContractStore_Get_Call{Call: _e.mock.On("Get", address)}
 }
 
@@ -137,7 +146,7 @@ type MockActiveContractStore_GetByContractId_Call struct {
 
 // GetByContractId is a helper method to define mock.On call
 //   - contractId types.CONTRACT_ID
-func (_e *MockActiveContractStore_Expecter) GetByContractId(contractId interface{}) *MockActiveContractStore_GetByContractId_Call {
+func (_e *MockActiveContractStore_Expecter) GetByContractId(contractId any) *MockActiveContractStore_GetByContractId_Call {
 	return &MockActiveContractStore_GetByContractId_Call{Call: _e.mock.On("GetByContractId", contractId)}
 }
 
@@ -200,7 +209,7 @@ type MockActiveContractStore_GetByTemplateId_Call struct {
 // GetByTemplateId is a helper method to define mock.On call
 //   - party types.PARTY
 //   - templateId contracts.TemplateID
-func (_e *MockActiveContractStore_Expecter) GetByTemplateId(party interface{}, templateId interface{}) *MockActiveContractStore_GetByTemplateId_Call {
+func (_e *MockActiveContractStore_Expecter) GetByTemplateId(party any, templateId any) *MockActiveContractStore_GetByTemplateId_Call {
 	return &MockActiveContractStore_GetByTemplateId_Call{Call: _e.mock.On("GetByTemplateId", party, templateId)}
 }
 
@@ -250,9 +259,9 @@ type MockActiveContractStore_RegisterTemplates_Call struct {
 
 // RegisterTemplates is a helper method to define mock.On call
 //   - templates ...store.RegisteredTemplate
-func (_e *MockActiveContractStore_Expecter) RegisterTemplates(templates ...interface{}) *MockActiveContractStore_RegisterTemplates_Call {
+func (_e *MockActiveContractStore_Expecter) RegisterTemplates(templates ...any) *MockActiveContractStore_RegisterTemplates_Call {
 	return &MockActiveContractStore_RegisterTemplates_Call{Call: _e.mock.On("RegisterTemplates",
-		append([]interface{}{}, templates...)...)}
+		append([]any{}, templates...)...)}
 }
 
 func (_c *MockActiveContractStore_RegisterTemplates_Call) Run(run func(templates ...store.RegisteredTemplate)) *MockActiveContractStore_RegisterTemplates_Call {

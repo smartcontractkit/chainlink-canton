@@ -78,8 +78,8 @@ func TestOffRampSourceOnRamps_DualAllowlist(t *testing.T) {
 	chainSelectorNumeric := types.NUMERIC(strconv.FormatUint(chainSelector, 10))
 
 	cantonChain := &canton.Chain{
-		ChainMetadata: canton.ChainMetadata{Selector: chainSelector},
-		Participants:  []canton.Participant{participant},
+		Selector:     chainSelector,
+		Participants: []canton.Participant{participant},
 	}
 	bundle := cld_ops.NewBundle(t.Context, logger.Test(t), cld_ops.NewMemoryReporter())
 

@@ -16,10 +16,19 @@ func NewMockInstanceAddressFilter(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockInstanceAddressFilter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockInstanceAddressFilter{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -63,7 +72,7 @@ type MockInstanceAddressFilter_FilterContracts_Call struct {
 
 // FilterContracts is a helper method to define mock.On call
 //   - addresses []contracts.InstanceAddress
-func (_e *MockInstanceAddressFilter_Expecter) FilterContracts(addresses interface{}) *MockInstanceAddressFilter_FilterContracts_Call {
+func (_e *MockInstanceAddressFilter_Expecter) FilterContracts(addresses any) *MockInstanceAddressFilter_FilterContracts_Call {
 	return &MockInstanceAddressFilter_FilterContracts_Call{Call: _e.mock.On("FilterContracts", addresses)}
 }
 
