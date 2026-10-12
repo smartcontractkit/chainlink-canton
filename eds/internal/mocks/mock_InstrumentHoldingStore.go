@@ -18,10 +18,19 @@ func NewMockInstrumentHoldingStore(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockInstrumentHoldingStore {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockInstrumentHoldingStore{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -75,7 +84,7 @@ type MockInstrumentHoldingStore_GetHolding_Call struct {
 // GetHolding is a helper method to define mock.On call
 //   - party types.PARTY
 //   - instrumentId splice_api_token_holding_v1.InstrumentId
-func (_e *MockInstrumentHoldingStore_Expecter) GetHolding(party interface{}, instrumentId interface{}) *MockInstrumentHoldingStore_GetHolding_Call {
+func (_e *MockInstrumentHoldingStore_Expecter) GetHolding(party any, instrumentId any) *MockInstrumentHoldingStore_GetHolding_Call {
 	return &MockInstrumentHoldingStore_GetHolding_Call{Call: _e.mock.On("GetHolding", party, instrumentId)}
 }
 
@@ -142,7 +151,7 @@ type MockInstrumentHoldingStore_ListHoldings_Call struct {
 
 // ListHoldings is a helper method to define mock.On call
 //   - instrumentId splice_api_token_holding_v1.InstrumentId
-func (_e *MockInstrumentHoldingStore_Expecter) ListHoldings(instrumentId interface{}) *MockInstrumentHoldingStore_ListHoldings_Call {
+func (_e *MockInstrumentHoldingStore_Expecter) ListHoldings(instrumentId any) *MockInstrumentHoldingStore_ListHoldings_Call {
 	return &MockInstrumentHoldingStore_ListHoldings_Call{Call: _e.mock.On("ListHoldings", instrumentId)}
 }
 
@@ -187,9 +196,9 @@ type MockInstrumentHoldingStore_RegisterParty_Call struct {
 
 // RegisterParty is a helper method to define mock.On call
 //   - parties ...string
-func (_e *MockInstrumentHoldingStore_Expecter) RegisterParty(parties ...interface{}) *MockInstrumentHoldingStore_RegisterParty_Call {
+func (_e *MockInstrumentHoldingStore_Expecter) RegisterParty(parties ...any) *MockInstrumentHoldingStore_RegisterParty_Call {
 	return &MockInstrumentHoldingStore_RegisterParty_Call{Call: _e.mock.On("RegisterParty",
-		append([]interface{}{}, parties...)...)}
+		append([]any{}, parties...)...)}
 }
 
 func (_c *MockInstrumentHoldingStore_RegisterParty_Call) Run(run func(parties ...string)) *MockInstrumentHoldingStore_RegisterParty_Call {
