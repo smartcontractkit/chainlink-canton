@@ -56,6 +56,5 @@ func NewPublicKeyFromHex(hexStr string, usage cryptov30.SigningKeyUsage) (*crypt
 		Format:    cryptov30.CryptoKeyFormat_CRYPTO_KEY_FORMAT_RAW,
 		KeySpec:   cryptov30.SigningKeySpec_SIGNING_KEY_SPEC_EC_CURVE25519,
 		Usage:     []cryptov30.SigningKeyUsage{usage},
-		Scheme:    cryptov30.SigningKeyScheme_SIGNING_KEY_SCHEME_ED25519,
 	}, nil
 }

@@ -48,7 +48,7 @@ func TestServer_PostCCVSend(t *testing.T) {
 	ccv1 := contracts.NewRawInstanceAddress("ccv1", "owner")
 	ccv2 := contracts.NewRawInstanceAddress("ccv2", "owner")
 	cfg := config.CCVAPIConfig{CCVs: []config.CCV{
-		{ContractIdentifier: config.ContractIdentifier{InstanceAddress: ccv1.InstanceAddress()}},
+		{InstanceAddress: ccv1.InstanceAddress()},
 	}}
 
 	setup := func(t *testing.T) (*mocks.MockActiveContractStore, oapiCCV.ClientWithResponsesInterface) {
@@ -211,7 +211,7 @@ func TestServer_PostCCVExecute(t *testing.T) {
 	ccv1 := contracts.NewRawInstanceAddress("ccv1", "owner")
 	ccv2 := contracts.NewRawInstanceAddress("ccv2", "owner")
 	cfg := config.CCVAPIConfig{CCVs: []config.CCV{
-		{ContractIdentifier: config.ContractIdentifier{InstanceAddress: ccv1.InstanceAddress()}},
+		{InstanceAddress: ccv1.InstanceAddress()},
 	}}
 	message := protocol.Message{
 		SourceChainSelector: protocol.ChainSelector(123),
@@ -360,9 +360,9 @@ func TestServer_FilterContracts(t *testing.T) {
 
 	cfg := config.CCVAPIConfig{
 		CCVs: []config.CCV{
-			{ContractIdentifier: config.ContractIdentifier{InstanceAddress: contracts.HexToInstanceAddress("0x1")}},
-			{ContractIdentifier: config.ContractIdentifier{InstanceAddress: contracts.HexToInstanceAddress("0x2")}},
-			{ContractIdentifier: config.ContractIdentifier{InstanceAddress: contracts.HexToInstanceAddress("0x3")}},
+			{InstanceAddress: contracts.HexToInstanceAddress("0x1")},
+			{InstanceAddress: contracts.HexToInstanceAddress("0x2")},
+			{InstanceAddress: contracts.HexToInstanceAddress("0x3")},
 		},
 	}
 	mockActiveContractStore := mocks.NewMockActiveContractStore(t)
