@@ -129,7 +129,7 @@ func TestSplitBatchOpsByOwner_contractTypeCommitteeVerifier(t *testing.T) {
 	ccipBatch, ccvBatch, rmnBatch := SplitBatchOpsByOwner([]mcms_types.BatchOperation{{
 		ChainSelector: 8706591216959472610,
 		Transactions: []mcms_types.Transaction{{
-			OperationMetadata: mcms_types.OperationMetadata{ContractType: "CommitteeVerifier"},
+			ContractType: "CommitteeVerifier",
 		}},
 	}})
 	require.Empty(t, ccipBatch)
@@ -143,7 +143,7 @@ func TestSplitBatchOpsByOwner_contractTypeRMNRemote(t *testing.T) {
 	ccipBatch, ccvBatch, rmnBatch := SplitBatchOpsByOwner([]mcms_types.BatchOperation{{
 		ChainSelector: 8706591216959472610,
 		Transactions: []mcms_types.Transaction{{
-			OperationMetadata: mcms_types.OperationMetadata{ContractType: "RMNRemote"},
+			ContractType: "RMNRemote",
 		}},
 	}})
 	require.Empty(t, ccipBatch)

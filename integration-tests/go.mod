@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-canton/integration-tests
 
-go 1.26.7
+go 1.27.1
 
 replace github.com/smartcontractkit/chainlink-canton => ../
 
@@ -27,7 +27,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.1
-	github.com/smartcontractkit/chain-selectors v1.0.111
+	github.com/smartcontractkit/chain-selectors v1.0.112
 	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/smartcontractkit/chainlink-canton/authentication v1.1.0
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.1
@@ -232,7 +232,7 @@ require (
 	github.com/mitchellh/pointerstructure v1.2.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.3 // indirect
-	github.com/moby/moby/api v1.56.0 // indirect
+	github.com/moby/moby/api v1.56.1 // indirect
 	github.com/moby/moby/client v0.5.0 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect

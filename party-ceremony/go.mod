@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-canton/party-ceremony
 
-go 1.26.7
+go 1.27.1
 
 replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../contracts
 
