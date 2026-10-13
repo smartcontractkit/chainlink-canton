@@ -413,8 +413,8 @@ func buildCantonChain(ctx context.Context, t *testing.T, numberOfValidators int,
 	}
 
 	return &canton.Chain{
-		ChainMetadata: canton.ChainMetadata{Selector: chainsel.CANTON_LOCALNET.Selector},
-		Participants:  participants,
+		Selector:     chainsel.CANTON_LOCALNET.Selector,
+		Participants: participants,
 	}, nil
 }
 

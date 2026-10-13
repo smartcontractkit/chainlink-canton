@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-rate-limiter"
-	PackageID   = "ff31b4e98a26d9927ccfeff1472b7c5af75e60eb6af9a29199a6a7ca9ece228c"
+	PackageID   = "825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a"
 	SDKVersion  = "3.4.11"
 )
 
@@ -35,6 +35,7 @@ type Template interface {
 
 const (
 	RateLimiterContextKey = types.TEXT("rate-limiter")
+	MaxTruncatableTokens  = types.NUMERIC("9223372036854775807.0000000000")
 )
 
 func argsToMap(args any) map[string]any {

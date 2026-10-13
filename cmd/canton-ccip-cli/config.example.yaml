@@ -2,6 +2,7 @@
 network: mainnet
 canton:
   authType: "authorizationCode"
+  authEnableKeyRing: true
   authServerURL: "https://auth.example.com"
   authClientID: "my-client-id"
   participantGRPCLedgerAPIURL: "participant.example.com:5001"

@@ -62,14 +62,20 @@ elapsedMicroseconds start end =
     let micros = convertRelTimeToMicroseconds (subTime end start)
     in intToNumeric (max 0 micros)
 
+-- | Max Int value (2^63 - 1) as a Decimal: the largest whole number `truncate` can represent.
+maxTruncatableTokens : Decimal
+maxTruncatableTokens = 9223372036854775807.0
+
 -- | Calculate whole tokens refilled during the elapsed time at a given rate.
 -- | Preserves fractional seconds: (rate * elapsed_micros / 1_000_000) rounded down to whole tokens.
+-- | Saturates at max Int instead of aborting: refills beyond that are capped at the limiter's
+-- | capacity by availableTokensAt anyway.
 refilledTokens : Time -> Time -> Numeric 0 -> Numeric 0
 refilledTokens start end rate =
     let tokenMicros : Decimal = Numeric.mul rate (elapsedMicroseconds start end)
         microsPerSecond : Decimal = 1000000.0
         accrued : Decimal = Numeric.div tokenMicros microsPerSecond
-    in intToNumeric (truncate accrued)
+    in intToNumeric (truncate (min accrued maxTruncatableTokens))
 
 -- | Calculate total available capacity at a given time, accounting for refills since last update.
 -- | If disabled, returns capacity. Otherwise returns current tokens plus accrued refills, capped at capacity.

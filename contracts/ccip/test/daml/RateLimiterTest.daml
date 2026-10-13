@@ -4,7 +4,7 @@ import Daml.Script
 
 import DA.Assert
 import DA.Optional (fromSome)
-import DA.Time (addRelTime, milliseconds)
+import DA.Time (addRelTime, milliseconds, seconds)
 
 import qualified CCIP.RateLimiterV2
 
@@ -45,6 +45,43 @@ testRateLimiterConsumeAndRefill = script do
     CCIP.RateLimiterV2.availableTokensAt now limiterState === 206.0
 
     debug "testRateLimiterConsumeAndRefill: PASSED"
+
+testRateLimiterOverflow : Script ()
+testRateLimiterOverflow = script do
+    poolOwner <- allocateParty "pool-owner"
+
+    now <- getTime
+    limiter <- submit poolOwner do
+        createCmd CCIP.RateLimiterV2.RateLimiter with
+            instanceId = "rl-overflow"
+            poolInstanceId = "pool-1"
+            poolOwner = poolOwner
+            remoteChainSelector = 123.0
+            direction = CCIP.RateLimiterV2.RateLimitDirection_Outbound
+            mode = CCIP.RateLimiterV2.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            -- max int64: 9223372036854775807
+            -- rate:        10000000000000000
+            rate = 10000000000000000.0
+            tokens = 100.0
+            lastUpdated = now
+
+    consumed <- submit poolOwner do
+        exerciseCmd limiter CCIP.RateLimiterV2.ConsumeCapacity with
+            requested = 50.0
+    consumed.availableBeforeConsume === 100.0
+    consumed.consumed === 50.0
+
+    passTime (seconds 1000) -- 1000 seconds = rate * 1000, must not cause an overflow because tokens should be capped at capacity
+
+    consumed <- submit poolOwner do
+        exerciseCmd consumed.rateLimiterCid CCIP.RateLimiterV2.ConsumeCapacity with
+            requested = 100.0
+    consumed.availableBeforeConsume === 100.0
+    consumed.consumed === 100.0
+
+    debug "testRateLimiterOverflow: PASSED"
 
 testRateLimiterRejectsOverCapacity : Script ()
 testRateLimiterRejectsOverCapacity = script do

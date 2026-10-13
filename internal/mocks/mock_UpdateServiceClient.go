@@ -18,10 +18,19 @@ func NewMockUpdateServiceClient(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockUpdateServiceClient {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockUpdateServiceClient{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -82,9 +91,9 @@ type MockUpdateServiceClient_GetUpdateById_Call struct {
 //   - ctx context.Context
 //   - in *v2.GetUpdateByIdRequest
 //   - opts ...grpc.CallOption
-func (_e *MockUpdateServiceClient_Expecter) GetUpdateById(ctx interface{}, in interface{}, opts ...interface{}) *MockUpdateServiceClient_GetUpdateById_Call {
+func (_e *MockUpdateServiceClient_Expecter) GetUpdateById(ctx any, in any, opts ...any) *MockUpdateServiceClient_GetUpdateById_Call {
 	return &MockUpdateServiceClient_GetUpdateById_Call{Call: _e.mock.On("GetUpdateById",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockUpdateServiceClient_GetUpdateById_Call) Run(run func(ctx context.Context, in *v2.GetUpdateByIdRequest, opts ...grpc.CallOption)) *MockUpdateServiceClient_GetUpdateById_Call {
@@ -165,9 +174,9 @@ type MockUpdateServiceClient_GetUpdateByOffset_Call struct {
 //   - ctx context.Context
 //   - in *v2.GetUpdateByOffsetRequest
 //   - opts ...grpc.CallOption
-func (_e *MockUpdateServiceClient_Expecter) GetUpdateByOffset(ctx interface{}, in interface{}, opts ...interface{}) *MockUpdateServiceClient_GetUpdateByOffset_Call {
+func (_e *MockUpdateServiceClient_Expecter) GetUpdateByOffset(ctx any, in any, opts ...any) *MockUpdateServiceClient_GetUpdateByOffset_Call {
 	return &MockUpdateServiceClient_GetUpdateByOffset_Call{Call: _e.mock.On("GetUpdateByOffset",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockUpdateServiceClient_GetUpdateByOffset_Call) Run(run func(ctx context.Context, in *v2.GetUpdateByOffsetRequest, opts ...grpc.CallOption)) *MockUpdateServiceClient_GetUpdateByOffset_Call {
@@ -248,9 +257,9 @@ type MockUpdateServiceClient_GetUpdates_Call struct {
 //   - ctx context.Context
 //   - in *v2.GetUpdatesRequest
 //   - opts ...grpc.CallOption
-func (_e *MockUpdateServiceClient_Expecter) GetUpdates(ctx interface{}, in interface{}, opts ...interface{}) *MockUpdateServiceClient_GetUpdates_Call {
+func (_e *MockUpdateServiceClient_Expecter) GetUpdates(ctx any, in any, opts ...any) *MockUpdateServiceClient_GetUpdates_Call {
 	return &MockUpdateServiceClient_GetUpdates_Call{Call: _e.mock.On("GetUpdates",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockUpdateServiceClient_GetUpdates_Call) Run(run func(ctx context.Context, in *v2.GetUpdatesRequest, opts ...grpc.CallOption)) *MockUpdateServiceClient_GetUpdates_Call {

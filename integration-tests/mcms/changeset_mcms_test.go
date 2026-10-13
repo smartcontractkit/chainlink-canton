@@ -68,8 +68,8 @@ func TestMCMS_ChangesetProposalE2E(t *testing.T) {
 
 	// Build CLDF environment from the shared participant
 	cantonChain := &canton.Chain{
-		ChainMetadata: canton.ChainMetadata{Selector: chainSelector},
-		Participants:  []canton.Participant{participant},
+		Selector:     chainSelector,
+		Participants: []canton.Participant{participant},
 	}
 	bundle := cld_ops.NewBundle(t.Context, logger.Test(t), cld_ops.NewMemoryReporter())
 	env := &cldf.Environment{

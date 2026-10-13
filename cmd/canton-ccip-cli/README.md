@@ -140,9 +140,12 @@ Command-specific flags:
 | `canton list-events [--event {sent\|executed}]`   | List active `CCIPMessageSent` (default) or `ExecutionStateChanged` contracts visible to the configured party.        |
 | `canton list-holdings [--cid]`                    | List all holdings for the configured party. `--cid` also prints each holding's Contract ID.                          |
 | `canton list-transfer-instructions`               | List all `TransferInstruction` contracts for the configured party.                                                   |
+| `canton list-receivers [--cid]`                   | List all `CCIPReceiver` contracts visible to the configured party, including finality config and required/optional CCVs. `--cid` also prints each receiver's Contract ID. |
 | `canton create-transfer --amount <decimal>`       | Create an outgoing `TransferInstruction`. `--receiver <party>` defaults to own party; `--token` defaults to `link`.   |
 | `canton accept-transfer --contract-id <cid>`      | Accept an incoming `TransferInstruction` by contract ID. `--token` defaults to `link`.                               |
 | `canton sync-receiver-ccv --required-ccv <addr>`  | Deploy or update the `CCIPReceiver` required CCVs. Run once before inbound load/e2e on prod.                         |
+| `canton set-receiver-required-ccvs <cid> <ccv> [ccv...]` | Update a `CCIPReceiver`'s required CCVs by contract ID. Each CCV is a raw address in `instanceId@owner` form.         |
+| `canton archive-receiver <cid>`                   | Archive a `CCIPReceiver` contract by contract ID.                                                                    |
 
 `--required-ccv` takes a Canton committee verifier raw address in `instanceId@owner` form. Note that
 `sync-receiver-ccv` defaults `--finality` to `1`, not `finality`.
