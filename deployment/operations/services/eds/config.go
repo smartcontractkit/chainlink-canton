@@ -134,10 +134,8 @@ var BuildConfig = operations.NewOperation(
 		ccvs := make([]edsConfig.CCV, len(refs))
 		for i, ref := range refs {
 			ccvs[i] = edsConfig.CCV{
-				ContractIdentifier: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
-				},
+				PartyID:         participant.PartyID,
+				InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
 			}
 		}
 
@@ -167,12 +165,10 @@ var BuildConfig = operations.NewOperation(
 
 			instanceAddress := contracts.HexToInstanceAddress(ref.Address)
 			pool := edsConfig.TokenPool{
-				ContractIdentifier: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: instanceAddress,
-				},
-				Type:      tokenPoolType,
-				PoolOwner: participant.PartyID,
+				PartyID:         participant.PartyID,
+				InstanceAddress: instanceAddress,
+				Type:            tokenPoolType,
+				PoolOwner:       participant.PartyID,
 			}
 			if tokenPoolType == edsConfig.TokenPoolTypeLockRelease {
 				pool.Factory = &edsConfig.Factory{
@@ -228,10 +224,8 @@ var BuildConfig = operations.NewOperation(
 				Enabled: true,
 				Executors: []edsConfig.Executor{
 					{
-						ContractIdentifier: edsConfig.ContractIdentifier{
-							PartyID:         participant.PartyID,
-							InstanceAddress: contracts.HexToInstanceAddress(executor.Address),
-						},
+						PartyID:         participant.PartyID,
+						InstanceAddress: contracts.HexToInstanceAddress(executor.Address),
 					},
 				},
 			},

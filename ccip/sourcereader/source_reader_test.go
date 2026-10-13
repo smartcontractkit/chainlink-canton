@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"math/big"
+	"strconv"
 	"testing"
 
 	ledgerv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -112,19 +113,15 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 			stateServiceClient: stateClient,
 		}
 
-		blockZero := big.NewInt(0)
-		blockZeroUint64 := blockZero.Uint64()
-		blockFive := big.NewInt(5)
-		blockFiveUint64 := blockFive.Uint64()
-		headers, err := reader.GetBlocksHeaders(ctx, []*big.Int{blockZero, blockFive})
+		headers, err := reader.GetBlocksHeaders(ctx, []uint64{0, 5})
 		require.NoError(t, err)
 		require.Len(t, headers, 2)
-		require.Equal(t, uint64(0), headers[blockZeroUint64].Number)
-		require.Equal(t, protocol.Bytes32{}, headers[blockZeroUint64].ParentHash)
-		require.Equal(t, intToBytes32(0), headers[blockZeroUint64].Hash)
-		require.Equal(t, uint64(5), headers[blockFiveUint64].Number)
-		require.Equal(t, intToBytes32(4), headers[blockFiveUint64].ParentHash)
-		require.Equal(t, intToBytes32(5), headers[blockFiveUint64].Hash)
+		require.Equal(t, uint64(0), headers[0].Number)
+		require.Equal(t, protocol.Bytes32{}, headers[0].ParentHash)
+		require.Equal(t, intToBytes32(0), headers[0].Hash)
+		require.Equal(t, uint64(5), headers[5].Number)
+		require.Equal(t, intToBytes32(4), headers[5].ParentHash)
+		require.Equal(t, intToBytes32(5), headers[5].Hash)
 	})
 
 	t.Run("errors when block exceeds latest offset", func(t *testing.T) {
@@ -141,69 +138,9 @@ func TestSourceReader_GetBlocksHeaders(t *testing.T) {
 			stateServiceClient: stateClient,
 		}
 
-		_, err := reader.GetBlocksHeaders(ctx, []*big.Int{big.NewInt(4)})
+		_, err := reader.GetBlocksHeaders(ctx, []uint64{4})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "block number is greater than latest offset")
-	})
-
-	t.Run("errors when block number is nil", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		stateClient := mocks.NewMockStateServiceClient(t)
-
-		stateClient.EXPECT().GetLedgerEnd(
-			mock.Anything,
-			mock.Anything,
-		).Return(&ledgerv2.GetLedgerEndResponse{Offset: 10}, nil)
-
-		reader := &sourceReader{
-			stateServiceClient: stateClient,
-		}
-
-		_, err := reader.GetBlocksHeaders(ctx, []*big.Int{big.NewInt(0), nil})
-		require.Error(t, err)
-		require.ErrorContains(t, err, "blockNumbers[1]: block number is nil")
-	})
-
-	t.Run("errors when block offset is negative", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		stateClient := mocks.NewMockStateServiceClient(t)
-
-		stateClient.EXPECT().GetLedgerEnd(
-			mock.Anything,
-			mock.Anything,
-		).Return(&ledgerv2.GetLedgerEndResponse{Offset: 10}, nil)
-
-		reader := &sourceReader{
-			stateServiceClient: stateClient,
-		}
-
-		_, err := reader.GetBlocksHeaders(ctx, []*big.Int{big.NewInt(-1)})
-		require.Error(t, err)
-		require.ErrorContains(t, err, "block offset must be non-negative")
-	})
-
-	t.Run("errors when block offset overflows uint64", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		stateClient := mocks.NewMockStateServiceClient(t)
-
-		stateClient.EXPECT().GetLedgerEnd(
-			mock.Anything,
-			mock.Anything,
-		).Return(&ledgerv2.GetLedgerEndResponse{Offset: 10}, nil)
-
-		reader := &sourceReader{
-			stateServiceClient: stateClient,
-		}
-
-		tooLarge := new(big.Int).SetUint64(math.MaxUint64)
-		tooLarge.Add(tooLarge, big.NewInt(1))
-
-		_, err := reader.GetBlocksHeaders(ctx, []*big.Int{tooLarge})
-		require.Error(t, err)
-		require.ErrorContains(t, err, "block offset overflows uint64")
 	})
 }
 
@@ -516,50 +453,17 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		}
 	)
 
-	t.Run("returns error when fromBlock is nil", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		reader := &sourceReader{}
-
-		events, err := reader.FetchMessageSentEvents(ctx, nil, big.NewInt(1))
-		require.Nil(t, events)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "fromBlock is nil")
-	})
-
-	t.Run("returns error when fromBlock is negative", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		reader := &sourceReader{}
-
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(-1), big.NewInt(5))
-		require.Nil(t, events)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "fromBlock is negative")
-	})
-
-	t.Run("returns error when toBlock is negative", func(t *testing.T) {
-		t.Parallel()
-		ctx := context.Background()
-		reader := &sourceReader{}
-
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(-3))
-		require.Nil(t, events)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "toBlock is negative")
-	})
-
 	t.Run("returns error when toBlock exceeds max Int64", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 		reader := &sourceReader{}
 
-		toBlock := new(big.Int).Add(big.NewInt(math.MaxInt64), big.NewInt(1))
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), toBlock)
+		toBlock := uint64(math.MaxInt64) + 1
+		events, err := reader.FetchMessageSentEvents(ctx, 1, toBlock)
 		require.Nil(t, events)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "toBlock is larger than the max Int64 value")
-		require.ErrorContains(t, err, toBlock.String())
+		require.ErrorContains(t, err, strconv.FormatUint(toBlock, 10))
 	})
 
 	t.Run("returns error when fromBlock is greater than toBlock", func(t *testing.T) {
@@ -567,22 +471,22 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 		ctx := context.Background()
 		reader := &sourceReader{}
 
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(10), big.NewInt(5))
+		events, err := reader.FetchMessageSentEvents(ctx, 10, 5)
 		require.Nil(t, events)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "fromBlock is greater than toBlock")
 	})
 
-	t.Run("returns error when exclusive begin offset exceeds max Int64", func(t *testing.T) {
+	t.Run("returns error when fromBlock exceeds max Int64", func(t *testing.T) {
 		t.Parallel()
 		ctx := context.Background()
 		reader := &sourceReader{}
 
-		fromBlock := new(big.Int).Add(big.NewInt(math.MaxInt64), big.NewInt(2))
-		events, err := reader.FetchMessageSentEvents(ctx, fromBlock, nil)
+		fromBlock := uint64(math.MaxInt64) + 2
+		events, err := reader.FetchMessageSentEvents(ctx, fromBlock, 0)
 		require.Nil(t, events)
 		require.Error(t, err)
-		require.ErrorContains(t, err, "exclusive begin offset derived from fromBlock exceeds max Int64")
+		require.ErrorContains(t, err, "fromBlock is larger than the max Int64 value")
 	})
 
 	t.Run("ignores event when ccipOwner does not match", func(t *testing.T) {
@@ -699,7 +603,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			},
 		}
 
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
+		events, err := reader.FetchMessageSentEvents(ctx, 1, 5)
 		require.NoError(t, err)
 		require.Empty(t, events)
 	})
@@ -817,7 +721,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			},
 		}
 
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
+		events, err := reader.FetchMessageSentEvents(ctx, 1, 5)
 		require.NoError(t, err)
 		require.Empty(t, events, "event with ccipOwner not in signatories should be ignored")
 	})
@@ -846,7 +750,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			},
 		}
 
-		_, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(2))
+		_, err := reader.FetchMessageSentEvents(ctx, 1, 2)
 		require.Error(t, err)
 		require.ErrorContains(t, err, "failed to get updates")
 	})
@@ -881,7 +785,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			},
 		}
 
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(0), big.NewInt(2))
+		events, err := reader.FetchMessageSentEvents(ctx, 0, 2)
 		require.NoError(t, err)
 		require.Empty(t, events)
 	})
@@ -1056,7 +960,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			},
 		}
 
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
+		events, err := reader.FetchMessageSentEvents(ctx, 1, 5)
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 		require.Equal(t, msg.MustMessageID(), events[0].MessageID)
@@ -1210,7 +1114,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			},
 		}
 
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
+		events, err := reader.FetchMessageSentEvents(ctx, 1, 5)
 		require.NoError(t, err)
 		require.Empty(t, events)
 	})
@@ -1333,7 +1237,7 @@ func TestSourceReader_FetchMessageSentEvents(t *testing.T) {
 			},
 		}
 
-		events, err := reader.FetchMessageSentEvents(ctx, big.NewInt(1), big.NewInt(5))
+		events, err := reader.FetchMessageSentEvents(ctx, 1, 5)
 		require.NoError(t, err)
 		require.Empty(t, events)
 	})

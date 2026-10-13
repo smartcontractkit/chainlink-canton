@@ -9,7 +9,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 
 	"github.com/smartcontractkit/chainlink-ccip/deployment/finality"
-	seqcore "github.com/smartcontractkit/chainlink-ccip/deployment/utils/sequences"
 	ccipadapters "github.com/smartcontractkit/chainlink-ccip/deployment/v2_0_0/adapters"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
 	cldf_chain "github.com/smartcontractkit/chainlink-deployments-framework/chain"
@@ -144,10 +143,8 @@ func DeployCantonChainContracts(ctx context.Context, bundle cldf_ops.Bundle, cha
 	}
 
 	return ccipadapters.DeployChainContractsOutput{
-		OnChainOutput: seqcore.OnChainOutput{
-			Addresses: out.Output.Addresses,
-			BatchOps:  out.Output.BatchOps,
-		},
+		Addresses:               out.Output.Addresses,
+		BatchOps:                out.Output.BatchOps,
 		RefsToTransferOwnership: nil,
 	}, nil
 }
