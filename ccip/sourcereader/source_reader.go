@@ -92,63 +92,49 @@ func NewSourceReader(
 // events that pass the configured node-operator filter, template id match, and signatory
 // checks (including ccipOwner alignment with the configured CCIP owner party).
 //
+// A toBlock of 0 queries up to the latest ledger end.
+//
 // Resilience: after those checks, if decoding or validation fails for a single event (message
 // payload, receipts, verifier blobs, transaction update id, cross-field checks, etc.), the
 // failure is logged at error level with ledger context and that event is skipped. Other events
 // in the same range are still returned. Metadata mismatches (wrong owner / template) are
 // skipped without an error log. Transport and RPC errors (GetUpdates, Recv, GetLedgerEnd
-// when toBlock is nil) still fail the entire call.
-func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, toBlock *big.Int) ([]protocol.MessageSentEvent, error) {
-	if fromBlock == nil {
-		return nil, fmt.Errorf("fromBlock is nil, it must be provided")
+// when toBlock is 0) still fail the entire call.
+func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, toBlock uint64) ([]protocol.MessageSentEvent, error) {
+	// Canton ledger offsets are int64, so reject ranges that cannot be represented.
+	if fromBlock > math.MaxInt64 {
+		return nil, fmt.Errorf(
+			"fromBlock is larger than the max Int64 value, cannot proceed: %d > %d",
+			fromBlock,
+			int64(math.MaxInt64),
+		)
 	}
-
-	// Check that neither fromBlock nor toBlock are negative.
-	if fromBlock.Sign() < 0 {
-		return nil, fmt.Errorf("fromBlock is negative, cannot proceed: %s", fromBlock.String())
+	if toBlock > math.MaxInt64 {
+		return nil, fmt.Errorf(
+			"toBlock is larger than the max Int64 value, cannot proceed: %d > %d",
+			toBlock,
+			int64(math.MaxInt64),
+		)
 	}
-	if toBlock != nil && toBlock.Sign() < 0 {
-		return nil, fmt.Errorf("toBlock is negative, cannot proceed: %s", toBlock.String())
-	}
-
-	maxInt64 := big.NewInt(math.MaxInt64)
-	if toBlock != nil {
-		if fromBlock.Cmp(toBlock) > 0 {
+	if toBlock != 0 {
+		if fromBlock > toBlock {
 			return nil, fmt.Errorf(
-				"fromBlock is greater than toBlock, cannot proceed: %s > %s",
-				fromBlock.String(),
-				toBlock.String(),
-			)
-		}
-		if toBlock.Cmp(maxInt64) > 0 {
-			return nil, fmt.Errorf(
-				"toBlock is larger than the max Int64 value, cannot proceed: %s > %d",
-				toBlock.String(),
-				math.MaxInt64,
+				"fromBlock is greater than toBlock, cannot proceed: %d > %d",
+				fromBlock,
+				toBlock,
 			)
 		}
 	}
 
 	// since begin is exclusive we need to subtract 1 from fromBlock
-	begin := new(big.Int).Sub(fromBlock, big.NewInt(1))
-	// check that begin is not negative
-	if begin.Sign() < 0 {
-		begin = big.NewInt(0)
-	}
-	if begin.Cmp(maxInt64) > 0 {
-		return nil, fmt.Errorf(
-			"exclusive begin offset derived from fromBlock exceeds max Int64, cannot proceed: %s > %d",
-			begin.String(),
-			math.MaxInt64,
-		)
-	}
+	// avoid underflowing when subtracting 1 from 0
+	begin := max(int64(fromBlock)-1, 0)
 
 	var end *int64
-	if toBlock != nil {
-		// Safe to convert: toBlock is non-negative and <= max Int64.
-		end = new(toBlock.Int64())
+	if toBlock != 0 {
+		end = new(int64(toBlock))
 	} else {
-		// If toBlock is nil, we need to get the latest ledger end to avoid streaming indefinitely
+		// If toBlock is 0, we need to get the latest ledger end to avoid streaming indefinitely
 		// and to ensure we return a slice as expected by the interface.
 		ledgerEnd, err := c.stateServiceClient.GetLedgerEnd(ctx, &ledgerv2.GetLedgerEndRequest{})
 		if err != nil {
@@ -159,7 +145,7 @@ func (c *sourceReader) FetchMessageSentEvents(ctx context.Context, fromBlock, to
 
 	ccipMessageSentIdentifier := c.config.CCIPMessageSentTemplateID.ToLedgerIdentifier()
 	updates, err := c.updateServiceClient.GetUpdates(ctx, &ledgerv2.GetUpdatesRequest{
-		BeginExclusive: begin.Int64(), // safe to convert: begin is non-negative and <= max Int64.
+		BeginExclusive: begin,
 		EndInclusive:   end,
 		UpdateFormat: &ledgerv2.UpdateFormat{
 			IncludeTransactions: &ledgerv2.TransactionFormat{
@@ -406,7 +392,7 @@ func identifiersClose(a, b *ledgerv2.Identifier) bool {
 
 // GetBlocksHeaders implements chainaccess.SourceReader.
 // The blockNumbers passed in are offset numbers, since that's all we ever return from LatestAndFinalizedBlock.
-func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big.Int) (map[uint64]protocol.BlockHeader, error) {
+func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []uint64) (map[uint64]protocol.BlockHeader, error) {
 	latest, _, err := c.LatestAndFinalizedBlock(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest block: %w", err)
@@ -417,25 +403,15 @@ func (c *sourceReader) GetBlocksHeaders(ctx context.Context, blockNumbers []*big
 
 	headers := make(map[uint64]protocol.BlockHeader)
 	for i, blockNum := range blockNumbers {
-		if blockNum == nil {
-			return nil, fmt.Errorf("blockNumbers[%d]: block number is nil", i)
-		}
-		if blockNum.Sign() < 0 {
-			return nil, fmt.Errorf("blockNumbers[%d]: block offset must be non-negative: %s", i, blockNum.String())
-		}
-		if !blockNum.IsUint64() {
-			return nil, fmt.Errorf("blockNumbers[%d]: block offset overflows uint64: %s", i, blockNum.String())
-		}
-		u := blockNum.Uint64()
-		if u > latest.Number {
-			return nil, fmt.Errorf("blockNumbers[%d]: block number is greater than latest offset: %d > %d", i, u, latest.Number)
+		if blockNum > latest.Number {
+			return nil, fmt.Errorf("blockNumbers[%d]: block number is greater than latest offset: %d > %d", i, blockNum, latest.Number)
 		}
 
-		h := intToBytes32(u)
-		headers[u] = protocol.BlockHeader{
-			Number:     u,
+		h := intToBytes32(blockNum)
+		headers[blockNum] = protocol.BlockHeader{
+			Number:     blockNum,
 			Hash:       h,
-			ParentHash: parentHash(u),
+			ParentHash: parentHash(blockNum),
 			// TODO: determine if we can get an offset's timestamp.
 			// Timestamp: time.Time{},
 		}
