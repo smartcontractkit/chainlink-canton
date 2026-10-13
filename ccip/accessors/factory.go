@@ -158,3 +158,7 @@ func (a *accessor) DestinationReader() (chainaccess.DestinationReader, error) {
 func (a *accessor) ContractTransmitter() (chainaccess.ContractTransmitter, error) {
 	return nil, fmt.Errorf("not supported")
 }
+
+func (a *accessor) CCTPCodec() (chainaccess.CCTPCodec, error) {
+	return nil, fmt.Errorf("not supported")
+}
