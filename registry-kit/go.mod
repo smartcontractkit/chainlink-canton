@@ -8,12 +8,8 @@ replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../contract
 
 replace github.com/smartcontractkit/chainlink-canton/eds => ../eds
 
-replace (
-	// Coming from chainlink-deployments-framework
-	github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
-	// Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
-	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
-)
+// Coming from chainlink-deployments-framework
+replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
 
 require (
 	github.com/digital-asset/dazl-client/v8 v8.9.0
