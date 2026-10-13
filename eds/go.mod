@@ -12,8 +12,6 @@ replace (
 	// PoolDiscoveryService. Same pattern as integration-tests, registry-kit, and
 	// party-ceremony's go.mod files.
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../contracts
-	// Pin codec to v1.2.x: chainlink-evm's generated code uses GenVersion/GenHelper removed in v1.3.0
-	github.com/ugorji/go/codec => github.com/ugorji/go/codec v1.2.12
 )
 
 require (
