@@ -51,7 +51,7 @@ type Server struct {
 	// ccipOwner is the party that owns the CCIP contracts and receives the fees paid in the fee token.
 	ccipOwner types.PARTY
 	// feeTokenFactories are the transfer factories of the configured fee tokens.
-	feeTokenFactories []feeTokenFactory
+	feeTokenFactories map[splice_api_token_holding_v1.InstrumentId]feeTokenFactory
 }
 
 // feeTokenFactory bundles a fee token's configured instrument identity with its transfer factory.
@@ -79,7 +79,7 @@ func NewServer(
 		rmnRemote:             config.RMNRemote.InstanceAddress,
 		feeQuoter:             config.FeeQuoter.InstanceAddress,
 		ccipOwner:             types.PARTY(config.CcipOwner),
-		feeTokenFactories:     make([]feeTokenFactory, 0, len(config.FeeTokens)),
+		feeTokenFactories:     make(map[splice_api_token_holding_v1.InstrumentId]feeTokenFactory, len(config.FeeTokens)),
 	}
 
 	s.activeContractStore.RegisterTemplates(
@@ -123,10 +123,13 @@ func NewServer(
 			return nil, fmt.Errorf("failed to create transfer factory for fee token %s@%s: %w", feeToken.TokenId, feeToken.Admin, err)
 		}
 		if disclosureFactory != nil {
-			s.feeTokenFactories = append(s.feeTokenFactories, feeTokenFactory{
+			s.feeTokenFactories[splice_api_token_holding_v1.InstrumentId{
+				Admin: types.PARTY(feeToken.Admin),
+				Id:    types.TEXT(feeToken.TokenId),
+			}] = feeTokenFactory{
 				feeToken:                  feeToken,
 				FeeTokenDisclosureFactory: disclosureFactory,
-			})
+			}
 		}
 	}
 
@@ -425,10 +428,11 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, oapiCommon.ErrorResponse{Error: "invalid fee token"})
 		return
 	}
-	encodedFeeInstrumentId := contracts.EncodeInstrumentID(splice_api_token_holding_v1.InstrumentId{
+	feeTokenInstrumentId := splice_api_token_holding_v1.InstrumentId{
 		Admin: types.PARTY(req.Message.FeeToken.Admin),
 		Id:    types.TEXT(req.Message.FeeToken.Id),
-	})
+	}
+	encodedFeeInstrumentId := contracts.EncodeInstrumentID(feeTokenInstrumentId)
 	feeTokenConfigInstanceAddress := contracts.InstanceID(hex.EncodeToString(encodedFeeInstrumentId.Bytes())).
 		RawInstanceAddress(types.PARTY(parsedTokenAdminRegistry.Address.Owner())).
 		InstanceAddress()
@@ -444,7 +448,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 	// from it so clients don't have to query the TransferFactory API themselves.
 	var feeTokenTransferFactoryCid *string
 	var feeTokenTransferFactoryContext *map[string]any
-	factoryCid, factoryContextData, factoryDisclosures, err := s.feeTokenFactoryDisclosures(c, req.Message.FeeToken, req.Message.Sender)
+	factoryCid, factoryContextData, factoryDisclosures, err := s.feeTokenFactoryDisclosures(c, feeTokenInstrumentId, req.Message.Sender)
 	if err != nil {
 		s.logger.Err(err).Str("feeTokenId", req.Message.FeeToken.Id).Msg("failed to get fee token transfer factory disclosures")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
@@ -508,31 +512,15 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 // feeTokenFactoryDisclosures resolves the transfer factory disclosures of the given fee token
 // via its configured transfer factory. Returns nils if no transfer factory is configured for
 // the fee token.
-func (s Server) feeTokenFactoryDisclosures(ctx context.Context, feeToken oapiCommon.InstrumentId, sender string) (*string, *map[string]any, []oapiCommon.DisclosedContract, error) {
-	var configured *feeTokenFactory
-	for i := range s.feeTokenFactories {
-		if s.feeTokenFactories[i].feeToken.TokenId != feeToken.Id {
-			continue
-		}
-		if s.feeTokenFactories[i].feeToken.Admin != feeToken.Admin {
-			s.logger.Warn().Str("feeTokenId", feeToken.Id).Str("configuredAdmin", s.feeTokenFactories[i].feeToken.Admin).Str("requestedAdmin", feeToken.Admin).Msg("fee token admin mismatch, skipping fee token transfer factory disclosures")
-
-			return nil, nil, nil, nil
-		}
-		configured = &s.feeTokenFactories[i]
-
-		break
-	}
-	if configured == nil {
+func (s Server) feeTokenFactoryDisclosures(ctx context.Context, feeToken splice_api_token_holding_v1.InstrumentId, sender string) (*string, *map[string]any, []oapiCommon.DisclosedContract, error) {
+	configured, ok := s.feeTokenFactories[feeToken]
+	if !ok {
 		return nil, nil, nil, nil
 	}
 
 	factoryCid, factoryContext, factoryDisclosures, err := configured.GetFeeTokenDisclosures(
 		ctx,
-		splice_api_token_holding_v1.InstrumentId{
-			Admin: types.PARTY(feeToken.Admin),
-			Id:    types.TEXT(feeToken.Id),
-		},
+		feeToken,
 		types.PARTY(sender),
 		s.ccipOwner,
 	)

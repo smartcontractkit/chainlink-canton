@@ -102,7 +102,6 @@ type CCIPAPIConfig struct {
 type FeeToken struct {
 	// TokenId is the token id of the fee token's instrument.
 	TokenId string `toml:"token_id" validate:"required"`
-
 	// Admin is the admin party of the fee token's instrument.
 	Admin string `toml:"admin" validate:"required"`
 
