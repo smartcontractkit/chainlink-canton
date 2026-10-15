@@ -178,6 +178,12 @@ type CCIPSendDisclosure struct {
 	CCVs               []string
 	Executor           *string
 	FeeTokenConfigCid  string
+	// FeeTokenTransferFactoryCid is the fee token's transfer factory contract ID, empty if no
+	// transfer factory is configured for the fee token on EDS.
+	FeeTokenTransferFactoryCid string
+	// FeeTokenTransferFactoryContext is the choice context returned by the fee token's transfer
+	// factory, to be passed as the context of the fee token's ExtraArgs.
+	FeeTokenTransferFactoryContext splice_api_token_metadata_v1.ChoiceContext
 }
 
 func GetCCIPSendDisclosure(
@@ -233,11 +239,26 @@ func GetCCIPSendDisclosure(
 		executor = &executorAddr
 	}
 
+	var feeTokenTransferFactoryContext splice_api_token_metadata_v1.ChoiceContext
+	if resp.JSON200.FeeTokenTransferFactoryContext != nil {
+		feeTokenTransferFactoryContext, err = contracts.ChoiceContextFromData(*resp.JSON200.FeeTokenTransferFactoryContext)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert fee token transfer factory context: %w", err)
+		}
+	}
+
+	var feeTokenTransferFactoryCid string
+	if resp.JSON200.FeeTokenTransferFactoryCid != nil {
+		feeTokenTransferFactoryCid = *resp.JSON200.FeeTokenTransferFactoryCid
+	}
+
 	return &CCIPSendDisclosure{
-		ChoiceContext:      choiceContext,
-		DisclosedContracts: disclosedContracts,
-		CCVs:               ccvs,
-		Executor:           executor,
-		FeeTokenConfigCid:  resp.JSON200.FeeTokenConfigCid,
+		ChoiceContext:                  choiceContext,
+		DisclosedContracts:             disclosedContracts,
+		CCVs:                           ccvs,
+		Executor:                       executor,
+		FeeTokenConfigCid:              resp.JSON200.FeeTokenConfigCid,
+		FeeTokenTransferFactoryCid:     feeTokenTransferFactoryCid,
+		FeeTokenTransferFactoryContext: feeTokenTransferFactoryContext,
 	}, nil
 }

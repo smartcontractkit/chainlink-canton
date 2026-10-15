@@ -96,6 +96,17 @@ type CCIPSendResponse struct {
 
 	// FeeTokenConfigCid TokenConfig contract ID for the message fee token.
 	FeeTokenConfigCid string `json:"feeTokenConfigCid"`
+
+	// FeeTokenTransferFactoryCid TransferFactory contract ID for the message fee token, resolved by EDS via the fee
+	// token's configured transfer factory. Empty if no transfer factory is configured for
+	// the fee token, in which case clients have to fetch it from the TransferFactory API
+	// themselves.
+	FeeTokenTransferFactoryCid *string `json:"feeTokenTransferFactoryCid,omitempty"`
+
+	// FeeTokenTransferFactoryContext The choice context returned by the fee token's transfer factory, to be passed as the
+	// context of the fee token's ExtraArgs. Empty if no transfer factory is configured for
+	// the fee token.
+	FeeTokenTransferFactoryContext *map[string]interface{} `json:"feeTokenTransferFactoryContext,omitempty"`
 }
 
 // LookupTokenPoolResponse defines model for LookupTokenPoolResponse.

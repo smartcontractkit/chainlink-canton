@@ -28,6 +28,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool/factory"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 )
 
@@ -46,12 +47,23 @@ type Server struct {
 	tokenAdminRegistry    contracts.InstanceAddress
 	rmnRemote             contracts.InstanceAddress
 	feeQuoter             contracts.InstanceAddress
+
+	// ccipOwner is the party that owns the CCIP contracts and receives the fees paid in the fee token.
+	ccipOwner types.PARTY
+	// feeTokenFactories are the transfer factories of the configured fee tokens.
+	feeTokenFactories []feeTokenFactory
+}
+
+// feeTokenFactory bundles a fee token's configured instrument identity with its transfer factory.
+type feeTokenFactory struct {
+	feeToken config.FeeToken
+	factory.FeeTokenDisclosureFactory
 }
 
 var _ oapiCCIP.ServerInterface = &Server{}
 
 func NewServer(
-	_ context.Context,
+	ctx context.Context,
 	logger zerolog.Logger,
 	activeContractStore store.ActiveContractStoreInterface,
 	config config.CCIPAPIConfig,
@@ -66,6 +78,8 @@ func NewServer(
 		tokenAdminRegistry:    config.TokenAdminRegistry.InstanceAddress,
 		rmnRemote:             config.RMNRemote.InstanceAddress,
 		feeQuoter:             config.FeeQuoter.InstanceAddress,
+		ccipOwner:             types.PARTY(config.CcipOwner),
+		feeTokenFactories:     make([]feeTokenFactory, 0, len(config.FeeTokens)),
 	}
 
 	s.activeContractStore.RegisterTemplates(
@@ -97,6 +111,24 @@ func NewServer(
 			},
 		}...,
 	)
+
+	// Set up the transfer factories of the configured fee tokens, so that the send API can
+	// return the fee token's transfer factory disclosures.
+	for _, feeToken := range config.FeeTokens {
+		if feeToken.Factory == nil {
+			continue
+		}
+		disclosureFactory, err := factory.NewTransferFactory(ctx, s.ccipOwner, activeContractStore, *feeToken.Factory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create transfer factory for fee token %s@%s: %w", feeToken.TokenId, feeToken.Admin, err)
+		}
+		if disclosureFactory != nil {
+			s.feeTokenFactories = append(s.feeTokenFactories, feeTokenFactory{
+				feeToken:                  feeToken,
+				FeeTokenDisclosureFactory: disclosureFactory,
+			})
+		}
+	}
 
 	return s, nil
 }
@@ -408,6 +440,22 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 	feeTokenConfigCid = activeFeeTokenConfigContract.GetCreatedEvent().GetContractId()
 	disclosedContracts = append(disclosedContracts, converters.ActiveContractToDisclosedContract(activeFeeTokenConfigContract))
 
+	// If a transfer factory is configured for the fee token, fetch the factory disclosures
+	// from it so clients don't have to query the TransferFactory API themselves.
+	var feeTokenTransferFactoryCid *string
+	var feeTokenTransferFactoryContext *map[string]any
+	factoryCid, factoryContextData, factoryDisclosures, err := s.feeTokenFactoryDisclosures(c, req.Message.FeeToken, req.Message.Sender)
+	if err != nil {
+		s.logger.Err(err).Str("feeTokenId", req.Message.FeeToken.Id).Msg("failed to get fee token transfer factory disclosures")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+	if factoryCid != nil {
+		feeTokenTransferFactoryCid = factoryCid
+		feeTokenTransferFactoryContext = factoryContextData
+		disclosedContracts = append(disclosedContracts, factoryDisclosures...)
+	}
+
 	// If the message contains a token transfer, look up the token pool on the TAR and return the TokenConfig
 	if req.Message.TokenTransfer != nil {
 		// Calculate the InstanceID of the TokenConfig
@@ -446,13 +494,60 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 	}
 
 	resp := &oapiCCIP.CCIPSendResponse{
-		Ccvs:               maps.Values(resolvedCCVs),
-		ContextData:        contextData,
-		Executor:           executor,
-		DisclosedContracts: disclosedContracts,
-		FeeTokenConfigCid:  feeTokenConfigCid,
+		Ccvs:                           maps.Values(resolvedCCVs),
+		ContextData:                    contextData,
+		Executor:                       executor,
+		DisclosedContracts:             disclosedContracts,
+		FeeTokenConfigCid:              feeTokenConfigCid,
+		FeeTokenTransferFactoryCid:     feeTokenTransferFactoryCid,
+		FeeTokenTransferFactoryContext: feeTokenTransferFactoryContext,
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// feeTokenFactoryDisclosures resolves the transfer factory disclosures of the given fee token
+// via its configured transfer factory. Returns nils if no transfer factory is configured for
+// the fee token.
+func (s Server) feeTokenFactoryDisclosures(ctx context.Context, feeToken oapiCommon.InstrumentId, sender string) (*string, *map[string]any, []oapiCommon.DisclosedContract, error) {
+	var configured *feeTokenFactory
+	for i := range s.feeTokenFactories {
+		if s.feeTokenFactories[i].feeToken.TokenId != feeToken.Id {
+			continue
+		}
+		if s.feeTokenFactories[i].feeToken.Admin != feeToken.Admin {
+			s.logger.Warn().Str("feeTokenId", feeToken.Id).Str("configuredAdmin", s.feeTokenFactories[i].feeToken.Admin).Str("requestedAdmin", feeToken.Admin).Msg("fee token admin mismatch, skipping fee token transfer factory disclosures")
+
+			return nil, nil, nil, nil
+		}
+		configured = &s.feeTokenFactories[i]
+
+		break
+	}
+	if configured == nil {
+		return nil, nil, nil, nil
+	}
+
+	factoryCid, factoryContext, factoryDisclosures, err := configured.GetFeeTokenDisclosures(
+		ctx,
+		splice_api_token_holding_v1.InstrumentId{
+			Admin: types.PARTY(feeToken.Admin),
+			Id:    types.TEXT(feeToken.Id),
+		},
+		types.PARTY(sender),
+		s.ccipOwner,
+	)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to get fee token transfer factory disclosures: %w", err)
+	}
+
+	serializedFactoryContext, err := converters.SerializeChoiceContext(factoryContext)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to serialize fee token transfer factory context: %w", err)
+	}
+
+	factoryCidString := string(factoryCid)
+
+	return &factoryCidString, &serializedFactoryContext, factoryDisclosures, nil
 }
 
 func (s Server) PostCCIPExecute(c *gin.Context) {
