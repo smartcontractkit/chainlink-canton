@@ -1062,23 +1062,6 @@ func cantonSend(
 		}
 	}
 
-	// --- Build transfer factory for fee payment ---
-	transferFactory, err := testhelpers.GetTransferFactoryV2(ctx, feeTokenTransferInstructionClient, string(feeTokenInstrumentId.Admin), splice_api_token_transfer_instruction_v1.Transfer{
-		Sender:           types.PARTY(b.Participant.PartyID),
-		Receiver:         b.Profile.CCIPOwnerPartyID,
-		Amount:           "1.0",
-		InstrumentId:     *feeTokenInstrumentId,
-		InputHoldingCids: feeTokenInputCids,
-		Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
-	})
-	if err != nil {
-		return fmt.Errorf("get transfer factory for fee token: %w", err)
-	}
-	feeChoiceContext, err := contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
-	if err != nil {
-		return fmt.Errorf("fee choice context: %w", err)
-	}
-
 	// --- Resolve token transfer holdings ---
 	var tokenTransferInputCids []types.CONTRACT_ID
 	if withToken {
@@ -1181,6 +1164,37 @@ func cantonSend(
 	if err != nil {
 		return fmt.Errorf("CCIP send disclosure: %w", err)
 	}
+
+	// --- Fee token transfer factory (prefer the EDS response, fall back to a direct fetch) ---
+	var (
+		feeTokenTransferFactoryCid string
+		feeChoiceContext           splice_api_token_metadata_v1.ChoiceContext
+		feeTokenFactoryDisclosures []*apiv2.DisclosedContract
+	)
+	if ccipSendDisclosure.FeeTokenTransferFactoryCid != "" {
+		// The CCIP EDS resolved the fee token's transfer factory - its disclosures are
+		// already part of ccipSendDisclosure.DisclosedContracts.
+		feeTokenTransferFactoryCid = ccipSendDisclosure.FeeTokenTransferFactoryCid
+		feeChoiceContext = ccipSendDisclosure.FeeTokenTransferFactoryContext
+	} else {
+		transferFactory, err := testhelpers.GetTransferFactoryV2(ctx, feeTokenTransferInstructionClient, string(feeTokenInstrumentId.Admin), splice_api_token_transfer_instruction_v1.Transfer{
+			Sender:           types.PARTY(b.Participant.PartyID),
+			Receiver:         b.Profile.CCIPOwnerPartyID,
+			Amount:           "1.0",
+			InstrumentId:     *feeTokenInstrumentId,
+			InputHoldingCids: feeTokenInputCids,
+			Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+		})
+		if err != nil {
+			return fmt.Errorf("get transfer factory for fee token: %w", err)
+		}
+		feeTokenTransferFactoryCid = transferFactory.FactoryID
+		feeChoiceContext, err = contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
+		if err != nil {
+			return fmt.Errorf("fee choice context: %w", err)
+		}
+		feeTokenFactoryDisclosures = transferFactory.DisclosedContracts
+	}
 	defaultCCVAddress, err := contracts.RawInstanceAddressFromString(ccipSendDisclosure.CCVs[0])
 	if err != nil {
 		return fmt.Errorf("parse default CCV address: %w", err)
@@ -1261,7 +1275,7 @@ func cantonSend(
 		FeeTokenInput: sender.FeeTokenInput{
 			SenderInputCids:         feeTokenInputCids,
 			FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
-			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactory.FactoryID),
+			FeeTokenTransferFactory: types.CONTRACT_ID(feeTokenTransferFactoryCid),
 			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: feeChoiceContext,
 				Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
@@ -1284,7 +1298,7 @@ func cantonSend(
 
 	// --- Concatenate disclosures ---
 	allDisclosures := slices.Concat(
-		transferFactory.DisclosedContracts,
+		feeTokenFactoryDisclosures,
 		ccipSendDisclosure.DisclosedContracts,
 		ccvSendDisclosure.DisclosedContracts,
 		executorDisclosures,

@@ -367,6 +367,21 @@ func TestCCIPSend(t *testing.T) {
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
+				CcipOwner: partyCCIP,
+				FeeTokens: map[string]config.FeeToken{
+					string(nativeInstrumentId.Id): {
+						TokenId: string(nativeInstrumentId.Id),
+						Admin:   string(nativeInstrumentId.Admin),
+						Factory: &config.Factory{
+							Type:             config.FactoryTypeURL,
+							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
+							TokenStandardAuthConfig: &config2.AuthConfig{
+								Type: config2.AuthTypeInsecureStatic,
+								JWT:  edsToken.AccessToken,
+							},
+						},
+					},
+				},
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
 				Enabled: true,
@@ -491,61 +506,6 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err, "failed to mint Amulet tokens to sender")
 	t.Logf("Minted Amulet tokens to sender, Holding CID: %s", feeTokenHoldingCid)
 
-	// Get transfer factory for Amulet tokens (sender to CCIP owner)
-	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
-	require.NoError(t, err, "failed to get transfer factory")
-	require.NotNil(t, choiceContextRaw, "choiceContext should not be nil")
-
-	choiceContext, err := testhelpers.ChoiceContextFromData(choiceContextRaw)
-	require.NoError(t, err, "failed to parse choice context")
-	// Verify choiceContext has the expected structure (Record with "values" field)
-	require.NotNil(t, choiceContext.GetRecord(), "choiceContext should be a Record")
-	require.NotEmpty(t, choiceContext.GetRecord().GetFields(), "choiceContext should have fields")
-
-	// Verify the "values" field exists and contains entries
-	valuesField := choiceContext.GetRecord().GetFields()[0]
-	require.Equal(t, "values", valuesField.GetLabel(), "first field should be 'values'")
-	require.NotNil(t, valuesField.GetValue().GetTextMap(), "values field should be a TextMap")
-
-	// Check if "amulet-rules" entry exists
-	textMap := valuesField.GetValue().GetTextMap()
-	hasAmuletRules := false
-	for _, entry := range textMap.GetEntries() {
-		if entry.GetKey() == "amulet-rules" {
-			hasAmuletRules = true
-			t.Logf("Found 'amulet-rules' entry in choiceContext")
-
-			break
-		}
-	}
-	if !hasAmuletRules {
-		t.Logf("WARNING: 'amulet-rules' entry not found in choiceContext")
-		t.Logf("choiceContext entries: %v", func() []string {
-			entries := textMap.GetEntries()
-			keys := make([]string, 0, len(entries))
-			for _, entry := range entries {
-				keys = append(keys, entry.GetKey())
-			}
-
-			return keys
-		}())
-	}
-
-	// Extract transfer factory context values (e.g. amulet-rules) for the fee token input
-	transferFactoryContextValues := make(map[string]splice_api_token_metadata_v1.AnyValue)
-	if choiceContextRecord := choiceContext.GetRecord(); choiceContextRecord != nil && len(choiceContextRecord.Fields) > 0 {
-		valuesField := choiceContextRecord.Fields[0]
-		if valuesField.GetLabel() == "values" && valuesField.GetValue().GetTextMap() != nil {
-			for _, entry := range valuesField.GetValue().GetTextMap().GetEntries() {
-				if v := entry.GetValue().GetVariant(); v != nil {
-					transferFactoryContextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(v.GetValue().GetContractId()))}
-				} else if entry.GetValue().GetText() != "" {
-					transferFactoryContextValues[entry.GetKey()] = splice_api_token_metadata_v1.AnyValue{AVText: new(types.TEXT(entry.GetValue().GetText()))}
-				}
-			}
-		}
-	}
-
 	executorRawOrHashedAddress := oapiCommon.RawOrHashedAddress{}
 	_ = executorRawOrHashedAddress.FromRawInstanceAddress(executorAddress.String())
 	msg := oapiCommon.Message{
@@ -607,11 +567,9 @@ func TestCCIPSend(t *testing.T) {
 		FeeTokenInput: sender.FeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 			FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
-			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
+			FeeTokenTransferFactory: types.CONTRACT_ID(ccipSendDisclosure.FeeTokenTransferFactoryCid),
 			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-				Context: splice_api_token_metadata_v1.ChoiceContext{
-					Values: transferFactoryContextValues,
-				},
+				Context: ccipSendDisclosure.FeeTokenTransferFactoryContext,
 				Meta: splice_api_token_metadata_v1.Metadata{
 					Values: map[string]types.TEXT{},
 				},
@@ -632,7 +590,6 @@ func TestCCIPSend(t *testing.T) {
 
 	// TODO: not clear what is duplicated here yet
 	allDisclosures := slices.Concat(
-		transferFactoryDisclosures, // TODO should be returned by EDS?
 		ccipSendDisclosure.DisclosedContracts,
 		ccvSendDisclosure.DisclosedContracts,
 		executorSendDisclosure.DisclosedContracts,
@@ -650,10 +607,11 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err)
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
 	sendArgs.FeeTokenInput.FeeTokenConfigCid = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid)
+	sendArgs.FeeTokenInput.FeeTokenTransferFactory = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenTransferFactoryCid)
+	sendArgs.FeeTokenInput.FeeTokenExtraArgs.Context = ccipSendDisclosure.FeeTokenTransferFactoryContext
 	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
 	sendArgs.ExecutorInput.ExecutorCid = types.CONTRACT_ID(executorSendDisclosure.ContractId)
 	allDisclosures = testhelpers.DeduplicateDisclosedContracts(slices.Concat(
-		transferFactoryDisclosures,
 		ccipSendDisclosure.DisclosedContracts,
 		ccvSendDisclosure.DisclosedContracts,
 		executorSendDisclosure.DisclosedContracts,

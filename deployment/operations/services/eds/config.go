@@ -186,7 +186,8 @@ var BuildConfig = operations.NewOperation(
 		return GenerateEDSConfigOutput{
 			NodeConfig: nodeConfig,
 			CCIPAPIConfig: edsConfig.CCIPAPIConfig{
-				Enabled: true,
+				Enabled:   true,
+				CcipOwner: participant.PartyID,
 				PerPartyRouterFactory: edsConfig.ContractIdentifier{
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),

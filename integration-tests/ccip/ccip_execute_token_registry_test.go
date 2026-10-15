@@ -466,6 +466,7 @@ func runRegistryTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlo
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
+				CcipOwner: partyCCIP,
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
 				Enabled: true,

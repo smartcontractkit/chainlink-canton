@@ -309,8 +309,65 @@ func TestConfigValidation(t *testing.T) {
 						TokenAdminRegistry:    validContractIdentifier(),
 						RMNRemote:             validContractIdentifier(),
 						FeeQuoter:             validContractIdentifier(),
+						CcipOwner:             "ccipOwner",
 					},
 					wantErr: false,
+				}, {
+					name: "enabled without CcipOwner invalid",
+					s: CCIPAPIConfig{
+						Enabled:               true,
+						PerPartyRouterFactory: validContractIdentifier(),
+						OnRamp:                validContractIdentifier(),
+						OffRamp:               validContractIdentifier(),
+						GlobalConfig:          validContractIdentifier(),
+						TokenAdminRegistry:    validContractIdentifier(),
+						RMNRemote:             validContractIdentifier(),
+						FeeQuoter:             validContractIdentifier(),
+					},
+					wantErr: true,
+				},
+			},
+		}, {
+			structName: "FeeToken",
+			tests: []test{
+				{
+					name:    "without token id invalid",
+					s:       FeeToken{},
+					wantErr: true,
+				}, {
+					name: "without admin invalid",
+					s: FeeToken{
+						TokenId: "Amulet",
+					},
+					wantErr: true,
+				}, {
+					name: "with token id and admin and no factory valid",
+					s: FeeToken{
+						TokenId: "Amulet",
+						Admin:   "ccipOwner",
+					},
+					wantErr: false,
+				}, {
+					name: "with token id and admin and url factory valid",
+					s: FeeToken{
+						TokenId: "Amulet",
+						Admin:   "ccipOwner",
+						Factory: &Factory{
+							Type:             FactoryTypeURL,
+							TokenStandardURL: new("https://eds.chain.link"),
+						},
+					},
+					wantErr: false,
+				}, {
+					name: "with token id and admin and invalid factory invalid",
+					s: FeeToken{
+						TokenId: "Amulet",
+						Admin:   "ccipOwner",
+						Factory: &Factory{
+							Type: FactoryTypeURL,
+						},
+					},
+					wantErr: true,
 				},
 			},
 		},
