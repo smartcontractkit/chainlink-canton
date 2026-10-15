@@ -5,14 +5,7 @@
 
 ### Features
 
-* **cli:** Add option to persist auth tokens between runs ([#1100](https://github.com/smartcontractkit/chainlink-canton/issues/1100)) ([03a05a0](https://github.com/smartcontractkit/chainlink-canton/commit/03a05a095a304ca2fd1a4847dda5ba99183b9b42))
-* **contracts:** PoolReceiveMetadata to Registry LnR TP ([#1097](https://github.com/smartcontractkit/chainlink-canton/issues/1097)) ([7fa56f1](https://github.com/smartcontractkit/chainlink-canton/commit/7fa56f19e7905caef8cdc84ff7af4225e09df7e5))
 * **eds:** Resolve fee token disclosures as part of CCIPSend (NONEVM-6275) ([#1135](https://github.com/smartcontractkit/chainlink-canton/issues/1135)) ([4f3c0f2](https://github.com/smartcontractkit/chainlink-canton/commit/4f3c0f29cd76883f56b30fa39b7e65735f7203a2))
-
-
-### Bug Fixes
-
-* **rate limiters:** Cap refills at maxInt64 ([#1102](https://github.com/smartcontractkit/chainlink-canton/issues/1102)) ([846535f](https://github.com/smartcontractkit/chainlink-canton/commit/846535f26498ef6b73cf03d7be2f8e7c5ea4ed38))
 
 ## 1.0.0 (2026-09-16)
 
