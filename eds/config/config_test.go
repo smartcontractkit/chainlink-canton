@@ -280,7 +280,7 @@ chain_selector = "8706591216959472610"
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := Read(strings.NewReader(tt.config))
+			got, err := Read(strings.NewReader(tt.config), true)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Read() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -290,6 +290,65 @@ chain_selector = "8706591216959472610"
 			if err := got.Validate(); (err != nil) != tt.wantValidationErr {
 				t.Errorf("Validate() error = %v, wantValidationErr %v", err, tt.wantValidationErr)
 			}
+		})
+	}
+}
+
+func TestConfig_Merge_Read(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		base    string
+		secrets string
+		want    *Config
+	}{
+		{
+			name: "",
+			base: `
+	[node.auth]
+	type = 'clientCredentials'
+	user_id = 'userId'
+	auth_url = 'https://auth.chain.link'
+	client_id = 'clientId'
+	client_secret = 'replacedBySecret'
+
+	[global_api]
+	max_batch_size = 2048
+			`,
+			secrets: `
+node.auth.client_secret = 'secretValue'
+			`,
+			want: &Config{
+				Server: ServerConfig{
+					MaxRequestSizeBytes: 1024 * 1024 * 10, // default
+				},
+				Node: NodeConfig{
+					AuthConfig: authConfig.AuthConfig{
+						Type:         authConfig.AuthTypeClientCredentials,
+						UserID:       "userId",
+						AuthURL:      "https://auth.chain.link",
+						ClientID:     "clientId",
+						ClientSecret: "secretValue",
+					},
+				},
+				GlobalAPIConfig: GlobalAPIConfig{
+					MaxBatchSize: 2048,
+				},
+				TokenStandardAPIConfig: TokenStandardAPIConfig{
+					SupplyCacheTTL: time.Second * 10,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ReadAndMerge(strings.NewReader(tt.base), strings.NewReader(tt.secrets))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -477,6 +536,13 @@ func TestConfig_Merge(t *testing.T) {
 							Factory: &Factory{
 								Type:             FactoryTypeURL,
 								TokenStandardURL: new("http://validator/v0/scan-proxy"),
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type:         authConfig.AuthTypeClientCredentials,
+									UserID:       "userid1",
+									AuthURL:      "https://auth.chain.link",
+									ClientID:     "clientid1",
+									ClientSecret: "",
+								},
 							},
 						},
 					},
@@ -488,8 +554,7 @@ func TestConfig_Merge(t *testing.T) {
 						"CC": {
 							Factory: &Factory{
 								TokenStandardAuthConfig: &authConfig.AuthConfig{
-									Type: authConfig.AuthTypeInsecureStatic,
-									JWT:  "fake.jwt.token",
+									ClientSecret: "clientSecret",
 								},
 							},
 						},
@@ -510,8 +575,11 @@ func TestConfig_Merge(t *testing.T) {
 								Type:             FactoryTypeURL,
 								TokenStandardURL: new("http://validator/v0/scan-proxy"),
 								TokenStandardAuthConfig: &authConfig.AuthConfig{
-									Type: authConfig.AuthTypeInsecureStatic,
-									JWT:  "fake.jwt.token",
+									Type:         authConfig.AuthTypeClientCredentials,
+									UserID:       "userid1",
+									AuthURL:      "https://auth.chain.link",
+									ClientID:     "clientid1",
+									ClientSecret: "clientSecret",
 								},
 							},
 						},
