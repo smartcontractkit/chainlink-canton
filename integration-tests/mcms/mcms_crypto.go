@@ -866,22 +866,6 @@ func MustEncodeBlockedFunction(t testing.TB, bf mcmsApi.BlockedFunction) string 
 	return wireToHex(wire)
 }
 
-// EncodeSelfDispatchSetConfig encodes role + SetConfigParams for self-dispatch set_config
-// Format matches Canton MCMS.Codec.encodeSelfDispatchSetConfig:
-//
-//	uint8(roleToInt(role)) <> encodeSetConfigParams(params)
-func EncodeSelfDispatchSetConfig(role MCMSRole, params mcmsApi.SetConfigParams) (string, error) {
-	wire, err := params.MarshalHex()
-	if err != nil {
-		return "", fmt.Errorf("MarshalHex failed: %w", err)
-	}
-
-	// uint8(role) <> encodeSetConfigParams(params), then hex for TimelockCall hex:"bytes16".
-	payload := append([]byte{byte(role)}, []byte(wire)...) //nolint:gosec // MCMSRole is a controlled value
-
-	return hex.EncodeToString(payload), nil
-}
-
 // EncodePruneSeenHashesParams encodes the role byte for a PruneSeenHashes self-dispatch call.
 // PruneTimelockTimestamps takes no parameters — pass "" as operationData.
 func EncodePruneSeenHashesParams(role MCMSRole) string {
