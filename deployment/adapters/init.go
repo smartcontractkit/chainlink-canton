@@ -45,6 +45,7 @@ func init() {
 	ccipadapters.GetDeployChainContractsRegistry().Register(chainsel.FamilyCanton, &CantonDeployChainContractsAdapter{})
 	ccipadapters.GetChainFamilyRegistry().RegisterChainFamily(chainsel.FamilyCanton, &cantonChainFamilyWithDataStoreCache{})
 	ccipdeploy.GetTransferOwnershipRegistry().RegisterAdapter(chainsel.FamilyCanton, ccipdeploy.MCMSVersion, &CantonTransferOwnershipAdapter{})
+	ccipdeploy.GetRegistry().RegisterDeployer(chainsel.FamilyCanton, ccipdeploy.MCMSVersion, &CantonMCMSDeployer{})
 
 	// Register the offchain adapters into the ccv per-type singleton registries.
 	// The legacy GetRegistry().Register(ChainAdapters{}) shim was removed in the

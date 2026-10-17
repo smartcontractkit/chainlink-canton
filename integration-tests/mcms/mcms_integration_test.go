@@ -21,6 +21,7 @@ import (
 	mcmsApi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/api"
 	mcmsCore "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/mcmstest"
+	mcmsops "github.com/smartcontractkit/chainlink-canton/deployment/operations/mcms"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
 )
 
@@ -805,7 +806,7 @@ func testExecuteMCMSOp(
 	// We target the Proposer role's config (the test verifies proposer config)
 	encoder := NewMCMSEncoder()
 	setConfigParams := ToBindingSetConfigParams(config.Signers, newQuorums, newParents, false)
-	setConfigOpData, err := EncodeSelfDispatchSetConfig(MCMSRoleProposer, setConfigParams)
+	setConfigOpData, err := mcmsops.EncodeSelfDispatchSetConfig(mcmsApi.RoleProposer, setConfigParams)
 	require.NoError(t, err)
 	t.Logf("Encoded SetConfig params with role: %s... (%d bytes)", setConfigOpData[:min(40, len(setConfigOpData))], len(setConfigOpData)/2)
 
