@@ -515,7 +515,7 @@ func (t *SettlementInfo) UnmarshalHex(data string) error {
 type TransferLeg struct {
 	Sender       types.PARTY                              `json:"sender"`
 	Receiver     types.PARTY                              `json:"receiver"`
-	Amount       types.NUMERIC                            `json:"amount"`
+	Amount       types.NUMERIC                            `json:"amount" hex:"decimal"`
 	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	Meta         splice_api_token_metadata_v1.Metadata    `json:"meta"`
 }

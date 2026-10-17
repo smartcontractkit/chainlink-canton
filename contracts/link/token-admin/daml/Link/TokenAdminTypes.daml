@@ -1,0 +1,56 @@
+-- | Types for LinkTokenAdmin, extracted so the codec generator can produce
+-- | encoders/decoders without pulling in the template definitions.
+module Link.TokenAdminTypes where
+
+-- ===========================================================================
+-- MCMS Choice Params Types
+-- ===========================================================================
+
+-- | Params for the ApproveMint choice
+data ApproveMintParams = ApproveMintParams
+    with
+        recipient : Party       -- Party receiving the newly minted holdings
+        amount : Decimal        -- Amount to mint
+        reference : Text        -- Operator reference for audit trail
+        validForSeconds : Int   -- Validity window of the created authorization, relative to execution time
+    deriving (Eq, Show)
+
+-- | Params for the ApproveBurn choice
+data ApproveBurnParams = ApproveBurnParams
+    with
+        holder : Party          -- Party whose holdings may be burned
+        maxAmount : Decimal     -- Upper bound on the total burned amount
+        reference : Text        -- Operator reference for audit trail
+        validForSeconds : Int   -- Validity window of the created authorization, relative to execution time
+    deriving (Eq, Show)
+
+-- | Params for the ApproveTransfer choice
+data ApproveTransferParams = ApproveTransferParams
+    with
+        receiver : Party        -- Party receiving the transferred holdings
+        amount : Decimal        -- Amount to transfer from ccipOwner-held holdings
+        reference : Text        -- Operator reference for audit trail
+        validForSeconds : Int   -- Validity window of the created authorization, relative to execution time
+    deriving (Eq, Show)
+
+-- | Params for the ApproveAllocate choice
+data ApproveAllocateParams = ApproveAllocateParams
+    with
+        receiver : Party        -- Party receiving the allocated holdings
+        amount : Decimal        -- Amount to allocate from ccipOwner-held holdings
+        transferLegId : Text    -- Identifier of the transfer leg within the settlement
+        reference : Text        -- Operator reference for audit trail
+        validForSeconds : Int   -- Validity window of the created authorization, relative to execution time
+    deriving (Eq, Show)
+
+-- | Params for the SetPaused choice
+data SetPausedParams = SetPausedParams
+    with
+        paused : Bool           -- Emergency stop on new approvals when True
+    deriving (Eq, Show)
+
+-- | Params for the SetObservers choice
+data SetObserversParams = SetObserversParams
+    with
+        observers : [Party]     -- Observer set for EDS/off-chain visibility of the admin contract
+    deriving (Eq, Show)

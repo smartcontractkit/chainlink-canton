@@ -1,0 +1,26 @@
+module Main where
+
+import Daml.Script
+
+import Link.TokenAdminTest
+
+runAll : Script ()
+runAll = script do
+  testTokenAdminMintViaEntrypoint
+  testTokenAdminBurnViaEntrypoint
+  testTokenAdminTransferViaEntrypoint
+  testTokenAdminAllocateViaEntrypoint
+  testTokenAdminBurnRejectsOverMax
+  testTokenAdminBurnRejectsWrongOwner
+  testTokenAdminBurnRejectsWrongInstrument
+  testTokenAdminExecuteRejectsExpired
+  testTokenAdminExecuteRejectsForeignFactory
+  testTokenAdminSetPausedBlocksApprovals
+  testTokenAdminSetObservers
+  testTokenAdminUnknownFunctionAndBadParams
+  testTokenAdminSingleSignatory
+  testTokenAdminEntrypointRequiresCcipOwner
+  testTokenAdminExecuteBlockedWhenPaused
+  testTokenAdminExecuteRejectsStaleAdminCid
+  testTokenAdminExecuteRejectsForeignAdmin
+  testTokenAdminUnpauseAllowsExecute
