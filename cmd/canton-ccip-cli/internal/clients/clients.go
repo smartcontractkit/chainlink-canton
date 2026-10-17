@@ -89,6 +89,8 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 		var authProvider authentication.Provider
 		switch cfg.Canton.AuthType {
 		case "static":
+			authProvider = static.NewStaticProvider(cfg.Canton.AuthJWT)
+		case "insecureStatic":
 			authProvider = static.NewInsecureStaticProvider(cfg.Canton.AuthJWT)
 		case "clientCredentials":
 			authProvider, err = clientcredentials.NewDiscoveryProvider(ctx, cfg.Canton.AuthServerURL, cfg.Canton.AuthClientID, cfg.Canton.AuthClientSecret)
