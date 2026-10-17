@@ -307,6 +307,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 		amount                      string
 		useLedger                   string
 		packageSelectionPreferences []string
+		memo                        string
 	)
 	c := &cobra.Command{
 		Use:   "create-transfer",
@@ -384,6 +385,12 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 			if !input.Confirm() {
 				return fmt.Errorf("cancel creating transfer")
 			}
+			var metadata splice_api_token_metadata_v1.Metadata
+			if memo != "" {
+				metadata = splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{
+					"splice.lfdecentralizedtrust.org/reason": types.TEXT(memo),
+				}}
+			}
 
 			// Create Transfer
 			tx, err := cantonops.CantonSubmit(
@@ -400,6 +407,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 							Transfer:      transfer,
 							ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 								Context: choiceContext,
+								Meta:    metadata,
 							},
 						}),
 					}},
@@ -443,6 +451,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&amount, "amount", "", "the amount to transfer (required)")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 	c.Flags().StringSliceVar(&packageSelectionPreferences, "package-selection-preferences", nil, "comma-separated list of package IDs for package selection preference")
+	c.Flags().StringVar(&memo, "memo", "", "optional memo to include in the transfer metadata")
 	_ = c.MarkFlagRequired("amount")
 
 	return c
