@@ -344,6 +344,14 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 				}
 			}
 
+			// Add memo to metadata
+			var metadata splice_api_token_metadata_v1.Metadata
+			if memo != "" {
+				metadata = splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{
+					"splice.lfdecentralizedtrust.org/reason": types.TEXT(memo),
+				}}
+			}
+
 			// Get disclosures
 			transfer := splice_api_token_transfer_instruction_v1.Transfer{
 				Sender:           types.PARTY(b.Participant.PartyID),
@@ -353,7 +361,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 				RequestedAt:      types.TIMESTAMP(time.Now()),
 				ExecuteBefore:    types.TIMESTAMP(time.Now().Add(time.Hour * 24)),
 				InputHoldingCids: inputHoldings,
-				Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+				Meta:             metadata,
 			}
 			transferFactory, err := testhelpers.GetTransferFactoryV2(ctx, transferInstructionClient, string(instrumentId.Admin), transfer)
 			if err != nil {
@@ -380,16 +388,16 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 			tw.AppendRow(table.Row{"Requested at", time.Time(transfer.RequestedAt).String()})
 			tw.AppendRow(table.Row{"Execute before", time.Time(transfer.ExecuteBefore).String()})
 			tw.AppendRow(table.Row{"Input Holdings", strings.Join(inputHoldingStrings, ",")})
+			metadataPairs := make([]string, 0, len(transfer.Meta.Values))
+			for k, v := range transfer.Meta.Values {
+				metadataPairs = append(metadataPairs, fmt.Sprintf("%s=%s", k, v))
+			}
+			slices.Sort(metadataPairs)
+			tw.AppendRow(table.Row{"Metadata", strings.Join(metadataPairs, ", ")})
 			fmt.Println(tw.Render())
 			fmt.Println("Confirm? (Y/N)")
 			if !input.Confirm() {
 				return fmt.Errorf("cancel creating transfer")
-			}
-			var metadata splice_api_token_metadata_v1.Metadata
-			if memo != "" {
-				metadata = splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{
-					"splice.lfdecentralizedtrust.org/reason": types.TEXT(memo),
-				}}
 			}
 
 			// Create Transfer
@@ -407,7 +415,6 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 							Transfer:      transfer,
 							ExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 								Context: choiceContext,
-								Meta:    metadata,
 							},
 						}),
 					}},
