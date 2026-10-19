@@ -26,7 +26,7 @@ require (
 	github.com/smartcontractkit/chain-selectors v1.0.112
 	github.com/smartcontractkit/chainlink-canton/authentication v1.1.0
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.1
-	github.com/smartcontractkit/chainlink-ccv v0.13.0
+	github.com/smartcontractkit/chainlink-ccv v0.14.0
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260915214759-02f2214d5823
 	github.com/smartcontractkit/chainlink-deployments-framework v0.124.1
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
@@ -264,7 +264,7 @@ require (
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
-	github.com/ugorji/go/codec v1.3.1 // indirect
+	github.com/ugorji/go/codec v1.3.2 // indirect
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xssnick/tonutils-go v1.18.0 // indirect
