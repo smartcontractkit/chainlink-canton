@@ -1286,7 +1286,7 @@ func (t *PerPartyRouterPrepareSend) UnmarshalHex(data string) error {
 // TokenTransfer is a Record type
 type TokenTransfer struct {
 	Token  splice_api_token_holding_v1.InstrumentId `json:"token"`
-	Amount types.NUMERIC                            `json:"amount"`
+	Amount types.NUMERIC                            `json:"amount" hex:"decimal"`
 }
 
 // ToMap converts TokenTransfer to a map for DAML arguments
