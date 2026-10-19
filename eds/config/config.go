@@ -361,8 +361,11 @@ func mergeTokenPoolMaps(base, overlay map[string]TokenPool) (map[string]TokenPoo
 	return out, nil
 }
 
-func Read(configData io.Reader) (*Config, error) {
-	config := DefaultConfig()
+func Read(configData io.Reader, withDefaults bool) (*Config, error) {
+	config := &Config{}
+	if withDefaults {
+		config = DefaultConfig()
+	}
 
 	decoder := toml.NewDecoder(configData)
 	if _, err := decoder.Decode(&config); err != nil {
@@ -378,7 +381,9 @@ func ReadAndMerge(configDatas ...io.Reader) (*Config, error) {
 	config := DefaultConfig()
 
 	for i, data := range configDatas {
-		inCfg, err := Read(data)
+		// Only the first config should be read with defaults, the rest should override it.
+		// Having defaults on the overrides would cause them to override the base config with default values.
+		inCfg, err := Read(data, i == 0)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config at index %d: %w", i, err)
 		}
