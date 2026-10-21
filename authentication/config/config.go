@@ -68,7 +68,7 @@ type AuthConfig struct {
 	// Optional; only applicable to clientCredentials and authorizationCode. Leave unset
 	// to use the provider defaults ("openid" and "daml_ledger_api" for authorizationCode,
 	// "daml_ledger_api" for clientCredentials).
-	Scopes []string `toml:"scopes,omitempty" validate:"omitempty,dive,required"`
+	Scopes []string `toml:"scopes,omitempty" validate:"excluded_unless=Type clientCredentials|excluded_unless=Type authorizationCode,omitempty,dive,required"`
 }
 
 func (a *AuthConfig) Validate() error {

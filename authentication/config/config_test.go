@@ -274,6 +274,24 @@ func TestAuthConfig_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "static_scopes_must_be_unset",
+			config: AuthConfig{
+				Type:   AuthTypeStatic,
+				JWT:    validJWT,
+				Scopes: []string{"openid"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "insecureStatic_scopes_must_be_unset",
+			config: AuthConfig{
+				Type:   AuthTypeInsecureStatic,
+				JWT:    validJWT,
+				Scopes: []string{"openid"},
+			},
+			wantErr: true,
+		},
 
 		// --- Type validation ---
 		{
