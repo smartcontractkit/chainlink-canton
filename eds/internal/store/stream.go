@@ -142,8 +142,9 @@ func (s *BackfilledStream) stream(
 	onExercisedEvent func(ctx context.Context, transaction *apiv2.Transaction, exercisedEvent *apiv2.ExercisedEvent) error,
 ) error {
 	// Create uptime ticker
-	// Ticking once a second to increase the uptime counter metric
-	// Checking if the metric is increasing can be used to verify that the ContractStore is still subscribed and ready to process updates
+	// Ticking once a second to increase the uptime counter metric, but only
+	// while the current stream incarnation has delivered at least one update:
+	// a quiet or broken stream no longer fakes subscription health.
 	uptimeTicker := time.NewTicker(time.Second)
 	defer uptimeTicker.Stop()
 
@@ -153,6 +154,9 @@ func (s *BackfilledStream) stream(
 		maxEmptyReconnects: streamConfig.MaxEmptyReconnects,
 		maxDisconnected:    streamConfig.MaxDisconnected,
 	}
+	// Backoff between consecutive empty reconnects, so a burst of instant
+	// stream failures cannot spend the whole reconnect budget in a second.
+	reconnectBackoff := &backoff.Backoff{Min: streamConfig.BackoffMin, Max: streamConfig.BackoffMax, Factor: streamConfig.BackoffFactor}
 
 	for {
 		// Start streaming from offset (exclusive)
@@ -184,16 +188,20 @@ func (s *BackfilledStream) stream(
 
 				return ctx.Err()
 			case <-uptimeTicker.C:
-				// Increment uptime metric on every tick
-				s.metrics.IncrementStoreSubscriptionUptime(ctx)
+				// Increment uptime metric on every tick, but only while this
+				// stream incarnation is delivering updates
+				if updated {
+					s.metrics.IncrementStoreSubscriptionUptime(ctx)
+				}
 			case resp, ok := <-updateChan:
 				if !ok {
 					// updateChan closed; err was already sent on errChan, inner loop will handle it
 					break reconnect
 				}
 				if transaction, ok := resp.GetUpdate().(*apiv2.GetUpdatesResponse_Transaction); ok {
-					// A real update is proof of health: reset the reconnect budget.
+					// A real update is proof of health: reset the reconnect budget and backoff.
 					budget.update()
+					reconnectBackoff.Reset()
 					updated = true
 					s.logger.Trace().Str("updateID", transaction.Transaction.GetUpdateId()).Int("events", len(transaction.Transaction.GetEvents())).Msg("Update received")
 					for _, event := range transaction.Transaction.GetEvents() {
@@ -261,6 +269,14 @@ func (s *BackfilledStream) stream(
 			}
 			if budget.emptyReconnect() {
 				return fmt.Errorf("update stream reconnected %d times without receiving any update (budget %d), failing closed", budget.emptyReconnects, budget.maxEmptyReconnects)
+			}
+
+			// Wait before resubscribing: a burst of instant stream failures must
+			// not spend the whole budget (or hot-spin) in under a second.
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(reconnectBackoff.Duration()):
 			}
 		}
 	}

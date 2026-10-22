@@ -10,19 +10,13 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
+	"github.com/smartcontractkit/chainlink-canton/eds/monitoring"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-// nopMetrics satisfies Metrics without a metrics registry.
-type nopMetrics struct{}
-
-func (nopMetrics) IncrementStoreSubscriptionUptime(context.Context) {}
-func (nopMetrics) IncrementStoreUpdatesCounter(context.Context)     {}
-func (nopMetrics) RecordStoreLedgerEndGauge(context.Context, int64) {}
 
 // fakeUpdateService fakes apiv2.UpdateServiceClient; only GetUpdates is wired.
 type fakeUpdateService struct {
@@ -58,7 +52,7 @@ func TestStreamFailsClosedAfterEmptyReconnects(t *testing.T) {
 			return nil, status.Error(codes.Unimplemented, `unexpected HTTP status code received from server: 404 (Not Found)`)
 		}}, nil
 	}}
-	s := &BackfilledStream{logger: zerolog.Nop(), metrics: nopMetrics{}, updateService: svc}
+	s := &BackfilledStream{logger: zerolog.Nop(), metrics: monitoring.NoopEDSMetricLabeler{}, updateService: svc}
 
 	cfg := DefaultStreamConfig()
 	cfg.MaxEmptyReconnects = 3
@@ -70,12 +64,17 @@ func TestStreamFailsClosedAfterEmptyReconnects(t *testing.T) {
 	assert.Equal(t, int32(3), calls.Load(), "must stop after exactly MaxEmptyReconnects reconnects")
 }
 
-// Receiving updates resets the budget: incarnations that each deliver one update
-// before closing must never trip it.
+// Receiving updates resets the budget: ten incarnations that each deliver one
+// update must never trip it, even though MaxEmptyReconnects is 3.
 func TestStreamBudgetResetsOnUpdates(t *testing.T) {
-	var incarnations atomic.Int32
+	var served atomic.Int32
 	svc := &fakeUpdateService{getUpdates: func(ctx context.Context, in *apiv2.GetUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
-		incarnations.Add(1)
+		if served.Load() >= 10 {
+			// Participant stops accepting streams: the connect retry loop then
+			// runs until the test context expires, so the served count is exact.
+			return nil, status.Error(codes.Unavailable, "participant down")
+		}
+		served.Add(1)
 		first := true
 		return &fakeStream{recv: func() (*apiv2.GetUpdatesResponse, error) {
 			if first {
@@ -85,20 +84,19 @@ func TestStreamBudgetResetsOnUpdates(t *testing.T) {
 			return nil, io.EOF
 		}}, nil
 	}}
-	s := &BackfilledStream{logger: zerolog.Nop(), metrics: nopMetrics{}, updateService: svc}
+	s := &BackfilledStream{logger: zerolog.Nop(), metrics: monitoring.NoopEDSMetricLabeler{}, updateService: svc}
 
 	cfg := DefaultStreamConfig()
 	cfg.MaxEmptyReconnects = 3
-	cfg.MaxDisconnected = 0
+	cfg.MaxDisconnected = 0 // keep the connect retry loop running until the context expires
 
-	// Run well past MaxEmptyReconnects incarnations, then stop via the context.
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
 	err := s.stream(ctx, 0, FiltersByParty{}, cfg, nil, nil, nil)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded) // stopped by the test, not by the budget
-	assert.Greater(t, incarnations.Load(), int32(3), "budget must reset on every update")
+	assert.Equal(t, int32(10), served.Load(), "budget must reset on every update")
 }
 
 // A participant that refuses all connections must fail closed after
@@ -107,7 +105,7 @@ func TestStreamFailsClosedAfterDisconnected(t *testing.T) {
 	svc := &fakeUpdateService{getUpdates: func(ctx context.Context, in *apiv2.GetUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
 		return nil, status.Error(codes.Unavailable, "connection refused")
 	}}
-	s := &BackfilledStream{logger: zerolog.Nop(), metrics: nopMetrics{}, updateService: svc}
+	s := &BackfilledStream{logger: zerolog.Nop(), metrics: monitoring.NoopEDSMetricLabeler{}, updateService: svc}
 
 	cfg := DefaultStreamConfig()
 	cfg.MaxEmptyReconnects = 0 // isolate the disconnect timer
