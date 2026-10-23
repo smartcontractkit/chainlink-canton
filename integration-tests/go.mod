@@ -35,7 +35,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccv v0.14.0
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.6.1-0.20261006183231-cb0b4a406b64
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260915214759-02f2214d5823
-	github.com/smartcontractkit/chainlink-deployments-framework v0.124.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.126.0
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/smartcontractkit/mcms v0.56.1
@@ -131,7 +131,6 @@ require (
 	github.com/ethereum/hid v1.0.1-0.20260421154323-c2ab8d9bf68a // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fatih/color v1.19.0 // indirect
-	github.com/fbsobreira/gotron-sdk v0.0.0-20250403083053-2943ce8c759b // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/ferranbt/fastssz v0.1.4 // indirect
 	github.com/fjl/jsonw v0.1.0 // indirect
@@ -303,7 +302,7 @@ require (
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.51.5 // indirect
 	github.com/smartcontractkit/chainlink-ton v1.0.5-0.20260923220748-d8bac63fa0a7 // indirect
 	github.com/smartcontractkit/chainlink-ton/cciplib v0.1.1-0.20260923220748-d8bac63fa0a7 // indirect
-	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20251014143056-a0c6328c91e9 // indirect
+	github.com/smartcontractkit/chainlink-tron/relayer v0.0.11-0.20261013132128-58831cfe6302 // indirect
 	github.com/smartcontractkit/grpc-proxy v0.0.0-20240830132753-a7e17fec5ab7 // indirect
 	github.com/smartcontractkit/libocr v0.0.0-20260810200708-618b5bf7f342 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
