@@ -34,7 +34,7 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20261001213322-a2d686f610ca
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20261001213322-a2d686f610ca
-	github.com/smartcontractkit/chainlink-ccv v0.14.0
+	github.com/smartcontractkit/chainlink-ccv v0.15.0
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.6.1-0.20261006183231-cb0b4a406b64
 	github.com/smartcontractkit/chainlink-ccv/deployment v0.1.1-0.20261009063357-1e21946a7cbd
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260915214759-02f2214d5823
@@ -80,6 +80,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.13.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/XSAM/otelsql v0.42.0 // indirect
+	github.com/a-h/templ v0.3.1020 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
