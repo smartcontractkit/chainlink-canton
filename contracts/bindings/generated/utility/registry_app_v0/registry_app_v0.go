@@ -898,7 +898,7 @@ func (t *AllocationFactoryTransferInternal) UnmarshalHex(data string) error {
 // Burn is a Record type
 type Burn struct {
 	InstrumentId  splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount        types.NUMERIC                            `json:"amount"`
+	Amount        types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Holder        types.PARTY                              `json:"holder"`
 	Reference     types.TEXT                               `json:"reference"`
 	RequestedAt   types.TIMESTAMP                          `json:"requestedAt"`
@@ -5142,7 +5142,7 @@ type HolderServiceOfferLock struct {
 	Registrar            types.PARTY                              `json:"registrar"`
 	Locker               types.PARTY                              `json:"locker"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Context              types.TEXT                               `json:"context"`
 	HoldingLabel         types.TEXT                               `json:"holdingLabel"`
 	Reference            types.TEXT                               `json:"reference"`
@@ -5235,7 +5235,7 @@ type HolderServiceOfferTransfer struct {
 	Registrar            types.PARTY                              `json:"registrar"`
 	Receiver             types.PARTY                              `json:"receiver"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	SenderLabel          types.TEXT                               `json:"senderLabel"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`
@@ -5326,7 +5326,7 @@ type HolderServiceOfferUnlock struct {
 	Locker               types.PARTY                              `json:"locker"`
 	LockContext          types.TEXT                               `json:"lockContext"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	HoldingLabel         types.TEXT                               `json:"holdingLabel"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`
@@ -5765,7 +5765,7 @@ func (t *HolderServiceRejectUnlockRequest) UnmarshalHex(data string) error {
 type HolderServiceRequestBurn struct {
 	Registrar            types.PARTY                              `json:"registrar"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	HoldingLabel         types.TEXT                               `json:"holdingLabel"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`
@@ -5925,7 +5925,7 @@ type HolderServiceRequestForceTransfer struct {
 	RequestorRationale   types.TEXT                               `json:"requestorRationale"`
 	Registrar            types.PARTY                              `json:"registrar"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`
 	Sender               types.PARTY                              `json:"sender"`
@@ -6024,7 +6024,7 @@ type HolderServiceRequestLock struct {
 	Registrar            types.PARTY                              `json:"registrar"`
 	Holder               types.PARTY                              `json:"holder"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Context              types.TEXT                               `json:"context"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`
@@ -6113,7 +6113,7 @@ func (t *HolderServiceRequestLockResult) UnmarshalHex(data string) error {
 type HolderServiceRequestMint struct {
 	Registrar            types.PARTY                              `json:"registrar"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`
 	HoldingLabel         types.TEXT                               `json:"holdingLabel"`
@@ -6201,7 +6201,7 @@ type HolderServiceRequestTransfer struct {
 	Registrar            types.PARTY                              `json:"registrar"`
 	Sender               types.PARTY                              `json:"sender"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	ReceiverLabel        types.TEXT                               `json:"receiverLabel"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`
@@ -6292,7 +6292,7 @@ type HolderServiceRequestUnlock struct {
 	Holder               types.PARTY                              `json:"holder"`
 	LockContext          types.TEXT                               `json:"lockContext"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	HoldingLabel         types.TEXT                               `json:"holdingLabel"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`
@@ -6482,7 +6482,7 @@ func (t *InstrumentAllowance) UnmarshalHex(data string) error {
 // Mint is a Record type
 type Mint struct {
 	InstrumentId  splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Amount        types.NUMERIC                            `json:"amount"`
+	Amount        types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Holder        types.PARTY                              `json:"holder"`
 	Reference     types.TEXT                               `json:"reference"`
 	RequestedAt   types.TIMESTAMP                          `json:"requestedAt"`
@@ -13257,7 +13257,7 @@ func (t *RegistrarServiceMergeHolding) UnmarshalHex(data string) error {
 // RegistrarServiceOfferBurn is a Record type
 type RegistrarServiceOfferBurn struct {
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Holder               types.PARTY                              `json:"holder"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`
@@ -13341,7 +13341,7 @@ func (t *RegistrarServiceOfferBurnResult) UnmarshalHex(data string) error {
 // RegistrarServiceOfferMint is a Record type
 type RegistrarServiceOfferMint struct {
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Holder               types.PARTY                              `json:"holder"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                registry_v0.Batch                        `json:"batch"`

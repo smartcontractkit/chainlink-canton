@@ -940,7 +940,7 @@ type LockOrBurn struct {
 	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	SenderInputCids       []types.CONTRACT_ID                        `json:"senderInputCids"`
-	Amount                types.NUMERIC                              `json:"amount"`
+	Amount                types.NUMERIC                              `json:"amount" hex:"decimal"`
 	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
@@ -2892,7 +2892,7 @@ type VerifyOutboundCCVs struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	Amount                types.NUMERIC                              `json:"amount"`
+	Amount                types.NUMERIC                              `json:"amount" hex:"decimal"`
 	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }

@@ -2481,7 +2481,7 @@ type Burn struct {
 	Provider             types.PARTY                              `json:"provider"`
 	Registrar            types.PARTY                              `json:"registrar"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Holder               types.PARTY                              `json:"holder"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                Batch                                    `json:"batch"`
@@ -7092,7 +7092,7 @@ type Lock3 struct {
 	Holder               types.PARTY                              `json:"holder"`
 	Locker               types.PARTY                              `json:"locker"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Context              types.TEXT                               `json:"context"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                Batch                                    `json:"batch"`
@@ -7984,7 +7984,7 @@ type Mint struct {
 	Provider             types.PARTY                              `json:"provider"`
 	Registrar            types.PARTY                              `json:"registrar"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Holder               types.PARTY                              `json:"holder"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                Batch                                    `json:"batch"`
@@ -10220,7 +10220,7 @@ type Transfer2 struct {
 	Sender               types.PARTY                              `json:"sender"`
 	Receiver             types.PARTY                              `json:"receiver"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                Batch                                    `json:"batch"`
 }
@@ -11783,7 +11783,7 @@ type Unlock struct {
 	Locker               types.PARTY                              `json:"locker"`
 	LockContext          types.TEXT                               `json:"lockContext"`
 	InstrumentIdentifier registry_holding_v0.InstrumentIdentifier `json:"instrumentIdentifier"`
-	Amount               types.NUMERIC                            `json:"amount"`
+	Amount               types.NUMERIC                            `json:"amount" hex:"decimal"`
 	Reference            types.TEXT                               `json:"reference"`
 	Batch                Batch                                    `json:"batch"`
 }
