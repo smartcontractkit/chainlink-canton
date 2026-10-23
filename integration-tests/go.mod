@@ -32,7 +32,7 @@ require (
 	github.com/smartcontractkit/chainlink-canton/registry-kit v0.0.0
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20261001213322-a2d686f610ca
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20261001213322-a2d686f610ca
-	github.com/smartcontractkit/chainlink-ccv v0.14.0
+	github.com/smartcontractkit/chainlink-ccv v0.15.0
 	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.6.1-0.20261006183231-cb0b4a406b64
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260915214759-02f2214d5823
 	github.com/smartcontractkit/chainlink-deployments-framework v0.126.0
