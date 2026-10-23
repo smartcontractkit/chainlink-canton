@@ -290,7 +290,6 @@ func evmSend(
 	}
 
 	fmt.Println("⏳ Sending message...")
-	auth.GasLimit = 500_000
 	tx, err := router.CcipSend(auth, b.Profile.CantonSelector, msg)
 	if err != nil {
 		return fmt.Errorf("ccip send: %w", err)
@@ -335,6 +334,7 @@ func newEVMExecuteCmd(g *Globals) *cobra.Command {
 		messageIDHex string
 		wait         time.Duration
 		useLedger    string
+		gasLimit     uint64
 	)
 	c := &cobra.Command{
 		Use:   "execute",
@@ -381,8 +381,31 @@ func newEVMExecuteCmd(g *Globals) *cobra.Command {
 			}
 
 			fmt.Println("⏳ Executing message...")
+			auth := b.EthAuth
+			if gasLimit != 0 {
+				auth.GasLimit = gasLimit
+			} else {
+				// gas limit unset - Simulate to get gasLimit
+				auth.NoSend = true
+				tx, err := offRamp.Execute(
+					auth,
+					encodedMessage,
+					[]common.Address{common.BytesToAddress(verifierResult.VerifierDestAddress)},
+					[][]byte{verifierResult.CCVData},
+					0,
+				)
+				if err != nil {
+					return fmt.Errorf("simulate execute: %w", err)
+				}
+				// floor gas limit at 120% of the message's gas limit
+				// See https://github.com/smartcontractkit/ccip-tools-ts/blob/65e86633b7a5bd253d6ae118fcead72bd43a5e7c/ccip-sdk/src/evm/index.ts#L1622
+				gasLimit = min(tx.Gas(), uint64(float64(verifierResult.Message.ExecutionGasLimit)*1.2))
+				auth.GasLimit = gasLimit
+			}
+
+			fmt.Println("⏳ Executing message with gas limit:", auth.GasLimit)
 			tx, err := offRamp.Execute(
-				b.EthAuth,
+				auth,
 				encodedMessage,
 				[]common.Address{common.BytesToAddress(verifierResult.VerifierDestAddress)},
 				[][]byte{verifierResult.CCVData},
@@ -408,6 +431,7 @@ func newEVMExecuteCmd(g *Globals) *cobra.Command {
 	}
 	c.Flags().StringVar(&messageIDHex, "message-id", "", "CCIP message id (0x-prefixed hex) (required)")
 	c.Flags().DurationVar(&wait, "wait", 15*time.Minute, "max time to wait for verifier results")
+	c.Flags().Uint64Var(&gasLimit, "gas-limit", 0, "gas limit for the execute transaction (0 = auto)")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/60'/0'/0/0 or a depth like 42 in which case it will replace the hardened account component, e.g. m/44'/60'/42'/0/0")
 	_ = c.MarkFlagRequired("message-id")
 
