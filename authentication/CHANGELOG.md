@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/authentication/v1.1.0...authentication/v1.2.0) (2026-10-23)
+
+
+### Features
+
+* **authentication:** Add option to override scopes ([#1152](https://github.com/smartcontractkit/chainlink-canton/issues/1152)) ([a66aa24](https://github.com/smartcontractkit/chainlink-canton/commit/a66aa24f21c119353813f8fbd79bb916c3aee045))
+
 ## [1.1.0](https://github.com/smartcontractkit/chainlink-canton/compare/authentication/v1.0.0...authentication/v1.1.0) (2026-09-28)
 
 
