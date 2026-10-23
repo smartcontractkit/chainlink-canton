@@ -149,7 +149,7 @@ func (s *BackfilledStream) stream(
 	defer uptimeTicker.Stop()
 
 	// Fail-closed policy: reconnecting is pointless if we never receive updates
-	// or cannot re-establish the stream at all. Run's caller shuts the service down.
+	// or cannot re-establish the stream at all.
 	budget := &reconnectBudget{
 		maxEmptyReconnects: streamConfig.MaxEmptyReconnects,
 		maxDisconnected:    streamConfig.MaxDisconnected,
@@ -313,6 +313,7 @@ func (b *reconnectBudget) connectFailed(now time.Time) time.Duration {
 	if b.disconnectedSince.IsZero() {
 		b.disconnectedSince = now
 	}
+
 	return now.Sub(b.disconnectedSince)
 }
 
@@ -361,6 +362,7 @@ func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64,
 		}
 
 		budget.connected()
+
 		return stream, nil
 	}
 }

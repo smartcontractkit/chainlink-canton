@@ -10,12 +10,13 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/rs/zerolog"
-	"github.com/smartcontractkit/chainlink-canton/eds/monitoring"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/smartcontractkit/chainlink-canton/eds/monitoring"
 )
 
 // fakeUpdateService fakes apiv2.UpdateServiceClient; only GetUpdates is wired.
@@ -26,9 +27,11 @@ type fakeUpdateService struct {
 func (f *fakeUpdateService) GetUpdates(ctx context.Context, in *apiv2.GetUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
 	return f.getUpdates(ctx, in, opts...)
 }
+
 func (f *fakeUpdateService) GetUpdateByOffset(ctx context.Context, in *apiv2.GetUpdateByOffsetRequest, opts ...grpc.CallOption) (*apiv2.GetUpdateResponse, error) {
 	return nil, errors.New("not implemented")
 }
+
 func (f *fakeUpdateService) GetUpdateById(ctx context.Context, in *apiv2.GetUpdateByIdRequest, opts ...grpc.CallOption) (*apiv2.GetUpdateResponse, error) {
 	return nil, errors.New("not implemented")
 }
@@ -40,11 +43,13 @@ type fakeStream struct {
 }
 
 func (f *fakeStream) Recv() (*apiv2.GetUpdatesResponse, error) { return f.recv() }
-func (f *fakeStream) CloseSend() error                         { return nil }
+
+func (f *fakeStream) CloseSend() error { return nil }
 
 // A stream that immediately fails like the production 404 (Unimplemented on Recv)
 // must fail closed after MaxEmptyReconnects incarnations instead of looping forever.
 func TestStreamFailsClosedAfterEmptyReconnects(t *testing.T) {
+	t.Parallel()
 	var calls atomic.Int32
 	svc := &fakeUpdateService{getUpdates: func(ctx context.Context, in *apiv2.GetUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
 		calls.Add(1)
@@ -67,6 +72,7 @@ func TestStreamFailsClosedAfterEmptyReconnects(t *testing.T) {
 // Receiving updates resets the budget: ten incarnations that each deliver one
 // update must never trip it, even though MaxEmptyReconnects is 3.
 func TestStreamBudgetResetsOnUpdates(t *testing.T) {
+	t.Parallel()
 	var served atomic.Int32
 	svc := &fakeUpdateService{getUpdates: func(ctx context.Context, in *apiv2.GetUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
 		if served.Load() >= 10 {
@@ -76,11 +82,13 @@ func TestStreamBudgetResetsOnUpdates(t *testing.T) {
 		}
 		served.Add(1)
 		first := true
+
 		return &fakeStream{recv: func() (*apiv2.GetUpdatesResponse, error) {
 			if first {
 				first = false
 				return &apiv2.GetUpdatesResponse{Update: &apiv2.GetUpdatesResponse_Transaction{Transaction: &apiv2.Transaction{Offset: 1}}}, nil
 			}
+
 			return nil, io.EOF
 		}}, nil
 	}}
@@ -95,13 +103,14 @@ func TestStreamBudgetResetsOnUpdates(t *testing.T) {
 
 	err := s.stream(ctx, 0, FiltersByParty{}, cfg, nil, nil, nil)
 	require.Error(t, err)
-	assert.ErrorIs(t, err, context.DeadlineExceeded) // stopped by the test, not by the budget
+	require.ErrorIs(t, err, context.DeadlineExceeded) // stopped by the test, not by the budget
 	assert.Equal(t, int32(10), served.Load(), "budget must reset on every update")
 }
 
 // A participant that refuses all connections must fail closed after
 // MaxDisconnected of retrying, not retry forever.
 func TestStreamFailsClosedAfterDisconnected(t *testing.T) {
+	t.Parallel()
 	svc := &fakeUpdateService{getUpdates: func(ctx context.Context, in *apiv2.GetUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
 		return nil, status.Error(codes.Unavailable, "connection refused")
 	}}
