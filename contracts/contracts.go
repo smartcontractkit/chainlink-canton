@@ -53,6 +53,14 @@ const (
 	CCIPFactoryV2              = Package("ccip-factory-v2")
 	CCIPFeeTreasury            = Package("ccip-fee-treasury")
 
+	// CCIP - Registry pools (EDS auto-detection observer field; separate template
+	// family from the production/LINK pools above, kept isolated so a bug or spam on
+	// the registry-discovery side can never affect production pool serving).
+
+	CCIPRegistryBurnMintTokenPoolV2    = Package("ccip-registry-burn-mint-token-pool")
+	CCIPRegistryLockReleaseTokenPoolV2 = Package("ccip-registry-lock-release-token-pool")
+	CCIPRegistryRateLimiterV2          = Package("ccip-registry-rate-limiter")
+
 	// CCIP - Legacy
 
 	CCIPCore                 = Package("ccip-core")
@@ -120,27 +128,30 @@ const CurrentVersion = "current"
 // CI will prevent any of the already committed release artifacts from being changed/altered. If a released package
 // is therefore updated without its version being bumped, CI is expected to fail.
 var ReleasedVersions map[Package][]string = map[Package][]string{
-	CCIPAPIV2:                  []string{"2.0.0"},
-	CCIPBurnMintTokenPoolV2:    []string{"2.0.0", "2.1.0"},
-	CCIPClientAPIV2:            []string{"2.0.0"},
-	CCIPCodecV2:                []string{"2.0.0"},
-	CCIPCommitteeVerifierV2:    []string{"2.0.0"},
-	CCIPCoreV2:                 []string{"2.0.0", "2.1.0"},
-	CCIPEventsV2:               []string{"2.0.0"},
-	CCIPExecutorV2:             []string{"2.0.0"},
-	CCIPExtensionAPIV2:         []string{"2.0.0"},
-	CCIPFactoryV2:              []string{"2.0.0", "2.1.0"},
-	CCIPLockReleaseTokenPoolV2: []string{"2.0.0", "2.1.0"},
-	CCIPRateLimiterV2:          []string{"2.0.0"},
-	CCIPReceiverV2:             []string{"2.0.0", "2.1.0"},
-	CCIPRuntimeV2:              []string{"2.0.0", "2.1.0"},
-	CCIPSenderV2:               []string{"2.0.0", "2.1.0"},
-	CCIPTicketsV2:              []string{"2.0.0"},
-	CCIPUtilsV2:                []string{"2.0.0", "2.1.0"},
-	ChainlinkAPI:               []string{"2.0.0"},
-	Link:                       []string{"2.0.0"},
-	MCMSAPI:                    []string{"1.0.0"},
-	MCMSCore:                   []string{"2.0.0"},
+	CCIPAPIV2:                          []string{"2.0.0"},
+	CCIPBurnMintTokenPoolV2:            []string{"2.0.0", "2.1.0", "2.1.1", "2.1.2"},
+	CCIPClientAPIV2:                    []string{"2.0.0"},
+	CCIPCodecV2:                        []string{"2.0.0"},
+	CCIPCommitteeVerifierV2:            []string{"2.0.0"},
+	CCIPCoreV2:                         []string{"2.0.0", "2.1.0", "2.1.1"},
+	CCIPEventsV2:                       []string{"2.0.0"},
+	CCIPExecutorV2:                     []string{"2.0.0"},
+	CCIPExtensionAPIV2:                 []string{"2.0.0"},
+	CCIPFactoryV2:                      []string{"2.0.0", "2.1.0", "2.1.1"},
+	CCIPLockReleaseTokenPoolV2:         []string{"2.0.0", "2.1.0", "2.1.1", "2.1.2"},
+	CCIPRateLimiterV2:                  []string{"2.0.0", "2.0.1", "2.0.2"},
+	CCIPReceiverV2:                     []string{"2.0.0", "2.1.0"},
+	CCIPRegistryBurnMintTokenPoolV2:    []string{},
+	CCIPRegistryLockReleaseTokenPoolV2: []string{},
+	CCIPRegistryRateLimiterV2:          []string{},
+	CCIPRuntimeV2:                      []string{"2.0.0", "2.1.0", "2.1.1"},
+	CCIPSenderV2:                       []string{"2.0.0", "2.1.0"},
+	CCIPTicketsV2:                      []string{"2.0.0"},
+	CCIPUtilsV2:                        []string{"2.0.0", "2.1.0"},
+	ChainlinkAPI:                       []string{"2.0.0"},
+	Link:                               []string{"2.0.0", "2.1.0"},
+	MCMSAPI:                            []string{"1.0.0"},
+	MCMSCore:                           []string{"2.0.0"},
 }
 
 const (
@@ -173,6 +184,10 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2: append(ReleasedVersions[CCIPLockReleaseTokenPoolV2], DevVersion),
 	CCIPBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
 	CCIPFactoryV2:              append(ReleasedVersions[CCIPFactoryV2], DevVersion),
+
+	CCIPRegistryBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPRegistryBurnMintTokenPoolV2], DevVersion),
+	CCIPRegistryLockReleaseTokenPoolV2: append(ReleasedVersions[CCIPRegistryLockReleaseTokenPoolV2], DevVersion),
+	CCIPRegistryRateLimiterV2:          append(ReleasedVersions[CCIPRegistryRateLimiterV2], DevVersion),
 
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
@@ -374,6 +389,10 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
 	CCIPFeeTreasury:            []string{"ccip", "feetreasury"},
+
+	CCIPRegistryBurnMintTokenPoolV2:    []string{"ccip", "registry", "burnminttokenpool"},
+	CCIPRegistryLockReleaseTokenPoolV2: []string{"ccip", "registry", "lockreleasetokenpool"},
+	CCIPRegistryRateLimiterV2:          []string{"ccip", "registry", "ratelimiter"},
 
 	SpliceApiFeaturedAppV1:                []string{"splice", "splice_api_featured_app_v1"},
 	SpliceApiTokenAllocationV1:            []string{"splice", "splice_api_token_allocation_v1"},

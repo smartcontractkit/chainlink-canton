@@ -25,13 +25,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/testhelpers"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
 )
 
 const RequestSizeLimit = 100_000
@@ -357,6 +357,8 @@ func TestServer_PostCCIPSend(t *testing.T) {
 	rmnRemoteAddress := contracts.NewRawInstanceAddress("rmnRemote", "owner")
 	feeQuoterAddress := contracts.NewRawInstanceAddress("feeQuoter", "owner")
 	tokenPoolAddress := contracts.NewRawInstanceAddress("tokenPool", "owner")
+	feeTokenTransferFactoryAddress := contracts.NewRawInstanceAddress("feeTokenTransferFactory", "feeAdmin")
+	feeTokenTransferFactoryInstance := feeTokenTransferFactoryAddress.InstanceAddress()
 	cfg := config.CCIPAPIConfig{
 		PerPartyRouterFactory: config.ContractIdentifier{InstanceAddress: perPartyRouterFactoryAddress.InstanceAddress()},
 		OnRamp:                config.ContractIdentifier{InstanceAddress: onRampAddress.InstanceAddress()},
@@ -365,6 +367,19 @@ func TestServer_PostCCIPSend(t *testing.T) {
 		TokenAdminRegistry:    config.ContractIdentifier{InstanceAddress: tokenAdminRegistryAddress.InstanceAddress()},
 		RMNRemote:             config.ContractIdentifier{InstanceAddress: rmnRemoteAddress.InstanceAddress()},
 		FeeQuoter:             config.ContractIdentifier{InstanceAddress: feeQuoterAddress.InstanceAddress()},
+		CcipOwner:             "ccipOwner",
+		FeeTokens: map[string]config.FeeToken{
+			"LINK": {
+				TokenId: "LINK",
+				Admin:   "feeAdmin",
+				Factory: &config.Factory{
+					Type:            config.FactoryTypeAddress,
+					TemplateId:      new("#splice-amulet:Splice.AmuletRules:AmuletRules"),
+					Party:           new("feeAdmin"),
+					InstanceAddress: &feeTokenTransferFactoryInstance,
+				},
+			},
+		},
 	}
 	ccv1 := contracts.NewRawInstanceAddress("ccv1", "owner") // lane-mandated
 	ccv2 := contracts.NewRawInstanceAddress("ccv2", "owner")
@@ -390,7 +405,15 @@ func TestServer_PostCCIPSend(t *testing.T) {
 	setup := func(t *testing.T) (*mocks.MockActiveContractStore, oapiCCIP.ClientWithResponsesInterface) {
 		t.Helper()
 		mockActiveContractStore := mocks.NewMockActiveContractStore(t)
-		mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything)
+		mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything).Maybe()
+		mockActiveContractStore.EXPECT().Get(feeTokenTransferFactoryAddress.InstanceAddress()).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+			ContractId: "feeTokenTransferFactoryContractId",
+			TemplateId: &apiv2.Identifier{
+				PackageId:  "package",
+				ModuleName: "module",
+				EntityName: "TransferFactory",
+			},
+		}}, true).Maybe()
 		server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, cfg)
 		require.NoError(t, err)
 		client := makeClient(t, server)
@@ -549,10 +572,16 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				}, {
 					ContractId: "feeTokenConfigContractId",
 					TemplateId: "package:module:TokenConfig",
+				}, {
+					ContractId: "feeTokenTransferFactoryContractId",
+					TemplateId: "package:module:TransferFactory",
 				},
 			}, resp.JSON200.DisclosedContracts)
 			require.Equal(t, new(converters.RawInstanceAddressAsRawOrHashedAddress(defaultExecutor)), resp.JSON200.Executor)
 			require.Equal(t, "feeTokenConfigContractId", resp.JSON200.FeeTokenConfigCid)
+			require.NotNil(t, resp.JSON200.FeeTokenTransferFactoryCid)
+			require.Equal(t, "feeTokenTransferFactoryContractId", *resp.JSON200.FeeTokenTransferFactoryCid)
+			require.NotNil(t, resp.JSON200.FeeTokenTransferFactoryContext)
 		})
 		t.Run("Token Transfer", func(t *testing.T) {
 			t.Parallel()
@@ -619,10 +648,16 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				}, {
 					ContractId: "tokenConfigContractId",
 					TemplateId: "package:module:TokenConfig",
+				}, {
+					ContractId: "feeTokenTransferFactoryContractId",
+					TemplateId: "package:module:TransferFactory",
 				},
 			}, resp.JSON200.DisclosedContracts)
 			require.Equal(t, new(converters.RawInstanceAddressAsRawOrHashedAddress(defaultExecutor)), resp.JSON200.Executor)
 			require.Equal(t, "feeTokenConfigContractId", resp.JSON200.FeeTokenConfigCid)
+			require.NotNil(t, resp.JSON200.FeeTokenTransferFactoryCid)
+			require.Equal(t, "feeTokenTransferFactoryContractId", *resp.JSON200.FeeTokenTransferFactoryCid)
+			require.NotNil(t, resp.JSON200.FeeTokenTransferFactoryContext)
 		})
 		t.Run("Pure Token Transfer", func(t *testing.T) {
 			t.Parallel()
@@ -690,6 +725,9 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				}, {
 					ContractId: "tokenConfigContractId",
 					TemplateId: "package:module:TokenConfig",
+				}, {
+					ContractId: "feeTokenTransferFactoryContractId",
+					TemplateId: "package:module:TransferFactory",
 				},
 			}, resp.JSON200.DisclosedContracts)
 			require.Equal(t, new(converters.RawInstanceAddressAsRawOrHashedAddress(defaultExecutor)), resp.JSON200.Executor)
@@ -782,6 +820,102 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				// No TokenPoolRequiredCCVs
 			}, resp.JSON200.Ccvs)
 			require.Nil(t, resp.JSON200.Executor)
+		})
+		t.Run("No fee token factory configured", func(t *testing.T) {
+			t.Parallel()
+			// Same as cfg, but without fee tokens - the response must simply omit the
+			// fee token transfer factory fields.
+			cfgWithoutFeeTokens := cfg
+			cfgWithoutFeeTokens.FeeTokens = nil
+
+			mockActiveContractStore := mocks.NewMockActiveContractStore(t)
+			mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything).Maybe()
+			mockActiveContractStore.EXPECT().Get(cfgWithoutFeeTokens.OnRamp.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+				ContractId: "onRampContractId",
+				TemplateId: &apiv2.Identifier{
+					PackageId:  "package",
+					ModuleName: "module",
+					EntityName: "OnRamp",
+				},
+			}}, true)
+			mockActiveContractStore.EXPECT().Get(cfgWithoutFeeTokens.GlobalConfig.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+				ContractId: "globalConfigContractId",
+				TemplateId: &apiv2.Identifier{
+					PackageId:  "package",
+					ModuleName: "module",
+					EntityName: "GlobalConfig",
+				},
+				CreateArguments: bindings.MarshalTemplateToRecord(core.GlobalConfig{
+					InstanceId:    "globalconfig",
+					CcipOwner:     "owner",
+					ChainSelector: types.NUMERIC(sourceSelector),
+					DestChainConfigs: map[types.NUMERIC]core.DestChainConfig2{
+						types.NUMERIC(destSelector): {
+							IsEnabled:                 true,
+							DefaultExecutor:           new(defaultExecutor.Binding()),
+							MessageNetworkFeeUSDCents: "0",
+							TokenNetworkFeeUSDCents:   "0",
+							DefaultCCVs:               []chainlinkapi.RawInstanceAddress{contracts.NewRawInstanceAddress("ccv1", "owner").Binding()},
+						},
+					},
+				}),
+			}}, true)
+			mockActiveContractStore.EXPECT().Get(cfgWithoutFeeTokens.TokenAdminRegistry.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+				ContractId: "tokenAdminRegistryContractId",
+				TemplateId: &apiv2.Identifier{
+					PackageId:  "package",
+					ModuleName: "module",
+					EntityName: "TokenAdminRegistry",
+				},
+				CreateArguments: bindings.MarshalTemplateToRecord(core.TokenAdminRegistry{
+					InstanceId: "tokenadminregistry",
+					CcipOwner:  "owner",
+					EntryCount: 1,
+				}),
+			}}, true)
+			mockActiveContractStore.EXPECT().Get(cfgWithoutFeeTokens.RMNRemote.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+				ContractId: "rmnRemoteContractId",
+				TemplateId: &apiv2.Identifier{
+					PackageId:  "package",
+					ModuleName: "module",
+					EntityName: "RMNRemote",
+				},
+			}}, true)
+			mockActiveContractStore.EXPECT().Get(cfgWithoutFeeTokens.FeeQuoter.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+				ContractId: "feeQuoterContractId",
+				TemplateId: &apiv2.Identifier{
+					PackageId:  "package",
+					ModuleName: "module",
+					EntityName: "FeeQuoter",
+				},
+			}}, true)
+			mockActiveContractStore.EXPECT().Get(feeTokenConfigAddress.InstanceAddress()).Return(tokenConfigContract("feeTokenConfigContractId", feeInstrumentId, nil), true)
+			server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, cfgWithoutFeeTokens)
+			require.NoError(t, err)
+			client := makeClient(t, server)
+
+			resp, err := client.PostCCIPSendWithResponse(t.Context(), oapiCCIP.CCIPSendRequest{
+				Message: oapiCommon.Message{
+					DestinationChainSelector: destSelector,
+					Executor: struct {
+						Address *oapiCommon.RawOrHashedAddress `json:"address,omitempty"`
+						Type    oapiCommon.MessageExecutorType `json:"type"`
+					}{
+						Type: oapiCommon.NoExecutor,
+					},
+					FeeToken: oapiCommon.InstrumentId{
+						Admin: "feeAdmin",
+						Id:    "LINK",
+					},
+					Payload:  "0xdeadbeef",
+					Receiver: "0x1234567890",
+				},
+			})
+			require.NoError(t, err)
+			require.Equalf(t, http.StatusOK, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+			require.Equal(t, "feeTokenConfigContractId", resp.JSON200.FeeTokenConfigCid)
+			require.Nil(t, resp.JSON200.FeeTokenTransferFactoryCid)
+			require.Nil(t, resp.JSON200.FeeTokenTransferFactoryContext)
 		})
 	})
 	t.Run("Failure cases", func(t *testing.T) {

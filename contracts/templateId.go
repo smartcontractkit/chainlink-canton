@@ -43,6 +43,15 @@ func TemplateIDFromBinding(template templateBinding) TemplateID {
 	return templateId
 }
 
+func MustTemplateIDFromString(s string) TemplateID {
+	templateId, err := TemplateIDFromString(s)
+	if err != nil {
+		panic(err)
+	}
+
+	return templateId
+}
+
 func TemplateIDFromString(s string) (TemplateID, error) {
 	split := strings.Split(s, ":")
 	if len(split) != 3 {

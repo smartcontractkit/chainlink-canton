@@ -13,6 +13,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/smartcontractkit/chainlink-canton/authentication/config"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/services/committeeverifier"
 	"github.com/smartcontractkit/chainlink-ccv/build/devenv/util"
@@ -21,7 +23,6 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/ccip"
 	"github.com/smartcontractkit/chainlink-canton/ccip/sourcereader"
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
@@ -46,8 +47,8 @@ func CommitteeVerifierConfigLoader(outputs []*blockchain.Output) (map[string]any
 		// Return placeholder values here, the real values will be pulled from the mounted config in the container.
 		ret[strSelector] = ccip.BlockchainInfo{
 			GRPCLedgerAPIURL: "dontuse",
-			Auth: commonconfig.AuthConfig{
-				Type: commonconfig.AuthTypeStatic,
+			Auth: config.AuthConfig{
+				Type: config.AuthTypeStatic,
 				JWT:  "dontuse",
 			},
 		}
@@ -121,8 +122,8 @@ func hydrateAndMarshalCantonConfig(in *committeeverifier.Input, outputs []*block
 
 		cantonConfigs.BlockchainInfos[strSelector] = ccip.BlockchainInfo{
 			GRPCLedgerAPIURL: output.NetworkSpecificData.CantonData.InternalEndpoints.Participants[0].GRPCLedgerAPIURL,
-			Auth: commonconfig.AuthConfig{
-				Type: commonconfig.AuthTypeInsecureStatic,
+			Auth: config.AuthConfig{
+				Type: config.AuthTypeInsecureStatic,
 				JWT:  jwt,
 			},
 		}

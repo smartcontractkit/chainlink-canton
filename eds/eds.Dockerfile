@@ -1,10 +1,13 @@
 # build stage
-FROM golang:1.26.7-alpine@sha256:28d89ee9cc0ff9fec75c82ca201e6bf7fdf9a679d4b7b24dfa04f2bb766bb468 AS builder
+FROM golang:1.27.2-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS builder
 
 # Layer 1: Download dependencies first to leverage Docker layer caching
 WORKDIR /build
 COPY go.mod go.sum ./
+COPY ./authentication ./authentication
 COPY ./contracts ./contracts
+COPY ./eds ./eds
+WORKDIR /build/eds
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
@@ -12,7 +15,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY . .
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags='-s -w' -o /disclosure-server ./eds/cmd/server
+    CGO_ENABLED=0 GOOS=linux go build -ldflags='-s -w' -o /disclosure-server ./cmd/server
 
 FROM alpine:3.22.4@sha256:310c62b5e7ca5b08167e4384c68db0fd2905dd9c7493756d356e893909057601
 

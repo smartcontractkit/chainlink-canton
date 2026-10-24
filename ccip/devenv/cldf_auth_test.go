@@ -4,13 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	"github.com/smartcontractkit/chainlink-canton/authentication/config"
+	"github.com/smartcontractkit/chainlink-canton/authentication/providers/static"
 )
 
 // validJWT is a well-formed JWT with sub "1234567890".
@@ -51,26 +51,26 @@ func TestResolveAuthConfig(t *testing.T) {
 		env        map[string]string
 		tomlJWT    string
 		tomlUserID string
-		want       commonconfig.AuthConfig
+		want       config.AuthConfig
 	}{
 		{
 			name:    "toml jwt defaults to insecureStatic",
 			tomlJWT: validJWT,
-			want: commonconfig.AuthConfig{
-				Type: commonconfig.AuthTypeInsecureStatic,
+			want: config.AuthConfig{
+				Type: config.AuthTypeInsecureStatic,
 				JWT:  validJWT,
 			},
 		},
 		{
 			name: "no jwt defaults to authorizationCode",
-			want: commonconfig.AuthConfig{
-				Type: commonconfig.AuthTypeAuthorizationCode,
+			want: config.AuthConfig{
+				Type: config.AuthTypeAuthorizationCode,
 			},
 		},
 		{
 			name: "env overrides toml",
 			env: map[string]string{
-				"CANTON_AUTH_TYPE":     commonconfig.AuthTypeClientCredentials,
+				"CANTON_AUTH_TYPE":     config.AuthTypeClientCredentials,
 				"CANTON_JWT":           "env-jwt",
 				"CANTON_USER_ID":       "env-user",
 				"CANTON_AUTH_URL":      "https://auth.example.com/",
@@ -79,8 +79,8 @@ func TestResolveAuthConfig(t *testing.T) {
 			},
 			tomlJWT:    validJWT,
 			tomlUserID: "toml-user",
-			want: commonconfig.AuthConfig{
-				Type:         commonconfig.AuthTypeClientCredentials,
+			want: config.AuthConfig{
+				Type:         config.AuthTypeClientCredentials,
 				UserID:       "env-user",
 				JWT:          "env-jwt",
 				AuthURL:      "https://auth.example.com/",
@@ -91,13 +91,13 @@ func TestResolveAuthConfig(t *testing.T) {
 		{
 			name: "client secret cleared for authorizationCode",
 			env: map[string]string{
-				"CANTON_AUTH_TYPE":     commonconfig.AuthTypeAuthorizationCode,
+				"CANTON_AUTH_TYPE":     config.AuthTypeAuthorizationCode,
 				"CANTON_AUTH_URL":      "https://auth.example.com/",
 				"CANTON_CLIENT_ID":     "env-client",
 				"CANTON_CLIENT_SECRET": "should-not-apply",
 			},
-			want: commonconfig.AuthConfig{
-				Type:         commonconfig.AuthTypeAuthorizationCode,
+			want: config.AuthConfig{
+				Type:         config.AuthTypeAuthorizationCode,
 				AuthURL:      "https://auth.example.com/",
 				ClientID:     "env-client",
 				ClientSecret: "",
@@ -183,7 +183,7 @@ func TestResolveAuthConfig_envJWTOverridesToml(t *testing.T) {
 	t.Setenv("CANTON_JWT", validJWT)
 	got := resolveAuthConfig("toml-jwt-should-lose", "")
 	require.Equal(t, validJWT, got.JWT)
-	require.Equal(t, commonconfig.AuthTypeInsecureStatic, got.Type)
+	require.Equal(t, config.AuthTypeInsecureStatic, got.Type)
 }
 
 type testAuthProvider struct {
@@ -195,7 +195,7 @@ func (p testAuthProvider) TokenSource() oauth2.TokenSource {
 }
 
 func (p testAuthProvider) TransportCredentials() credentials.TransportCredentials {
-	return authentication.NewInsecureStaticProvider(p.token).TransportCredentials()
+	return static.NewInsecureStaticProvider(p.token).TransportCredentials()
 }
 
 func (p testAuthProvider) PerRPCCredentials() credentials.PerRPCCredentials {

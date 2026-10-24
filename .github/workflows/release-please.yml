@@ -39,6 +39,7 @@ jobs:
 
   # Publishes the Dar release artifacts to a drafted release and marks the release as released.
   dar-artifacts:
+    name: Add Dar release artifacts to Github release.
     needs: release-please
     if: needs.release-please.outputs.releases_created && contains(needs.release-please.outputs.paths_released, 'contracts')
     runs-on: ubuntu-latest

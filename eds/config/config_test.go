@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	authConfig "github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
@@ -53,6 +53,7 @@ chain_selector = "8706591216959472610"
 
 [ccip_api]
 	enabled = true
+	ccip_owner = "ccipOwner"
 	[ccip_api.per_party_router_factory]
 		party_id = "ccipOwner"
 		instance_address = "0x02e3bd794d451e6e9962f0c3ca7de62049bce82d040e431ccd3c4d77acaa31cf"
@@ -74,6 +75,15 @@ chain_selector = "8706591216959472610"
 	[ccip_api.fee_quoter]
 		party_id = "ccipOwner"
 		instance_address = "0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"
+	[ccip_api.fee_tokens."CC"]
+		token_id = "Amulet"
+		admin = "ccipOwner"
+		[ccip_api.fee_tokens."CC".factory]
+			type = "url"
+			token_standard_url = "localhost:8545"
+			[ccip_api.fee_tokens."CC".factory.token_standard_auth]
+				type = "insecureStatic"
+				jwt = "fake.jwt.token"
 
 [ccv_api]
 	enabled = true
@@ -161,15 +171,28 @@ chain_selector = "8706591216959472610"
 						PartyID:         "ccipOwner",
 						InstanceAddress: contracts.HexToInstanceAddress("0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"),
 					},
+					CcipOwner: "ccipOwner",
+					FeeTokens: map[string]FeeToken{
+						"CC": {
+							TokenId: "Amulet",
+							Admin:   "ccipOwner",
+							Factory: &Factory{
+								Type:             FactoryTypeURL,
+								TokenStandardURL: new("localhost:8545"),
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type: authConfig.AuthTypeInsecureStatic,
+									JWT:  "fake.jwt.token",
+								},
+							},
+						},
+					},
 				},
 				CCVAPIConfig: CCVAPIConfig{
 					Enabled: true,
 					CCVs: []CCV{
 						{
-							ContractIdentifier: ContractIdentifier{
-								PartyID:         "ccvOwner",
-								InstanceAddress: contracts.HexToInstanceAddress("0xad5d98a90ea7dbba634111605ccc4e5c1dca73a460c403070b49284e950aebf2"),
-							},
+							PartyID:         "ccvOwner",
+							InstanceAddress: contracts.HexToInstanceAddress("0xad5d98a90ea7dbba634111605ccc4e5c1dca73a460c403070b49284e950aebf2"),
 						},
 					},
 				},
@@ -189,8 +212,8 @@ chain_selector = "8706591216959472610"
 							Factory: &Factory{
 								Type:             FactoryTypeURL,
 								TokenStandardURL: new("localhost:8545"),
-								TokenStandardAuthConfig: &commonconfig.AuthConfig{
-									Type: commonconfig.AuthTypeInsecureStatic,
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type: authConfig.AuthTypeInsecureStatic,
 									JWT:  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 								},
 							},
@@ -232,8 +255,8 @@ chain_selector = "8706591216959472610"
 				},
 				Node: NodeConfig{
 					URL: "localhost:8545",
-					AuthConfig: commonconfig.AuthConfig{
-						Type:   commonconfig.AuthTypeInsecureStatic,
+					AuthConfig: authConfig.AuthConfig{
+						Type:   authConfig.AuthTypeInsecureStatic,
 						UserID: "local-user",
 						JWT:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30",
 					},
@@ -257,7 +280,7 @@ chain_selector = "8706591216959472610"
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := Read(strings.NewReader(tt.config))
+			got, err := Read(strings.NewReader(tt.config), true)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Read() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -267,6 +290,65 @@ chain_selector = "8706591216959472610"
 			if err := got.Validate(); (err != nil) != tt.wantValidationErr {
 				t.Errorf("Validate() error = %v, wantValidationErr %v", err, tt.wantValidationErr)
 			}
+		})
+	}
+}
+
+func TestConfig_Merge_Read(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		base    string
+		secrets string
+		want    *Config
+	}{
+		{
+			name: "",
+			base: `
+	[node.auth]
+	type = 'clientCredentials'
+	user_id = 'userId'
+	auth_url = 'https://auth.chain.link'
+	client_id = 'clientId'
+	client_secret = 'replacedBySecret'
+
+	[global_api]
+	max_batch_size = 2048
+			`,
+			secrets: `
+node.auth.client_secret = 'secretValue'
+			`,
+			want: &Config{
+				Server: ServerConfig{
+					MaxRequestSizeBytes: 1024 * 1024 * 10, // default
+				},
+				Node: NodeConfig{
+					AuthConfig: authConfig.AuthConfig{
+						Type:         authConfig.AuthTypeClientCredentials,
+						UserID:       "userId",
+						AuthURL:      "https://auth.chain.link",
+						ClientID:     "clientId",
+						ClientSecret: "secretValue",
+					},
+				},
+				GlobalAPIConfig: GlobalAPIConfig{
+					MaxBatchSize: 2048,
+				},
+				TokenStandardAPIConfig: TokenStandardAPIConfig{
+					SupplyCacheTTL: time.Second * 10,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ReadAndMerge(strings.NewReader(tt.base), strings.NewReader(tt.secrets))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -298,10 +380,8 @@ func TestConfig_Merge(t *testing.T) {
 				CCVAPIConfig: CCVAPIConfig{
 					CCVs: []CCV{
 						{
-							ContractIdentifier: ContractIdentifier{
-								PartyID:         "ccvOwner1",
-								InstanceAddress: contracts.HexToInstanceAddress("0x1"),
-							},
+							PartyID:         "ccvOwner1",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1"),
 						},
 					},
 				},
@@ -347,8 +427,8 @@ func TestConfig_Merge(t *testing.T) {
 								InstanceAddress: poolAddrA,
 							},
 							Factory: &Factory{
-								TokenStandardAuthConfig: &commonconfig.AuthConfig{
-									Type: commonconfig.AuthTypeInsecureStatic,
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type: authConfig.AuthTypeInsecureStatic,
 									JWT:  "jwt-token-pool-a",
 								},
 							},
@@ -377,10 +457,8 @@ func TestConfig_Merge(t *testing.T) {
 				CCVAPIConfig: CCVAPIConfig{
 					CCVs: []CCV{
 						{
-							ContractIdentifier: ContractIdentifier{
-								PartyID:         "ccvOwner1",
-								InstanceAddress: contracts.HexToInstanceAddress("0x1"),
-							},
+							PartyID:         "ccvOwner1",
+							InstanceAddress: contracts.HexToInstanceAddress("0x1"),
 						},
 					},
 				},
@@ -397,8 +475,8 @@ func TestConfig_Merge(t *testing.T) {
 							Factory: &Factory{
 								Type:             FactoryTypeURL,
 								TokenStandardURL: new("http://validator/a/v0/scan-proxy"),
-								TokenStandardAuthConfig: &commonconfig.AuthConfig{
-									Type: commonconfig.AuthTypeInsecureStatic,
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type: authConfig.AuthTypeInsecureStatic,
 									JWT:  "jwt-token-pool-a",
 								},
 							},
@@ -440,6 +518,72 @@ func TestConfig_Merge(t *testing.T) {
 				Server:        ServerConfig{},
 				Node: NodeConfig{
 					URL: "localhost:1234",
+				},
+			},
+			wantErr: false,
+		}, {
+			name: "layered merge enriches fee token factory without dropping entries",
+			base: &Config{
+				ChainSelector: "1111",
+				Server:        ServerConfig{Host: "localhost", Port: 8080},
+				CCIPAPIConfig: CCIPAPIConfig{
+					Enabled:   true,
+					CcipOwner: "ccipOwner",
+					FeeTokens: map[string]FeeToken{
+						"CC": {
+							TokenId: "Amulet",
+							Admin:   "ccipOwner",
+							Factory: &Factory{
+								Type:             FactoryTypeURL,
+								TokenStandardURL: new("http://validator/v0/scan-proxy"),
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type:         authConfig.AuthTypeClientCredentials,
+									UserID:       "userid1",
+									AuthURL:      "https://auth.chain.link",
+									ClientID:     "clientid1",
+									ClientSecret: "",
+								},
+							},
+						},
+					},
+				},
+			},
+			config: &Config{
+				CCIPAPIConfig: CCIPAPIConfig{
+					FeeTokens: map[string]FeeToken{
+						"CC": {
+							Factory: &Factory{
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									ClientSecret: "clientSecret",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				ChainSelector: "1111",
+				Server:        ServerConfig{Host: "localhost", Port: 8080},
+				CCIPAPIConfig: CCIPAPIConfig{
+					Enabled:   true,
+					CcipOwner: "ccipOwner",
+					FeeTokens: map[string]FeeToken{
+						"CC": {
+							TokenId: "Amulet",
+							Admin:   "ccipOwner",
+							Factory: &Factory{
+								Type:             FactoryTypeURL,
+								TokenStandardURL: new("http://validator/v0/scan-proxy"),
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type:         authConfig.AuthTypeClientCredentials,
+									UserID:       "userid1",
+									AuthURL:      "https://auth.chain.link",
+									ClientID:     "clientid1",
+									ClientSecret: "clientSecret",
+								},
+							},
+						},
+					},
 				},
 			},
 			wantErr: false,

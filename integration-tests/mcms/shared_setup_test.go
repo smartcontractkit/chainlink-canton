@@ -244,14 +244,12 @@ func GetSharedTAREnvironment(t *testing.T) *SharedTAREnvironment {
 		sortedSigners := SortSignersByAddress(signers)
 
 		sharedTAREnv = &SharedTAREnvironment{
-			SharedCantonEnvironment: SharedCantonEnvironment{
-				Participant:   participant,
-				McmsEncoder:   NewMCMSEncoder(),
-				CcipOwner:     participant.PartyID,
-				Signers:       signers,
-				SortedSigners: sortedSigners,
-				Config:        New2of3Config(signers),
-			},
+			Participant:   participant,
+			McmsEncoder:   NewMCMSEncoder(),
+			CcipOwner:     participant.PartyID,
+			Signers:       signers,
+			SortedSigners: sortedSigners,
+			Config:        New2of3Config(signers),
 		}
 	})
 
@@ -306,14 +304,12 @@ func GetSharedCCIPMCMSEnvironment(t *testing.T) *SharedCCIPMCMSEnvironment {
 		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.FactoryV2", "CCIPFactory").Encoder()
 
 		sharedCCIPMCMSEnv = &SharedCCIPMCMSEnvironment{
-			SharedCantonEnvironment: SharedCantonEnvironment{
-				Participant:   participant,
-				McmsEncoder:   NewMCMSEncoder(),
-				CcipOwner:     participant.PartyID,
-				Signers:       signers,
-				SortedSigners: sortedSigners,
-				Config:        New2of3Config(signers),
-			},
+			Participant:    participant,
+			McmsEncoder:    NewMCMSEncoder(),
+			CcipOwner:      participant.PartyID,
+			Signers:        signers,
+			SortedSigners:  sortedSigners,
+			Config:         New2of3Config(signers),
 			FactoryEncoder: factoryEncoder,
 		}
 	})
@@ -375,17 +371,13 @@ func GetSharedCCIPMCMSTwoParticipantEnvironment(t *testing.T) *SharedCCIPMCMSTwo
 		factoryEncoder := factory.NewContract(fmt.Sprintf("#%s", factory.PackageName), "CCIP.FactoryV2", "CCIPFactory").Encoder()
 
 		sharedCCIPMCMSTwoPartEnv = &SharedCCIPMCMSTwoParticipantEnvironment{
-			SharedCCIPMCMSEnvironment: SharedCCIPMCMSEnvironment{
-				SharedCantonEnvironment: SharedCantonEnvironment{
-					Participant:   participant,
-					McmsEncoder:   NewMCMSEncoder(),
-					CcipOwner:     participant.PartyID,
-					Signers:       signers,
-					SortedSigners: sortedSigners,
-					Config:        New2of3Config(signers),
-				},
-				FactoryEncoder: factoryEncoder,
-			},
+			Participant:    participant,
+			McmsEncoder:    NewMCMSEncoder(),
+			CcipOwner:      participant.PartyID,
+			Signers:        signers,
+			SortedSigners:  sortedSigners,
+			Config:         New2of3Config(signers),
+			FactoryEncoder: factoryEncoder,
 			BootstrapParty: bootstrapParty,
 		}
 	})

@@ -17,13 +17,12 @@ import (
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	cantonProvider "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
-	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider/authentication"
+
+	chainlink_canton "github.com/smartcontractkit/chainlink-canton"
+	"github.com/smartcontractkit/chainlink-canton/authentication/providers/static"
 )
 
 const ParticipantInputEnvVar = "PARTICIPANT_INPUT"
-
-// SpliceVersion overrides the default version specified by CTF
-const SpliceVersion = "0.7.4"
 
 type TestEnvironment struct {
 	Logger zerolog.Logger
@@ -66,7 +65,7 @@ func LoadChainFromFile(t *testing.T, path string) (*canton.Chain, error) {
 
 		if party == "" {
 			// If no party is specified, use UserManagement service to get the primary party for the user
-			authProvider := authentication.NewInsecureStaticProvider(config.JWT)
+			authProvider := static.NewInsecureStaticProvider(config.JWT)
 			ledgerApiConn, err := grpc.NewClient(
 				config.GRPCLedgerAPIURL,
 				grpc.WithTransportCredentials(authProvider.TransportCredentials()),
@@ -84,17 +83,15 @@ func LoadChainFromFile(t *testing.T, path string) (*canton.Chain, error) {
 			_ = ledgerApiConn.Close()
 		}
 
-		authProvider := authentication.NewInsecureStaticProvider(config.JWT)
+		authProvider := static.NewInsecureStaticProvider(config.JWT)
 		providerConfig.Participants[i] = cantonProvider.ParticipantConfig{
-			Endpoints: cantonProvider.Endpoints{
-				JSONLedgerAPIURL: config.JSONLedgerAPIURL,
-				GRPCLedgerAPIURL: config.GRPCLedgerAPIURL,
-				AdminAPIURL:      config.AdminAPIURL,
-				ValidatorAPIURL:  config.ValidatorAPIURL,
-			},
-			UserID:       config.UserName,
-			PartyID:      party,
-			AuthProvider: authProvider,
+			JSONLedgerAPIURL: config.JSONLedgerAPIURL,
+			GRPCLedgerAPIURL: config.GRPCLedgerAPIURL,
+			AdminAPIURL:      config.AdminAPIURL,
+			ValidatorAPIURL:  config.ValidatorAPIURL,
+			UserID:           config.UserName,
+			PartyID:          party,
+			AuthProvider:     authProvider,
 		}
 	}
 
@@ -110,7 +107,7 @@ func LoadChainWithCTF(t *testing.T, numberOfValidators int) (*canton.Chain, erro
 	bc, err := cantonProvider.NewCTFChainProvider(t, chainsel.CANTON_LOCALNET.Selector, cantonProvider.CTFChainProviderConfig{
 		NumberOfValidators: numberOfValidators,
 		Once:               defaultNetworkOnce,
-		Image:              SpliceVersion,
+		Image:              chainlink_canton.GetSpliceVersion(),
 	}).Initialize(t.Context())
 	require.NoError(t, err, "Failed to initialize CTF chain provider")
 

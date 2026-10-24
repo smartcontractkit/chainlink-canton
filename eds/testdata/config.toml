@@ -29,6 +29,7 @@ chain_selector = "8706591216959472610"
 
 [ccip_api]
   enabled = true
+  ccip_owner = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
   [ccip_api.per_party_router_factory]
     instance_address = "0x29ae752fb185acd3ce1b4176c85d7a45b0beb1278df0ca18441270d8f21fa905"
     party_id = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
@@ -50,6 +51,20 @@ chain_selector = "8706591216959472610"
   [ccip_api.fee_quoter]
     instance_address = "0x80b5666a8c377bfd0a4794a7c0a56a49f48fc406c8889e48a3b458c99c2ed883"
     party_id = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
+  [ccip_api.fee_tokens."CC"]
+    token_id = "Amulet"
+    admin = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
+    [ccip_api.fee_tokens."CC".factory]
+      type = "url"
+      token_standard_url = "participant1.validator-api.localhost:8081/v0/scan-proxy"
+  [ccip_api.fee_tokens."LINK"]
+    token_id = "link-token"
+    admin = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
+    [ccip_api.fee_tokens."LINK".factory]
+      type = "address"
+      instance_address = "0x44f3b1f70058285992aaffa899d0015ea4d9c0b5cba4ed3a90f2c99b5ca30012"
+      template_id = "#link:Link.Token:LinkToken"
+      party = "linkOwnerParty"
 
 [ccv_api]
   enabled = true

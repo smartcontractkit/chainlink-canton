@@ -303,16 +303,16 @@ func evmLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.Unkno
 		Receiver: receiver,
 		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, executorAddr protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
 			return cciptestinterfaces.MessageFields{
-					Receiver: receiver,
-					Data:     fmt.Appendf(nil, "canton2evm load n=%d dest=%d", callNum, destSelector),
-				}, cciptestinterfaces.MessageOptions{
-					ExecutionGasLimit: 200_000,
-					FinalityConfig:    1,
-					Executor:          executorAddr,
-					CCVs: []protocol.CCV{
-						{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
-					},
-				}, nil
+				Receiver: receiver,
+				Data:     fmt.Appendf(nil, "canton2evm load n=%d dest=%d", callNum, destSelector),
+			}, cciptestinterfaces.MessageOptions{
+				ExecutionGasLimit: 200_000,
+				FinalityConfig:    1,
+				Executor:          executorAddr,
+				CCVs: []protocol.CCV{
+					{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
+				},
+			}, nil
 		},
 	}
 }
@@ -326,19 +326,19 @@ func evmTokenLoadDestination(chain cciptestinterfaces.CCIP17, receiver protocol.
 		TokenLane: &laneCopy,
 		buildMessage: func(_ cciptestinterfaces.CCIP17, callNum int64, ccvAddr, executorAddr protocol.UnknownAddress) (cciptestinterfaces.MessageFields, cciptestinterfaces.MessageOptions, error) {
 			return cciptestinterfaces.MessageFields{
-					Receiver: receiver,
-					Data:     fmt.Appendf(nil, "canton2evm token load n=%d dest=%d", callNum, destSelector),
-					TokenAmount: cciptestinterfaces.TokenAmount{
-						Amount: lane.TransferAmount,
-					},
-				}, cciptestinterfaces.MessageOptions{
-					ExecutionGasLimit: lane.ExecutionGasLimit,
-					FinalityConfig:    lane.FinalityConfig,
-					Executor:          executorAddr,
-					CCVs: []protocol.CCV{
-						{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
-					},
-				}, nil
+				Receiver: receiver,
+				Data:     fmt.Appendf(nil, "canton2evm token load n=%d dest=%d", callNum, destSelector),
+				TokenAmount: cciptestinterfaces.TokenAmount{
+					Amount: lane.TransferAmount,
+				},
+			}, cciptestinterfaces.MessageOptions{
+				ExecutionGasLimit: lane.ExecutionGasLimit,
+				FinalityConfig:    lane.FinalityConfig,
+				Executor:          executorAddr,
+				CCVs: []protocol.CCV{
+					{CCVAddress: ccvAddr, Args: []byte{}, ArgsLen: 0},
+				},
+			}, nil
 		},
 	}
 }

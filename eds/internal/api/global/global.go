@@ -12,11 +12,11 @@ import (
 	"golang.org/x/exp/maps"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/eds/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
 )
 
 type Server struct {
