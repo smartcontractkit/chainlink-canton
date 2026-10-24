@@ -22,4 +22,5 @@ func (n NoopEDSMetricLabeler) RecordHTTPRequestDuration(ctx context.Context, dur
 }
 func (n NoopEDSMetricLabeler) IncrementStoreSubscriptionUptime(ctx context.Context)           {}
 func (n NoopEDSMetricLabeler) IncrementStoreUpdatesCounter(ctx context.Context)               {}
+func (n NoopEDSMetricLabeler) IncrementStoreReconnectCounter(ctx context.Context)             {}
 func (n NoopEDSMetricLabeler) RecordStoreLedgerEndGauge(ctx context.Context, ledgerEnd int64) {}
