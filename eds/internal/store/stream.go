@@ -260,6 +260,9 @@ func (s *BackfilledStream) stream(
 			}
 		}
 
+		// Every path out of the receive loop ends this subscription: count the reconnect.
+		s.metrics.IncrementStoreReconnectCounter(ctx)
+
 		// Stream ended without a context cancellation. If this incarnation never
 		// delivered a single update, drain the reconnect budget and fail closed
 		// when it is spent: reconnecting is evidently not making progress.
@@ -341,6 +344,8 @@ func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64,
 			},
 		})
 		if err != nil {
+			s.metrics.IncrementStoreReconnectCounter(ctx)
+
 			// Fail closed if we have been unable to establish a stream for too long.
 			if gap := budget.connectFailed(time.Now()); budget.maxDisconnected > 0 && gap > budget.maxDisconnected {
 				return nil, fmt.Errorf("disconnected for %s (budget %s): %w", gap.Round(time.Second), budget.maxDisconnected, err)

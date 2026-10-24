@@ -25,6 +25,8 @@ type EDSMetricLabeler interface {
 	IncrementStoreSubscriptionUptime(ctx context.Context)
 	// IncrementStoreUpdatesCounter increments the store updates counter.
 	IncrementStoreUpdatesCounter(ctx context.Context)
+	// IncrementStoreReconnectCounter increments the store reconnects counter.
+	IncrementStoreReconnectCounter(ctx context.Context)
 	// RecordStoreLedgerEndGauge records the store's current ledger end.
 	RecordStoreLedgerEndGauge(ctx context.Context, ledgerEnd int64)
 }
