@@ -117,14 +117,12 @@ func GetSharedFeeTreasuryEnvironment(t *testing.T) *SharedFeeTreasuryEnvironment
 		sortedSigners := SortSignersByAddress(signers)
 
 		sharedFeeTreasuryEnv = &SharedFeeTreasuryEnvironment{
-			SharedCantonEnvironment: SharedCantonEnvironment{
-				Participant:   participant,
-				McmsEncoder:   NewMCMSEncoder(),
-				CcipOwner:     participant.PartyID,
-				Signers:       signers,
-				SortedSigners: sortedSigners,
-				Config:        New2of3Config(signers),
-			},
+			Participant:          participant,
+			McmsEncoder:          NewMCMSEncoder(),
+			CcipOwner:            participant.PartyID,
+			Signers:              signers,
+			SortedSigners:        sortedSigners,
+			Config:               New2of3Config(signers),
 			RecipientParticipant: recipientParticipant,
 			Recipient:            recipientParticipant.PartyID,
 		}
