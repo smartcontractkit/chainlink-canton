@@ -13,16 +13,14 @@ func TestCantonOnlyConfigureLanesConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := v2cs.ConfigureChainsForLanesFromTopologyConfig{
-		BuildLanesCrossFamilyConfig: v2cs.BuildLanesCrossFamilyConfig{
-			Lanes: []v2cs.CrossFamilyLanePair{
-				{
-					ChainA: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
-					ChainB: chainsel.CANTON_TESTNET.Selector,
-				},
-				{
-					ChainA: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
-					ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector,
-				},
+		Lanes: []v2cs.CrossFamilyLanePair{
+			{
+				ChainA: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+				ChainB: chainsel.CANTON_TESTNET.Selector,
+			},
+			{
+				ChainA: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+				ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector,
 			},
 		},
 	}
@@ -36,12 +34,10 @@ func TestFamiliesInConfigureLanesConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := v2cs.ConfigureChainsForLanesFromTopologyConfig{
-		BuildLanesCrossFamilyConfig: v2cs.BuildLanesCrossFamilyConfig{
-			Lanes: []v2cs.CrossFamilyLanePair{
-				{
-					ChainA: chainsel.CANTON_TESTNET.Selector,
-					ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
-				},
+		Lanes: []v2cs.CrossFamilyLanePair{
+			{
+				ChainA: chainsel.CANTON_TESTNET.Selector,
+				ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
 			},
 		},
 	}
@@ -55,12 +51,10 @@ func TestHasCantonChainsInConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := v2cs.ConfigureChainsForLanesFromTopologyConfig{
-		BuildLanesCrossFamilyConfig: v2cs.BuildLanesCrossFamilyConfig{
-			Lanes: []v2cs.CrossFamilyLanePair{
-				{
-					ChainA: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
-					ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector,
-				},
+		Lanes: []v2cs.CrossFamilyLanePair{
+			{
+				ChainA: chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector,
+				ChainB: chainsel.ETHEREUM_TESTNET_SEPOLIA_ARBITRUM_1.Selector,
 			},
 		},
 	}

@@ -12,11 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/eds/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/testhelpers"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
 )
 
 func makeClient(t *testing.T, server *Server) oapiGlobal.ClientWithResponsesInterface {

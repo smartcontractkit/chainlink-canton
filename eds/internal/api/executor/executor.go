@@ -12,13 +12,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
 )
 
 type ContractConfig struct{}

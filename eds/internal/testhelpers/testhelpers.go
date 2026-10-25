@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 )
 
 func TestMain(m *testing.M) {

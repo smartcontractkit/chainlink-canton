@@ -15,6 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 )
 
 func GetCurrentOffset(ctx context.Context, stateService apiv2.StateServiceClient) (int64, error) {
@@ -189,6 +193,54 @@ func ListActiveContractsByInterfaceId(ctx context.Context, participant canton.Pa
 	})
 
 	return activeContracts, nil
+}
+
+func GetCreatedEventFromTransaction[T model.CreateCommander](tx *apiv2.Transaction, templateId *apiv2.Identifier) (*T, *apiv2.CreatedEvent, error) {
+	for i, event := range tx.GetEvents() {
+		switch e := event.GetEvent().(type) {
+		case *apiv2.Event_Created:
+			ev := e.Created
+			if (ev.GetTemplateId().GetPackageId() == templateId.GetPackageId() || fmt.Sprintf("#%s", ev.GetPackageName()) == templateId.GetPackageId()) &&
+				ev.GetTemplateId().GetModuleName() == templateId.GetModuleName() &&
+				ev.GetTemplateId().GetEntityName() == templateId.GetEntityName() {
+				contract, err := bindings.UnmarshalCreatedEvent[T](ev)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to unmarshal created event at index %d: %w", i, err)
+				}
+
+				return contract, ev, nil
+			}
+		default:
+			continue
+		}
+	}
+
+	return nil, nil, fmt.Errorf("created event not found for template ID %v", templateId)
+}
+
+func GetCreatedInterfaceViewFromTransaction[T any](tx *apiv2.Transaction, templateId *apiv2.Identifier) (*T, *apiv2.CreatedEvent, error) {
+	for i, event := range tx.GetEvents() {
+		switch e := event.GetEvent().(type) {
+		case *apiv2.Event_Created:
+			ev := e.Created
+			for _, interfaceView := range ev.GetInterfaceViews() {
+				if interfaceView.GetInterfaceId().GetPackageId() == templateId.GetPackageId() &&
+					interfaceView.GetInterfaceId().GetModuleName() == templateId.GetModuleName() &&
+					interfaceView.GetInterfaceId().GetEntityName() == templateId.GetEntityName() {
+					var view T
+					if err := ledger.RecordToStruct(interfaceView.GetViewValue(), &view); err != nil {
+						return nil, nil, fmt.Errorf("failed to parse interface view at index %d: %w", i, err)
+					}
+
+					return &view, ev, nil
+				}
+			}
+		default:
+			continue
+		}
+	}
+
+	return nil, nil, fmt.Errorf("created event not found for template ID %v", templateId)
 }
 
 // ContractCleanup performs a best-effort attempt at removing all CCIP and MCMS contracts.

@@ -18,10 +18,19 @@ func NewMockStateServiceClient(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockStateServiceClient {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockStateServiceClient{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -82,9 +91,9 @@ type MockStateServiceClient_GetActiveContracts_Call struct {
 //   - ctx context.Context
 //   - in *v2.GetActiveContractsRequest
 //   - opts ...grpc.CallOption
-func (_e *MockStateServiceClient_Expecter) GetActiveContracts(ctx interface{}, in interface{}, opts ...interface{}) *MockStateServiceClient_GetActiveContracts_Call {
+func (_e *MockStateServiceClient_Expecter) GetActiveContracts(ctx any, in any, opts ...any) *MockStateServiceClient_GetActiveContracts_Call {
 	return &MockStateServiceClient_GetActiveContracts_Call{Call: _e.mock.On("GetActiveContracts",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockStateServiceClient_GetActiveContracts_Call) Run(run func(ctx context.Context, in *v2.GetActiveContractsRequest, opts ...grpc.CallOption)) *MockStateServiceClient_GetActiveContracts_Call {
@@ -165,9 +174,9 @@ type MockStateServiceClient_GetConnectedSynchronizers_Call struct {
 //   - ctx context.Context
 //   - in *v2.GetConnectedSynchronizersRequest
 //   - opts ...grpc.CallOption
-func (_e *MockStateServiceClient_Expecter) GetConnectedSynchronizers(ctx interface{}, in interface{}, opts ...interface{}) *MockStateServiceClient_GetConnectedSynchronizers_Call {
+func (_e *MockStateServiceClient_Expecter) GetConnectedSynchronizers(ctx any, in any, opts ...any) *MockStateServiceClient_GetConnectedSynchronizers_Call {
 	return &MockStateServiceClient_GetConnectedSynchronizers_Call{Call: _e.mock.On("GetConnectedSynchronizers",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockStateServiceClient_GetConnectedSynchronizers_Call) Run(run func(ctx context.Context, in *v2.GetConnectedSynchronizersRequest, opts ...grpc.CallOption)) *MockStateServiceClient_GetConnectedSynchronizers_Call {
@@ -248,9 +257,9 @@ type MockStateServiceClient_GetLatestPrunedOffsets_Call struct {
 //   - ctx context.Context
 //   - in *v2.GetLatestPrunedOffsetsRequest
 //   - opts ...grpc.CallOption
-func (_e *MockStateServiceClient_Expecter) GetLatestPrunedOffsets(ctx interface{}, in interface{}, opts ...interface{}) *MockStateServiceClient_GetLatestPrunedOffsets_Call {
+func (_e *MockStateServiceClient_Expecter) GetLatestPrunedOffsets(ctx any, in any, opts ...any) *MockStateServiceClient_GetLatestPrunedOffsets_Call {
 	return &MockStateServiceClient_GetLatestPrunedOffsets_Call{Call: _e.mock.On("GetLatestPrunedOffsets",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockStateServiceClient_GetLatestPrunedOffsets_Call) Run(run func(ctx context.Context, in *v2.GetLatestPrunedOffsetsRequest, opts ...grpc.CallOption)) *MockStateServiceClient_GetLatestPrunedOffsets_Call {
@@ -331,9 +340,9 @@ type MockStateServiceClient_GetLedgerEnd_Call struct {
 //   - ctx context.Context
 //   - in *v2.GetLedgerEndRequest
 //   - opts ...grpc.CallOption
-func (_e *MockStateServiceClient_Expecter) GetLedgerEnd(ctx interface{}, in interface{}, opts ...interface{}) *MockStateServiceClient_GetLedgerEnd_Call {
+func (_e *MockStateServiceClient_Expecter) GetLedgerEnd(ctx any, in any, opts ...any) *MockStateServiceClient_GetLedgerEnd_Call {
 	return &MockStateServiceClient_GetLedgerEnd_Call{Call: _e.mock.On("GetLedgerEnd",
-		append([]interface{}{ctx, in}, opts...)...)}
+		append([]any{ctx, in}, opts...)...)}
 }
 
 func (_c *MockStateServiceClient_GetLedgerEnd_Call) Run(run func(ctx context.Context, in *v2.GetLedgerEndRequest, opts ...grpc.CallOption)) *MockStateServiceClient_GetLedgerEnd_Call {

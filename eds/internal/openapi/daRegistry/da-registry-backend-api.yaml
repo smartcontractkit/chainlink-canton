@@ -1,0 +1,1145 @@
+openapi: 3.0.0
+info:
+  title: Utilities API
+  description: Exposes technical information and contract data of the Utility App
+  version: 2.1.0
+tags:
+  - name: utility
+servers:
+  - url: "http://localhost:8080"
+paths:
+  /:
+    get:
+      tags: [common]
+      operationId: "root"
+      x-jvm-package: health
+      responses:
+        "200":
+          description: ok
+  /readyz:
+    get:
+      tags: [common]
+      operationId: "isReady"
+      x-jvm-package: health
+      responses:
+        "200":
+          description: ok
+        "503":
+          description: service unavailable
+  /livez:
+    get:
+      tags: [common]
+      operationId: "isLive"
+      x-jvm-package: health
+      responses:
+        "200":
+          description: ok
+        "503":
+          description: service unavailable
+
+  /api/utilities/v0/openapi:
+    get:
+      tags: [operator]
+      operationId: "getOpenApiSpec"
+      x-jvm-package: utility
+      responses:
+        "200":
+          description: Returns the OpenApi specification
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "500":
+          description: OpenApi specification is not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/utilities/v0/operator:
+    get:
+      tags: [operator]
+      operationId: "getOperator"
+      x-jvm-package: utility
+      responses:
+        "200":
+          description: Returns the operator party
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetOperatorResponse"
+        "500":
+          description: Operator party is not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/utilities/v0/package/all:
+    get:
+      tags: [operator]
+      operationId: "getAllPackages"
+      x-jvm-package: utility
+      responses:
+        "200":
+          description: Returns package information that are in use
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAllPackagesResponse"
+        "500":
+          description: Operator party is not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/utilities/v0/contract/instrument-configuration/all:
+    get:
+      tags: [operator]
+      operationId: "getAllInstrumentConfigurations"
+      x-jvm-package: utility
+      responses:
+        "200":
+          description: Returns all instrument configurations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetAllInstrumentConfigurationsResponse"
+        "500":
+          description: Operator party is not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/utilities/v0/contract/instrument-configuration:
+    post:
+      tags: [operator]
+      operationId: "getInstrumentConfiguration"
+      x-jvm-package: utility
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetInstrumentConfigurationRequest"
+      responses:
+        "200":
+          description: Returns the instrument configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetInstrumentConfigurationResponse"
+        "404":
+          description: Instrument configuration not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Operator party is not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/utilities/v0/registry/mint/v0/offer:
+    post:
+      tags: [registry]
+      operationId: "getMintOfferCreateContext"
+      x-jvm-package: registry
+      description: |
+        Get the factory and choice context for creating a mint offer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfferMintRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FactoryWithChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/mint/v0/request:
+    post:
+      tags: [registry]
+      operationId: "getMintRequestCreateContext"
+      x-jvm-package: registry
+      description: |
+        Get the factory and choice context for creating a mint request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestMintRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FactoryWithChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/burn/v0/offer:
+    post:
+      tags: [registry]
+      operationId: "getBurnOfferCreateContext"
+      x-jvm-package: registry
+      description: |
+        Get the factory and choice context for creating a burn offer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OfferBurnRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FactoryWithChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/burn/v0/request:
+    post:
+      tags: [registry]
+      operationId: "getBurnRequestCreateContext"
+      x-jvm-package: registry
+      description: |
+        Get the factory and choice context for creating a burn request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestBurnRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FactoryWithChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/mint/v0/offer/{mintOfferId}/choice-contexts/accept:
+    post:
+      tags: [registry]
+      operationId: "getMintOfferAcceptContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to accept and execute a mint offer.
+      parameters:
+        - name: mintOfferId
+          description: "The contract ID of the mint offer to accept."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/mint/v0/offer/{mintOfferId}/choice-contexts/reject:
+    post:
+      tags: [registry]
+      operationId: "getMintOfferRejectContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to reject a mint offer.
+      parameters:
+        - name: mintOfferId
+          description: "The contract ID of the mint offer to reject."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/mint/v0/offer/{mintOfferId}/choice-contexts/cancel:
+    post:
+      tags: [registry]
+      operationId: "getMintOfferCancelContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to cancel a mint offer.
+      parameters:
+        - name: mintOfferId
+          description: "The contract ID of the mint offer to cancel."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/mint/v0/request/{mintRequestId}/choice-contexts/accept:
+    post:
+      tags: [registry]
+      operationId: "getMintRequestAcceptContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to accept and execute a mint request.
+      parameters:
+        - name: mintRequestId
+          description: "The contract ID of the mint request to accept."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/mint/v0/request/{mintRequestId}/choice-contexts/reject:
+    post:
+      tags: [registry]
+      operationId: "getMintRequestRejectContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to reject a mint request.
+      parameters:
+        - name: mintRequestId
+          description: "The contract ID of the mint request to reject."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/mint/v0/request/{mintRequestId}/choice-contexts/cancel:
+    post:
+      tags: [registry]
+      operationId: "getMintRequestCancelContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to cancel a mint request.
+      parameters:
+        - name: mintRequestId
+          description: "The contract ID of the mint request to cancel."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/burn/v0/offer/{burnOfferId}/choice-contexts/accept:
+    post:
+      tags: [registry]
+      operationId: "getBurnOfferAcceptContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to accept and execute a burn offer.
+      parameters:
+        - name: burnOfferId
+          description: "The contract ID of the burn offer to accept."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/burn/v0/offer/{burnOfferId}/choice-contexts/reject:
+    post:
+      tags: [registry]
+      operationId: "getBurnOfferRejectContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to reject a burn offer.
+      parameters:
+        - name: burnOfferId
+          description: "The contract ID of the burn offer to reject."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/burn/v0/offer/{burnOfferId}/choice-contexts/cancel:
+    post:
+      tags: [registry]
+      operationId: "getBurnOfferCancelContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to cancel a burn offer.
+      parameters:
+        - name: burnOfferId
+          description: "The contract ID of the burn offer to cancel."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/burn/v0/request/{burnRequestId}/choice-contexts/accept:
+    post:
+      tags: [registry]
+      operationId: "getBurnRequestAcceptContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to accept and execute a burn request.
+      parameters:
+        - name: burnRequestId
+          description: "The contract ID of the burn request to accept."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/burn/v0/request/{burnRequestId}/choice-contexts/reject:
+    post:
+      tags: [registry]
+      operationId: "getBurnRequestRejectContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to reject a burn request.
+      parameters:
+        - name: burnRequestId
+          description: "The contract ID of the burn request to reject."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/burn/v0/request/{burnRequestId}/choice-contexts/cancel:
+    post:
+      tags: [registry]
+      operationId: "getBurnRequestCancelContext"
+      x-jvm-package: registry
+      description: |
+        Get the choice context to cancel a burn request.
+      parameters:
+        - name: burnRequestId
+          description: "The contract ID of the burn request to cancel."
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/burn-mint-instruction/v0/burn-mint-factory:
+    post:
+      tags: [registry]
+      operationId: "getBurnMintFactory"
+      x-jvm-package: registry
+      description: |
+        Get the burn mint factory and choice context for burn and mint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetBurnMintFactoryRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FactoryWithChoiceContext"
+        "400":
+          $ref: "#/components/responses/400"
+        "404":
+          $ref: "#/components/responses/404"
+        "500":
+          $ref: "#/components/responses/500"
+
+  /api/utilities/v0/registry/transfer/v0/proof:
+    post:
+      tags: [registry]
+      operationId: "verifyTransferProof"
+      x-jvm-package: registry
+      description: |
+        Verify the outcome of a transfer of Registry Utility assets on Canton.
+
+        Given an UpdateID and a Transfer Object, the service looks up the corresponding
+        ledger transaction and verifies the transfer details against the on-chain events.
+
+        The response status indicates the transfer outcome:
+        - `Success`: The transfer was executed in the referenced transaction
+        - `Pending`: The transfer instruction has been created but not yet settled
+        - `Failure`: The transfer instruction was rejected or withdrawn by one of the parties
+
+        If none of the above conditions are met, if the provided transfer details do not match
+        the on-chain data, or if the original TransferInstruction contract cannot be retrieved,
+        a `400` is returned. No further diagnostic information is included in
+        the error response to prevent unintended disclosure of sensitive ledger data.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyTransferProofRequest"
+      responses:
+        "200":
+          description: |
+            Transfer proof verified. The `status` field indicates the transfer outcome
+            (`Success`, `Pending`, or `Failure`). See the endpoint description for details.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyTransferProofResponse"
+        "400":
+          $ref: "#/components/responses/400"
+        "500":
+          $ref: "#/components/responses/500"
+
+components:
+  responses:
+    "400":
+      description: "bad request"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "404":
+      description: "not found"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    "500":
+      description: "Internal server error"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Error:
+      type: object
+      description: "A problem occurred with processing the request. For instance: syntactically invalid JSON body, missing required fields, etc."
+      required:
+        - error
+        - error_description
+      properties:
+        error:
+          description: An error code, e.g. invalid_token
+          type: string
+          default: unknown_error
+        error_description:
+          description: A description of the error
+          type: string
+          default: Something went wrong
+
+    ContractMeta:
+      type: object
+      required:
+        - contractId
+        - templateId
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        contractId:
+          type: string
+        templateId:
+          type: string
+        synchronizerId:
+          type: string
+          description: Preferred synchronizer identifier for disclosed contracts and contract metadata.
+        domainId:
+          type: string
+          deprecated: true
+          description: Deprecated alias of synchronizerId kept for backward compatibility.
+
+    DisclosedContract:
+      allOf:
+        - $ref: "#/components/schemas/ContractMeta"
+        - type: object
+          required:
+            - createdEventBlob
+          properties:
+            createdEventBlob:
+              type: string
+              description: The base64 encoded created event blob
+
+    PartyCredentialRequirement:
+      type: object
+      required:
+        - issuer
+        - requiredClaims
+      properties:
+        issuer:
+          type: string
+          description: Required issuer of the credential
+        requiredClaims:
+          type: string
+          description: Required (property, value) pairs that the holder has to have claims for as a subject
+          items:
+            $ref: "#/components/schemas/CredentialClaim"
+
+    CredentialClaim:
+      type: object
+      required:
+        - property
+        - value
+      properties:
+        property:
+          type: string
+          description: The property of the claim
+        value:
+          type: string
+          description: The value of the claim
+
+    InstrumentIdentifier:
+      type: object
+      required:
+        - source
+        - id
+        - scheme
+      properties:
+        source:
+          description: The entity that originally created or issued the identifier.
+          type: string
+        id:
+          description: The identifier for the instrument
+          type: string
+        scheme:
+          description: The scheme or standard used for the identifier.
+          type: string
+
+    GetOperatorResponse:
+      type: object
+      required:
+        - partyId
+      properties:
+        partyId:
+          type: string
+          description: The operator party id
+
+    GetAllPackagesResponse:
+      type: object
+      required:
+        - packages
+      properties:
+        packages:
+          type: array
+          items:
+            $ref: "#/components/schemas/PackageDescriptor"
+
+    PackageDescriptor:
+      type: object
+      description: Contains the package ids for a given package name
+      required:
+        - name
+        - id
+      properties:
+        name:
+          description: Name of the package
+          type: string
+        id:
+          description: Package ID
+          type: string
+
+    GetInstrumentConfigurationRequest:
+      type: object
+      required:
+        - registrar
+        - instrumentIdentifier
+      properties:
+        registrar:
+          type: string
+          description: The registrar party id
+        instrumentIdentifier:
+          $ref: "#/components/schemas/InstrumentIdentifier"
+
+    GetInstrumentConfigurationResponse:
+      $ref: "#/components/schemas/InstrumentConfiguration"
+
+    GetAllInstrumentConfigurationsResponse:
+      type: object
+      required:
+        - instrumentConfigurations
+      properties:
+        instrumentConfigurations:
+          type: array
+          description: All instrument configurations
+          items:
+            $ref: "#/components/schemas/InstrumentConfiguration"
+
+    InstrumentConfiguration:
+      type: object
+      required:
+        - contract
+        - payload
+      properties:
+        contract:
+          $ref: "#/components/schemas/ContractMeta"
+        payload:
+          $ref: "#/components/schemas/InstrumentConfigurationPayload"
+
+    InstrumentConfigurationPayload:
+      type: object
+      required:
+        - operator
+        - provider
+        - registrar
+        - defaultIdentifier
+        - additionalIdentifiers
+        - issuerRequirements
+        - holderRequirements
+      properties:
+        operator:
+          type: string
+          description: The operator party id
+        provider:
+          type: string
+          description: The provider party id
+        registrar:
+          type: string
+          description: The registrar party id
+        defaultIdentifier:
+          $ref: "#/components/schemas/InstrumentIdentifier"
+        additionalIdentifiers:
+          type: array
+          description: Additional instrument identifiers
+          items:
+            $ref: "#/components/schemas/InstrumentIdentifier"
+        issuerRequirements:
+          type: array
+          description: Credential requirements to mint/burn a given asset
+          items:
+            $ref: "#/components/schemas/PartyCredentialRequirement"
+        holderRequirements:
+          type: array
+          description: Credential requirements to transfer/lock/unlock a given asset
+          items:
+            $ref: "#/components/schemas/PartyCredentialRequirement"
+
+    TokenInformation:
+      type: object
+      required:
+        - access_token
+      properties:
+        id_token:
+          type: string
+        access_token:
+          type: string
+
+    GetFactoryRequest:
+      type: object
+      required:
+        - choiceArguments
+      properties:
+        choiceArguments:
+          type: object
+          description: |
+            The arguments that are intended to be passed to the choice provided by the factory.
+            To avoid repeating the Daml type definitions, they are specified as JSON objects.
+            However the concrete format is given by how the choice arguments are encoded using the Daml JSON API
+
+            The choice arguments are provided so that the registry can also provide choice-argument
+            specific contracts, e.g., the configuration for a specific instrument-id.
+
+    FactoryWithChoiceContext:
+      description: |
+        A factory contract together with the choice context required to exercise the choice
+        provided by the factory. Typically used to implement the generic initiation of on-ledger workflows
+        via a Daml interface.
+
+        Clients SHOULD avoid reusing the same `FactoryWithChoiceContext` for exercising multiple choices,
+        as the choice context MAY be specific to the choice being exercised.
+      type: object
+      required:
+        - factoryId
+        - choiceContext
+      properties:
+        factoryId:
+          description: "The contract ID of the contract of the factory which can be used to create instruction."
+          type: string
+        choiceContext:
+          $ref: "#/components/schemas/ChoiceContext"
+
+    ChoiceContext:
+      description: |
+        The context required to exercise a choice on a contract via an interface.
+        Used to retrieve additional reference date that is passed in via disclosed contracts,
+        which are in turn referred to via their contract ID in the `choiceContextData`.
+      type: object
+      required:
+        - choiceContextData
+        - disclosedContracts
+      properties:
+        choiceContextData:
+          description: "The additional data to use when exercising the choice."
+          type: object
+        disclosedContracts:
+          description: |
+            The contracts that are required to be disclosed to the participant node for exercising
+            the choice.
+          type: array
+          items:
+            $ref: "#/components/schemas/DisclosedContract"
+
+    RequestBurnRequest:
+      description: "The request to get the factory and choice context for creating a burn request."
+      type: object
+      required:
+        - holder
+        - holdingContractIds
+        - instrumentId
+      properties:
+        holder:
+          description: "The party whose holding will be burned."
+          type: string
+        holdingContractIds:
+          description: "Contract ids of Holdings to be used for the burn."
+          type: array
+          items:
+            type: string
+        instrumentId:
+          $ref: "#/components/schemas/InstrumentId"
+
+    OfferBurnRequest:
+      description: "The request to get the factory and choice context for creating a burn offer."
+      type: object
+      required:
+        - holder
+        - instrumentId
+      properties:
+        holder:
+          description: "The party whose holding will be burned."
+          type: string
+        instrumentId:
+          $ref: "#/components/schemas/InstrumentId"
+
+    RequestMintRequest:
+      description: "The request to get the factory and choice context for creating a mint request."
+      type: object
+      required:
+        - holder
+        - instrumentId
+      properties:
+        holder:
+          description: "The party for whom the holding will be minted."
+          type: string
+        instrumentId:
+          $ref: "#/components/schemas/InstrumentId"
+
+    OfferMintRequest:
+      description: "The request to get the factory and choice context for creating a mint offer."
+      type: object
+      required:
+        - holder
+        - instrumentId
+      properties:
+        holder:
+          description: "The party for whom the holding will be minted."
+          type: string
+        instrumentId:
+          $ref: "#/components/schemas/InstrumentId"
+
+    GetBurnMintFactoryRequest:
+      description: "The request to get the factory and choice context for burn and mint."
+      type: object
+      required:
+        - instrumentId
+        - inputHoldingCids
+        - outputs
+      properties:
+        instrumentId:
+          $ref: "#/components/schemas/InstrumentId"
+        inputHoldingCids:
+          description: "Contract ids of Holdings to be used for the burn."
+          type: array
+          items:
+            type: string
+        outputs:
+          description: "The list of specification of a holding to be minted."
+          type: array
+          items:
+            $ref: "#/components/schemas/MintOutput"
+
+    MintOutput:
+      description: "The output to be minted."
+      type: object
+      required:
+        - owner
+        - amount
+      properties:
+        owner:
+          description: "The party for whom the holding will be minted."
+          type: string
+        amount:
+          description: "The amount to be minted."
+          type: string
+
+    InstrumentId:
+      description: "The identifier of the instrument."
+      type: object
+      required:
+        - admin
+        - id
+      properties:
+        admin:
+          description: "The party administering the instrument."
+          type: string
+        id:
+          description: "The unique identifier of the instrument."
+          type: string
+
+    VerifyTransferProofRequest:
+      description: "Request to verify the outcome of a transfer of Registry Utility assets on Canton."
+      type: object
+      required:
+        - updateId
+        - transfer
+      properties:
+        updateId:
+          description: |
+            For the two-step transfer workflow, specifies the most recent UpdateId.
+            If the transfer has completed its second step (accept, reject, or withdraw),
+            use the UpdateId associated with that action. Otherwise, use the UpdateId from the initial transfer offer.
+          type: string
+        transfer:
+          $ref: "#/components/schemas/TransferObject"
+
+    TransferObject:
+      description: "The transfer payload containing transaction details known only to the sender and receiver."
+      type: object
+      required:
+        - sender
+        - receiver
+        - amount
+        - instrumentId
+        - requestedAt
+        - executeBefore
+        - inputHoldingCids
+        - meta
+      properties:
+        sender:
+          description: "The party ID of the transfer sender."
+          type: string
+        receiver:
+          description: "The party ID of the transfer receiver."
+          type: string
+        amount:
+          description: "The transfer amount as a decimal string."
+          type: string
+          example: "1.0000000000"
+        instrumentId:
+          $ref: "#/components/schemas/InstrumentId"
+        requestedAt:
+          description: "The timestamp when the transfer was requested."
+          type: string
+          format: date-time
+        executeBefore:
+          description: "The deadline by which the transfer must be executed."
+          type: string
+          format: date-time
+        inputHoldingCids:
+          description: "Contract IDs of the holdings used as inputs for the transfer."
+          type: array
+          items:
+            type: string
+        meta:
+          $ref: "#/components/schemas/TransferMeta"
+
+    TransferMeta:
+      description: "Additional metadata associated with the transfer."
+      type: object
+      required:
+        - values
+      properties:
+        values:
+          description: "Arbitrary key-value metadata attached to the transfer."
+          type: object
+          additionalProperties:
+            type: string
+
+    VerifyTransferProofResponse:
+      description: "The outcome of verifying a transfer proof."
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          $ref: "#/components/schemas/TransferProofStatus"
+
+    TransferProofStatus:
+      description: |
+        The status of the transfer proof verification:
+        - `Success`: The proof is verified and the transfer was successfully concluded
+        - `Failure`: The proof is verified, but the transfer did not successfully conclude.
+        - `Pending`: The transaction is still in progress (e.g., a transfer offer has been sent but not yet accepted in a two-step flow).
+      type: string
+      enum:
+        - Success
+        - Failure
+        - Pending

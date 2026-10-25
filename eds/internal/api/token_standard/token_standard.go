@@ -26,13 +26,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_transfer_instruction_v1"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/global"
+	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/tokenMetadataV1"
+	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
 const (

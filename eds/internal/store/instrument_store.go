@@ -81,6 +81,19 @@ func (s *InstrumentHoldingStore) Run(ctx context.Context, streamConfig StreamCon
 	s.activeContracts = make(map[types.CONTRACT_ID]splice_api_token_holding_v1.HoldingView)
 	s.mux.Unlock()
 
+	// This store finds a pool's holdings by watching a specific owner party (RegisterParty).
+	// If no pool owner has been registered, there's nothing to watch for - and the ledger
+	// rejects a stream with an empty party filter anyway - so just skip it. This is normal for
+	// pool types that don't need holdings (e.g. burn/mint pools mint/burn, they don't hold).
+	if len(s.filters) == 0 {
+		s.logger.Info().Msg("no parties registered, instrument holding store will not stream")
+		if options.onBackfillCompleted != nil {
+			options.onBackfillCompleted()
+		}
+
+		return nil
+	}
+
 	return s.stream.Run(ctx, s.filters, streamConfig, s.onActiveContract, s.onCreatedEvent, s.onArchivedEvent, nil, options.onBackfillCompleted)
 }
 

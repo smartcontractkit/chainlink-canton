@@ -33,8 +33,6 @@ type DeployBurnMintTokenPoolConfig struct {
 	Qualifier string
 	// Optional; defaults to empty. PoolReceiveContext can be set for receive context.
 	PoolReceiveContext splice_api_token_metadata_v1.ChoiceContext
-	// Optional; defaults to 24h RelativeHours. TransferTimeout for the pool.
-	TransferTimeout burnminttokenpool.TransferTimeout
 	// Optional; defaults to empty map.
 	RemoteChainConfigs map[types.NUMERIC]burnminttokenpool.RemoteChainConfig
 	// Optional; defaults to empty map.
@@ -71,10 +69,6 @@ func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[D
 	if poolReceiveContext.Values == nil {
 		poolReceiveContext = splice_api_token_metadata_v1.ChoiceContext{Values: map[string]splice_api_token_metadata_v1.AnyValue{}}
 	}
-	transferTimeout := cfg.TransferTimeout
-	if transferTimeout.RelativeHours == nil && transferTimeout.Indefinite == nil {
-		transferTimeout = burnminttokenpool.TransferTimeout{RelativeHours: new(types.INT64(24))}
-	}
 	remoteChainConfigs := cfg.RemoteChainConfigs
 	if remoteChainConfigs == nil {
 		remoteChainConfigs = map[types.NUMERIC]burnminttokenpool.RemoteChainConfig{}
@@ -99,8 +93,9 @@ func (d DeployBurnMintTokenPool) Apply(e cldf.Environment, config CantonCSDeps[D
 			RemoteChainConfigs:      remoteChainConfigs,
 			TokenTransferFeeConfigs: tokenTransferFeeConfigs,
 			PoolReceiveContext:      poolReceiveContext,
-			TransferTimeout:         transferTimeout,
-			Deps:                    cfg.Deps,
+			// TransferTimeout is deprecated and unused
+			TransferTimeout: burnminttokenpool.TransferTimeout{RelativeHours: new(types.INT64(0))},
+			Deps:            cfg.Deps,
 		},
 		OwnerParty: types.PARTY(cfg.PoolOwner),
 	})

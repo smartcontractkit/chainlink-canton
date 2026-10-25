@@ -30,7 +30,7 @@ services:
       - max_connections=1000
 
   canton:
-    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:${SPLICE_VERSION}"
+    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:${SPLICE_VERSION:?Splice version not set - pass --env-file pointing at the repo-root .SPLICE-VERSION file, see README.md}"
     container_name: canton
     volumes:
       - ./docker/canton/health-check.sh:/app/health-check.sh
@@ -73,7 +73,7 @@ services:
       - 1305:1305  # Ledger API
 
   splice:
-    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-app:${SPLICE_VERSION}"
+    image: "ghcr.io/digital-asset/decentralized-canton-sync/docker/splice-app:${SPLICE_VERSION:?Splice version not set - pass --env-file pointing at the repo-root .SPLICE-VERSION file, see README.md}"
     container_name: splice
     env_file:
       - ./env/common.env
@@ -127,7 +127,7 @@ services:
     build:
       context: ./docker/console
       args:
-        BASE_NAME: ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:${SPLICE_VERSION}
+        BASE_NAME: ghcr.io/digital-asset/decentralized-canton-sync/docker/canton:${SPLICE_VERSION:?Splice version not set - pass --env-file pointing at the repo-root .SPLICE-VERSION file, see README.md}
     env_file:
       - ./env/common.env
     environment:

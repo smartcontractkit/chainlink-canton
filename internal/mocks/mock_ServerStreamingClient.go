@@ -17,10 +17,19 @@ func NewMockServerStreamingClient[Res any](t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockServerStreamingClient[Res] {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockServerStreamingClient[Res]{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -262,7 +271,7 @@ type MockServerStreamingClient_RecvMsg_Call[Res any] struct {
 
 // RecvMsg is a helper method to define mock.On call
 //   - m any
-func (_e *MockServerStreamingClient_Expecter[Res]) RecvMsg(m interface{}) *MockServerStreamingClient_RecvMsg_Call[Res] {
+func (_e *MockServerStreamingClient_Expecter[Res]) RecvMsg(m any) *MockServerStreamingClient_RecvMsg_Call[Res] {
 	return &MockServerStreamingClient_RecvMsg_Call[Res]{Call: _e.mock.On("RecvMsg", m)}
 }
 
@@ -313,7 +322,7 @@ type MockServerStreamingClient_SendMsg_Call[Res any] struct {
 
 // SendMsg is a helper method to define mock.On call
 //   - m any
-func (_e *MockServerStreamingClient_Expecter[Res]) SendMsg(m interface{}) *MockServerStreamingClient_SendMsg_Call[Res] {
+func (_e *MockServerStreamingClient_Expecter[Res]) SendMsg(m any) *MockServerStreamingClient_SendMsg_Call[Res] {
 	return &MockServerStreamingClient_SendMsg_Call[Res]{Call: _e.mock.On("SendMsg", m)}
 }
 

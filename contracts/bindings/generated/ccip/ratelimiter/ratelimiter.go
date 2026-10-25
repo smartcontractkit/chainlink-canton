@@ -24,7 +24,7 @@ var (
 
 const (
 	PackageName = "ccip-rate-limiter-v2"
-	PackageID   = "3c33043d19b1a5eb1b842d3c1634ab73c6886c3b1e0b36628053093dbe5739c3"
+	PackageID   = "598fc69f3ee858fb72a105457dc54a32f8e6b8eb34860d0cb8f37a5be16929a7"
 	SDKVersion  = "3.4.11"
 )
 
@@ -35,6 +35,7 @@ type Template interface {
 
 const (
 	RateLimiterContextKey = types.TEXT("rate-limiter")
+	MaxTruncatableTokens  = types.NUMERIC("9223372036854775807.0000000000")
 )
 
 func argsToMap(args any) map[string]any {
@@ -519,9 +520,10 @@ var _ api.IMCMSReceiver = (*RateLimiter)(nil)
 
 // SetConfig is a Record type
 type SetConfig struct {
-	NewIsEnabled types.BOOL    `json:"newIsEnabled"`
-	NewCapacity  types.NUMERIC `json:"newCapacity"`
-	NewRate      types.NUMERIC `json:"newRate"`
+	NewIsEnabled   types.BOOL       `json:"newIsEnabled"`
+	NewCapacity    types.NUMERIC    `json:"newCapacity"`
+	NewRate        types.NUMERIC    `json:"newRate"`
+	NewLastUpdated *types.TIMESTAMP `json:"newLastUpdated" hex:"optional"`
 }
 
 // ToMap converts SetConfig to a map for DAML arguments
@@ -533,6 +535,18 @@ func (t SetConfig) ToMap() map[string]any {
 	m["newCapacity"] = t.NewCapacity
 
 	m["newRate"] = t.NewRate
+
+	if t.NewLastUpdated != nil {
+		m["newLastUpdated"] = map[string]any{
+			"_type": "optional",
+			"value": *t.NewLastUpdated,
+		}
+	} else {
+		m["newLastUpdated"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
 
 	return m
 }

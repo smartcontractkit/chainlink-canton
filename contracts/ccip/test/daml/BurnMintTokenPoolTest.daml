@@ -1599,6 +1599,7 @@ testBurnMintTokenPool_RateLimitAdminSetConfigAndCannotRewireLimiters = script do
       newIsEnabled = True
       newCapacity = 50.0
       newRate = 5.0
+      newLastUpdated = None
 
   -- the rate limit admin can call SetConfig on the rate limiter, but isn't an observer of the rate limiter itself
   disclosedRateLimiter <- fromSome <$> queryDisclosure poolOwner inboundRateLimiterCid

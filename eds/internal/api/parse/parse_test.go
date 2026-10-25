@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 )
 
 func validMessage() oapiCommon.Message {

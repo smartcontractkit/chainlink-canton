@@ -12,6 +12,7 @@ import (
 	cantonsdk "github.com/smartcontractkit/mcms/sdk/canton"
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
+	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
@@ -43,7 +44,7 @@ func (r *CantonMCMSReader) GetChainMetadata(
 	inspector := cantonsdk.NewInspector(
 		participant.LedgerServices.State,
 		opcontract.LedgerQueryParties(participant),
-		timelockRoleForAction(input.TimelockAction),
+		cantonmcms.RoleForAction(input.TimelockAction).SDKRole,
 	)
 
 	metadata, err := inspector.GetRootMetadata(ctx, mcmsRef.Address)
@@ -73,7 +74,7 @@ func (r *CantonMCMSReader) GetMCMSRef(
 	chainSelector uint64,
 	input ccipmcms.Input,
 ) (datastore.AddressRef, error) {
-	return findMCMSAddressRef(e.DataStore, chainSelector, resolveMCMSContractType(input.TimelockAction), input.Qualifier)
+	return findMCMSAddressRef(e.DataStore, chainSelector, cantonmcms.RoleForAction(input.TimelockAction).ContractType, input.Qualifier)
 }
 
 func findMCMSAddressRef(
@@ -110,31 +111,5 @@ func findMCMSAddressRef(
 		}
 
 		return datastore.AddressRef{}, fmt.Errorf("multiple %s refs found on chain %d; specify MCMS qualifier", contractType, chainSelector)
-	}
-}
-
-func resolveMCMSContractType(action mcms_types.TimelockAction) datastore.ContractType {
-	switch action {
-	case mcms_types.TimelockActionBypass:
-		return datastore.ContractType(ccipdeploymentutils.BypasserManyChainMultisig)
-	case mcms_types.TimelockActionCancel:
-		return datastore.ContractType(ccipdeploymentutils.CancellerManyChainMultisig)
-	case mcms_types.TimelockActionSchedule:
-		fallthrough
-	default:
-		return datastore.ContractType(ccipdeploymentutils.ProposerManyChainMultisig)
-	}
-}
-
-func timelockRoleForAction(action mcms_types.TimelockAction) cantonsdk.TimelockRole {
-	switch action {
-	case mcms_types.TimelockActionBypass:
-		return cantonsdk.TimelockRoleBypasser
-	case mcms_types.TimelockActionCancel:
-		return cantonsdk.TimelockRoleCanceller
-	case mcms_types.TimelockActionSchedule:
-		fallthrough
-	default:
-		return cantonsdk.TimelockRoleProposer
 	}
 }

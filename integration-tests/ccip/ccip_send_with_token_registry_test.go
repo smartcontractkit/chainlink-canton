@@ -22,6 +22,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
+	config2 "github.com/smartcontractkit/chainlink-canton/authentication/config"
+
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -34,7 +36,6 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
@@ -59,13 +60,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	contractops "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/eds/api/global"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/service"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
-	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
 	rkccip "github.com/smartcontractkit/chainlink-canton/registry-kit/ccip"
 	rkledger "github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/registry"
@@ -429,8 +430,8 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 			},
 			Node: config.NodeConfig{
 				URL: edsParticipant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
+				AuthConfig: config2.AuthConfig{
+					Type:   config2.AuthTypeInsecureStatic,
 					UserID: edsParticipant.UserID,
 					JWT:    edsToken.AccessToken,
 				},
@@ -466,15 +467,28 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
+				CcipOwner: partyCCIP,
+				FeeTokens: map[string]config.FeeToken{
+					string(nativeInstrumentId.Id): {
+						TokenId: string(nativeInstrumentId.Id),
+						Admin:   string(nativeInstrumentId.Admin),
+						Factory: &config.Factory{
+							Type:             config.FactoryTypeURL,
+							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", edsParticipant.Endpoints.ValidatorAPIURL)),
+							TokenStandardAuthConfig: &config2.AuthConfig{
+								Type: config2.AuthTypeInsecureStatic,
+								JWT:  edsToken.AccessToken,
+							},
+						},
+					},
+				},
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
 				Enabled: true,
 				CCVs: []config.CCV{
 					{
-						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         partyCCIP,
-							InstanceAddress: committeeVerifierAddress.InstanceAddress(),
-						},
+						PartyID:         partyCCIP,
+						InstanceAddress: committeeVerifierAddress.InstanceAddress(),
 					},
 				},
 			},
@@ -482,10 +496,8 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 				Enabled: true,
 				Executors: []config.Executor{
 					{
-						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         partyCCIP,
-							InstanceAddress: executorAddress.InstanceAddress(),
-						},
+						PartyID:         partyCCIP,
+						InstanceAddress: executorAddress.InstanceAddress(),
 					},
 				},
 			},
@@ -568,12 +580,6 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 	for i, row := range holdingRows {
 		senderHoldingCids[i] = types.CONTRACT_ID(row.ContractID)
 	}
-
-	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(ctx, transferInstructionClient, registryAdmin, partySender, partyCCIP)
-	require.NoError(t, err)
-	choiceContext, err := testhelpers.ChoiceContextFromData(choiceContextRaw)
-	require.NoError(t, err)
-	transferFactoryContextValues := testhelpers.ExtractChoiceContextValues(choiceContext)
 
 	const tokenTransferAmountDecimal = "0.0000010000"
 
@@ -671,12 +677,10 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 			FeeTokenInput: sender.FeeTokenInput{
 				SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 				FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
-				FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
+				FeeTokenTransferFactory: types.CONTRACT_ID(ccipSendDisclosure.FeeTokenTransferFactoryCid),
 				FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-					Context: splice_api_token_metadata_v1.ChoiceContext{
-						Values: transferFactoryContextValues,
-					},
-					Meta: splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+					Context: ccipSendDisclosure.FeeTokenTransferFactoryContext,
+					Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 				},
 			},
 			CcvSendInputs: []sender.CCVSendInput{
@@ -698,7 +702,6 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 		}
 
 		sendDisclosures := testhelpers.DeduplicateDisclosedContracts(slices.Concat(
-			transferFactoryDisclosures,
 			ccipSendDisclosure.DisclosedContracts,
 			tokenPoolSendDisclosure.DisclosedContracts,
 			ccvSendDisclosure.DisclosedContracts,

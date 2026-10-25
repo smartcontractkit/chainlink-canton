@@ -17,6 +17,11 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton/provider"
 
+	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
+	oapiCCV "github.com/smartcontractkit/chainlink-canton/eds/api/ccv"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
+	oapiGlobal "github.com/smartcontractkit/chainlink-canton/eds/api/global"
+	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
 	edsCommon "github.com/smartcontractkit/chainlink-canton/eds/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/ccip"
@@ -26,15 +31,10 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/token_standard"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool"
+	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/tokenMetadataV1"
+	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 	"github.com/smartcontractkit/chainlink-canton/eds/monitoring"
-	oapiCCIP "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccip"
-	oapiCCV "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/ccv"
-	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
-	oapiGlobal "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/global"
-	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/tokenpool"
-	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/openapi/gen/tokenMetadataV1"
-	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
 func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) error {
@@ -129,6 +129,8 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 
 	errChan := make(chan error)
 	var globalAddressFilters []global.InstanceAddressFilter
+	var poolDiscoveryService *PoolDiscoveryService
+
 	if cfg.CCIPAPIConfig.Enabled {
 		ccipAPIServer, err := ccip.NewServer(ctx, logger, activeContractStore, cfg.CCIPAPIConfig)
 		if err != nil {
@@ -160,6 +162,12 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		}
 		oapiTokenPool.RegisterHandlers(router, tokenPoolAPIServer)
 		globalAddressFilters = append(globalAddressFilters, tokenPoolAPIServer)
+
+		// Registry-observer party discovers pools that name it as an observer - it is never
+		// a pool's owner party, which is separate and per-pool.
+		if cfg.RegistryAPIConfig.Enabled {
+			poolDiscoveryService = NewPoolDiscoveryService(logger, activeContractStore, tokenPoolAPIServer, cfg.RegistryAPIConfig)
+		}
 
 		// Run instrument holding store in the background
 		// This should only be run if the TokenPool API is enabled, as it will fail if no filters are specified.
@@ -205,6 +213,20 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		err := activeContractStore.Run(ctx, store.DefaultStreamConfig(), store.WithOnBackfillCompleted(func() {
 			logger.Info().Msg("active contract store backfill completed")
 			backfillWaitGroup.Done()
+
+			// Start pool discovery after backfill completes
+			if poolDiscoveryService != nil {
+				go func() {
+					logger.Info().Msg("starting pool discovery service")
+					if err := poolDiscoveryService.Watch(ctx); err != nil {
+						select {
+						case errChan <- fmt.Errorf("pool discovery service error: %w", err):
+						default:
+							logger.Warn().Err(err).Msg("Pool discovery service encountered an error that could not be handled, likely due to a pending shutdown.")
+						}
+					}
+				}()
+			}
 		}))
 		if err != nil {
 			select {

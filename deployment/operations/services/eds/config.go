@@ -9,7 +9,8 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	"github.com/smartcontractkit/chainlink-canton/authentication/config"
+
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -101,8 +102,8 @@ var BuildConfig = operations.NewOperation(
 			// No internal endpoints, so we assume the node is externally accessible and can be reached via the GRPC ledger API URL
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
+				AuthConfig: config.AuthConfig{
+					Type:   config.AuthTypeInsecureStatic,
 					UserID: participant.UserID,
 					JWT:    jwt.AccessToken,
 				},
@@ -112,8 +113,8 @@ var BuildConfig = operations.NewOperation(
 		} else {
 			nodeConfig = edsConfig.NodeConfig{
 				URL: participant.InternalEndpoints.GRPCLedgerAPIURL,
-				AuthConfig: commonconfig.AuthConfig{
-					Type:   commonconfig.AuthTypeInsecureStatic,
+				AuthConfig: config.AuthConfig{
+					Type:   config.AuthTypeInsecureStatic,
 					UserID: participant.UserID,
 					JWT:    jwt.AccessToken,
 				},
@@ -133,10 +134,8 @@ var BuildConfig = operations.NewOperation(
 		ccvs := make([]edsConfig.CCV, len(refs))
 		for i, ref := range refs {
 			ccvs[i] = edsConfig.CCV{
-				ContractIdentifier: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
-				},
+				PartyID:         participant.PartyID,
+				InstanceAddress: contracts.HexToInstanceAddress(ref.Address),
 			}
 		}
 
@@ -150,7 +149,7 @@ var BuildConfig = operations.NewOperation(
 			var (
 				tokenPoolType           edsConfig.TokenPoolType
 				tokenStandardURL        *string
-				tokenStandardAuthConfig *commonconfig.AuthConfig
+				tokenStandardAuthConfig *config.AuthConfig
 			)
 			switch ref.Type {
 			case datastore.ContractType(lock_release_token_pool.ContractType):
@@ -166,12 +165,10 @@ var BuildConfig = operations.NewOperation(
 
 			instanceAddress := contracts.HexToInstanceAddress(ref.Address)
 			pool := edsConfig.TokenPool{
-				ContractIdentifier: edsConfig.ContractIdentifier{
-					PartyID:         participant.PartyID,
-					InstanceAddress: instanceAddress,
-				},
-				Type:      tokenPoolType,
-				PoolOwner: participant.PartyID,
+				PartyID:         participant.PartyID,
+				InstanceAddress: instanceAddress,
+				Type:            tokenPoolType,
+				PoolOwner:       participant.PartyID,
 			}
 			if tokenPoolType == edsConfig.TokenPoolTypeLockRelease {
 				pool.Factory = &edsConfig.Factory{
@@ -189,7 +186,8 @@ var BuildConfig = operations.NewOperation(
 		return GenerateEDSConfigOutput{
 			NodeConfig: nodeConfig,
 			CCIPAPIConfig: edsConfig.CCIPAPIConfig{
-				Enabled: true,
+				Enabled:   true,
+				CcipOwner: participant.PartyID,
 				PerPartyRouterFactory: edsConfig.ContractIdentifier{
 					PartyID:         participant.PartyID,
 					InstanceAddress: contracts.HexToInstanceAddress(perPartyRouterFactory.Address),
@@ -227,10 +225,8 @@ var BuildConfig = operations.NewOperation(
 				Enabled: true,
 				Executors: []edsConfig.Executor{
 					{
-						ContractIdentifier: edsConfig.ContractIdentifier{
-							PartyID:         participant.PartyID,
-							InstanceAddress: contracts.HexToInstanceAddress(executor.Address),
-						},
+						PartyID:         participant.PartyID,
+						InstanceAddress: contracts.HexToInstanceAddress(executor.Address),
 					},
 				},
 			},

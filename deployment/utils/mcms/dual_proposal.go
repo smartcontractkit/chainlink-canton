@@ -239,7 +239,7 @@ func BuildTimelockProposalForOwner(
 	}
 
 	participant := chain.Participants[0]
-	role := cantonsdkRoleForAction(input.TimelockAction)
+	role := RoleForAction(input.TimelockAction).SDKRole
 
 	return GenerateTimelockProposal(
 		ctx,
@@ -270,17 +270,4 @@ func timelockDelayAsDuration(d mcms_types.Duration) time.Duration {
 	}
 
 	return parsed
-}
-
-func cantonsdkRoleForAction(action mcms_types.TimelockAction) cantonsdk.TimelockRole {
-	switch action {
-	case mcms_types.TimelockActionBypass:
-		return cantonsdk.TimelockRoleBypasser
-	case mcms_types.TimelockActionCancel:
-		return cantonsdk.TimelockRoleCanceller
-	case mcms_types.TimelockActionSchedule:
-		return cantonsdk.TimelockRoleProposer
-	default:
-		return cantonsdk.TimelockRoleProposer
-	}
 }

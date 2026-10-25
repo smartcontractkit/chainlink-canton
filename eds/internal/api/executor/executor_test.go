@@ -20,12 +20,12 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
+	oapiExecutor "github.com/smartcontractkit/chainlink-canton/eds/api/executor"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/mocks"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/testhelpers"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	oapiExecutor "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/executor"
 )
 
 const RequestSizeLimit = 100_000
@@ -74,10 +74,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 		server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, config.ExecutorAPIConfig{
 			Executors: []config.Executor{
 				{
-					ContractIdentifier: config.ContractIdentifier{
-						PartyID:         executorAddress.Owner(),
-						InstanceAddress: executorAddress.InstanceAddress(),
-					},
+					PartyID:         executorAddress.Owner(),
+					InstanceAddress: executorAddress.InstanceAddress(),
 				},
 			},
 		})
@@ -412,10 +410,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 		server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, config.ExecutorAPIConfig{
 			Executors: []config.Executor{
 				{
-					ContractIdentifier: config.ContractIdentifier{
-						PartyID:         "owner",
-						InstanceAddress: executorAddress.InstanceAddress(),
-					},
+					PartyID:         "owner",
+					InstanceAddress: executorAddress.InstanceAddress(),
 				},
 			},
 		})
@@ -598,10 +594,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 			server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, config.ExecutorAPIConfig{
 				Executors: []config.Executor{
 					{
-						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         "owner",
-							InstanceAddress: executorAddress.InstanceAddress(),
-						},
+						PartyID:         "owner",
+						InstanceAddress: executorAddress.InstanceAddress(),
 					},
 				},
 			})
@@ -639,10 +633,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 			server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, config.ExecutorAPIConfig{
 				Executors: []config.Executor{
 					{
-						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         "owner",
-							InstanceAddress: executorAddress.InstanceAddress(),
-						},
+						PartyID:         "owner",
+						InstanceAddress: executorAddress.InstanceAddress(),
 					},
 				},
 			})
@@ -688,10 +680,8 @@ func TestServer_PostExecutorSend(t *testing.T) {
 			server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, config.ExecutorAPIConfig{
 				Executors: []config.Executor{
 					{
-						ContractIdentifier: config.ContractIdentifier{
-							PartyID:         "owner",
-							InstanceAddress: executorAddress.InstanceAddress(),
-						},
+						PartyID:         "owner",
+						InstanceAddress: executorAddress.InstanceAddress(),
 					},
 				},
 			})
@@ -743,9 +733,9 @@ func TestServer_FilterContracts(t *testing.T) {
 
 	cfg := config.ExecutorAPIConfig{
 		Executors: []config.Executor{
-			{ContractIdentifier: config.ContractIdentifier{InstanceAddress: contracts.HexToInstanceAddress("0x1")}},
-			{ContractIdentifier: config.ContractIdentifier{InstanceAddress: contracts.HexToInstanceAddress("0x2")}},
-			{ContractIdentifier: config.ContractIdentifier{InstanceAddress: contracts.HexToInstanceAddress("0x3")}},
+			{InstanceAddress: contracts.HexToInstanceAddress("0x1")},
+			{InstanceAddress: contracts.HexToInstanceAddress("0x2")},
+			{InstanceAddress: contracts.HexToInstanceAddress("0x3")},
 		},
 	}
 	mockActiveContractStore := mocks.NewMockActiveContractStore(t)

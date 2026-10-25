@@ -12,14 +12,14 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
+	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 	"github.com/smartcontractkit/chainlink-canton/eds/config"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/converters"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
-	oapiCommon "github.com/smartcontractkit/chainlink-canton/openapi/gen/eds/common"
-	"github.com/smartcontractkit/chainlink-canton/openapi/gen/transferInstructionV1"
 )
 
-func NewTransferFactory(ctx context.Context, poolOwner types.PARTY, acs store.ActiveContractStoreInterface, cfg config.Factory) (DisclosureFactory, error) {
+func NewTransferFactory(ctx context.Context, poolOwner types.PARTY, acs store.ActiveContractStoreInterface, cfg config.Factory) (TransferDisclosureFactory, error) {
 	switch cfg.Type {
 	case config.FactoryTypeDisabled:
 		return nil, nil //nolint:nilnil
@@ -87,6 +87,22 @@ type AddressTransferFactory struct {
 	acs            store.ActiveContractStoreInterface
 }
 
+func (f AddressTransferFactory) GetFeeTokenDisclosures(
+	ctx context.Context,
+	instrumentId splice_api_token_holding_v1.InstrumentId,
+	sender types.PARTY,
+	receiver types.PARTY,
+) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+	// The address-based transfer factory is instrument-independent: it is simply the
+	// factory contract itself.
+	activeTransferFactory, ok := f.acs.Get(f.factoryAddress)
+	if !ok {
+		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no active contract found for transfer factory at address %s", f.factoryAddress)
+	}
+
+	return types.CONTRACT_ID(activeTransferFactory.GetCreatedEvent().GetContractId()), splice_api_token_metadata_v1.ChoiceContext{}, []oapiCommon.DisclosedContract{converters.ActiveContractToDisclosedContract(activeTransferFactory)}, nil
+}
+
 func (f AddressTransferFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	activeTransferFactory, ok := f.acs.Get(f.factoryAddress)
 	if !ok {
@@ -121,7 +137,10 @@ func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapi
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no TokenTransfer in message")
 	}
 	tokenTransfer := message.TokenTransfer
-	instrumentId := tokenTransfer.Token
+	instrumentId := splice_api_token_holding_v1.InstrumentId{
+		Admin: types.PARTY(tokenTransfer.Token.Admin),
+		Id:    types.TEXT(tokenTransfer.Token.Id),
+	}
 	// API expects empty arrays to be `[]`, not `null`
 	inputHoldingCids := []string{}
 	if tokenTransfer.HoldingContractIds != nil {
@@ -134,12 +153,31 @@ func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapi
 		sender = types.PARTY(message.Sender)
 	}
 
+	return f.getTransferFactory(ctx, instrumentId, inputHoldingCids, sender, f.poolOwner)
+}
+
+func (f URLTransferFactory) GetFeeTokenDisclosures(
+	ctx context.Context,
+	instrumentId splice_api_token_holding_v1.InstrumentId,
+	sender types.PARTY,
+	receiver types.PARTY,
+) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+	return f.getTransferFactory(ctx, instrumentId, []string{}, sender, receiver)
+}
+
+func (f URLTransferFactory) getTransferFactory(
+	ctx context.Context,
+	instrumentId splice_api_token_holding_v1.InstrumentId,
+	inputHoldingCids []string,
+	sender types.PARTY,
+	receiver types.PARTY,
+) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	resp, err := f.transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{
 			"expectedAdmin": instrumentId.Admin,
 			"transfer": map[string]any{
 				"sender":   sender,
-				"receiver": f.poolOwner,
+				"receiver": receiver,
 				// TODO: this isn't currently used. If we'd wanted to take the amount from message.TokenTransfer it would have to be properly scaled by the TP's decimals
 				"amount": "1.0",
 				"instrumentId": map[string]any{
@@ -209,59 +247,10 @@ func (f URLTransferFactory) GetExecuteDisclosures(
 	if receiver == "" {
 		receiver = f.poolOwner
 	}
-
-	resp, err := f.transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
-		ChoiceArguments: map[string]any{
-			"expectedAdmin": instrumentId.Admin,
-			"transfer": map[string]any{
-				"sender":   f.poolOwner,
-				"receiver": receiver,
-				// TODO: this isn't currently used. If we'd wanted to take the amount from message.TokenTransfer it would have to be properly scaled by the TP's decimals
-				"amount": "1.0",
-				"instrumentId": map[string]any{
-					"admin": instrumentId.Admin,
-					"id":    instrumentId.Id,
-				},
-				"lock":             nil,
-				"requestedAt":      time.Now().Add(time.Second * -10).Format(time.RFC3339),
-				"executeBefore":    time.Now().Add(time.Hour * 24).Format(time.RFC3339),
-				"inputHoldingCids": inputHoldingCids,
-				"meta": map[string]any{
-					"values": map[string]any{},
-				},
-			},
-			"extraArgs": map[string]any{
-				"context": map[string]any{
-					"values": map[string]any{},
-				},
-				"meta": map[string]any{
-					"values": map[string]any{},
-				},
-			},
-		},
-		ExcludeDebugFields: nil,
-	})
-	if err != nil {
-		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("failed to call GetTransferFactory: %w", err)
-	}
-	if resp.StatusCode() != http.StatusOK {
-		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
+	inputHoldingCidStrings := make([]string, len(inputHoldingCids))
+	for i, cid := range inputHoldingCids {
+		inputHoldingCidStrings[i] = string(cid)
 	}
 
-	disclosedContracts := make([]oapiCommon.DisclosedContract, len(resp.JSON200.ChoiceContext.DisclosedContracts))
-	for i, contract := range resp.JSON200.ChoiceContext.DisclosedContracts {
-		disclosedContracts[i] = oapiCommon.DisclosedContract{
-			TemplateId:       contract.TemplateId,
-			ContractId:       contract.ContractId,
-			CreatedEventBlob: contract.CreatedEventBlob,
-			SynchronizerId:   contract.SynchronizerId,
-		}
-	}
-
-	choiceContext, err := contracts.ChoiceContextFromData(resp.JSON200.ChoiceContext.ChoiceContextData)
-	if err != nil {
-		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("failed to convert choice context: %w", err)
-	}
-
-	return types.CONTRACT_ID(resp.JSON200.FactoryId), choiceContext, disclosedContracts, nil
+	return f.getTransferFactory(ctx, instrumentId, inputHoldingCidStrings, f.poolOwner, receiver)
 }

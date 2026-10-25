@@ -16,7 +16,8 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 
-	"github.com/smartcontractkit/chainlink-canton/commonconfig"
+	"github.com/smartcontractkit/chainlink-canton/authentication/config"
+
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 )
 
@@ -97,11 +98,11 @@ func main() {
 	}
 
 	ctx := context.Background()
-	authType := commonconfig.AuthTypeStatic
+	authType := config.AuthTypeStatic
 	if insecure {
-		authType = commonconfig.AuthTypeInsecureStatic
+		authType = config.AuthTypeInsecureStatic
 	}
-	provider, err := (&commonconfig.AuthConfig{Type: authType, JWT: jwt}).NewProvider(ctx)
+	provider, err := (&config.AuthConfig{Type: authType, JWT: jwt}).NewProvider(ctx)
 	if err != nil {
 		fatalf("build auth provider: %v", err)
 	}

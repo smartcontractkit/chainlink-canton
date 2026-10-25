@@ -6,6 +6,9 @@ updates:
   - package-ecosystem: "gomod"
     directories:
       - "/"
+      - "/authentication"
+      - "/contracts"
+      - "/eds"
       - "/integration-tests"
       - "/party-ceremony"
       - "/party-ceremony/integration-tests"
