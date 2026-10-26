@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.1.1...contracts/v2.2.0) (2026-10-26)
+
+
+### Features
+
+* **cli:** Add CCIPReceiver administration commands ([#1066](https://github.com/smartcontractkit/chainlink-canton/issues/1066)) ([a73abfa](https://github.com/smartcontractkit/chainlink-canton/commit/a73abfa549238e32b97d009d948229971742877e))
+* **contracts:** PoolReceiveMetadata to Registry LnR TP ([#1097](https://github.com/smartcontractkit/chainlink-canton/issues/1097)) ([7fa56f1](https://github.com/smartcontractkit/chainlink-canton/commit/7fa56f19e7905caef8cdc84ff7af4225e09df7e5))
+* **contracts:** Release registry pool DARs 1.0.0 ([#1169](https://github.com/smartcontractkit/chainlink-canton/issues/1169)) ([7cf4a95](https://github.com/smartcontractkit/chainlink-canton/commit/7cf4a95244c71b563000db8f8901158f288d868d))
+
+
+### Bug Fixes
+
+* **contracts:** Add MCMS dispatch for SetPoolReceiveMetadata in registry LnR pool ([#1170](https://github.com/smartcontractkit/chainlink-canton/issues/1170)) ([33d0d6b](https://github.com/smartcontractkit/chainlink-canton/commit/33d0d6b78f7a5c329955f79eeb0859891ef7eeab))
+* **rate limiters:** Cap refills at maxInt64 ([#1102](https://github.com/smartcontractkit/chainlink-canton/issues/1102)) ([846535f](https://github.com/smartcontractkit/chainlink-canton/commit/846535f26498ef6b73cf03d7be2f8e7c5ea4ed38))
+
 ## [2.1.1](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.1.0...contracts/v2.1.1) (2026-09-22)
 
 
