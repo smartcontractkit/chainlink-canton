@@ -123,6 +123,20 @@ data SetTransferTimeoutParams = SetTransferTimeoutParams
         transferTimeout : TransferTimeout
     deriving (Eq, Show)
 
+-- | One key/value pair of Splice token Metadata (TextMap is not codec-supported,
+-- so Metadata is transported as a list of entries).
+data MetadataEntry = MetadataEntry
+    with
+        key : Text
+        value : Text
+    deriving (Eq, Show)
+
+-- | Params for SetPoolReceiveMetadata choice (holdings-disclosure labels).
+data SetPoolReceiveMetadataParams = SetPoolReceiveMetadataParams
+    with
+        metadataEntries : [MetadataEntry]
+    deriving (Eq, Show)
+
 -- | MCMS params: set one ChoiceContext entry from a serialized AnyValue payload.
 -- | valuePayload must be exactly encodeAnyValue output (see CCIP.ContextCodec); AV_ContractId is not round-trippable in bytes—use AddPoolReceiveContextContractValueParams instead.
 data AddPoolReceiveContextNonContractValueParams = AddPoolReceiveContextNonContractValueParams

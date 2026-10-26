@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-lock-release-token-pool"
-	PackageID   = "dea9f7a2d1ce77df731377e30766da0ba5a26f408f34934cf463c72db61261cf"
+	PackageID   = "fe5b153149583b1dd59f1726119b9d4653c3e9a558d69094bfed2d217166d373"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1872,6 +1872,45 @@ func (t *LockReleaseTokenPoolDeps) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// MetadataEntry is a Record type
+type MetadataEntry struct {
+	Key   types.TEXT `json:"key"`
+	Value types.TEXT `json:"value"`
+}
+
+// ToMap converts MetadataEntry to a map for DAML arguments
+func (t MetadataEntry) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["key"] = string(t.Key)
+
+	m["value"] = string(t.Value)
+
+	return m
+}
+
+func (t MetadataEntry) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *MetadataEntry) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes MetadataEntry to hex string (Canton MCMS format)
+func (t MetadataEntry) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MetadataEntry from hex string (Canton MCMS format)
+func (t *MetadataEntry) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // RateLimitConfigArgs is a Record type
 type RateLimitConfigArgs struct {
 	RemoteChainSelector                        types.NUMERIC                   `json:"remoteChainSelector"`
@@ -2386,6 +2425,48 @@ func (t SetPoolReceiveMetadata) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes SetPoolReceiveMetadata from hex string (Canton MCMS format)
 func (t *SetPoolReceiveMetadata) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetPoolReceiveMetadataParams is a Record type
+type SetPoolReceiveMetadataParams struct {
+	MetadataEntries []MetadataEntry `json:"metadataEntries"`
+}
+
+// ToMap converts SetPoolReceiveMetadataParams to a map for DAML arguments
+func (t SetPoolReceiveMetadataParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["metadataEntries"] = func() []any {
+		res := make([]any, 0, len(t.MetadataEntries))
+		for _, e := range t.MetadataEntries {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SetPoolReceiveMetadataParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetPoolReceiveMetadataParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetPoolReceiveMetadataParams to hex string (Canton MCMS format)
+func (t SetPoolReceiveMetadataParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetPoolReceiveMetadataParams from hex string (Canton MCMS format)
+func (t *SetPoolReceiveMetadataParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2987,6 +3068,7 @@ type MCMSEncoder interface {
 	SetObservers(args SetObservers) (*bind.EncodedChoice, error)
 	SetObserversParams(args SetObserversParams) (*bind.EncodedChoice, error)
 	SetPoolReceiveMetadata(args SetPoolReceiveMetadata) (*bind.EncodedChoice, error)
+	SetPoolReceiveMetadataParams(args SetPoolReceiveMetadataParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
@@ -3159,6 +3241,11 @@ func (e *encoder) SetObserversParams(args SetObserversParams) (*bind.EncodedChoi
 
 // SetPoolReceiveMetadata encodes parameters for the SetPoolReceiveMetadata choice.
 func (e *encoder) SetPoolReceiveMetadata(args SetPoolReceiveMetadata) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetPoolReceiveMetadata", args)
+}
+
+// SetPoolReceiveMetadataParams encodes parameters for the SetPoolReceiveMetadata choice.
+func (e *encoder) SetPoolReceiveMetadataParams(args SetPoolReceiveMetadataParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetPoolReceiveMetadata", args)
 }
 
