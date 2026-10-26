@@ -53,6 +53,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2CodecGen (
     decodeSetRateLimiterReferencesParamsAt,
     decodeSetRateLimitConfigParamsAt,
     decodeSetTransferTimeoutParamsAt,
+    decodeSetPoolReceiveMetadataParamsAt,
     decodeAddPoolReceiveContextNonContractValueParamsAt,
     decodeAddPoolReceiveContextContractValueParamsAt,
     decodeRemovePoolReceiveContextValueParamsAt,
@@ -71,6 +72,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2Types (
     SetRateLimiterReferencesParams(..),
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
+    SetPoolReceiveMetadataParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
     RemovePoolReceiveContextValueParams(..),
@@ -1485,5 +1487,14 @@ template LockReleaseTokenPool
                             assertMsg "E_TRAILING_BYTES: SetTransferTimeout" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid SetTransferTimeout with
                                 newTransferTimeout = transferTimeout
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetPoolReceiveMetadata" -> do
+                    case decodeSetPoolReceiveMetadataParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: SetPoolReceiveMetadata"
+                        Some (SetPoolReceiveMetadataParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetPoolReceiveMetadata" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetPoolReceiveMetadata with
+                                metadata = Splice.Api.Token.MetadataV1.Metadata with
+                                    values = TextMap.fromList (map (\e -> (e.key, e.value)) metadataEntries)
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
