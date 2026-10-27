@@ -53,6 +53,7 @@ chain_selector = "8706591216959472610"
 
 [ccip_api]
 	enabled = true
+	ccip_owner = "ccipOwner"
 	[ccip_api.per_party_router_factory]
 		party_id = "ccipOwner"
 		instance_address = "0x02e3bd794d451e6e9962f0c3ca7de62049bce82d040e431ccd3c4d77acaa31cf"
@@ -74,6 +75,15 @@ chain_selector = "8706591216959472610"
 	[ccip_api.fee_quoter]
 		party_id = "ccipOwner"
 		instance_address = "0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"
+	[ccip_api.fee_tokens."CC"]
+		token_id = "Amulet"
+		admin = "ccipOwner"
+		[ccip_api.fee_tokens."CC".factory]
+			type = "url"
+			token_standard_url = "localhost:8545"
+			[ccip_api.fee_tokens."CC".factory.token_standard_auth]
+				type = "insecureStatic"
+				jwt = "fake.jwt.token"
 
 [ccv_api]
 	enabled = true
@@ -160,6 +170,21 @@ chain_selector = "8706591216959472610"
 					FeeQuoter: ContractIdentifier{
 						PartyID:         "ccipOwner",
 						InstanceAddress: contracts.HexToInstanceAddress("0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"),
+					},
+					CcipOwner: "ccipOwner",
+					FeeTokens: map[string]FeeToken{
+						"CC": {
+							TokenId: "Amulet",
+							Admin:   "ccipOwner",
+							Factory: &Factory{
+								Type:             FactoryTypeURL,
+								TokenStandardURL: new("localhost:8545"),
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type: authConfig.AuthTypeInsecureStatic,
+									JWT:  "fake.jwt.token",
+								},
+							},
+						},
 					},
 				},
 				CCVAPIConfig: CCVAPIConfig{
@@ -255,7 +280,7 @@ chain_selector = "8706591216959472610"
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got, err := Read(strings.NewReader(tt.config))
+			got, err := Read(strings.NewReader(tt.config), true)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Read() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -265,6 +290,65 @@ chain_selector = "8706591216959472610"
 			if err := got.Validate(); (err != nil) != tt.wantValidationErr {
 				t.Errorf("Validate() error = %v, wantValidationErr %v", err, tt.wantValidationErr)
 			}
+		})
+	}
+}
+
+func TestConfig_Merge_Read(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		base    string
+		secrets string
+		want    *Config
+	}{
+		{
+			name: "",
+			base: `
+	[node.auth]
+	type = 'clientCredentials'
+	user_id = 'userId'
+	auth_url = 'https://auth.chain.link'
+	client_id = 'clientId'
+	client_secret = 'replacedBySecret'
+
+	[global_api]
+	max_batch_size = 2048
+			`,
+			secrets: `
+node.auth.client_secret = 'secretValue'
+			`,
+			want: &Config{
+				Server: ServerConfig{
+					MaxRequestSizeBytes: 1024 * 1024 * 10, // default
+				},
+				Node: NodeConfig{
+					AuthConfig: authConfig.AuthConfig{
+						Type:         authConfig.AuthTypeClientCredentials,
+						UserID:       "userId",
+						AuthURL:      "https://auth.chain.link",
+						ClientID:     "clientId",
+						ClientSecret: "secretValue",
+					},
+				},
+				GlobalAPIConfig: GlobalAPIConfig{
+					MaxBatchSize: 2048,
+				},
+				TokenStandardAPIConfig: TokenStandardAPIConfig{
+					SupplyCacheTTL: time.Second * 10,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ReadAndMerge(strings.NewReader(tt.base), strings.NewReader(tt.secrets))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -434,6 +518,72 @@ func TestConfig_Merge(t *testing.T) {
 				Server:        ServerConfig{},
 				Node: NodeConfig{
 					URL: "localhost:1234",
+				},
+			},
+			wantErr: false,
+		}, {
+			name: "layered merge enriches fee token factory without dropping entries",
+			base: &Config{
+				ChainSelector: "1111",
+				Server:        ServerConfig{Host: "localhost", Port: 8080},
+				CCIPAPIConfig: CCIPAPIConfig{
+					Enabled:   true,
+					CcipOwner: "ccipOwner",
+					FeeTokens: map[string]FeeToken{
+						"CC": {
+							TokenId: "Amulet",
+							Admin:   "ccipOwner",
+							Factory: &Factory{
+								Type:             FactoryTypeURL,
+								TokenStandardURL: new("http://validator/v0/scan-proxy"),
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type:         authConfig.AuthTypeClientCredentials,
+									UserID:       "userid1",
+									AuthURL:      "https://auth.chain.link",
+									ClientID:     "clientid1",
+									ClientSecret: "",
+								},
+							},
+						},
+					},
+				},
+			},
+			config: &Config{
+				CCIPAPIConfig: CCIPAPIConfig{
+					FeeTokens: map[string]FeeToken{
+						"CC": {
+							Factory: &Factory{
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									ClientSecret: "clientSecret",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				ChainSelector: "1111",
+				Server:        ServerConfig{Host: "localhost", Port: 8080},
+				CCIPAPIConfig: CCIPAPIConfig{
+					Enabled:   true,
+					CcipOwner: "ccipOwner",
+					FeeTokens: map[string]FeeToken{
+						"CC": {
+							TokenId: "Amulet",
+							Admin:   "ccipOwner",
+							Factory: &Factory{
+								Type:             FactoryTypeURL,
+								TokenStandardURL: new("http://validator/v0/scan-proxy"),
+								TokenStandardAuthConfig: &authConfig.AuthConfig{
+									Type:         authConfig.AuthTypeClientCredentials,
+									UserID:       "userid1",
+									AuthURL:      "https://auth.chain.link",
+									ClientID:     "clientid1",
+									ClientSecret: "clientSecret",
+								},
+							},
+						},
+					},
 				},
 			},
 			wantErr: false,

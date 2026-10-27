@@ -23,6 +23,7 @@ type EDSMetrics struct {
 	// ContractStore metrics
 	storeSubscriptionUptime metric.Int64Counter
 	storeUpdatesCounter     metric.Int64Counter
+	storeReconnectsCounter  metric.Int64Counter
 	storeLedgerEndGauge     metric.Int64Gauge
 }
 
@@ -61,6 +62,14 @@ func InitMetrics() (*EDSMetrics, error) {
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create eds_store_updates_total: %w", err)
+	}
+
+	m.storeReconnectsCounter, err = beholder.GetMeter().Int64Counter(
+		"eds_store_reconnects_total",
+		metric.WithDescription("Total number of update stream reconnects, including failed subscription attempts"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create eds_store_reconnects_total: %w", err)
 	}
 
 	m.storeLedgerEndGauge, err = beholder.GetMeter().Int64Gauge(
@@ -130,6 +139,11 @@ func (l *EDSMetricLabeler) IncrementStoreSubscriptionUptime(ctx context.Context)
 func (l *EDSMetricLabeler) IncrementStoreUpdatesCounter(ctx context.Context) {
 	otelLabels := beholder.OtelAttributes(l.Labels).AsStringAttributes()
 	l.m.storeUpdatesCounter.Add(ctx, 1, metric.WithAttributes(otelLabels...))
+}
+
+func (l *EDSMetricLabeler) IncrementStoreReconnectCounter(ctx context.Context) {
+	otelLabels := beholder.OtelAttributes(l.Labels).AsStringAttributes()
+	l.m.storeReconnectsCounter.Add(ctx, 1, metric.WithAttributes(otelLabels...))
 }
 
 func (l *EDSMetricLabeler) RecordStoreLedgerEndGauge(ctx context.Context, ledgerEnd int64) {

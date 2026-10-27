@@ -13,5 +13,6 @@ var _ Metrics = common.EDSMetricLabeler(nil)
 type Metrics interface {
 	IncrementStoreSubscriptionUptime(ctx context.Context)
 	IncrementStoreUpdatesCounter(ctx context.Context)
+	IncrementStoreReconnectCounter(ctx context.Context)
 	RecordStoreLedgerEndGauge(ctx context.Context, ledgerEnd int64)
 }

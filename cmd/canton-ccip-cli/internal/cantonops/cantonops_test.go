@@ -31,13 +31,13 @@ func TestFinalityConfigEqual(t *testing.T) {
 func TestReceiverInstanceID(t *testing.T) {
 	t.Parallel()
 
-	require.Equal(t, "ccipreceiver-WaitForFinality", receiverInstanceID(ccipcodec.FinalityConfig{
+	require.Equal(t, contracts.InstanceID("ccipreceiver-WaitForFinality"), receiverInstanceID(ccipcodec.FinalityConfig{
 		WaitForFinality: &types.UNIT{},
 	}))
-	require.Equal(t, "ccipreceiver-WaitForSafe", receiverInstanceID(ccipcodec.FinalityConfig{
+	require.Equal(t, contracts.InstanceID("ccipreceiver-WaitForSafe"), receiverInstanceID(ccipcodec.FinalityConfig{
 		WaitForSafe: &types.UNIT{},
 	}))
-	require.Equal(t, "ccipreceiver-BlockDepth-1", receiverInstanceID(ccipcodec.FinalityConfig{
+	require.Equal(t, contracts.InstanceID("ccipreceiver-BlockDepth-1"), receiverInstanceID(ccipcodec.FinalityConfig{
 		BlockDepth: new(types.INT64(1)),
 	}))
 }

@@ -505,6 +505,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
+				CcipOwner: partyCCIP,
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
 				Enabled: true,

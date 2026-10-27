@@ -29,7 +29,7 @@ var poolDiscoverySecretsConfigToml string
 func TestExampleConfig(t *testing.T) {
 	t.Parallel()
 
-	want, err := config.Read(strings.NewReader(exampleMergedGoldenToml))
+	want, err := config.Read(strings.NewReader(exampleMergedGoldenToml), true)
 	require.NoError(t, err)
 
 	got, err := config.ReadAndMerge(strings.NewReader(exampleConfigToml), strings.NewReader(exampleSecretsConfigToml))

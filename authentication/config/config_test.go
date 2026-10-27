@@ -239,6 +239,60 @@ func TestAuthConfig_Validate(t *testing.T) {
 			wantErr: true,
 		},
 
+		// --- Scopes: optional for clientCredentials and authorizationCode, entries must be non-empty ---
+		{
+			name: "authorizationCode_with_scopes",
+			config: AuthConfig{
+				Type:     AuthTypeAuthorizationCode,
+				UserID:   "user-1",
+				AuthURL:  "https://auth.example.com/",
+				ClientID: "client-id",
+				Scopes:   []string{"openid", "daml_ledger_api", "offline_access"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "clientCredentials_with_scopes",
+			config: AuthConfig{
+				Type:         AuthTypeClientCredentials,
+				UserID:       "user-1",
+				AuthURL:      "https://auth.example.com/",
+				ClientID:     "client-id",
+				ClientSecret: "client-secret",
+				Scopes:       []string{"daml_ledger_api"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "scopes_with_empty_entry",
+			config: AuthConfig{
+				Type:     AuthTypeAuthorizationCode,
+				UserID:   "user-1",
+				AuthURL:  "https://auth.example.com/",
+				ClientID: "client-id",
+				Scopes:   []string{"openid", ""},
+			},
+			wantErr: true,
+		},
+		{
+			name: "static_scopes_must_be_unset",
+			config: AuthConfig{
+				Type:   AuthTypeStatic,
+				JWT:    validJWT,
+				Scopes: []string{"openid"},
+			},
+			wantErr: true,
+		},
+		{
+			name: "insecureStatic_scopes_must_be_unset",
+			config: AuthConfig{
+				Type:   AuthTypeInsecureStatic,
+				JWT:    validJWT,
+				Scopes: []string{"openid"},
+			},
+			wantErr: true,
+		},
+
 		// --- Type validation ---
 		{
 			name: "missing_type",

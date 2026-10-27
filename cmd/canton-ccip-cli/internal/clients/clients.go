@@ -89,6 +89,8 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 		var authProvider authentication.Provider
 		switch cfg.Canton.AuthType {
 		case "static":
+			authProvider = static.NewStaticProvider(cfg.Canton.AuthJWT)
+		case "insecureStatic":
 			authProvider = static.NewInsecureStaticProvider(cfg.Canton.AuthJWT)
 		case "clientCredentials":
 			authProvider, err = clientcredentials.NewDiscoveryProvider(ctx, cfg.Canton.AuthServerURL, cfg.Canton.AuthClientID, cfg.Canton.AuthClientSecret)
@@ -100,7 +102,11 @@ func New(ctx context.Context, profile *cfgpkg.NetworkProfile, cfg *cfgpkg.UserCo
 		default:
 			var providerOptions []authorizationcode.ProviderOption
 			if cfg.Canton.AuthEnableKeyring {
-				providerOptions = append(providerOptions, authorizationcode.WithKeyring(true))
+				// If keyring is enabled, we persist the token in the OS keyring and request offline access to get a refresh token.
+				providerOptions = append(providerOptions,
+					authorizationcode.WithKeyring(true),
+					authorizationcode.WithScopes("openid", "daml_ledger_api", "offline_access"),
+				)
 			}
 			authProvider, err = authorizationcode.NewDiscoveryProvider(ctx, cfg.Canton.AuthServerURL, cfg.Canton.AuthClientID, providerOptions...)
 			if err != nil {

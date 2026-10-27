@@ -414,6 +414,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
+				CcipOwner: partyCCIP,
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
 				Enabled: true,

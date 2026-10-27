@@ -37,9 +37,14 @@ func MCMSRawInstanceAddress(ds datastore.DataStore, chainSelector uint64, qualif
 		return "", err
 	}
 
+	return MCMSRawInstanceAddressFromRef(ref)
+}
+
+// MCMSRawInstanceAddressFromRef returns the raw instance address label of an MCMS ref.
+func MCMSRawInstanceAddressFromRef(ref datastore.AddressRef) (contracts.RawInstanceAddress, error) {
 	labels := ref.Labels.List()
 	if len(labels) == 0 {
-		return "", fmt.Errorf("MCMS ref for qualifier %q is missing raw instance address label", qualifier)
+		return "", fmt.Errorf("MCMS ref %s (qualifier %q) is missing the raw instance address label", ref.Type, ref.Qualifier)
 	}
 
 	return contracts.RawInstanceAddressFromString(labels[0])

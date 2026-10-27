@@ -58,6 +58,17 @@ type AuthConfig struct {
 	// Optional; only applicable to clientCredentials and authorizationCode. Leave unset to
 	// let the authorization server choose the audience.
 	Audience string `toml:"audience,omitempty" validate:"excluded_unless=Type clientCredentials|excluded_unless=Type authorizationCode"`
+
+	// Scopes are the OAuth2 scopes requested from the authorization server, e.g.
+	// ["openid", "daml_ledger_api", "offline_access"]. Requesting "offline_access" is
+	// required by most authorization servers (per RFC 6749 / OIDC) for a refresh token
+	// to be issued, which is needed for long-running sessions in the authorizationCode
+	// flow.
+	//
+	// Optional; only applicable to clientCredentials and authorizationCode. Leave unset
+	// to use the provider defaults ("openid" and "daml_ledger_api" for authorizationCode,
+	// "daml_ledger_api" for clientCredentials).
+	Scopes []string `toml:"scopes,omitempty" validate:"excluded_unless=Type clientCredentials|excluded_unless=Type authorizationCode,omitempty,dive,required"`
 }
 
 func (a *AuthConfig) Validate() error {
@@ -104,6 +115,9 @@ func (a *AuthConfig) NewProvider(ctx context.Context) (authentication.Provider, 
 		if a.Audience != "" {
 			opts = append(opts, clientcredentials.WithAudience(a.Audience))
 		}
+		if len(a.Scopes) > 0 {
+			opts = append(opts, clientcredentials.WithScopes(a.Scopes...))
+		}
 
 		return clientcredentials.NewDiscoveryProvider(ctx, a.AuthURL, a.ClientID, a.ClientSecret, opts...)
 
@@ -115,6 +129,9 @@ func (a *AuthConfig) NewProvider(ctx context.Context) (authentication.Provider, 
 		var opts []authorizationcode.ProviderOption
 		if a.Audience != "" {
 			opts = append(opts, authorizationcode.WithAudience(a.Audience))
+		}
+		if len(a.Scopes) > 0 {
+			opts = append(opts, authorizationcode.WithScopes(a.Scopes...))
 		}
 
 		return authorizationcode.NewDiscoveryProvider(ctx, a.AuthURL, a.ClientID, opts...)

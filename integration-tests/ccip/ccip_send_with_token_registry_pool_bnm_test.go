@@ -34,7 +34,7 @@ import (
 	damlledger "github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	authConfig "github.com/smartcontractkit/chainlink-canton/authentication/config"
+	config2 "github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
@@ -503,8 +503,8 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 			},
 			Node: config.NodeConfig{
 				URL: ccipParticipant.Endpoints.GRPCLedgerAPIURL,
-				AuthConfig: authConfig.AuthConfig{
-					Type:   authConfig.AuthTypeInsecureStatic,
+				AuthConfig: config2.AuthConfig{
+					Type:   config2.AuthTypeInsecureStatic,
 					UserID: ccipParticipant.UserID,
 					JWT:    ccipEDSToken.AccessToken,
 				},
@@ -539,6 +539,21 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 				FeeQuoter: config.ContractIdentifier{
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
+				},
+				CcipOwner: partyCCIP,
+				FeeTokens: map[string]config.FeeToken{
+					string(nativeInstrumentId.Id): {
+						TokenId: string(nativeInstrumentId.Id),
+						Admin:   string(nativeInstrumentId.Admin),
+						Factory: &config.Factory{
+							Type:             config.FactoryTypeURL,
+							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", ccipParticipant.Endpoints.ValidatorAPIURL)),
+							TokenStandardAuthConfig: &config2.AuthConfig{
+								Type: config2.AuthTypeInsecureStatic,
+								JWT:  ccipEDSToken.AccessToken,
+							},
+						},
+					},
 				},
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
@@ -701,15 +716,6 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 		senderHoldingCids[i] = types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
 	}
 
-	// Get transfer factory for Amulet tokens (sender to CCIP owner)
-	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(t.Context(), transferInstructionClient, registryAdmin, partySender, partyCCIP)
-	require.NoError(t, err, "failed to get transfer factory")
-	require.NotNil(t, choiceContextRaw, "choiceContext should not be nil")
-
-	choiceContext, err := testhelpers.ChoiceContextFromData(choiceContextRaw)
-	require.NoError(t, err, "failed to parse choice context")
-	transferFactoryContextValues := testhelpers.ExtractChoiceContextValues(choiceContext)
-
 	const tokenTransferAmountDecimal = "1.0"
 
 	executorRawOrHashedAddress := oapiCommon.RawOrHashedAddress{}
@@ -818,11 +824,9 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 		FeeTokenInput: sender.FeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 			FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
-			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
+			FeeTokenTransferFactory: types.CONTRACT_ID(ccipSendDisclosure.FeeTokenTransferFactoryCid),
 			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-				Context: splice_api_token_metadata_v1.ChoiceContext{
-					Values: transferFactoryContextValues,
-				},
+				Context: ccipSendDisclosure.FeeTokenTransferFactoryContext,
 				Meta: splice_api_token_metadata_v1.Metadata{
 					Values: map[string]types.TEXT{},
 				},
@@ -847,7 +851,6 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 	}
 
 	sendDisclosures := testhelpers.DeduplicateDisclosedContracts(slices.Concat(
-		transferFactoryDisclosures,
 		ccipSendDisclosure.DisclosedContracts,
 		ccvSendDisclosure.DisclosedContracts,
 		executorSendDisclosure.DisclosedContracts,
@@ -873,12 +876,13 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	sendArgs.Context = ccipSendDisclosure.ChoiceContext
 	sendArgs.FeeTokenInput.FeeTokenConfigCid = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid)
+	sendArgs.FeeTokenInput.FeeTokenTransferFactory = types.CONTRACT_ID(ccipSendDisclosure.FeeTokenTransferFactoryCid)
+	sendArgs.FeeTokenInput.FeeTokenExtraArgs.Context = ccipSendDisclosure.FeeTokenTransferFactoryContext
 	sendArgs.CcvSendInputs[0].CcvCid = types.CONTRACT_ID(ccvSendDisclosure.ContractId)
 	sendArgs.CcvSendInputs[0].Context = ccvSendDisclosure.ChoiceContext
 	sendArgs.ExecutorInput.ExecutorCid = types.CONTRACT_ID(executorSendDisclosure.ContractId)
 	sendArgs.ExecutorInput.Context = executorSendDisclosure.ChoiceContext
 	sendDisclosures = testhelpers.DeduplicateDisclosedContracts(slices.Concat(
-		transferFactoryDisclosures,
 		ccipSendDisclosure.DisclosedContracts,
 		ccvSendDisclosure.DisclosedContracts,
 		executorSendDisclosure.DisclosedContracts,

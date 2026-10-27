@@ -77,6 +77,10 @@ type GlobalAPIConfig struct {
 type CCIPAPIConfig struct {
 	Enabled bool `toml:"enabled"`
 
+	// CcipOwner is the party that owns all the CCIP contracts (OnRamp, OffRamp, ...) and
+	// receives the fees paid in the fee token.
+	CcipOwner string `toml:"ccip_owner" validate:"required_if=Enabled true,omitempty"`
+
 	PerPartyRouterFactory ContractIdentifier `toml:"per_party_router_factory" validate:"required_if=Enabled true,omitempty"`
 	OnRamp                ContractIdentifier `toml:"on_ramp" validate:"required_if=Enabled true,omitempty"`
 	OffRamp               ContractIdentifier `toml:"off_ramp" validate:"required_if=Enabled true,omitempty"`
@@ -84,6 +88,25 @@ type CCIPAPIConfig struct {
 	TokenAdminRegistry    ContractIdentifier `toml:"token_admin_registry" validate:"required_if=Enabled true,omitempty"`
 	RMNRemote             ContractIdentifier `toml:"rmn_remote" validate:"required_if=Enabled true,omitempty"`
 	FeeQuoter             ContractIdentifier `toml:"fee_quoter" validate:"required_if=Enabled true,omitempty"`
+
+	// FeeTokens configures the supported fee tokens, keyed by an alias that uniquely identifies
+	// the fee token within this config. A fee token itself is uniquely identified by the
+	// combination of its token id and admin party.
+	// If a fee token has a factory configured, the CCIP API returns the transfer factory
+	// disclosures for the fee token, otherwise clients have to get these from the
+	// TransferFactory API themselves.
+	FeeTokens map[string]FeeToken `toml:"fee_tokens" validate:"dive"`
+}
+
+// FeeToken configures a token that can be used to pay CCIP message fees.
+type FeeToken struct {
+	// TokenId is the token id of the fee token's instrument.
+	TokenId string `toml:"token_id" validate:"required"`
+	// Admin is the admin party of the fee token's instrument.
+	Admin string `toml:"admin" validate:"required"`
+
+	// Factory is the transfer factory configuration for the fee token, optional.
+	Factory *Factory `toml:"factory" validate:"omitnil"`
 }
 
 // CCV API
@@ -267,8 +290,13 @@ func (cfg *Config) Merge(in *Config) (*Config, error) {
 	overlayPools := maps.Clone(in.TokenPoolAPIConfig.TokenPools)
 	cfg.TokenPoolAPIConfig.TokenPools = nil
 
+	baseFeeTokens := maps.Clone(cfg.CCIPAPIConfig.FeeTokens)
+	overlayFeeTokens := maps.Clone(in.CCIPAPIConfig.FeeTokens)
+	cfg.CCIPAPIConfig.FeeTokens = nil
+
 	inMerged := *in
 	inMerged.TokenPoolAPIConfig.TokenPools = nil
+	inMerged.CCIPAPIConfig.FeeTokens = nil
 
 	if err := mergo.Merge(cfg, &inMerged, mergo.WithOverride, mergo.WithTransformers(configTransformer{})); err != nil {
 		return nil, fmt.Errorf("failed to merge config: %w", err)
@@ -283,7 +311,36 @@ func (cfg *Config) Merge(in *Config) (*Config, error) {
 	}
 	cfg.TokenPoolAPIConfig.TokenPools = mergedPools
 
+	mergedFeeTokens := mergeFeeTokenMaps(baseFeeTokens, overlayFeeTokens)
+	if len(mergedFeeTokens) == 0 {
+		mergedFeeTokens = nil
+	}
+	cfg.CCIPAPIConfig.FeeTokens = mergedFeeTokens
+
 	return cfg, nil
+}
+
+func mergeFeeTokenMaps(base, overlay map[string]FeeToken) map[string]FeeToken {
+	if len(base) == 0 && len(overlay) == 0 {
+		return nil
+	}
+
+	out := make(map[string]FeeToken)
+	maps.Copy(out, base)
+	for k, sv := range overlay {
+		if dv, ok := out[k]; ok {
+			merged := dv
+			if err := mergo.Merge(&merged, &sv, mergo.WithOverride); err != nil {
+				// Fall back to the overlay value if merging fails.
+				merged = sv
+			}
+			out[k] = merged
+		} else {
+			out[k] = sv
+		}
+	}
+
+	return out
 }
 
 func mergeTokenPoolMaps(base, overlay map[string]TokenPool) (map[string]TokenPool, error) {
@@ -304,8 +361,11 @@ func mergeTokenPoolMaps(base, overlay map[string]TokenPool) (map[string]TokenPoo
 	return out, nil
 }
 
-func Read(configData io.Reader) (*Config, error) {
-	config := DefaultConfig()
+func Read(configData io.Reader, withDefaults bool) (*Config, error) {
+	config := &Config{}
+	if withDefaults {
+		config = DefaultConfig()
+	}
 
 	decoder := toml.NewDecoder(configData)
 	if _, err := decoder.Decode(&config); err != nil {
@@ -321,7 +381,9 @@ func ReadAndMerge(configDatas ...io.Reader) (*Config, error) {
 	config := DefaultConfig()
 
 	for i, data := range configDatas {
-		inCfg, err := Read(data)
+		// Only the first config should be read with defaults, the rest should override it.
+		// Having defaults on the overrides would cause them to override the base config with default values.
+		inCfg, err := Read(data, i == 0)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read config at index %d: %w", i, err)
 		}

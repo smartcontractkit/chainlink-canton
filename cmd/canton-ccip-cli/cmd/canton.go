@@ -307,6 +307,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 		amount                      string
 		useLedger                   string
 		packageSelectionPreferences []string
+		memo                        string
 	)
 	c := &cobra.Command{
 		Use:   "create-transfer",
@@ -343,6 +344,14 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 				}
 			}
 
+			// Add memo to metadata
+			var metadata splice_api_token_metadata_v1.Metadata
+			if memo != "" {
+				metadata = splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{
+					"splice.lfdecentralizedtrust.org/reason": types.TEXT(memo),
+				}}
+			}
+
 			// Get disclosures
 			transfer := splice_api_token_transfer_instruction_v1.Transfer{
 				Sender:           types.PARTY(b.Participant.PartyID),
@@ -352,7 +361,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 				RequestedAt:      types.TIMESTAMP(time.Now()),
 				ExecuteBefore:    types.TIMESTAMP(time.Now().Add(time.Hour * 24)),
 				InputHoldingCids: inputHoldings,
-				Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+				Meta:             metadata,
 			}
 			transferFactory, err := testhelpers.GetTransferFactoryV2(ctx, transferInstructionClient, string(instrumentId.Admin), transfer)
 			if err != nil {
@@ -379,6 +388,12 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 			tw.AppendRow(table.Row{"Requested at", time.Time(transfer.RequestedAt).String()})
 			tw.AppendRow(table.Row{"Execute before", time.Time(transfer.ExecuteBefore).String()})
 			tw.AppendRow(table.Row{"Input Holdings", strings.Join(inputHoldingStrings, ",")})
+			metadataPairs := make([]string, 0, len(transfer.Meta.Values))
+			for k, v := range transfer.Meta.Values {
+				metadataPairs = append(metadataPairs, fmt.Sprintf("%s=%s", k, v))
+			}
+			slices.Sort(metadataPairs)
+			tw.AppendRow(table.Row{"Metadata", strings.Join(metadataPairs, ", ")})
 			fmt.Println(tw.Render())
 			fmt.Println("Confirm? (Y/N)")
 			if !input.Confirm() {
@@ -443,6 +458,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 	c.Flags().StringVar(&amount, "amount", "", "the amount to transfer (required)")
 	c.Flags().StringVar(&useLedger, "ledger", "", "enable interactive Ledger signing if set. Accepts a derivation path value, either a full path like m/44'/6767'/0'/0'/0' or a depth like 42 in which case it will increment the last component, e.g. m/44'/6767'/0'/0'/42'")
 	c.Flags().StringSliceVar(&packageSelectionPreferences, "package-selection-preferences", nil, "comma-separated list of package IDs for package selection preference")
+	c.Flags().StringVar(&memo, "memo", "", "optional memo to include in the transfer metadata")
 	_ = c.MarkFlagRequired("amount")
 
 	return c
@@ -1062,23 +1078,6 @@ func cantonSend(
 		}
 	}
 
-	// --- Build transfer factory for fee payment ---
-	transferFactory, err := testhelpers.GetTransferFactoryV2(ctx, feeTokenTransferInstructionClient, string(feeTokenInstrumentId.Admin), splice_api_token_transfer_instruction_v1.Transfer{
-		Sender:           types.PARTY(b.Participant.PartyID),
-		Receiver:         b.Profile.CCIPOwnerPartyID,
-		Amount:           "1.0",
-		InstrumentId:     *feeTokenInstrumentId,
-		InputHoldingCids: feeTokenInputCids,
-		Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
-	})
-	if err != nil {
-		return fmt.Errorf("get transfer factory for fee token: %w", err)
-	}
-	feeChoiceContext, err := contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
-	if err != nil {
-		return fmt.Errorf("fee choice context: %w", err)
-	}
-
 	// --- Resolve token transfer holdings ---
 	var tokenTransferInputCids []types.CONTRACT_ID
 	if withToken {
@@ -1181,6 +1180,37 @@ func cantonSend(
 	if err != nil {
 		return fmt.Errorf("CCIP send disclosure: %w", err)
 	}
+
+	// --- Fee token transfer factory (prefer the EDS response, fall back to a direct fetch) ---
+	var (
+		feeTokenTransferFactoryCid string
+		feeChoiceContext           splice_api_token_metadata_v1.ChoiceContext
+		feeTokenFactoryDisclosures []*apiv2.DisclosedContract
+	)
+	if ccipSendDisclosure.FeeTokenTransferFactoryCid != "" {
+		// The CCIP EDS resolved the fee token's transfer factory - its disclosures are
+		// already part of ccipSendDisclosure.DisclosedContracts.
+		feeTokenTransferFactoryCid = ccipSendDisclosure.FeeTokenTransferFactoryCid
+		feeChoiceContext = ccipSendDisclosure.FeeTokenTransferFactoryContext
+	} else {
+		transferFactory, err := testhelpers.GetTransferFactoryV2(ctx, feeTokenTransferInstructionClient, string(feeTokenInstrumentId.Admin), splice_api_token_transfer_instruction_v1.Transfer{
+			Sender:           types.PARTY(b.Participant.PartyID),
+			Receiver:         b.Profile.CCIPOwnerPartyID,
+			Amount:           "1.0",
+			InstrumentId:     *feeTokenInstrumentId,
+			InputHoldingCids: feeTokenInputCids,
+			Meta:             splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+		})
+		if err != nil {
+			return fmt.Errorf("get transfer factory for fee token: %w", err)
+		}
+		feeTokenTransferFactoryCid = transferFactory.FactoryID
+		feeChoiceContext, err = contracts.ChoiceContextFromData(transferFactory.ChoiceContextData)
+		if err != nil {
+			return fmt.Errorf("fee choice context: %w", err)
+		}
+		feeTokenFactoryDisclosures = transferFactory.DisclosedContracts
+	}
 	defaultCCVAddress, err := contracts.RawInstanceAddressFromString(ccipSendDisclosure.CCVs[0])
 	if err != nil {
 		return fmt.Errorf("parse default CCV address: %w", err)
@@ -1261,7 +1291,7 @@ func cantonSend(
 		FeeTokenInput: sender.FeeTokenInput{
 			SenderInputCids:         feeTokenInputCids,
 			FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
-			FeeTokenTransferFactory: types.CONTRACT_ID(transferFactory.FactoryID),
+			FeeTokenTransferFactory: types.CONTRACT_ID(feeTokenTransferFactoryCid),
 			FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
 				Context: feeChoiceContext,
 				Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
@@ -1284,7 +1314,7 @@ func cantonSend(
 
 	// --- Concatenate disclosures ---
 	allDisclosures := slices.Concat(
-		transferFactory.DisclosedContracts,
+		feeTokenFactoryDisclosures,
 		ccipSendDisclosure.DisclosedContracts,
 		ccvSendDisclosure.DisclosedContracts,
 		executorDisclosures,

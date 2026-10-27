@@ -467,6 +467,21 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
+				CcipOwner: partyCCIP,
+				FeeTokens: map[string]config.FeeToken{
+					string(nativeInstrumentId.Id): {
+						TokenId: string(nativeInstrumentId.Id),
+						Admin:   string(nativeInstrumentId.Admin),
+						Factory: &config.Factory{
+							Type:             config.FactoryTypeURL,
+							TokenStandardURL: new(fmt.Sprintf("%s/v0/scan-proxy", edsParticipant.Endpoints.ValidatorAPIURL)),
+							TokenStandardAuthConfig: &config2.AuthConfig{
+								Type: config2.AuthTypeInsecureStatic,
+								JWT:  edsToken.AccessToken,
+							},
+						},
+					},
+				},
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
 				Enabled: true,
@@ -566,12 +581,6 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 		senderHoldingCids[i] = types.CONTRACT_ID(row.ContractID)
 	}
 
-	transferFactoryCid, transferFactoryDisclosures, choiceContextRaw, err := testhelpers.GetTransferFactory(ctx, transferInstructionClient, registryAdmin, partySender, partyCCIP)
-	require.NoError(t, err)
-	choiceContext, err := testhelpers.ChoiceContextFromData(choiceContextRaw)
-	require.NoError(t, err)
-	transferFactoryContextValues := testhelpers.ExtractChoiceContextValues(choiceContext)
-
 	const tokenTransferAmountDecimal = "0.0000010000"
 
 	senderBalanceBefore, err := testhelpers.GetHoldingsBalance(ctx, senderParticipant, &nativeInstrumentId)
@@ -668,12 +677,10 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 			FeeTokenInput: sender.FeeTokenInput{
 				SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 				FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
-				FeeTokenTransferFactory: types.CONTRACT_ID(transferFactoryCid),
+				FeeTokenTransferFactory: types.CONTRACT_ID(ccipSendDisclosure.FeeTokenTransferFactoryCid),
 				FeeTokenExtraArgs: splice_api_token_metadata_v1.ExtraArgs{
-					Context: splice_api_token_metadata_v1.ChoiceContext{
-						Values: transferFactoryContextValues,
-					},
-					Meta: splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
+					Context: ccipSendDisclosure.FeeTokenTransferFactoryContext,
+					Meta:    splice_api_token_metadata_v1.Metadata{Values: map[string]types.TEXT{}},
 				},
 			},
 			CcvSendInputs: []sender.CCVSendInput{
@@ -695,7 +702,6 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 		}
 
 		sendDisclosures := testhelpers.DeduplicateDisclosedContracts(slices.Concat(
-			transferFactoryDisclosures,
 			ccipSendDisclosure.DisclosedContracts,
 			tokenPoolSendDisclosure.DisclosedContracts,
 			ccvSendDisclosure.DisclosedContracts,

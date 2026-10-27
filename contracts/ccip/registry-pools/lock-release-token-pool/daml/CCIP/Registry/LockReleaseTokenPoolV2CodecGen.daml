@@ -4,7 +4,7 @@ module CCIP.Registry.LockReleaseTokenPoolV2CodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import CCIP.Registry.LockReleaseTokenPoolV2Types (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), SetObserversParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimiterReferencesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), RateLimiterDeploySpec(..), LaneDeploySpec(..), TransferTimeout(..))
+import CCIP.Registry.LockReleaseTokenPoolV2Types (ChainUpdate(..), RemoteChainConfig(..), TokenTransferFeeConfigArgs(..), TokenTransferFeeConfig(..), RateLimitConfigArgs(..), SetDynamicConfigParams(..), SetObserversParams(..), ApplyChainUpdatesParams(..), ApplyTokenTransferFeeConfigUpdatesParams(..), SetRateLimiterReferencesParams(..), SetRateLimitConfigParams(..), SetTransferTimeoutParams(..), MetadataEntry(..), SetPoolReceiveMetadataParams(..), AddPoolReceiveContextNonContractValueParams(..), AddPoolReceiveContextContractValueParams(..), RemovePoolReceiveContextValueParams(..), RateLimiterDeploySpec(..), LaneDeploySpec(..), TransferTimeout(..))
 
 import MCMS.Codec (
     decodeBoolAt,
@@ -266,6 +266,36 @@ decodeSetTransferTimeoutParamsAt : BytesHex -> Int -> Optional (SetTransferTimeo
 decodeSetTransferTimeoutParamsAt encoded offset = do
     (transferTimeout, offset) <- decodeTransferTimeoutAt encoded offset
     Some (SetTransferTimeoutParams{..}, offset)
+
+
+-- ===============================================
+-- |              MetadataEntry
+-- ===============================================
+
+encodeMetadataEntry : MetadataEntry -> BytesHex
+encodeMetadataEntry params =
+    encodeText params.key
+    <> encodeText params.value
+
+decodeMetadataEntryAt : BytesHex -> Int -> Optional (MetadataEntry, Int)
+decodeMetadataEntryAt encoded offset = do
+    (key, offset) <- decodeTextAt encoded offset
+    (value, offset) <- decodeTextAt encoded offset
+    Some (MetadataEntry{..}, offset)
+
+
+-- ===============================================
+-- |              SetPoolReceiveMetadataParams
+-- ===============================================
+
+encodeSetPoolReceiveMetadataParams : SetPoolReceiveMetadataParams -> BytesHex
+encodeSetPoolReceiveMetadataParams params =
+    encodeList params.metadataEntries encodeMetadataEntry
+
+decodeSetPoolReceiveMetadataParamsAt : BytesHex -> Int -> Optional (SetPoolReceiveMetadataParams, Int)
+decodeSetPoolReceiveMetadataParamsAt encoded offset = do
+    (metadataEntries, offset) <- decodeList encoded offset decodeMetadataEntryAt
+    Some (SetPoolReceiveMetadataParams{..}, offset)
 
 
 -- ===============================================
