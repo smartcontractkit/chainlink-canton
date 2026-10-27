@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.1.1...eds/v1.2.0) (2026-10-27)
+
+
+### Features
+
+* **eds:** Fail closed when the update stream reconnects without progress ([#1165](https://github.com/smartcontractkit/chainlink-canton/issues/1165)) ([dbba982](https://github.com/smartcontractkit/chainlink-canton/commit/dbba9829e07973694266ea24fa61a80d476108b5))
+
+
+### Bug Fixes
+
+* Update alpine and go docker images ([#1172](https://github.com/smartcontractkit/chainlink-canton/issues/1172)) ([7fba94d](https://github.com/smartcontractkit/chainlink-canton/commit/7fba94d6663e929308ea3eaa2177f2b1f7e669eb))
+
 ## [1.1.1](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.1.0...eds/v1.1.1) (2026-10-19)
 
 
