@@ -23,7 +23,7 @@ jobs:
       - name: Setup CCIP devenv
         uses: ./.github/actions/setup-ccip-devenv
         with:
-          ccv-ref-go-mod: go.mod
+          ccv-ref: a8e8ca2d1f17b8514d88b4b1265fd2e80b0b3c72
           ccv-iam-role: ${{ secrets.CCV_IAM_ROLE }}
           jd-registry: ${{ secrets.JD_REGISTRY }}
           jd-image: ${{ secrets.JD_IMAGE }}
