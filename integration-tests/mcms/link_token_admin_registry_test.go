@@ -391,14 +391,14 @@ func executeDisclosures(
 	t *testing.T,
 	ctx context.Context,
 	client rkledger.Client,
-	ccipOwner, authCid, liveAdminCid, allocationFactoryCid string,
+	ccipOwner, authCid, liveAdminCid, burnMintFactoryCid string,
 	instDisclosed *apiv2.DisclosedContract,
 ) []*apiv2.DisclosedContract {
 	t.Helper()
 
 	disclosed := make([]*apiv2.DisclosedContract, 0, 4)
 	disclosed = append(disclosed, instDisclosed)
-	for _, cid := range []string{authCid, liveAdminCid, allocationFactoryCid} {
+	for _, cid := range []string{authCid, liveAdminCid, burnMintFactoryCid} {
 		d, err := registry.DiscloseByID(ctx, client, ccipOwner, cid)
 		require.NoError(t, err, "disclose %s", cid)
 		disclosed = append(disclosed, d)
@@ -435,7 +435,7 @@ func executeMintOnRegistry(
 	ctx context.Context,
 	client rkledger.Client,
 	actAs []string,
-	ccipOwner, mintAuthCid, liveAdminCid, allocationFactoryCid, expectedOwner, expectedAmount string,
+	ccipOwner, mintAuthCid, liveAdminCid, burnMintFactoryCid, expectedOwner, expectedAmount string,
 	mintCtx spliceMeta.ChoiceContext,
 	instDisclosed *apiv2.DisclosedContract,
 ) string {
@@ -447,12 +447,12 @@ func executeMintOnRegistry(
 		tokenadmin.ExecuteMint{
 			Submitter:          types.PARTY(actAs[0]),
 			TokenAdminCid:      types.CONTRACT_ID(liveAdminCid),
-			BurnMintFactoryCid: types.CONTRACT_ID(allocationFactoryCid),
+			BurnMintFactoryCid: types.CONTRACT_ID(burnMintFactoryCid),
 			RegistryContext:    mintCtx,
 			Meta:               spliceMeta.Metadata{},
 		},
-		executeDisclosures(t, ctx, client, ccipOwner, mintAuthCid, liveAdminCid, allocationFactoryCid, instDisclosed))
-	require.NoError(t, err, "ExecuteMint one-step against the registry AllocationFactory")
+		executeDisclosures(t, ctx, client, ccipOwner, mintAuthCid, liveAdminCid, burnMintFactoryCid, instDisclosed))
+	require.NoError(t, err, "ExecuteMint one-step against the registry factory")
 
 	var minted []string
 	for cid, holding := range activeRegistryHoldings(t, ctx, client) {
@@ -476,7 +476,7 @@ func executeBurnOnRegistry(
 	ctx context.Context,
 	client rkledger.Client,
 	actAs []string,
-	ccipOwner, burnAuthCid, liveAdminCid, allocationFactoryCid string,
+	ccipOwner, burnAuthCid, liveAdminCid, burnMintFactoryCid string,
 	inputHoldingCids []string,
 	mintCtx spliceMeta.ChoiceContext,
 	instDisclosed *apiv2.DisclosedContract,
@@ -494,7 +494,7 @@ func executeBurnOnRegistry(
 	}
 
 	// The submitter is not a stakeholder of the input holdings either.
-	disclosed := executeDisclosures(t, ctx, client, ccipOwner, burnAuthCid, liveAdminCid, allocationFactoryCid, instDisclosed)
+	disclosed := executeDisclosures(t, ctx, client, ccipOwner, burnAuthCid, liveAdminCid, burnMintFactoryCid, instDisclosed)
 	for _, cid := range inputHoldingCids {
 		holdingDisclosed, err := registry.DiscloseByID(ctx, client, ccipOwner, cid)
 		require.NoError(t, err, "disclose input holding")
@@ -505,13 +505,13 @@ func executeBurnOnRegistry(
 		tokenadmin.ExecuteBurn{
 			Submitter:          types.PARTY(actAs[0]),
 			TokenAdminCid:      types.CONTRACT_ID(liveAdminCid),
-			BurnMintFactoryCid: types.CONTRACT_ID(allocationFactoryCid),
+			BurnMintFactoryCid: types.CONTRACT_ID(burnMintFactoryCid),
 			InputHoldingCids:   inputs,
 			RegistryContext:    mintCtx,
 			Meta:               spliceMeta.Metadata{},
 		},
 		disclosed)
-	require.NoError(t, err, "ExecuteBurn against the registry AllocationFactory")
+	require.NoError(t, err, "ExecuteBurn against the registry factory")
 
 	after := activeRegistryHoldings(t, ctx, client)
 	for _, cid := range inputHoldingCids {
