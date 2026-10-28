@@ -17,7 +17,8 @@ inputs:
     description: >-
       Optional path to a go.mod file. If set, extract
       github.com/smartcontractkit/chainlink-ccv version from it and use that as
-      the checkout ref (overrides ccv-ref).
+      the checkout ref (overrides ccv-ref). Go pseudo-versions are resolved to
+      their commit SHA.
     required: false
     default: ""
   ccv-iam-role:
@@ -84,6 +85,20 @@ runs:
           if [[ -z "${resolved_ref}" ]]; then
             echo "github.com/smartcontractkit/chainlink-ccv not found in ${CCV_REF_GO_MOD}" >&2
             exit 1
+          fi
+          # A pseudo-version names a commit, not a git ref, so actions/checkout
+          # cannot fetch it directly.
+          if [[ "${resolved_ref}" =~ [0-9]{14}-[0-9a-f]{12}$ ]]; then
+            resolved_sha="$(
+              curl -fsSL "https://proxy.golang.org/github.com/smartcontractkit/chainlink-ccv/@v/${resolved_ref}.info" \
+                | sed -n 's/.*"Hash":"\([0-9a-f]\{40\}\)".*/\1/p'
+            )"
+            if [[ -z "${resolved_sha}" ]]; then
+              echo "could not resolve a commit SHA for chainlink-ccv pseudo-version ${resolved_ref}" >&2
+              exit 1
+            fi
+            echo "Resolved pseudo-version ${resolved_ref} to commit ${resolved_sha}"
+            resolved_ref="${resolved_sha}"
           fi
           echo "Using chainlink-ccv ref '${resolved_ref}' resolved from go.mod: ${CCV_REF_GO_MOD}"
           echo "ref=${resolved_ref}" >> "${GITHUB_OUTPUT}"
