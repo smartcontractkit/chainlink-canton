@@ -34,9 +34,9 @@ require (
 	github.com/smartcontractkit/chainlink-ccip/chains/evm v0.0.0-20261001213322-a2d686f610ca
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139
 	github.com/smartcontractkit/chainlink-ccip/deployment v0.0.0-20261001213322-a2d686f610ca
-	github.com/smartcontractkit/chainlink-ccv v0.14.0
-	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.6.1-0.20261006183231-cb0b4a406b64
-	github.com/smartcontractkit/chainlink-ccv/deployment v0.1.1-0.20261009063357-1e21946a7cbd
+	github.com/smartcontractkit/chainlink-ccv v0.16.1-0.20261028162353-a8e8ca2d1f17
+	github.com/smartcontractkit/chainlink-ccv/build/devenv v0.7.1-0.20261028162353-a8e8ca2d1f17
+	github.com/smartcontractkit/chainlink-ccv/deployment v0.1.1-0.20261028162353-a8e8ca2d1f17
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260915214759-02f2214d5823
 	github.com/smartcontractkit/chainlink-common/keystore v1.3.1-0.20260903141829-ef07b52a737d
 	github.com/smartcontractkit/chainlink-deployments-framework v0.126.0
@@ -80,6 +80,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.13.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/XSAM/otelsql v0.42.0 // indirect
+	github.com/a-h/templ v0.3.1020 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
@@ -396,7 +397,7 @@ require (
 	github.com/smartcontractkit/ccip-owner-contracts v0.2.1 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
-	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.2-0.20260811153216-3f3baa768540 // indirect
+	github.com/smartcontractkit/chainlink-ccv/integration/evm v0.0.2-0.20261028162353-a8e8ca2d1f17 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.11-0.20260915184316-2730f1867c92 // indirect
 	github.com/smartcontractkit/chainlink-common/x/config v0.0.0-20260928140953-a9b0d3a04daa // indirect
 	github.com/smartcontractkit/chainlink-evm v0.3.4-0.20260915165527-3701875605f4 // indirect
@@ -525,7 +526,7 @@ require (
 	golang.org/x/arch v0.22.0 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
-	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/term v0.47.0 // indirect

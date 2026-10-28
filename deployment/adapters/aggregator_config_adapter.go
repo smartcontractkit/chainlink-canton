@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	"github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/go-daml/pkg/types"
+	mcmstypes "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
@@ -32,18 +34,18 @@ var _ adapters.CommitteeVerifierOnchainAdapter = (*CantonCommitteeVerifierOnchai
 type CantonCommitteeVerifierOnchain struct{}
 
 // ApplySignatureConfigs implements [adapters.CommitteeVerifierOnchainAdapter].
-func (a *CantonCommitteeVerifierOnchain) ApplySignatureConfigs(ctx context.Context, env deployment.Environment, destChainSelector uint64, qualifier string, change adapters.SignatureConfigChange) error {
-	return nil
+func (a *CantonCommitteeVerifierOnchain) ApplySignatureConfigs(ctx context.Context, env deployment.Environment, destChainSelector uint64, qualifier string, change adapters.SignatureConfigChange) ([]mcmstypes.BatchOperation, error) {
+	return nil, errors.New("apply signature configs is not supported on Canton")
 }
 
 // SetAllowedFinalityConfig implements [adapters.CommitteeVerifierOnchainAdapter].
-func (a *CantonCommitteeVerifierOnchain) SetAllowedFinalityConfig(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, waitForFinality bool, waitForSafe bool, blockDepth uint16) error {
-	return nil
+func (a *CantonCommitteeVerifierOnchain) SetAllowedFinalityConfig(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, waitForFinality bool, waitForSafe bool, blockDepth uint16) ([]mcmstypes.BatchOperation, error) {
+	return nil, errors.New("set allowed finality config is not supported on Canton")
 }
 
 // ApplyAllowlistUpdates implements [adapters.CommitteeVerifierOnchainAdapter].
-func (a *CantonCommitteeVerifierOnchain) ApplyAllowlistUpdates(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, destChainSelector uint64, allowlistEnabled bool, addedSenders []string, removedSenders []string) error {
-	return nil
+func (a *CantonCommitteeVerifierOnchain) ApplyAllowlistUpdates(ctx context.Context, env deployment.Environment, chainSelector uint64, qualifier string, destChainSelector uint64, allowlistEnabled bool, addedSenders []string, removedSenders []string) ([]mcmstypes.BatchOperation, error) {
+	return nil, errors.New("apply allowlist updates is not supported on Canton")
 }
 
 // ScanCommitteeStates implements [adapters.CommitteeVerifierOnchainAdapter].
