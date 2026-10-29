@@ -233,12 +233,11 @@ template MCMS
               expiringRoot = ExpiringRoot newRoot validUntil rs.expiringRoot.opCount
               rootMetadata = metadata
         let staged = setRoleState targetRole newRs this
-        -- Clear pending timelock ops when overriding root so stale ops
-        -- from the previous quorum cannot execute under the new root.
-        let finalMcms = if metadata.overridePreviousRoot
-              then staged with timelockTimestamps = Map.filter (== doneTimestamp) staged.timelockTimestamps
-              else staged
-        create finalMcms
+        -- Pending timelock ops are intentionally preserved even when
+        -- overriding the root (matching the EVM implementation, where MCMS
+        -- and Timelock are separate contracts). Clearing them here would
+        -- break CancelBatch for operations that are still pending.
+        create staged
 
     -- =========================================================================
     -- EXECUTE OPERATION (Main Entry Point - Dispatcher)
