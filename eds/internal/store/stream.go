@@ -313,6 +313,7 @@ func (s *BackfilledStream) stream(
 		// evidently not making progress.
 		if live {
 			budget.lived()
+			reconnectBackoff.Reset()
 		} else {
 			if err := ctx.Err(); err != nil {
 				return err
