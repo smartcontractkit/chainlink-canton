@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.0](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.2.0...eds/v2.0.0) (2026-10-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **deployment:** align committee verifier adapter with CCV ([#1173](https://github.com/smartcontractkit/chainlink-canton/issues/1173))
+
+### Features
+
+* **deployment:** Align committee verifier adapter with CCV ([#1173](https://github.com/smartcontractkit/chainlink-canton/issues/1173)) ([a6ff4dd](https://github.com/smartcontractkit/chainlink-canton/commit/a6ff4dd36688d66682f445ec98d84e69185e1746))
+
+
+### Bug Fixes
+
+* **eds:** Count subscription uptime while the stream is live, not only on updates ([#1176](https://github.com/smartcontractkit/chainlink-canton/issues/1176)) ([35986fe](https://github.com/smartcontractkit/chainlink-canton/commit/35986fe13af066591a51919a2e10e6a05d97d75e))
+
 ## [1.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.1.1...eds/v1.2.0) (2026-10-27)
 
 
