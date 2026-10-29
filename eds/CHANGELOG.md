@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.2.0...eds/v1.2.1) (2026-10-29)
+
+
+### Bug Fixes
+
+* **eds:** Count subscription uptime while the stream is live, not only on updates ([#1176](https://github.com/smartcontractkit/chainlink-canton/issues/1176)) ([35986fe](https://github.com/smartcontractkit/chainlink-canton/commit/35986fe13af066591a51919a2e10e6a05d97d75e))
+
 ## [1.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.1.1...eds/v1.2.0) (2026-10-27)
 
 
