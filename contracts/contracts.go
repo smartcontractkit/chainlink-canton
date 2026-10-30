@@ -25,7 +25,8 @@ const (
 
 	// LINK Token
 
-	Link = Package("link")
+	Link           = Package("link")
+	LinkTokenAdmin = Package("link-token-admin")
 
 	// MCMS
 
@@ -162,6 +163,9 @@ var Versions map[Package][]string = map[Package][]string{
 	ChainlinkAPI: append(ReleasedVersions[ChainlinkAPI], DevVersion),
 
 	Link: append(ReleasedVersions[Link], DevVersion),
+
+	// Unreleased: ships as a dev DAR until the migration is green-lit.
+	LinkTokenAdmin: []string{DevVersion},
 
 	MCMSAPI:  append(ReleasedVersions[MCMSAPI], DevVersion),
 	MCMSCore: append(ReleasedVersions[MCMSCore], DevVersion),
@@ -362,8 +366,9 @@ func GetLegacyDar(packageName Package, version string) ([]byte, error) {
 }
 
 var BindingsOutputDirs = map[Package][]string{
-	Coin: []string{"coin"},
-	Link: []string{"link"},
+	Coin:           []string{"coin"},
+	Link:           []string{"link"},
+	LinkTokenAdmin: []string{"link", "tokenadmin"},
 
 	ChainlinkAPI: []string{"chainlink", "chainlinkapi"},
 	MCMSAPI:      []string{"mcms", "api"},

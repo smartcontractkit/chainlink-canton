@@ -931,7 +931,7 @@ func (t LockedLinkHolding) ArchiveWithPackageID(contractID string, packageID str
 // Send is a Record type
 type Send struct {
 	Sender           types.PARTY                              `json:"sender"`
-	Amount           types.NUMERIC                            `json:"amount"`
+	Amount           types.NUMERIC                            `json:"amount" hex:"decimal"`
 	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	InputHoldingCids []types.CONTRACT_ID                      `json:"inputHoldingCids"`
 	Meta             splice_api_token_metadata_v1.Metadata    `json:"meta"`
