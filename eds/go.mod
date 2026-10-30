@@ -24,7 +24,7 @@ require (
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/rs/zerolog v1.35.1
 	github.com/smartcontractkit/chain-selectors v1.0.112
-	github.com/smartcontractkit/chainlink-canton/authentication v1.1.0
+	github.com/smartcontractkit/chainlink-canton/authentication v1.2.0
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.1
 	github.com/smartcontractkit/chainlink-ccv v0.16.1-0.20261029170609-07dc6fbeb2f1
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260915214759-02f2214d5823

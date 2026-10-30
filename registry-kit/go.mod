@@ -211,7 +211,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/smartcontractkit/chain-selectors v1.0.112 // indirect
 	github.com/smartcontractkit/chainlink-aptos v0.0.0-20260428085939-5c70de12dbfc // indirect
-	github.com/smartcontractkit/chainlink-canton/authentication v1.1.0 // indirect
+	github.com/smartcontractkit/chainlink-canton/authentication v1.2.0 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260915214759-02f2214d5823 // indirect
