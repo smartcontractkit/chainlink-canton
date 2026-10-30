@@ -26,6 +26,7 @@ packages:
   - ccip/pools/burn-mint-token-pool
   - ccip/rate-limiter
   - ccip/factory
+  - ccip/fee-treasury
   - ccip/test
   - ccip/tickets
   - ccip/utils
