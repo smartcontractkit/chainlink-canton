@@ -513,7 +513,7 @@ template LinkTransferAuthorization
         assertMsg "LinkTransferAuthorization.Execute: transferTimeoutHours out of range"
           (timeoutHours > 0 && timeoutHours <= indefiniteTransferHours)
         let executeBefore = addRelTime now (hours timeoutHours)
-        exercise transferFactoryCid TransferV1.TransferFactory_Transfer with
+        result <- exercise transferFactoryCid TransferV1.TransferFactory_Transfer with
           expectedAdmin = instrumentId.admin
           transfer = TransferV1.Transfer with
             sender = ccipOwner
@@ -527,6 +527,20 @@ template LinkTransferAuthorization
           extraArgs = MetadataV1.ExtraArgs with
             context = registryContext
             meta = meta
+        -- A pending instruction locks ccipOwner-held LINK until the receiver
+        -- acts, and its Withdraw choice is sender-controlled, so only MCMS can
+        -- ever reach it. The recovery created here is that withdraw path.
+        case result.output of
+          TransferV1.TransferInstructionResult_Pending transferInstructionCid -> do
+            _ <- create LinkTransferRecovery with
+              ccipOwner
+              instanceId
+              instrumentId
+              transferInstructionCid
+              executeBefore
+            pure ()
+          _ -> pure ()
+        pure result
 
     -- | Governance cancel, reached through MCMS.
     choice WithdrawTransferAuthorization : ()
@@ -556,6 +570,63 @@ template LinkTransferAuthorization
           "WithdrawAuthorization" -> do
             assertMsg "E_TRAILING_BYTES: WithdrawAuthorization" (byteCount operationData == 0)
             exercise selfCid WithdrawTransferAuthorization
+            pure (Map.delete instAddr contractIds)
+          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+-- | Withdraw path for a pending transfer whose receiver never acted. The
+-- | instruction's Withdraw is sender-controlled and the sender is ccipOwner,
+-- | which only acts through MCMS. Reuses the transfer authorization's id.
+template LinkTransferRecovery
+  with
+    ccipOwner : Party
+    instanceId : Text                      -- MCMS target id; the transfer authorization's id
+    instrumentId : HoldingV1.InstrumentId
+    transferInstructionCid : ContractId TransferV1.TransferInstruction
+    executeBefore : Time
+  where
+    signatory ccipOwner
+
+    ensure InstanceAddress.assertValidInstanceId instanceId
+      && instrumentId.admin == ccipOwner
+
+    -- | Only once executeBefore has passed: until then the receiver keeps sole
+    -- | control of the outcome, matching the instruction's own accept deadline.
+    choice WithdrawInstruction : TransferV1.TransferInstructionResult
+      controller ccipOwner
+      do
+        now <- getTime
+        assertMsg "LinkTransferRecovery.Withdraw: executeBefore has not passed"
+          (now >= executeBefore)
+        exercise transferInstructionCid TransferV1.TransferInstruction_Withdraw with
+          extraArgs = MetadataV1.ExtraArgs with
+            context = MetadataV1.emptyChoiceContext
+            meta = MetadataV1.emptyMetadata
+
+    -- | Cleanup once the instruction is archived. The ledger cannot prove from
+    -- | here that it is gone, so this stays a governance judgment.
+    choice DiscardRecovery : ()
+      controller ccipOwner
+      do pure ()
+
+    interface instance MCMSReceiver for LinkTransferRecovery where
+      view = MCMSReceiverView with
+        mcmsController = ccipOwner
+        instanceId
+
+      mcmsEntrypoint functionName operationData contractIds = do
+        let instAddr = InstanceAddress.makeText instanceId ccipOwner
+        selfCid <- case Map.lookup instAddr contractIds of
+          None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+          Some cid -> pure (coerceContractId cid : ContractId LinkTransferRecovery)
+
+        case functionName of
+          "Withdraw" -> do
+            assertMsg "E_TRAILING_BYTES: Withdraw" (byteCount operationData == 0)
+            _ <- exercise selfCid WithdrawInstruction
+            pure (Map.delete instAddr contractIds)
+          "Discard" -> do
+            assertMsg "E_TRAILING_BYTES: Discard" (byteCount operationData == 0)
+            exercise selfCid DiscardRecovery
             pure (Map.delete instAddr contractIds)
           _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 

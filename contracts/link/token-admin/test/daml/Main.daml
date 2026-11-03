@@ -28,6 +28,10 @@ runAll = script do
   testTokenAdminExecuteMintToCcipOwner
   testTokenAdminWithdrawAuthorizationViaMCMS
   testTokenAdminCleanupExpiredAuthorization
+  testTokenAdminTransferPendingCreatesRecovery
+  testTokenAdminRecoveryWithdrawAfterDeadline
+  testTokenAdminRecoveryWithdrawRequiresCcipOwner
+  testTokenAdminRecoveryDiscardAfterReject
   testTokenAdminTransferRejectsZeroTimeout
   testTokenAdminTransferRejectsTimeoutAboveCap
   testTokenAdminAllocateRejectsZeroAllocateBefore

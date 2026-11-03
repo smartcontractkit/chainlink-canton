@@ -10,7 +10,7 @@ import DA.Map qualified as Map
 import DA.Optional (fromSome)
 import DA.Text (isInfixOf)
 import DA.TextMap qualified as TextMap
-import DA.Time (seconds)
+import DA.Time (hours, seconds)
 
 import Link.Token
 import Link.TokenAdmin
@@ -186,6 +186,13 @@ findAllocateAuthorization admin authorizationId = do
   case [cid | (cid, auth) <- authorizations, auth.instanceId == authorizationId] of
     [cid] -> pure cid
     _ -> abort "expected exactly one matching LinkAllocationAuthorization"
+
+findTransferRecovery : Party -> Text -> Script (ContractId LinkTransferRecovery)
+findTransferRecovery admin authorizationId = do
+  recoveries <- query @LinkTransferRecovery admin
+  case [cid | (cid, recovery) <- recoveries, recovery.instanceId == authorizationId] of
+    [cid] -> pure cid
+    _ -> abort "expected exactly one matching LinkTransferRecovery"
 
 -- ========================================================
 -- |          MCMS Entrypoint - ApproveMint + Execute      |
@@ -1372,6 +1379,185 @@ testTokenAdminCleanupExpiredAuthorization = script do
     exerciseCmd mintAuthCid CleanupExpiredMintAuthorization with submitter = cleaner
 
   None <- queryContractId admin mintAuthCid
+  pure ()
+
+-- ========================================================
+-- |          Transfer recovery for pending legs           |
+-- ========================================================
+
+-- | Approve and execute a ccipOwner transfer with no receiver preapproval, so
+-- | the registry returns a pending instruction. Returns the live pieces the
+-- | recovery tests assert on.
+pendingTransferFixture
+  : Text
+  -> Int
+  -> Script ( Party
+            , Party
+            , ContractId LinkTransferAuthorization
+            , ContractId LinkTransferRecovery
+            , ContractId TransferV1.TransferInstruction )
+pendingTransferFixture suffix timeoutHours = do
+  admin <- allocateParty ("token-admin-owner-" <> suffix)
+  operator <- allocateParty ("token-admin-operator-" <> suffix)
+  alice <- allocateParty ("token-admin-alice-" <> suffix)
+
+  let instanceId = "link-token-admin-" <> suffix
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId ("token-admin-registry-" <> suffix)
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  inputCids <- mintViaRegistry admin registryCid instrumentId admin 20.0
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveTransfer"
+    (CodecGen.encodeApproveTransferParams ApproveTransferParams with
+      authorizationId = "transfer-auth"
+      receiver = alice
+      amount = 12.0
+      reference = "transfer-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  transferAuthCid <- findTransferAuthorization admin "transfer-auth"
+
+  transferResult <- submit (actAs operator <> readAs admin) do
+    exerciseCmd transferAuthCid ExecuteTransfer with
+      submitter = operator
+      tokenAdminCid = adminCid
+      transferFactoryCid = toInterfaceContractId @TransferV1.TransferFactory registryCid
+      inputHoldingCids = inputCids
+      transferTimeoutHours = Some timeoutHours
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  TransferV1.TransferInstructionResult_Pending transferInstructionCid <- pure transferResult.output
+  recoveryCid <- findTransferRecovery admin "transfer-auth"
+  pure (admin, alice, transferAuthCid, recoveryCid, transferInstructionCid)
+
+-- | A pending transfer consumes its authorization and creates a recovery
+-- | pointing at the live instruction.
+testTokenAdminTransferPendingCreatesRecovery : Script ()
+testTokenAdminTransferPendingCreatesRecovery = script do
+  (admin, _, transferAuthCid, recoveryCid, instructionCid) <-
+    pendingTransferFixture "recovery-create" 24
+
+  Some recovery <- queryContractId admin recoveryCid
+  recovery.instanceId === "transfer-auth"
+  recovery.instrumentId === HoldingV1.InstrumentId with admin = admin, id = "LINK"
+  recovery.transferInstructionCid === instructionCid
+
+  None <- queryContractId admin transferAuthCid
+
+  holdings <- query @LinkHolding admin
+  [change] <- pure [h | (_, h) <- holdings, h.holdingOwner == admin, h.holdingAmount == 8.0]
+  change.holdingInstrumentId === HoldingV1.InstrumentId with admin = admin, id = "LINK"
+  pure ()
+
+-- | Withdraw through the recovery is refused before executeBefore and returns
+-- | the locked LINK to ccipOwner once the deadline has passed.
+testTokenAdminRecoveryWithdrawAfterDeadline : Script ()
+testTokenAdminRecoveryWithdrawAfterDeadline = script do
+  (admin, _, _, recoveryCid, instructionCid) <-
+    pendingTransferFixture "recovery-withdraw" 1
+
+  let authInstAddr = InstanceAddress.makeText "transfer-auth" admin
+      recoveryAsMcmsReceiver = toInterfaceContractId @MCMSReceiver recoveryCid
+      recoveryContractIds = Map.fromList [(authInstAddr, toAnyContractId recoveryCid)]
+
+  tooEarly <- trySubmit admin do
+    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Withdraw"
+      operationData = ""
+      contractIds = recoveryContractIds
+  mustFailWith "executeBefore has not passed" tooEarly
+
+  passTime (hours 2)
+
+  updatedMap <- submit admin do
+    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Withdraw"
+      operationData = ""
+      contractIds = recoveryContractIds
+
+  Map.lookup authInstAddr updatedMap === None
+  None <- queryContractId admin recoveryCid
+  None <- queryContractId admin (fromInterfaceContractId @LinkTransferInstruction instructionCid)
+
+  holdings <- query @LinkHolding admin
+  [returned] <- pure [h | (_, h) <- holdings, h.holdingOwner == admin, h.holdingAmount == 12.0]
+  returned.holdingAmount === 12.0
+  pure ()
+
+-- | Only ccipOwner reaches the recovery: the entrypoint checks the controller
+-- | and the choice checks its controller.
+testTokenAdminRecoveryWithdrawRequiresCcipOwner : Script ()
+testTokenAdminRecoveryWithdrawRequiresCcipOwner = script do
+  (admin, _, _, recoveryCid, _) <-
+    pendingTransferFixture "recovery-controller" 24
+  outsider <- allocateParty "token-admin-recovery-outsider"
+
+  let authInstAddr = InstanceAddress.makeText "transfer-auth" admin
+      recoveryAsMcmsReceiver = toInterfaceContractId @MCMSReceiver recoveryCid
+      recoveryContractIds = Map.fromList [(authInstAddr, toAnyContractId recoveryCid)]
+
+  submitMustFail (actAs outsider <> readAs admin) do
+    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Withdraw"
+      operationData = ""
+      contractIds = recoveryContractIds
+
+  submitMustFail (actAs outsider <> readAs admin) do
+    exerciseCmd recoveryCid WithdrawInstruction
+  pure ()
+
+-- | After the receiver rejects, the instruction is gone: withdraw is refused
+-- | and governance discards the orphaned recovery.
+testTokenAdminRecoveryDiscardAfterReject : Script ()
+testTokenAdminRecoveryDiscardAfterReject = script do
+  (admin, alice, _, recoveryCid, instructionCid) <-
+    pendingTransferFixture "recovery-discard" 24
+
+  _ <- submit alice do
+    exerciseCmd instructionCid TransferV1.TransferInstruction_Reject with
+      extraArgs = MetadataV1.ExtraArgs with
+        context = MetadataV1.emptyChoiceContext
+        meta = MetadataV1.emptyMetadata
+
+  None <- queryContractId admin (fromInterfaceContractId @LinkTransferInstruction instructionCid)
+
+  passTime (hours 25)
+
+  let authInstAddr = InstanceAddress.makeText "transfer-auth" admin
+      recoveryAsMcmsReceiver = toInterfaceContractId @MCMSReceiver recoveryCid
+      recoveryContractIds = Map.fromList [(authInstAddr, toAnyContractId recoveryCid)]
+
+  gone <- trySubmit admin do
+    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Withdraw"
+      operationData = ""
+      contractIds = recoveryContractIds
+  mustFailWith "Could not find contract" gone
+
+  updatedMap <- submit admin do
+    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Discard"
+      operationData = ""
+      contractIds = recoveryContractIds
+
+  Map.lookup authInstAddr updatedMap === None
+  None <- queryContractId admin recoveryCid
   pure ()
 
 -- ========================================================
