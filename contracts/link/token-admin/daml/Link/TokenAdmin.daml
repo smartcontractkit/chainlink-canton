@@ -507,9 +507,12 @@ template LinkTransferAuthorization
         assertMsg "LinkTransferAuthorization.Execute: factory admin mismatch"
           (factoryView.admin == instrumentId.admin)
 
-        let executeBefore = case transferTimeoutHours of
-              None -> addRelTime now (hours indefiniteTransferHours)
-              Some h -> addRelTime now (hours h)
+        let timeoutHours = case transferTimeoutHours of
+              None -> indefiniteTransferHours
+              Some h -> h
+        assertMsg "LinkTransferAuthorization.Execute: transferTimeoutHours out of range"
+          (timeoutHours > 0 && timeoutHours <= indefiniteTransferHours)
+        let executeBefore = addRelTime now (hours timeoutHours)
         exercise transferFactoryCid TransferV1.TransferFactory_Transfer with
           expectedAdmin = instrumentId.admin
           transfer = TransferV1.Transfer with
@@ -603,6 +606,10 @@ template LinkAllocationAuthorization
         assertMsg "LinkAllocationAuthorization.Execute: authorization expired" (now < expiresAt)
         assertMsg "LinkAllocationAuthorization.Execute: settleBefore must exceed allocateBefore"
           (settleBeforeHours > allocateBeforeHours)
+        assertMsg "LinkAllocationAuthorization.Execute: allocateBeforeHours must be positive"
+          (allocateBeforeHours > 0)
+        assertMsg "LinkAllocationAuthorization.Execute: settleBeforeHours above the 90-day cap"
+          (settleBeforeHours <= indefiniteTransferHours)
         assertMsg "LinkAllocationAuthorization.Execute: no input holdings" (not (null inputHoldingCids))
 
         factoryView <- exercise allocationFactoryCid

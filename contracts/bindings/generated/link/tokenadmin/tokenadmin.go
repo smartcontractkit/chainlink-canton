@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "link-token-admin"
-	PackageID   = "d8cb4224beaf4f993aaf2f2a482e4af68c3ec276db1411d269199d38cb5bafcf"
+	PackageID   = "4a4a17b0349e334a2166542f30461d35ec9bef3ef7324e0038829b9499a95e8a"
 	SDKVersion  = "3.4.11"
 )
 

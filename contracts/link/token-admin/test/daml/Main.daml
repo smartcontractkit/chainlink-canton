@@ -28,3 +28,7 @@ runAll = script do
   testTokenAdminExecuteMintToCcipOwner
   testTokenAdminWithdrawAuthorizationViaMCMS
   testTokenAdminCleanupExpiredAuthorization
+  testTokenAdminTransferRejectsZeroTimeout
+  testTokenAdminTransferRejectsTimeoutAboveCap
+  testTokenAdminAllocateRejectsZeroAllocateBefore
+  testTokenAdminAllocateRejectsSettleBeforeAboveCap

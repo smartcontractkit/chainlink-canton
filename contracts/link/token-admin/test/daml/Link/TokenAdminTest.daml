@@ -8,6 +8,7 @@ import DA.Assert ((===))
 import DA.Foldable (forA_)
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
+import DA.Text (isInfixOf)
 import DA.TextMap qualified as TextMap
 import DA.Time (seconds)
 
@@ -1372,3 +1373,148 @@ testTokenAdminCleanupExpiredAuthorization = script do
 
   None <- queryContractId admin mintAuthCid
   pure ()
+
+-- ========================================================
+-- |            Execute deadline range checks              |
+-- ========================================================
+
+-- | Fails unless the submission was refused with an error naming `msg`. The
+-- | registry double rejects some bad deadlines on its own, so a bare
+-- | submitMustFail would not show which check refused them.
+mustFailWith : Text -> Either SubmitError a -> Script ()
+mustFailWith msg result = case result of
+  Right _ -> abort ("expected failure: " <> msg)
+  Left err -> assertMsg ("unexpected error: " <> show err) (msg `isInfixOf` show err)
+
+-- | Approve a transfer of ccipOwner-held LINK, then execute it with the
+-- | submitter-chosen timeout.
+executeTransferWithTimeout
+  : Text -> Optional Int -> Script (Either SubmitError TransferV1.TransferInstructionResult)
+executeTransferWithTimeout suffix timeoutHours = do
+  admin <- allocateParty ("token-admin-owner-" <> suffix)
+  operator <- allocateParty ("token-admin-operator-" <> suffix)
+  alice <- allocateParty ("token-admin-alice-" <> suffix)
+
+  let instanceId = "link-token-admin-" <> suffix
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId ("token-admin-registry-" <> suffix)
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  inputCids <- mintViaRegistry admin registryCid instrumentId admin 20.0
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveTransfer"
+    (CodecGen.encodeApproveTransferParams ApproveTransferParams with
+      authorizationId = "transfer-auth"
+      receiver = alice
+      amount = 12.0
+      reference = "transfer-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  transferAuthCid <- findTransferAuthorization admin "transfer-auth"
+
+  trySubmit (actAs operator <> readAs admin) do
+    exerciseCmd transferAuthCid ExecuteTransfer with
+      submitter = operator
+      tokenAdminCid = adminCid
+      transferFactoryCid = toInterfaceContractId @TransferV1.TransferFactory registryCid
+      inputHoldingCids = inputCids
+      transferTimeoutHours = timeoutHours
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+-- | Approve an allocation of ccipOwner-held LINK, then execute it with the
+-- | submitter-chosen deadlines.
+executeAllocateWithDeadlines
+  : Text -> Int -> Int -> Script (Either SubmitError AllocationInstructionV1.AllocationInstructionResult)
+executeAllocateWithDeadlines suffix allocateBefore settleBefore = do
+  admin <- allocateParty ("token-admin-owner-" <> suffix)
+  operator <- allocateParty ("token-admin-operator-" <> suffix)
+  alice <- allocateParty ("token-admin-alice-" <> suffix)
+  settlementExec <- allocateParty ("token-admin-settlement-" <> suffix)
+
+  let instanceId = "link-token-admin-" <> suffix
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId ("token-admin-registry-" <> suffix)
+  factoryCid <- submit admin do
+    createCmd StubAllocationFactory with
+      stubFactoryAdmin = admin
+      stubFactoryInstanceId = "stub-allocation-factory"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  inputCids <- mintViaRegistry admin registryCid instrumentId admin 15.0
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveAllocate"
+    (CodecGen.encodeApproveAllocateParams ApproveAllocateParams with
+      authorizationId = "allocate-auth"
+      receiver = alice
+      amount = 15.0
+      transferLegId = "leg-1"
+      reference = "allocate-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  allocateAuthCid <- findAllocateAuthorization admin "allocate-auth"
+
+  trySubmit (actAs operator <> readAs admin) do
+    exerciseCmd allocateAuthCid ExecuteAllocate with
+      submitter = operator
+      tokenAdminCid = adminCid
+      allocationFactoryCid = toInterfaceContractId @AllocationInstructionV1.AllocationFactory factoryCid
+      settlementExecutor = settlementExec
+      settlementRefId = "settlement-1"
+      inputHoldingCids = inputCids
+      allocateBeforeHours = allocateBefore
+      settleBeforeHours = settleBefore
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+-- | A zero transfer timeout is refused by the governor, not left to the factory.
+testTokenAdminTransferRejectsZeroTimeout : Script ()
+testTokenAdminTransferRejectsZeroTimeout = script do
+  result <- executeTransferWithTimeout "transfer-timeout-zero" (Some 0)
+  mustFailWith "LinkTransferAuthorization.Execute: transferTimeoutHours out of range" result
+
+-- | A transfer timeout past the 90-day cap is refused.
+testTokenAdminTransferRejectsTimeoutAboveCap : Script ()
+testTokenAdminTransferRejectsTimeoutAboveCap = script do
+  result <- executeTransferWithTimeout "transfer-timeout-cap" (Some (indefiniteTransferHours + 1))
+  mustFailWith "LinkTransferAuthorization.Execute: transferTimeoutHours out of range" result
+
+-- | allocateBefore must land after requestedAt.
+testTokenAdminAllocateRejectsZeroAllocateBefore : Script ()
+testTokenAdminAllocateRejectsZeroAllocateBefore = script do
+  result <- executeAllocateWithDeadlines "allocate-before-zero" 0 2
+  mustFailWith "LinkAllocationAuthorization.Execute: allocateBeforeHours must be positive" result
+
+-- | settleBefore past the 90-day cap is refused.
+testTokenAdminAllocateRejectsSettleBeforeAboveCap : Script ()
+testTokenAdminAllocateRejectsSettleBeforeAboveCap = script do
+  result <- executeAllocateWithDeadlines "settle-before-cap" 1 (indefiniteTransferHours + 1)
+  mustFailWith "LinkAllocationAuthorization.Execute: settleBeforeHours above the 90-day cap" result
