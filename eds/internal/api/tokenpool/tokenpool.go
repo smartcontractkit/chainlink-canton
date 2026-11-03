@@ -244,9 +244,12 @@ func (s *Server) lockReleaseTokenPoolSend(
 		Values: make(map[string]splice_api_token_metadata_v1.AnyValue),
 	}
 	var factoryDisclosures []oapiCommon.DisclosedContract
-	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
+	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled).
+	// The pool's poolReceiveMetadata rides along so the token-standard backend
+	// returns the context matching the transfer mode (a named receiver label
+	// yields the two-step context, "" the direct/preapproved one).
 	if cfg.disclosureFactory != nil {
-		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message)
+		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message, lockReleaseTokenPool.PoolReceiveMetadata.Values)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
@@ -359,7 +362,7 @@ func (s *Server) burnMintTokenPoolSend(
 	// Get BurnMintFactory (if enabled)
 	var factoryDisclosures []oapiCommon.DisclosedContract
 	if cfg.disclosureFactory != nil {
-		factoryId, factoryCtx, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message)
+		factoryId, factoryCtx, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message, nil)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("burn mint factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})

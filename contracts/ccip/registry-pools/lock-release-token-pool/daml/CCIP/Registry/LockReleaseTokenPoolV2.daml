@@ -1347,7 +1347,37 @@ template LockReleaseTokenPool
                             amount
                             completedReceiverCids
                         pure completedReceiverCids
-                    _ -> abort "LockOrBurn: transfer did not complete directly"
+                    -- Transfers that cannot settle directly (e.g. named receiver labels —
+                    -- preapprovals only cover the "" label) pend; accept them in-transaction,
+                    -- like PerPartyRouter's fee collection. Requires a poolOwner→sender
+                    -- delegation so the accept (controller: receiver) is authorized.
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid -> do
+                        assertTransferInstructionMatches
+                            "LockOrBurn: pending lock transfer"
+                            caller
+                            poolOwner
+                            amount
+                            instrumentId
+                            instrCid
+                        acceptResult <- exercise instrCid
+                            Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
+                                extraArgs = mergedExtraArgs
+                        case acceptResult.output of
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
+                                    acceptedReceiverCids -> do
+                                assertHoldingsMatchAndSum
+                                    "LockOrBurn: accepted receiver holdings"
+                                    poolOwner
+                                    instrumentId
+                                    amount
+                                    acceptedReceiverCids
+                                pure acceptedReceiverCids
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
+                                abort "LockOrBurn: lock transfer acceptance failed"
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
+                                abort "LockOrBurn: lock transfer acceptance is still pending"
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
+                        abort "LockOrBurn: lock transfer failed"
 
                 let amountAfterFeeBpsBytes = fromSomeNote
                         "LockOrBurn: amountAfterFeeBps does not fit uint256"

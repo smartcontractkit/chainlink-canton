@@ -103,7 +103,7 @@ func (f AddressTransferFactory) GetFeeTokenDisclosures(
 	return types.CONTRACT_ID(activeTransferFactory.GetCreatedEvent().GetContractId()), splice_api_token_metadata_v1.ChoiceContext{}, []oapiCommon.DisclosedContract{converters.ActiveContractToDisclosedContract(activeTransferFactory)}, nil
 }
 
-func (f AddressTransferFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+func (f AddressTransferFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, _ map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	activeTransferFactory, ok := f.acs.Get(f.factoryAddress)
 	if !ok {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no active contract found for transfer factory at address %s", f.factoryAddress)
@@ -132,7 +132,7 @@ type URLTransferFactory struct {
 	transferInstructionClient transferInstructionV1.ClientWithResponsesInterface
 }
 
-func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, poolReceiveMeta map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	if message.TokenTransfer == nil {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no TokenTransfer in message")
 	}
@@ -153,7 +153,7 @@ func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapi
 		sender = types.PARTY(message.Sender)
 	}
 
-	return f.getTransferFactory(ctx, instrumentId, inputHoldingCids, sender, f.poolOwner)
+	return f.getTransferFactory(ctx, instrumentId, inputHoldingCids, sender, f.poolOwner, poolReceiveMeta)
 }
 
 func (f URLTransferFactory) GetFeeTokenDisclosures(
@@ -162,7 +162,7 @@ func (f URLTransferFactory) GetFeeTokenDisclosures(
 	sender types.PARTY,
 	receiver types.PARTY,
 ) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
-	return f.getTransferFactory(ctx, instrumentId, []string{}, sender, receiver)
+	return f.getTransferFactory(ctx, instrumentId, []string{}, sender, receiver, nil)
 }
 
 func (f URLTransferFactory) getTransferFactory(
@@ -171,7 +171,15 @@ func (f URLTransferFactory) getTransferFactory(
 	inputHoldingCids []string,
 	sender types.PARTY,
 	receiver types.PARTY,
+	meta map[string]types.TEXT,
 ) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+	// The receiver label in the transfer meta selects the context mode: a named
+	// label (e.g. cip-112/receiver.id) yields the two-step context, "" the
+	// direct/preapproved one.
+	metaValues := make(map[string]any, len(meta))
+	for k, v := range meta {
+		metaValues[k] = string(v)
+	}
 	resp, err := f.transferInstructionClient.GetTransferFactoryWithResponse(ctx, transferInstructionV1.GetFactoryRequest{
 		ChoiceArguments: map[string]any{
 			"expectedAdmin": instrumentId.Admin,
@@ -189,7 +197,7 @@ func (f URLTransferFactory) getTransferFactory(
 				"executeBefore":    time.Now().Add(time.Hour * 24).Format(time.RFC3339),
 				"inputHoldingCids": inputHoldingCids,
 				"meta": map[string]any{
-					"values": map[string]any{},
+					"values": metaValues,
 				},
 			},
 			"extraArgs": map[string]any{
@@ -252,5 +260,5 @@ func (f URLTransferFactory) GetExecuteDisclosures(
 		inputHoldingCidStrings[i] = string(cid)
 	}
 
-	return f.getTransferFactory(ctx, instrumentId, inputHoldingCidStrings, f.poolOwner, receiver)
+	return f.getTransferFactory(ctx, instrumentId, inputHoldingCidStrings, f.poolOwner, receiver, nil)
 }
