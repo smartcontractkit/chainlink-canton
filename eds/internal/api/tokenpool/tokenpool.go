@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
@@ -535,18 +536,37 @@ func (s *Server) lockReleaseTokenPoolExecute(
 	}
 
 	holdings, ok := s.instrumentHoldingStore.GetHolding(cfg.Owner, lockReleaseTokenPool.InstrumentId)
-	if !ok {
-		s.logger.Error().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Msg("no holdings found for lock release token pool")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-	inputHoldingCids := make([]types.CONTRACT_ID, len(holdings))
-	tokenPoolHoldings := make([]splice_api_token_metadata_v1.AnyValue, len(holdings))
-	disclosedHoldings := make([]oapiCommon.DisclosedContract, len(holdings))
-	for i, holding := range holdings {
-		inputHoldingCids[i] = types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
-		tokenPoolHoldings[i] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId()))}
-		disclosedHoldings[i] = converters.ActiveContractToDisclosedContract(holding)
+
+	var (
+		inputHoldingCids  []types.CONTRACT_ID
+		tokenPoolHoldings []splice_api_token_metadata_v1.AnyValue
+		disclosedHoldings []oapiCommon.DisclosedContract
+	)
+	if ok {
+		inputHoldingCids = make([]types.CONTRACT_ID, len(holdings))
+		tokenPoolHoldings = make([]splice_api_token_metadata_v1.AnyValue, len(holdings))
+		disclosedHoldings = make([]oapiCommon.DisclosedContract, len(holdings))
+		for i, holding := range holdings {
+			inputHoldingCids[i] = types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
+			tokenPoolHoldings[i] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId()))}
+			disclosedHoldings[i] = converters.ActiveContractToDisclosedContract(holding)
+		}
+	} else {
+		// Store can't see third-party pool owners' holdings — fall back to the
+		// bridge API's public disclosure.
+		s.logger.Warn().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Msg("no holdings in store for lock release token pool; falling back to bridge API disclosure")
+		disclosedHoldings, err = bridgeDisclosedHoldings(cfg.disclosureFactory, cfg.Owner, lockReleaseTokenPool.InstrumentId)
+		if err != nil || len(disclosedHoldings) == 0 {
+			s.logger.Error().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Err(err).Msg("no holdings found for lock release token pool (store + bridge API)")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+		inputHoldingCids = make([]types.CONTRACT_ID, len(disclosedHoldings))
+		tokenPoolHoldings = make([]splice_api_token_metadata_v1.AnyValue, len(disclosedHoldings))
+		for i, h := range disclosedHoldings {
+			inputHoldingCids[i] = types.CONTRACT_ID(h.ContractId)
+			tokenPoolHoldings[i] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(h.ContractId))}
+		}
 	}
 
 	// The ChoiceContext that will be passed to the Token Pool
@@ -824,4 +844,14 @@ func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.T
 	s.logger.Info().Stringer("address", poolConfig.InstanceAddress).Str("type", string(poolConfig.Type)).Msg("dynamically registered discovered token pool")
 
 	return nil
+}
+
+// bridgeDisclosedHoldings fetches the owner's disclosed holdings via the
+// factory's bridge-API integration, when available.
+func bridgeDisclosedHoldings(df factory.DisclosureFactory, owner types.PARTY, instrumentId splice_api_token_holding_v1.InstrumentId) ([]oapiCommon.DisclosedContract, error) {
+	bf, ok := df.(factory.BridgeHoldingsDisclosureFactory)
+	if !ok {
+		return nil, fmt.Errorf("disclosure factory does not support bridge holdings lookup")
+	}
+	return bf.GetBridgeHoldings(context.Background(), owner, instrumentId)
 }

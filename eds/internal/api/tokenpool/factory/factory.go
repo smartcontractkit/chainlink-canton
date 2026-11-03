@@ -44,3 +44,13 @@ type TransferDisclosureFactory interface {
 	DisclosureFactory
 	FeeTokenDisclosureFactory
 }
+
+// BridgeHoldingsDisclosureFactory resolves a pool owner's holdings via DA's
+// explicit-disclosure bridge API, when the local holdings store cannot see them.
+type BridgeHoldingsDisclosureFactory interface {
+	GetBridgeHoldings(
+		ctx context.Context,
+		owner types.PARTY,
+		instrumentId splice_api_token_holding_v1.InstrumentId,
+	) ([]oapiCommon.DisclosedContract, error)
+}

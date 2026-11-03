@@ -2,8 +2,11 @@ package factory
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
@@ -71,9 +74,16 @@ func NewTransferFactory(ctx context.Context, poolOwner types.PARTY, acs store.Ac
 			return nil, fmt.Errorf("failed to create TransferInstructionV1 client with URL %q: %w", *cfg.TokenStandardURL, err)
 		}
 
+		// DA's bridge API lives on the same host as the token-standard API.
+		bridgeURL := ""
+		if u, err := url.Parse(*cfg.TokenStandardURL); err == nil && u.Host != "" {
+			bridgeURL = u.Scheme + "://" + u.Host + "/api/bridge/v0/ccip/holdings"
+		}
+
 		return URLTransferFactory{
 			poolOwner:                 poolOwner,
 			transferInstructionClient: transferInstructionClient,
+			bridgeHoldingsURL:         bridgeURL,
 		}, nil
 	case config.FactoryTypeURLRequests:
 		return nil, fmt.Errorf("invalid factory type %q: URLRequests is not supported for TransferFactory", cfg.Type)
@@ -130,6 +140,7 @@ func (f AddressTransferFactory) GetExecuteDisclosures(
 type URLTransferFactory struct {
 	poolOwner                 types.PARTY
 	transferInstructionClient transferInstructionV1.ClientWithResponsesInterface
+	bridgeHoldingsURL         string
 }
 
 func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, poolReceiveMeta map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
@@ -153,7 +164,36 @@ func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapi
 		sender = types.PARTY(message.Sender)
 	}
 
-	return f.getTransferFactory(ctx, instrumentId, inputHoldingCids, sender, f.poolOwner, poolReceiveMeta)
+	factoryID, choiceContext, disclosedContracts, err := f.getTransferFactory(ctx, instrumentId, inputHoldingCids, sender, f.poolOwner, poolReceiveMeta)
+	if err != nil {
+		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, err
+	}
+
+	// A named receiver label switches the backend to two-step ("offer") mode,
+	// which omits the direct-mode context entries and disclosures the offer path
+	// still requires — merge the direct-mode response in.
+	if len(poolReceiveMeta) > 0 {
+		_, directContext, directDisclosures, err := f.getTransferFactory(ctx, instrumentId, inputHoldingCids, sender, f.poolOwner, nil)
+		if err != nil {
+			return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("failed to fetch direct-mode context for merge: %w", err)
+		}
+		for k, v := range directContext.Values {
+			if _, ok := choiceContext.Values[k]; !ok {
+				choiceContext.Values[k] = v
+			}
+		}
+		seen := make(map[string]bool, len(disclosedContracts))
+		for _, d := range disclosedContracts {
+			seen[d.ContractId] = true
+		}
+		for _, d := range directDisclosures {
+			if !seen[d.ContractId] {
+				disclosedContracts = append(disclosedContracts, d)
+			}
+		}
+	}
+
+	return factoryID, choiceContext, disclosedContracts, nil
 }
 
 func (f URLTransferFactory) GetFeeTokenDisclosures(
@@ -261,4 +301,62 @@ func (f URLTransferFactory) GetExecuteDisclosures(
 	}
 
 	return f.getTransferFactory(ctx, instrumentId, inputHoldingCidStrings, f.poolOwner, receiver, nil)
+}
+
+// bridgeHoldingsResponse matches DA's GET /api/bridge/v0/ccip/holdings response.
+type bridgeHoldingsResponse struct {
+	DisclosedHoldings []struct {
+		ContractId       string `json:"contractId"`
+		TemplateId       string `json:"templateId"`
+		SynchronizerId   string `json:"synchronizerId"`
+		CreatedEventBlob string `json:"createdEventBlob"`
+	} `json:"disclosedHoldings"`
+}
+
+// GetBridgeHoldings fetches the owner's publicly disclosed holdings from DA's
+// bridge API, when the local holdings store cannot see them. instrumentId is
+// the bare id ("TESTLINK6LR"), not the "id@admin" form.
+func (f URLTransferFactory) GetBridgeHoldings(
+	ctx context.Context,
+	owner types.PARTY,
+	instrumentId splice_api_token_holding_v1.InstrumentId,
+) ([]oapiCommon.DisclosedContract, error) {
+	if f.bridgeHoldingsURL == "" {
+		return nil, fmt.Errorf("bridge holdings URL unavailable (token-standard URL not set)")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.bridgeHoldingsURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build bridge holdings request: %w", err)
+	}
+	q := req.URL.Query()
+	q.Set("adminPartyId", string(owner))
+	q.Set("instrumentId", string(instrumentId.Id))
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("bridge holdings request: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return nil, fmt.Errorf("bridge holdings returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var parsed bridgeHoldingsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("bridge holdings response: %w", err)
+	}
+
+	out := make([]oapiCommon.DisclosedContract, len(parsed.DisclosedHoldings))
+	for i, h := range parsed.DisclosedHoldings {
+		out[i] = oapiCommon.DisclosedContract{
+			ContractId:       h.ContractId,
+			TemplateId:       h.TemplateId,
+			CreatedEventBlob: h.CreatedEventBlob,
+			SynchronizerId:   h.SynchronizerId,
+		}
+	}
+	return out, nil
 }

@@ -335,7 +335,7 @@ func newCantonCreateTransferCmd(g *Globals) *cobra.Command {
 					inputHoldings = append(inputHoldings, types.CONTRACT_ID(cid))
 				}
 			} else {
-				holdings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, instrumentId, testhelpers.WithUnlockedHoldingsOnly())
+				holdings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, instrumentId, testhelpers.WithUnlockedHoldingsOnly(), testhelpers.WithHoldingOwner(b.Participant.PartyID))
 				if err != nil {
 					return fmt.Errorf("list holdings: %w", err)
 				}
@@ -1069,7 +1069,7 @@ func cantonSend(
 			feeTokenInputCids = append(feeTokenInputCids, types.CONTRACT_ID(cid))
 		}
 	} else {
-		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, feeTokenInstrumentId)
+		feeTokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, feeTokenInstrumentId, testhelpers.WithHoldingOwner(b.Participant.PartyID))
 		if err != nil {
 			return fmt.Errorf("list fee token holdings: %w", err)
 		}
@@ -1086,7 +1086,7 @@ func cantonSend(
 				tokenTransferInputCids = append(tokenTransferInputCids, types.CONTRACT_ID(holding))
 			}
 		} else {
-			tokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, tokenTransferInstrumentId, testhelpers.WithUnlockedHoldingsOnly())
+			tokenHoldings, err := testhelpers.ListHoldingsForInstrument(ctx, b.Participant, tokenTransferInstrumentId, testhelpers.WithUnlockedHoldingsOnly(), testhelpers.WithHoldingOwner(b.Participant.PartyID))
 			if err != nil {
 				return fmt.Errorf("list LINK holdings: %w", err)
 			}
