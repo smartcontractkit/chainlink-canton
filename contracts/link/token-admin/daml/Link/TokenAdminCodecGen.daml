@@ -4,7 +4,7 @@ module Link.TokenAdminCodecGen where
 import DA.Crypto.Text (BytesHex)
 import DA.Optional (fromSome)
 
-import Link.TokenAdminTypes (ApproveMintParams(..), ApproveBurnParams(..), ApproveTransferParams(..), ApproveAllocateParams(..), SetPausedParams(..), SetObserversParams(..))
+import Link.TokenAdminTypes (ApproveMintParams(..), ApproveBurnParams(..), ApproveTransferParams(..), ApproveAllocateParams(..), SetPausedParams(..), SetObserversParams(..), SetBlockedPartiesParams(..))
 
 import MCMS.Codec (
     decodeBoolAt,
@@ -139,6 +139,20 @@ decodeSetObserversParamsAt : BytesHex -> Int -> Optional (SetObserversParams, In
 decodeSetObserversParamsAt encoded offset = do
     (observers, offset) <- decodePartyList encoded offset
     Some (SetObserversParams{..}, offset)
+
+
+-- ===============================================
+-- |              SetBlockedPartiesParams
+-- ===============================================
+
+encodeSetBlockedPartiesParams : SetBlockedPartiesParams -> BytesHex
+encodeSetBlockedPartiesParams params =
+    encodePartyList params.blockedParties
+
+decodeSetBlockedPartiesParamsAt : BytesHex -> Int -> Optional (SetBlockedPartiesParams, Int)
+decodeSetBlockedPartiesParamsAt encoded offset = do
+    (blockedParties, offset) <- decodePartyList encoded offset
+    Some (SetBlockedPartiesParams{..}, offset)
 
 
 

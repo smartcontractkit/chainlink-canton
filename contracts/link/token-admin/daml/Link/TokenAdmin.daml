@@ -8,8 +8,8 @@
 -- | authorization. The submitter controls Execute*; mint and burn also need
 -- | the recipient or holder, because the registry factory asks for them.
 -- |
--- | Execute* reads the live admin, so pausing it also blocks approved
--- | authorizations.
+-- | Execute* reads the live admin, so pausing it or blocking a counterparty
+-- | also stops already-approved authorizations.
 module Link.TokenAdmin where
 
 import DA.Action (foldlA)
@@ -37,6 +37,7 @@ import Link.TokenAdminTypes (
     ApproveAllocateParams(..),
     SetPausedParams(..),
     SetObserversParams(..),
+    SetBlockedPartiesParams(..),
     )
 import Link.TokenAdminCodecGen (
     decodeApproveMintParamsAt,
@@ -45,6 +46,7 @@ import Link.TokenAdminCodecGen (
     decodeApproveAllocateParamsAt,
     decodeSetPausedParamsAt,
     decodeSetObserversParamsAt,
+    decodeSetBlockedPartiesParamsAt,
     )
 
 -- | Splice caps transfer lifetimes at tokenStandardMaxTTL (default 90 days).
@@ -58,6 +60,7 @@ template LinkTokenAdmin
     instrumentId : HoldingV1.InstrumentId
     paused : Bool
     observers : [Party]
+    blockedParties : [Party]                -- counterparties refused by mint, transfer and allocate
   where
     signatory ccipOwner
     observer observers
@@ -78,6 +81,7 @@ template LinkTokenAdmin
         assertMsg "LinkTokenAdmin.ApproveMint: paused" (not paused)
         assertMsg "LinkTokenAdmin.ApproveMint: amount must be positive" (amount > 0.0)
         assertMsg "LinkTokenAdmin.ApproveMint: validForSeconds must be positive" (validForSeconds > 0)
+        assertMsg "LinkTokenAdmin.ApproveMint: recipient is blocked" (not (recipient `elem` blockedParties))
         now <- getTime
         create LinkMintAuthorization with
           ccipOwner
@@ -125,6 +129,7 @@ template LinkTokenAdmin
         assertMsg "LinkTokenAdmin.ApproveTransfer: paused" (not paused)
         assertMsg "LinkTokenAdmin.ApproveTransfer: amount must be positive" (amount > 0.0)
         assertMsg "LinkTokenAdmin.ApproveTransfer: validForSeconds must be positive" (validForSeconds > 0)
+        assertMsg "LinkTokenAdmin.ApproveTransfer: receiver is blocked" (not (receiver `elem` blockedParties))
         now <- getTime
         create LinkTransferAuthorization with
           ccipOwner
@@ -149,6 +154,7 @@ template LinkTokenAdmin
         assertMsg "LinkTokenAdmin.ApproveAllocate: paused" (not paused)
         assertMsg "LinkTokenAdmin.ApproveAllocate: amount must be positive" (amount > 0.0)
         assertMsg "LinkTokenAdmin.ApproveAllocate: validForSeconds must be positive" (validForSeconds > 0)
+        assertMsg "LinkTokenAdmin.ApproveAllocate: receiver is blocked" (not (receiver `elem` blockedParties))
         now <- getTime
         create LinkAllocationAuthorization with
           ccipOwner
@@ -174,6 +180,13 @@ template LinkTokenAdmin
       controller ccipOwner
       do
         create this with observers
+
+    choice SetBlockedParties : ContractId LinkTokenAdmin
+      with
+        blockedParties : [Party]
+      controller ccipOwner
+      do
+        create this with blockedParties
 
     interface instance MCMSReceiver for LinkTokenAdmin where
       view = MCMSReceiverView with
@@ -258,6 +271,15 @@ template LinkTokenAdmin
                   observers
                 pure (Map.insert instAddr (coerceContractId newCid) contractIds)
 
+          "SetBlockedParties" -> do
+            case decodeSetBlockedPartiesParamsAt operationData 0 of
+              None -> abort "E_INVALID_PARAMS: SetBlockedParties"
+              Some (SetBlockedPartiesParams{..}, finalOffset) -> do
+                assertMsg "E_TRAILING_BYTES: SetBlockedParties" (finalOffset == byteCount operationData)
+                newCid <- exercise selfCid SetBlockedParties with
+                  blockedParties
+                pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+
           _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 -- | Authorizes minting `amount` of LINK to `recipient`. The recipient co-signs
@@ -295,6 +317,8 @@ template LinkMintAuthorization
             && tokenAdmin.instanceId == adminInstanceId
             && tokenAdmin.instrumentId == instrumentId)
         assertMsg "LinkMintAuthorization.Execute: token admin paused" (not tokenAdmin.paused)
+        assertMsg "LinkMintAuthorization.Execute: recipient is blocked"
+          (not (recipient `elem` tokenAdmin.blockedParties))
 
         now <- getTime
         assertMsg "LinkMintAuthorization.Execute: authorization expired" (now < expiresAt)
@@ -496,6 +520,8 @@ template LinkTransferAuthorization
             && tokenAdmin.instanceId == adminInstanceId
             && tokenAdmin.instrumentId == instrumentId)
         assertMsg "LinkTransferAuthorization.Execute: token admin paused" (not tokenAdmin.paused)
+        assertMsg "LinkTransferAuthorization.Execute: receiver is blocked"
+          (not (receiver `elem` tokenAdmin.blockedParties))
 
         now <- getTime
         assertMsg "LinkTransferAuthorization.Execute: authorization expired" (now < expiresAt)
@@ -672,6 +698,8 @@ template LinkAllocationAuthorization
             && tokenAdmin.instanceId == adminInstanceId
             && tokenAdmin.instrumentId == instrumentId)
         assertMsg "LinkAllocationAuthorization.Execute: token admin paused" (not tokenAdmin.paused)
+        assertMsg "LinkAllocationAuthorization.Execute: receiver is blocked"
+          (not (receiver `elem` tokenAdmin.blockedParties))
 
         now <- getTime
         assertMsg "LinkAllocationAuthorization.Execute: authorization expired" (now < expiresAt)

@@ -36,3 +36,6 @@ runAll = script do
   testTokenAdminTransferRejectsTimeoutAboveCap
   testTokenAdminAllocateRejectsZeroAllocateBefore
   testTokenAdminAllocateRejectsSettleBeforeAboveCap
+  testTokenAdminSetBlockedParties
+  testTokenAdminApproveMintRejectsBlockedRecipient
+  testTokenAdminExecuteTransferRejectsBlockedReceiver

@@ -58,3 +58,9 @@ data SetObserversParams = SetObserversParams
     with
         observers : [Party]     -- Observer set for EDS/off-chain visibility of the admin contract
     deriving (Eq, Show)
+
+-- | Params for the SetBlockedParties choice
+data SetBlockedPartiesParams = SetBlockedPartiesParams
+    with
+        blockedParties : [Party]  -- Parties refused as mint, transfer and allocate counterparties
+    deriving (Eq, Show)

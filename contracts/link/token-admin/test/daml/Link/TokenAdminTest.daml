@@ -218,6 +218,7 @@ testTokenAdminMintViaEntrypoint = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -282,6 +283,7 @@ testTokenAdminBurnViaEntrypoint = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -337,6 +339,7 @@ testTokenAdminTransferViaEntrypoint = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   -- Fund ccipOwner itself: the governor only moves ccipOwner-held LINK.
   inputCids <- mintViaRegistry admin registryCid instrumentId admin 20.0
@@ -418,6 +421,7 @@ testTokenAdminAllocateViaEntrypoint = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   inputCids <- mintViaRegistry admin registryCid instrumentId admin 15.0
 
@@ -487,6 +491,7 @@ testTokenAdminBurnRejectsOverMax = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -538,6 +543,7 @@ testTokenAdminBurnRejectsWrongOwner = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -590,6 +596,7 @@ testTokenAdminBurnRejectsWrongInstrument = script do
       instrumentId = linkInstrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText "link-token-admin-wronginst" admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -639,6 +646,7 @@ testTokenAdminExecuteRejectsExpired = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -691,6 +699,7 @@ testTokenAdminExecuteRejectsForeignFactory = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText "link-token-admin-foreign" admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -735,6 +744,7 @@ testTokenAdminSetPausedBlocksApprovals = script do
         id = "LINK"
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText "link-token-admin-paused" admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -777,6 +787,7 @@ testTokenAdminSetObservers = script do
         id = "LINK"
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText "link-token-admin-observers" admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -811,6 +822,7 @@ testTokenAdminUnknownFunctionAndBadParams = script do
         id = "LINK"
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText "link-token-admin-unknown" admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -867,6 +879,7 @@ testTokenAdminSingleSignatory = script do
         id = "LINK"
       paused = False
       observers = []
+      blockedParties = []
 
   Some fetched <- queryContractId admin adminCid
   signatory fetched === [admin]
@@ -886,6 +899,7 @@ testTokenAdminEntrypointRequiresCcipOwner = script do
         id = "LINK"
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText "link-token-admin-auth" admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -931,6 +945,7 @@ testTokenAdminExecuteBlockedWhenPaused = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -987,6 +1002,7 @@ testTokenAdminExecuteRejectsStaleAdminCid = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -1041,6 +1057,7 @@ testTokenAdminExecuteRejectsForeignAdmin = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   otherAdminCid <- submit admin do
     createCmd LinkTokenAdmin with
@@ -1049,6 +1066,7 @@ testTokenAdminExecuteRejectsForeignAdmin = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -1095,6 +1113,7 @@ testTokenAdminUnpauseAllowsExecute = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -1172,6 +1191,7 @@ testTokenAdminExecuteBySubmitter = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -1238,6 +1258,7 @@ testTokenAdminExecuteMintToCcipOwner = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -1289,6 +1310,7 @@ testTokenAdminWithdrawAuthorizationViaMCMS = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -1354,6 +1376,7 @@ testTokenAdminCleanupExpiredAuthorization = script do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   let instAddr = InstanceAddress.makeText instanceId admin
       contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
@@ -1415,6 +1438,7 @@ pendingTransferFixture suffix timeoutHours = do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   inputCids <- mintViaRegistry admin registryCid instrumentId admin 20.0
 
@@ -1595,6 +1619,7 @@ executeTransferWithTimeout suffix timeoutHours = do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   inputCids <- mintViaRegistry admin registryCid instrumentId admin 20.0
 
@@ -1650,6 +1675,7 @@ executeAllocateWithDeadlines suffix allocateBefore settleBefore = do
       instrumentId
       paused = False
       observers = []
+      blockedParties = []
 
   inputCids <- mintViaRegistry admin registryCid instrumentId admin 15.0
 
@@ -1704,3 +1730,193 @@ testTokenAdminAllocateRejectsSettleBeforeAboveCap : Script ()
 testTokenAdminAllocateRejectsSettleBeforeAboveCap = script do
   result <- executeAllocateWithDeadlines "settle-before-cap" 1 (indefiniteTransferHours + 1)
   mustFailWith "LinkAllocationAuthorization.Execute: settleBeforeHours above the 90-day cap" result
+
+-- ========================================================
+-- |                Party blocklist                        |
+-- ========================================================
+
+-- | SetBlockedParties governs the refusal list and re-keys the map; clearing
+-- | it restores the empty list.
+testTokenAdminSetBlockedParties : Script ()
+testTokenAdminSetBlockedParties = script do
+  admin <- allocateParty "token-admin-owner-blocked"
+  mallory <- allocateParty "token-admin-mallory"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-blocked"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+      paused = False
+      observers = []
+      blockedParties = []
+
+  let instAddr = InstanceAddress.makeText "link-token-admin-blocked" admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  blockedContractIds <- exerciseEntrypoint admin adminCid "SetBlockedParties"
+    (CodecGen.encodeSetBlockedPartiesParams SetBlockedPartiesParams with
+      blockedParties = [mallory])
+    contractIds
+
+  blockedAdminCid <- case Map.lookup instAddr blockedContractIds of
+    Some cid -> do
+      assertMsg "expected new admin CID after SetBlockedParties" (cid /= toAnyContractId adminCid)
+      pure (coerceContractId cid : ContractId LinkTokenAdmin)
+    None -> abort "expected admin CID in returned map"
+
+  Some blockedAdmin <- queryContractId admin blockedAdminCid
+  blockedAdmin.blockedParties === [mallory]
+
+  clearedContractIds <- exerciseEntrypoint admin blockedAdminCid "SetBlockedParties"
+    (CodecGen.encodeSetBlockedPartiesParams SetBlockedPartiesParams with
+      blockedParties = [])
+    blockedContractIds
+
+  clearedAdminCid <- case Map.lookup instAddr clearedContractIds of
+    Some cid -> pure (coerceContractId cid : ContractId LinkTokenAdmin)
+    None -> abort "expected admin CID in returned map"
+
+  Some clearedAdmin <- queryContractId admin clearedAdminCid
+  clearedAdmin.blockedParties === []
+  pure ()
+
+-- | Approving a mint to a blocked party is refused at approval time.
+testTokenAdminApproveMintRejectsBlockedRecipient : Script ()
+testTokenAdminApproveMintRejectsBlockedRecipient = script do
+  admin <- allocateParty "token-admin-owner-mint-blocked"
+  mallory <- allocateParty "token-admin-mint-mallory"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId = "link-token-admin-mint-blocked"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+      paused = False
+      observers = []
+      blockedParties = []
+
+  let instAddr = InstanceAddress.makeText "link-token-admin-mint-blocked" admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  blockedContractIds <- exerciseEntrypoint admin adminCid "SetBlockedParties"
+    (CodecGen.encodeSetBlockedPartiesParams SetBlockedPartiesParams with
+      blockedParties = [mallory])
+    contractIds
+
+  blockedAdminCid <- case Map.lookup instAddr blockedContractIds of
+    Some cid -> pure (coerceContractId cid : ContractId LinkTokenAdmin)
+    None -> abort "expected admin CID in returned map"
+
+  rejected <- trySubmit admin do
+    exerciseCmd (toInterfaceContractId @MCMSReceiver blockedAdminCid) MCMSReceiver_Entrypoint with
+      functionName = "ApproveMint"
+      operationData = CodecGen.encodeApproveMintParams ApproveMintParams with
+        authorizationId = "mint-auth"
+        recipient = mallory
+        amount = 1000.0
+        reference = "mint-ref"
+        validForSeconds = 3600
+      contractIds = Map.fromList [(instAddr, toAnyContractId blockedAdminCid)]
+  mustFailWith "recipient is blocked" rejected
+
+  pure ()
+
+-- | Blocking a receiver stops an already-approved transfer at execute time,
+-- | and unblocking lets the same authorization complete.
+testTokenAdminExecuteTransferRejectsBlockedReceiver : Script ()
+testTokenAdminExecuteTransferRejectsBlockedReceiver = script do
+  admin <- allocateParty "token-admin-owner-exec-blocked"
+  operator <- allocateParty "token-admin-operator-exec-blocked"
+  alice <- allocateParty "token-admin-alice-exec-blocked"
+
+  let instanceId = "link-token-admin-exec-blocked"
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId "token-admin-registry-exec-blocked"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+      blockedParties = []
+
+  inputCids <- mintViaRegistry admin registryCid instrumentId admin 20.0
+
+  disclosedRegistry <- fromSome <$> queryDisclosure admin registryCid
+  preapprovalCid <- submit (disclose disclosedRegistry <> actAs alice) do
+    exerciseCmd registryCid CreateTransferPreapproval with
+      receiver = alice
+      existingPreapprovalCid = None
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveTransfer"
+    (CodecGen.encodeApproveTransferParams ApproveTransferParams with
+      authorizationId = "transfer-auth"
+      receiver = alice
+      amount = 12.0
+      reference = "transfer-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  transferAuthCid <- findTransferAuthorization admin "transfer-auth"
+
+  blockedContractIds <- exerciseEntrypoint admin adminCid "SetBlockedParties"
+    (CodecGen.encodeSetBlockedPartiesParams SetBlockedPartiesParams with
+      blockedParties = [alice])
+    contractIds
+
+  blockedAdminCid <- case Map.lookup instAddr blockedContractIds of
+    Some cid -> pure (coerceContractId cid : ContractId LinkTokenAdmin)
+    None -> abort "expected admin CID in returned map"
+
+  rejected <- trySubmit (actAs operator <> readAs admin) do
+    exerciseCmd transferAuthCid ExecuteTransfer with
+      submitter = operator
+      tokenAdminCid = blockedAdminCid
+      transferFactoryCid = toInterfaceContractId @TransferV1.TransferFactory registryCid
+      inputHoldingCids = inputCids
+      transferTimeoutHours = None
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+  mustFailWith "receiver is blocked" rejected
+
+  clearedContractIds <- exerciseEntrypoint admin blockedAdminCid "SetBlockedParties"
+    (CodecGen.encodeSetBlockedPartiesParams SetBlockedPartiesParams with
+      blockedParties = [])
+    blockedContractIds
+
+  clearedAdminCid <- case Map.lookup instAddr clearedContractIds of
+    Some cid -> pure (coerceContractId cid : ContractId LinkTokenAdmin)
+    None -> abort "expected admin CID in returned map"
+
+  transferResult <- submit (actAs operator <> readAs admin) do
+    exerciseCmd transferAuthCid ExecuteTransfer with
+      submitter = operator
+      tokenAdminCid = clearedAdminCid
+      transferFactoryCid = toInterfaceContractId @TransferV1.TransferFactory registryCid
+      inputHoldingCids = inputCids
+      transferTimeoutHours = None
+      registryContext = MetadataV1.ChoiceContext with
+        values = TextMap.fromList
+          [(transferPreapprovalContextKey, MetadataV1.AV_ContractId (coerceContractId preapprovalCid))]
+      meta = MetadataV1.emptyMetadata
+
+  case transferResult.output of
+    TransferV1.TransferInstructionResult_Completed receiverHoldingCids -> do
+      [receiverHoldingCid] <- pure receiverHoldingCids
+      Some receiverHolding <- queryContractId alice (fromInterfaceContractId @LinkHolding receiverHoldingCid)
+      receiverHolding.holdingOwner === alice
+      receiverHolding.holdingAmount === 12.0
+    _ -> abort "expected direct transfer completion"

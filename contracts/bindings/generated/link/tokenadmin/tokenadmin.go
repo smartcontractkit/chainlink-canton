@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "link-token-admin"
-	PackageID   = "506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a"
+	PackageID   = "20a30e738659f63fecad99164b98a6254f185dc59b7511b8f3dbe3d502a66ea9"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1552,11 +1552,12 @@ var _ api.IMCMSReceiver = (*LinkMintAuthorization)(nil)
 
 // LinkTokenAdmin is a Template type
 type LinkTokenAdmin struct {
-	CcipOwner    types.PARTY                              `json:"ccipOwner"`
-	InstanceId   types.TEXT                               `json:"instanceId"`
-	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
-	Paused       types.BOOL                               `json:"paused"`
-	Observers    []types.PARTY                            `json:"observers"`
+	CcipOwner      types.PARTY                              `json:"ccipOwner"`
+	InstanceId     types.TEXT                               `json:"instanceId"`
+	InstrumentId   splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Paused         types.BOOL                               `json:"paused"`
+	Observers      []types.PARTY                            `json:"observers"`
+	BlockedParties []types.PARTY                            `json:"blockedParties"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1594,6 +1595,15 @@ func (t LinkTokenAdmin) CreateCommand() *model.CreateCommand {
 		return res
 	}()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["blockedParties"] = func() []any {
+		res := make([]any, 0, len(t.BlockedParties))
+		for _, e := range t.BlockedParties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -1620,6 +1630,15 @@ func (t LinkTokenAdmin) CreateCommandWithPackageID(packageID string) *model.Crea
 	args["observers"] = func() []any {
 		res := make([]any, 0, len(t.Observers))
 		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["blockedParties"] = func() []any {
+		res := make([]any, 0, len(t.BlockedParties))
+		for _, e := range t.BlockedParties {
 			res = append(res, e.ToMap())
 		}
 		return res
@@ -1798,6 +1817,27 @@ func (t LinkTokenAdmin) SetObserversWithPackageID(contractID string, packageID s
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkTokenAdmin"),
 		ContractID: contractID,
 		Choice:     "SetObservers",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetBlockedParties exercises the SetBlockedParties choice on this LinkTokenAdmin contract
+// This method uses the package name in the template ID
+func (t LinkTokenAdmin) SetBlockedParties(contractID string, args SetBlockedParties) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "LinkTokenAdmin"),
+		ContractID: contractID,
+		Choice:     "SetBlockedParties",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SetBlockedPartiesWithPackageID exercises the SetBlockedParties choice using the provided package ID instead of package name
+func (t LinkTokenAdmin) SetBlockedPartiesWithPackageID(contractID string, packageID string, args SetBlockedParties) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkTokenAdmin"),
+		ContractID: contractID,
+		Choice:     "SetBlockedParties",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -2233,6 +2273,90 @@ func (t LinkTransferRecovery) MCMSReceiverEntrypointWithPackageID(contractID str
 
 var _ api.IMCMSReceiver = (*LinkTransferRecovery)(nil)
 
+// SetBlockedParties is a Record type
+type SetBlockedParties struct {
+	BlockedParties []types.PARTY `json:"blockedParties"`
+}
+
+// ToMap converts SetBlockedParties to a map for DAML arguments
+func (t SetBlockedParties) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["blockedParties"] = func() []any {
+		res := make([]any, 0, len(t.BlockedParties))
+		for _, e := range t.BlockedParties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SetBlockedParties) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetBlockedParties) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetBlockedParties to hex string (Canton MCMS format)
+func (t SetBlockedParties) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetBlockedParties from hex string (Canton MCMS format)
+func (t *SetBlockedParties) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// SetBlockedPartiesParams is a Record type
+type SetBlockedPartiesParams struct {
+	BlockedParties []types.PARTY `json:"blockedParties"`
+}
+
+// ToMap converts SetBlockedPartiesParams to a map for DAML arguments
+func (t SetBlockedPartiesParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["blockedParties"] = func() []any {
+		res := make([]any, 0, len(t.BlockedParties))
+		for _, e := range t.BlockedParties {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SetBlockedPartiesParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetBlockedPartiesParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetBlockedPartiesParams to hex string (Canton MCMS format)
+func (t SetBlockedPartiesParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetBlockedPartiesParams from hex string (Canton MCMS format)
+func (t *SetBlockedPartiesParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetObservers is a Record type
 type SetObservers struct {
 	Observers []types.PARTY `json:"observers"`
@@ -2569,6 +2693,8 @@ type MCMSEncoder interface {
 	ExecuteBurn(args ExecuteBurn) (*bind.EncodedChoice, error)
 	ExecuteMint(args ExecuteMint) (*bind.EncodedChoice, error)
 	ExecuteTransfer(args ExecuteTransfer) (*bind.EncodedChoice, error)
+	SetBlockedParties(args SetBlockedParties) (*bind.EncodedChoice, error)
+	SetBlockedPartiesParams(args SetBlockedPartiesParams) (*bind.EncodedChoice, error)
 	SetObservers(args SetObservers) (*bind.EncodedChoice, error)
 	SetObserversParams(args SetObserversParams) (*bind.EncodedChoice, error)
 	SetPaused(args SetPaused) (*bind.EncodedChoice, error)
@@ -2690,6 +2816,16 @@ func (e *encoder) ExecuteMint(args ExecuteMint) (*bind.EncodedChoice, error) {
 // ExecuteTransfer encodes parameters for the ExecuteTransfer choice.
 func (e *encoder) ExecuteTransfer(args ExecuteTransfer) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ExecuteTransfer", args)
+}
+
+// SetBlockedParties encodes parameters for the SetBlockedParties choice.
+func (e *encoder) SetBlockedParties(args SetBlockedParties) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetBlockedParties", args)
+}
+
+// SetBlockedPartiesParams encodes parameters for the SetBlockedParties choice.
+func (e *encoder) SetBlockedPartiesParams(args SetBlockedPartiesParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetBlockedParties", args)
 }
 
 // SetObservers encodes parameters for the SetObservers choice.
