@@ -18,7 +18,7 @@ require (
 	github.com/smartcontractkit/chainlink-canton/authentication v1.2.0
 	github.com/smartcontractkit/chainlink-canton/party-ceremony v0.0.0-00010101000000-000000000000
 	github.com/smartcontractkit/chainlink-deployments-framework v0.127.0
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.10-0.20261103160236-268e76d9b5ac
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.16.10-0.20261103172806-191af37d2c44
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
