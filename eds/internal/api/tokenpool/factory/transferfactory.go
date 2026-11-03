@@ -358,5 +358,6 @@ func (f URLTransferFactory) GetBridgeHoldings(
 			SynchronizerId:   h.SynchronizerId,
 		}
 	}
+
 	return out, nil
 }

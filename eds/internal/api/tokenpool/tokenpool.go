@@ -853,5 +853,6 @@ func bridgeDisclosedHoldings(df factory.DisclosureFactory, owner types.PARTY, in
 	if !ok {
 		return nil, fmt.Errorf("disclosure factory does not support bridge holdings lookup")
 	}
+
 	return bf.GetBridgeHoldings(context.Background(), owner, instrumentId)
 }
