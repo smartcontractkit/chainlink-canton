@@ -24,6 +24,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	oapiCommon "github.com/smartcontractkit/chainlink-canton/eds/api/common"
 	oapiTokenPool "github.com/smartcontractkit/chainlink-canton/eds/api/tokenpool"
@@ -244,9 +245,12 @@ func (s *Server) lockReleaseTokenPoolSend(
 		Values: make(map[string]splice_api_token_metadata_v1.AnyValue),
 	}
 	var factoryDisclosures []oapiCommon.DisclosedContract
-	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled)
+	// Get ExtraArgs and TransferFactory from Token Standard API (if enabled).
+	// The pool's poolReceiveMetadata rides along so the token-standard backend
+	// returns the context matching the transfer mode (a named receiver label
+	// yields the two-step context, "" the direct/preapproved one).
 	if cfg.disclosureFactory != nil {
-		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message)
+		transferFactory, transferContext, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message, lockReleaseTokenPool.PoolReceiveMetadata.Values)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("transfer factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
@@ -359,7 +363,7 @@ func (s *Server) burnMintTokenPoolSend(
 	// Get BurnMintFactory (if enabled)
 	var factoryDisclosures []oapiCommon.DisclosedContract
 	if cfg.disclosureFactory != nil {
-		factoryId, factoryCtx, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message)
+		factoryId, factoryCtx, disclosedFactoryContracts, err := cfg.disclosureFactory.GetSendDisclosures(c, message, nil)
 		if err != nil {
 			s.logger.Error().Err(err).Msg("burn mint factory returned an error")
 			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
@@ -532,18 +536,37 @@ func (s *Server) lockReleaseTokenPoolExecute(
 	}
 
 	holdings, ok := s.instrumentHoldingStore.GetHolding(cfg.Owner, lockReleaseTokenPool.InstrumentId)
-	if !ok {
-		s.logger.Error().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Msg("no holdings found for lock release token pool")
-		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
-		return
-	}
-	inputHoldingCids := make([]types.CONTRACT_ID, len(holdings))
-	tokenPoolHoldings := make([]splice_api_token_metadata_v1.AnyValue, len(holdings))
-	disclosedHoldings := make([]oapiCommon.DisclosedContract, len(holdings))
-	for i, holding := range holdings {
-		inputHoldingCids[i] = types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
-		tokenPoolHoldings[i] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId()))}
-		disclosedHoldings[i] = converters.ActiveContractToDisclosedContract(holding)
+
+	var (
+		inputHoldingCids  []types.CONTRACT_ID
+		tokenPoolHoldings []splice_api_token_metadata_v1.AnyValue
+		disclosedHoldings []oapiCommon.DisclosedContract
+	)
+	if ok {
+		inputHoldingCids = make([]types.CONTRACT_ID, len(holdings))
+		tokenPoolHoldings = make([]splice_api_token_metadata_v1.AnyValue, len(holdings))
+		disclosedHoldings = make([]oapiCommon.DisclosedContract, len(holdings))
+		for i, holding := range holdings {
+			inputHoldingCids[i] = types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId())
+			tokenPoolHoldings[i] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(holding.GetCreatedEvent().GetContractId()))}
+			disclosedHoldings[i] = converters.ActiveContractToDisclosedContract(holding)
+		}
+	} else {
+		// Store can't see third-party pool owners' holdings — fall back to the
+		// bridge API's public disclosure.
+		s.logger.Warn().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Msg("no holdings in store for lock release token pool; falling back to bridge API disclosure")
+		disclosedHoldings, err = bridgeDisclosedHoldings(cfg.disclosureFactory, cfg.Owner, lockReleaseTokenPool.InstrumentId)
+		if err != nil || len(disclosedHoldings) == 0 {
+			s.logger.Error().Str("owner", string(cfg.Owner)).Any("instrumentId", lockReleaseTokenPool.InstrumentId).Err(err).Msg("no holdings found for lock release token pool (store + bridge API)")
+			c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+			return
+		}
+		inputHoldingCids = make([]types.CONTRACT_ID, len(disclosedHoldings))
+		tokenPoolHoldings = make([]splice_api_token_metadata_v1.AnyValue, len(disclosedHoldings))
+		for i, h := range disclosedHoldings {
+			inputHoldingCids[i] = types.CONTRACT_ID(h.ContractId)
+			tokenPoolHoldings[i] = splice_api_token_metadata_v1.AnyValue{AVContractId: new(types.CONTRACT_ID(h.ContractId))}
+		}
 	}
 
 	// The ChoiceContext that will be passed to the Token Pool
@@ -791,6 +814,21 @@ func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.T
 		Owner: types.PARTY(poolConfig.PoolOwner),
 	}
 
+	// Discovered pools: registry_api.token_standard_url is the shared bare host;
+	// scope the transfer API base per pool by its instrument admin.
+	if poolConfig.Type == config.TokenPoolTypeLockRelease && poolConfig.Factory != nil && poolConfig.Factory.TokenStandardURL != nil {
+		active, ok := s.activeContractStore.Get(poolConfig.InstanceAddress)
+		if !ok {
+			return fmt.Errorf("discovered pool %s not in store; cannot scope transfer factory URL", poolConfig.InstanceAddress)
+		}
+		pool, err := ParseLockReleaseTokenPool(active.GetCreatedEvent())
+		if err != nil {
+			return fmt.Errorf("failed to parse discovered pool %s for transfer factory URL scoping: %w", poolConfig.InstanceAddress, err)
+		}
+		scoped := factory.RegistrarScopedURL(*poolConfig.Factory.TokenStandardURL, pool.InstrumentId.Admin)
+		poolConfig.Factory.TokenStandardURL = &scoped
+	}
+
 	// Handle factory if configured — burn-mint pools use a BurnMintFactory,
 	// lock-release pools a TransferFactory.
 	if poolConfig.Factory != nil {
@@ -821,4 +859,15 @@ func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.T
 	s.logger.Info().Stringer("address", poolConfig.InstanceAddress).Str("type", string(poolConfig.Type)).Msg("dynamically registered discovered token pool")
 
 	return nil
+}
+
+// bridgeDisclosedHoldings fetches the owner's disclosed holdings via the
+// factory's bridge-API integration, when available.
+func bridgeDisclosedHoldings(df factory.DisclosureFactory, owner types.PARTY, instrumentId splice_api_token_holding_v1.InstrumentId) ([]oapiCommon.DisclosedContract, error) {
+	bf, ok := df.(factory.BridgeHoldingsDisclosureFactory)
+	if !ok {
+		return nil, fmt.Errorf("disclosure factory does not support bridge holdings lookup")
+	}
+
+	return bf.GetBridgeHoldings(context.Background(), owner, instrumentId)
 }

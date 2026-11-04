@@ -113,6 +113,9 @@ func TestPoolDiscoveryService_CheckForNewPools_LockRelease(t *testing.T) {
 	mockStore.EXPECT().
 		GetByTemplateId(types.PARTY(observerParty), contracts.TemplateIDFromBinding(lockreleasetokenpool.LockReleaseTokenPool{})).
 		Return([]*apiv2.ActiveContract{activeContract}, true)
+	// Registration scopes the transfer factory URL by the pool's instrument admin,
+	// read off the contract.
+	mockStore.EXPECT().Get(wantAddress).Return(activeContract, true)
 
 	svc.checkForNewPools(t.Context())
 

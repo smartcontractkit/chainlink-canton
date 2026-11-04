@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
 )
 
@@ -30,6 +31,10 @@ type LockReleaseTokenPool struct {
 	InstrumentId       splice_api_token_holding_v1.InstrumentId
 	Decimals           types.INT64
 	RemoteChainConfigs map[uint64]RemoteChainConfig
+	// PoolReceiveMetadata is stamped by the pool onto lock transfers; a named
+	// receiver label here (e.g. cip-112/receiver.id) selects the two-step
+	// transfer mode in the token-standard context.
+	PoolReceiveMetadata splice_api_token_metadata_v1.Metadata
 }
 
 func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTokenPool, error) {
@@ -81,11 +86,12 @@ func ParseLockReleaseTokenPool(createdEvent *apiv2.CreatedEvent) (*LockReleaseTo
 	}
 
 	return &LockReleaseTokenPool{
-		Address:            address,
-		CCIPOwner:          boundContract.CcipOwner,
-		RemoteChainConfigs: remoteChainConfigs,
-		InstrumentId:       boundContract.InstrumentId,
-		Decimals:           boundContract.Decimals,
+		Address:             address,
+		CCIPOwner:           boundContract.CcipOwner,
+		RemoteChainConfigs:  remoteChainConfigs,
+		InstrumentId:        boundContract.InstrumentId,
+		Decimals:            boundContract.Decimals,
+		PoolReceiveMetadata: boundContract.PoolReceiveMetadata,
 	}, nil
 }
 
