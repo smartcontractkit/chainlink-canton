@@ -814,6 +814,21 @@ func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.T
 		Owner: types.PARTY(poolConfig.PoolOwner),
 	}
 
+	// Discovered pools: registry_api.token_standard_url is the shared bare host;
+	// scope the transfer API base per pool by its instrument admin.
+	if poolConfig.Type == config.TokenPoolTypeLockRelease && poolConfig.Factory != nil && poolConfig.Factory.TokenStandardURL != nil {
+		active, ok := s.activeContractStore.Get(poolConfig.InstanceAddress)
+		if !ok {
+			return fmt.Errorf("discovered pool %s not in store; cannot scope transfer factory URL", poolConfig.InstanceAddress)
+		}
+		pool, err := ParseLockReleaseTokenPool(active.GetCreatedEvent())
+		if err != nil {
+			return fmt.Errorf("failed to parse discovered pool %s for transfer factory URL scoping: %w", poolConfig.InstanceAddress, err)
+		}
+		scoped := factory.RegistrarScopedURL(*poolConfig.Factory.TokenStandardURL, pool.InstrumentId.Admin)
+		poolConfig.Factory.TokenStandardURL = &scoped
+	}
+
 	// Handle factory if configured — burn-mint pools use a BurnMintFactory,
 	// lock-release pools a TransferFactory.
 	if poolConfig.Factory != nil {

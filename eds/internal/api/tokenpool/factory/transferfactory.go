@@ -22,6 +22,19 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 )
 
+// RegistrarScopePrefix scopes DA's token-standard transfer API to one registrar
+// (the instrument admin): <host>/api/token-standard/v0/registrars/<admin>/…
+const RegistrarScopePrefix = "/api/token-standard/v0/registrars/"
+
+// RegistrarScopedURL scopes the host-only discovery URL to the pool's instrument
+// admin. Values already carrying a path (static per-pool configs) pass through.
+func RegistrarScopedURL(host string, admin types.PARTY) string {
+	if u, err := url.Parse(host); err == nil && u.Host != "" && (u.Path == "" || u.Path == "/") {
+		return u.Scheme + "://" + u.Host + RegistrarScopePrefix + string(admin)
+	}
+	return host
+}
+
 func NewTransferFactory(ctx context.Context, poolOwner types.PARTY, acs store.ActiveContractStoreInterface, cfg config.Factory) (TransferDisclosureFactory, error) {
 	switch cfg.Type {
 	case config.FactoryTypeDisabled:
@@ -74,10 +87,10 @@ func NewTransferFactory(ctx context.Context, poolOwner types.PARTY, acs store.Ac
 			return nil, fmt.Errorf("failed to create TransferInstructionV1 client with URL %q: %w", *cfg.TokenStandardURL, err)
 		}
 
-		// DA's bridge API lives on the same host as the token-standard API.
+		// Bridge-holdings fetching is explicit opt-in via config.
 		bridgeURL := ""
-		if u, err := url.Parse(*cfg.TokenStandardURL); err == nil && u.Host != "" {
-			bridgeURL = u.Scheme + "://" + u.Host + "/api/bridge/v0/ccip/holdings"
+		if cfg.BridgeHoldingsURL != nil {
+			bridgeURL = *cfg.BridgeHoldingsURL
 		}
 
 		return URLTransferFactory{
@@ -172,6 +185,7 @@ func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapi
 	// A named receiver label switches the backend to two-step ("offer") mode,
 	// which omits the direct-mode context entries and disclosures the offer path
 	// still requires — merge the direct-mode response in.
+	// TODO: drop the second call once DA's getTransferFactory serves both legs in one response.
 	if len(poolReceiveMeta) > 0 {
 		_, directContext, directDisclosures, err := f.getTransferFactory(ctx, instrumentId, inputHoldingCids, sender, f.poolOwner, nil)
 		if err != nil {
@@ -322,7 +336,7 @@ func (f URLTransferFactory) GetBridgeHoldings(
 	instrumentId splice_api_token_holding_v1.InstrumentId,
 ) ([]oapiCommon.DisclosedContract, error) {
 	if f.bridgeHoldingsURL == "" {
-		return nil, fmt.Errorf("bridge holdings URL unavailable (token-standard URL not set)")
+		return nil, fmt.Errorf("bridge holdings not configured (set factory.bridge_holdings_url to enable)")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.bridgeHoldingsURL, nil)

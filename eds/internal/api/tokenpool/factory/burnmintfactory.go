@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -63,19 +62,12 @@ func NewBurnMintFactory(ctx context.Context, poolOwner types.PARTY, acs store.Ac
 			}
 			options = append(options, daRegistry.WithRequestEditorFn(interceptor))
 		}
-		// The burn-mint factory route lives under /api/utilities/v0/registry on
-		// the same host as the token-standard API — derive the host base from the
-		// (registrar-scoped) token-standard URL rather than using it directly.
-		daRegistryURL := *cfg.TokenStandardURL
-		if u, perr := url.Parse(*cfg.TokenStandardURL); perr == nil && u.Host != "" {
-			daRegistryURL = u.Scheme + "://" + u.Host
-		}
 		daRegistryClient, err := daRegistry.NewClientWithResponses(
-			daRegistryURL,
+			*cfg.TokenStandardURL,
 			options...,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create DARegistry client with URL %q: %w", daRegistryURL, err)
+			return nil, fmt.Errorf("failed to create DARegistry client with URL %q: %w", *cfg.TokenStandardURL, err)
 		}
 
 		//nolint:exhaustive // these are the only two possible types
