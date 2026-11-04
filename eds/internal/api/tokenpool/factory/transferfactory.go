@@ -32,6 +32,7 @@ func RegistrarScopedURL(host string, admin types.PARTY) string {
 	if u, err := url.Parse(host); err == nil && u.Host != "" && (u.Path == "" || u.Path == "/") {
 		return u.Scheme + "://" + u.Host + RegistrarScopePrefix + string(admin)
 	}
+
 	return host
 }
 
