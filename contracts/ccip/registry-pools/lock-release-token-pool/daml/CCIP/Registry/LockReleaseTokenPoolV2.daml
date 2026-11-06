@@ -1337,7 +1337,7 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = mergedExtraArgs
 
-                receiverCids <- case transferResult.output of
+                (receiverCids, acceptSenderChangeCids) <- case transferResult.output of
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
                             completedReceiverCids -> do
                         assertHoldingsMatchAndSum
@@ -1346,7 +1346,7 @@ template LockReleaseTokenPool
                             instrumentId
                             amount
                             completedReceiverCids
-                        pure completedReceiverCids
+                        pure (completedReceiverCids, [])
                     -- Transfers that cannot settle directly (e.g. named receiver labels —
                     -- preapprovals only cover the "" label) pend; accept them in-transaction,
                     -- like PerPartyRouter's fee collection. Requires a poolOwner→sender
@@ -1371,7 +1371,7 @@ template LockReleaseTokenPool
                                     instrumentId
                                     amount
                                     acceptedReceiverCids
-                                pure acceptedReceiverCids
+                                pure (acceptedReceiverCids, acceptResult.senderChangeCids)
                             Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
                                 abort "LockOrBurn: lock transfer acceptance failed"
                             Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
@@ -1397,7 +1397,7 @@ template LockReleaseTokenPool
 
                 pure CCIP.InterfacesV2.TokenPool.LockOrBurnResult with
                     poolChangeCids = receiverCids ++ tokenPoolHoldings
-                    senderChangeCids = transferResult.senderChangeCids
+                    senderChangeCids = transferResult.senderChangeCids ++ acceptSenderChangeCids
                     sendingMessageCid = coerceContractId newSendingMessageCid
                     context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
