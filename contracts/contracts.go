@@ -51,6 +51,7 @@ const (
 	CCIPLockReleaseTokenPoolV2 = Package("ccip-lock-release-token-pool-v2")
 	CCIPBurnMintTokenPoolV2    = Package("ccip-burn-mint-token-pool-v2")
 	CCIPFactoryV2              = Package("ccip-factory-v2")
+	CCIPFeeTreasury            = Package("ccip-fee-treasury")
 
 	// CCIP - Registry pools (EDS auto-detection observer field; separate template
 	// family from the production/LINK pools above, kept isolated so a bug or spam on
@@ -191,6 +192,7 @@ var Versions map[Package][]string = map[Package][]string{
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
 	MCMSTest:                              []string{DevVersion},
+	CCIPFeeTreasury:                       []string{DevVersion},
 	SpliceApiFeaturedAppV1:                []string{"1.0.0"},
 	SpliceApiTokenAllocationV1:            []string{"1.0.0"},
 	SpliceApiTokenAllocationInstructionV1: []string{"1.0.0"},
@@ -386,6 +388,7 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2: []string{"ccip", "lockreleasetokenpool"},
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
+	CCIPFeeTreasury:            []string{"ccip", "feetreasury"},
 
 	CCIPRegistryBurnMintTokenPoolV2:    []string{"ccip", "registry", "burnminttokenpool"},
 	CCIPRegistryLockReleaseTokenPoolV2: []string{"ccip", "registry", "lockreleasetokenpool"},

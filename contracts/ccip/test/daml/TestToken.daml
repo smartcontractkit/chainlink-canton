@@ -270,6 +270,27 @@ template BadTransferFactory
       transferFactory_publicFetchImpl _self _arg =
         pure (view (toInterface @Splice.Api.Token.TransferInstructionV1.TransferFactory this))
 
+-- | Transfer factory that always returns TransferInstructionResult_Failed. Used to
+-- exercise the failure-handling branch of consumers that abort when a transfer fails.
+template FailingTransferFactory
+  with
+    admin : Party
+  where
+    signatory admin
+
+    interface instance Splice.Api.Token.TransferInstructionV1.TransferFactory for FailingTransferFactory where
+      view = Splice.Api.Token.TransferInstructionV1.TransferFactoryView with admin, meta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+      transferFactory_transferImpl _self arg = do
+        assertMsg "FailingTransferFactory: expectedAdmin mismatch" (arg.expectedAdmin == admin)
+        pure Splice.Api.Token.TransferInstructionV1.TransferInstructionResult with
+          senderChangeCids = []
+          output = Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed
+          meta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+      transferFactory_publicFetchImpl _self _arg =
+        pure (view (toInterface @Splice.Api.Token.TransferInstructionV1.TransferFactory this))
+
 data BadBurnMintOutput = BadBurnMintOutput
   with
     owner : Party
