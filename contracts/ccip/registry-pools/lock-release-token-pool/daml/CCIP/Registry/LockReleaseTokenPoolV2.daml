@@ -1397,7 +1397,7 @@ template LockReleaseTokenPool
 
                 pure CCIP.InterfacesV2.TokenPool.LockOrBurnResult with
                     poolChangeCids = receiverCids ++ tokenPoolHoldings
-                    senderChangeCids = transferResult.senderChangeCids ++ acceptSenderChangeCids
+                    senderChangeCids = dedup (transferResult.senderChangeCids ++ acceptSenderChangeCids)
                     sendingMessageCid = coerceContractId newSendingMessageCid
                     context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
