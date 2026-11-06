@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.3.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.2.0...contracts/v2.3.0) (2026-11-06)
+
+
+### Features
+
+* **contracts:** Accept pending lock transfers in LRTP ([#1199](https://github.com/smartcontractkit/chainlink-canton/issues/1199)) ([fa58b01](https://github.com/smartcontractkit/chainlink-canton/commit/fa58b016268b20fcbe7b9e459d58cbb70e059add))
+
+
+### Bug Fixes
+
+* **contracts:** Carry accept-step sender change into LockOrBurn result ([#1218](https://github.com/smartcontractkit/chainlink-canton/issues/1218)) ([03e0f46](https://github.com/smartcontractkit/chainlink-canton/commit/03e0f46f45d9d362e0561c75b4b9e3b4b822ff08))
+
 ## [2.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.1.1...contracts/v2.2.0) (2026-10-26)
 
 
