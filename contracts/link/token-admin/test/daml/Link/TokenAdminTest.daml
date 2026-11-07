@@ -32,9 +32,18 @@ import Chainlink.InstanceAddress qualified as InstanceAddress
 -- |          Minimal allocation factory stub              |
 -- ========================================================
 
+-- | Left by Allocation_Withdraw on the stub so a test can see that it ran.
+template StubAllocationWithdrawn
+  with
+    stubAdmin : Party
+    stubAllocation : AllocationV1.AllocationSpecification
+  where
+    signatory stubAdmin
+
 -- | Stub allocation implementing the direct-completion path: archives the
--- | funding holdings and creates the allocation in one step. The unsupported
--- | lifecycle choices abort, which is all the governor's Execute relies on.
+-- | funding holdings and creates the allocation in one step. Withdraw is
+-- | recorded for the recovery tests; settlement and cancel abort, which is all
+-- | the governor's Execute relies on.
 template StubAllocation
   with
     stubAdmin : Party
@@ -53,8 +62,13 @@ template StubAllocation
         abort "StubAllocation: Allocation_ExecuteTransfer not supported"
       allocation_cancelImpl _self _arg =
         abort "StubAllocation: Allocation_Cancel not supported"
-      allocation_withdrawImpl _self _arg =
-        abort "StubAllocation: Allocation_Withdraw not supported"
+      allocation_withdrawImpl _self _arg = do
+        _ <- create StubAllocationWithdrawn with
+          stubAdmin
+          stubAllocation
+        pure AllocationV1.Allocation_WithdrawResult with
+          senderHoldingCids = []
+          meta = MetadataV1.emptyMetadata
 
 template StubAllocationFactory
   with
@@ -193,6 +207,13 @@ findTransferRecovery admin authorizationId = do
   case [cid | (cid, recovery) <- recoveries, recovery.instanceId == authorizationId] of
     [cid] -> pure cid
     _ -> abort "expected exactly one matching LinkTransferRecovery"
+
+findAllocationRecovery : Party -> Text -> Script (ContractId LinkAllocationRecovery)
+findAllocationRecovery admin authorizationId = do
+  recoveries <- query @LinkAllocationRecovery admin
+  case [cid | (cid, recovery) <- recoveries, recovery.instanceId == authorizationId] of
+    [cid] -> pure cid
+    _ -> abort "expected exactly one matching LinkAllocationRecovery"
 
 -- ========================================================
 -- |          MCMS Entrypoint - ApproveMint + Execute      |
@@ -1465,25 +1486,16 @@ testTokenAdminTransferPendingCreatesRecovery = script do
   change.holdingInstrumentId === HoldingV1.InstrumentId with admin = admin, id = "LINK"
   pure ()
 
--- | Withdraw through the recovery is refused before executeBefore and returns
--- | the locked LINK to ccipOwner once the deadline has passed.
-testTokenAdminRecoveryWithdrawAfterDeadline : Script ()
-testTokenAdminRecoveryWithdrawAfterDeadline = script do
+-- | Withdraw through the recovery works before executeBefore, while the
+-- | receiver could still accept, and returns the locked LINK to ccipOwner.
+testTokenAdminRecoveryWithdrawBeforeDeadline : Script ()
+testTokenAdminRecoveryWithdrawBeforeDeadline = script do
   (admin, _, _, recoveryCid, instructionCid) <-
     pendingTransferFixture "recovery-withdraw" 1
 
   let authInstAddr = InstanceAddress.makeText "transfer-auth" admin
       recoveryAsMcmsReceiver = toInterfaceContractId @MCMSReceiver recoveryCid
       recoveryContractIds = Map.fromList [(authInstAddr, toAnyContractId recoveryCid)]
-
-  tooEarly <- trySubmit admin do
-    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "Withdraw"
-      operationData = ""
-      contractIds = recoveryContractIds
-  mustFailWith "executeBefore has not passed" tooEarly
-
-  passTime (hours 2)
 
   updatedMap <- submit admin do
     exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
@@ -1549,6 +1561,179 @@ testTokenAdminRecoveryDiscardAfterReject = script do
       operationData = ""
       contractIds = recoveryContractIds
   mustFailWith "Could not find contract" gone
+
+  updatedMap <- submit admin do
+    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Discard"
+      operationData = ""
+      contractIds = recoveryContractIds
+
+  Map.lookup authInstAddr updatedMap === None
+  None <- queryContractId admin recoveryCid
+  pure ()
+
+-- ========================================================
+-- |        Allocation recovery for unsettled legs         |
+-- ========================================================
+
+-- | Approve and execute a ccipOwner allocation with a two-hour settlement
+-- | window. Returns the live pieces the recovery tests assert on.
+completedAllocationFixture
+  : Text
+  -> Script ( Party
+            , ContractId LinkAllocationAuthorization
+            , ContractId LinkAllocationRecovery
+            , ContractId AllocationV1.Allocation )
+completedAllocationFixture suffix = do
+  admin <- allocateParty ("token-admin-owner-" <> suffix)
+  operator <- allocateParty ("token-admin-operator-" <> suffix)
+  alice <- allocateParty ("token-admin-alice-" <> suffix)
+  settlementExec <- allocateParty ("token-admin-settlement-" <> suffix)
+
+  let instanceId = "link-token-admin-" <> suffix
+      instrumentId = HoldingV1.InstrumentId with
+        admin = admin
+        id = "LINK"
+
+  registryCid <- mkRegistry admin instrumentId ("token-admin-registry-" <> suffix)
+  factoryCid <- submit admin do
+    createCmd StubAllocationFactory with
+      stubFactoryAdmin = admin
+      stubFactoryInstanceId = "stub-allocation-factory"
+
+  adminCid <- submit admin do
+    createCmd LinkTokenAdmin with
+      ccipOwner = admin
+      instanceId
+      instrumentId
+      paused = False
+      observers = []
+
+  inputCids <- mintViaRegistry admin registryCid instrumentId admin 15.0
+
+  let instAddr = InstanceAddress.makeText instanceId admin
+      contractIds = Map.fromList [(instAddr, toAnyContractId adminCid)]
+
+  _ <- exerciseEntrypoint admin adminCid "ApproveAllocate"
+    (CodecGen.encodeApproveAllocateParams ApproveAllocateParams with
+      authorizationId = "allocate-auth"
+      receiver = alice
+      amount = 15.0
+      transferLegId = "leg-1"
+      reference = "allocate-ref"
+      validForSeconds = 3600)
+    contractIds
+
+  allocateAuthCid <- findAllocateAuthorization admin "allocate-auth"
+
+  allocateResult <- submit (actAs operator <> readAs admin) do
+    exerciseCmd allocateAuthCid ExecuteAllocate with
+      submitter = operator
+      tokenAdminCid = adminCid
+      allocationFactoryCid = toInterfaceContractId @AllocationInstructionV1.AllocationFactory factoryCid
+      settlementExecutor = settlementExec
+      settlementRefId = "settlement-1"
+      inputHoldingCids = inputCids
+      allocateBeforeHours = 1
+      settleBeforeHours = 2
+      registryContext = MetadataV1.emptyChoiceContext
+      meta = MetadataV1.emptyMetadata
+
+  AllocationInstructionV1.AllocationInstructionResult_Completed allocationCid <-
+    pure allocateResult.output
+  recoveryCid <- findAllocationRecovery admin "allocate-auth"
+  pure (admin, allocateAuthCid, recoveryCid, allocationCid)
+
+-- | A completed allocation consumes its authorization and creates a recovery
+-- | pointing at the live allocation.
+testTokenAdminAllocateCreatesRecovery : Script ()
+testTokenAdminAllocateCreatesRecovery = script do
+  (admin, allocateAuthCid, recoveryCid, allocationCid) <-
+    completedAllocationFixture "allocation-recovery-create"
+
+  Some recovery <- queryContractId admin recoveryCid
+  recovery.instanceId === "allocate-auth"
+  recovery.instrumentId === HoldingV1.InstrumentId with admin = admin, id = "LINK"
+  recovery.allocationCid === allocationCid
+
+  Some allocation <- queryContractId admin (fromInterfaceContractId @StubAllocation allocationCid)
+  recovery.settleBefore === allocation.stubAllocation.settlement.settleBefore
+
+  None <- queryContractId admin allocateAuthCid
+  pure ()
+
+-- | Withdraw through the recovery is refused before settleBefore and reaches
+-- | the allocation's Withdraw once the deadline has passed.
+testTokenAdminAllocationRecoveryWithdrawAfterDeadline : Script ()
+testTokenAdminAllocationRecoveryWithdrawAfterDeadline = script do
+  (admin, _, recoveryCid, allocationCid) <-
+    completedAllocationFixture "allocation-recovery-withdraw"
+
+  let authInstAddr = InstanceAddress.makeText "allocate-auth" admin
+      recoveryAsMcmsReceiver = toInterfaceContractId @MCMSReceiver recoveryCid
+      recoveryContractIds = Map.fromList [(authInstAddr, toAnyContractId recoveryCid)]
+
+  tooEarly <- trySubmit admin do
+    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Withdraw"
+      operationData = ""
+      contractIds = recoveryContractIds
+  mustFailWith "settleBefore has not passed" tooEarly
+
+  passTime (hours 2)
+
+  updatedMap <- submit admin do
+    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Withdraw"
+      operationData = ""
+      contractIds = recoveryContractIds
+
+  Map.lookup authInstAddr updatedMap === None
+  None <- queryContractId admin recoveryCid
+  None <- queryContractId admin (fromInterfaceContractId @StubAllocation allocationCid)
+
+  [(_, withdrawn)] <- query @StubAllocationWithdrawn admin
+  withdrawn.stubAllocation.transferLeg.sender === admin
+  withdrawn.stubAllocation.transferLeg.amount === 15.0
+  pure ()
+
+-- | Only ccipOwner reaches the recovery: the entrypoint checks the controller
+-- | and the choice checks its controller.
+testTokenAdminAllocationRecoveryWithdrawRequiresCcipOwner : Script ()
+testTokenAdminAllocationRecoveryWithdrawRequiresCcipOwner = script do
+  (admin, _, recoveryCid, allocationCid) <-
+    completedAllocationFixture "allocation-recovery-controller"
+  outsider <- allocateParty "token-admin-allocation-recovery-outsider"
+
+  passTime (hours 2)
+
+  let authInstAddr = InstanceAddress.makeText "allocate-auth" admin
+      recoveryAsMcmsReceiver = toInterfaceContractId @MCMSReceiver recoveryCid
+      recoveryContractIds = Map.fromList [(authInstAddr, toAnyContractId recoveryCid)]
+
+  submitMustFail (actAs outsider <> readAs admin) do
+    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "Withdraw"
+      operationData = ""
+      contractIds = recoveryContractIds
+
+  submitMustFail (actAs outsider <> readAs admin) do
+    exerciseCmd recoveryCid WithdrawAllocation
+
+  Some _ <- queryContractId admin recoveryCid
+  Some _ <- queryContractId admin (fromInterfaceContractId @StubAllocation allocationCid)
+  pure ()
+
+-- | After settlement the allocation is gone: governance discards the orphaned
+-- | recovery.
+testTokenAdminAllocationRecoveryDiscard : Script ()
+testTokenAdminAllocationRecoveryDiscard = script do
+  (admin, _, recoveryCid, _) <-
+    completedAllocationFixture "allocation-recovery-discard"
+
+  let authInstAddr = InstanceAddress.makeText "allocate-auth" admin
+      recoveryAsMcmsReceiver = toInterfaceContractId @MCMSReceiver recoveryCid
+      recoveryContractIds = Map.fromList [(authInstAddr, toAnyContractId recoveryCid)]
 
   updatedMap <- submit admin do
     exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
