@@ -625,29 +625,26 @@ template LinkTransferRecovery
             pure (Map.delete instAddr contractIds)
           _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
--- | Withdraw path for an allocation that never settled. The allocation's
--- | Withdraw is sender-controlled and the sender is ccipOwner, which only acts
--- | through MCMS. Reuses the allocation authorization's id.
+-- | Withdraw path for an unsettled allocation. The allocation's Withdraw is
+-- | sender-controlled and the sender is ccipOwner, which only acts through
+-- | MCMS. Reuses the allocation authorization's id.
 template LinkAllocationRecovery
   with
     ccipOwner : Party
     instanceId : Text                      -- MCMS target id; the allocation authorization's id
     instrumentId : HoldingV1.InstrumentId
     allocationCid : ContractId AllocationV1.Allocation
-    settleBefore : Time
   where
     signatory ccipOwner
 
     ensure InstanceAddress.assertValidInstanceId instanceId
       && instrumentId.admin == ccipOwner
 
-    -- | Only once settleBefore has passed: until then the settlement can run.
+    -- | Available at any time: settlement needs ccipOwner too, so waiting for
+    -- | settleBefore protects nothing and only keeps the LINK locked.
     choice WithdrawAllocation : AllocationV1.Allocation_WithdrawResult
       controller ccipOwner
       do
-        now <- getTime
-        assertMsg "LinkAllocationRecovery.Withdraw: settleBefore has not passed"
-          (now >= settleBefore)
         exercise allocationCid AllocationV1.Allocation_Withdraw with
           extraArgs = MetadataV1.ExtraArgs with
             context = MetadataV1.emptyChoiceContext
@@ -776,7 +773,6 @@ template LinkAllocationAuthorization
               instanceId
               instrumentId
               allocationCid
-              settleBefore
             pure ()
           _ -> pure ()
         pure result
