@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "link-token-admin"
-	PackageID   = "20a30e738659f63fecad99164b98a6254f185dc59b7511b8f3dbe3d502a66ea9"
+	PackageID   = "3800c47e6c1ca8dbf4927c1ce49a370f97386e37a8d06c406ce6740c136a1c2a"
 	SDKVersion  = "3.4.11"
 )
 
@@ -592,6 +592,38 @@ func (t *CleanupExpiredTransferAuthorization) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// DiscardAllocationRecovery is a Record type
+type DiscardAllocationRecovery struct {
+}
+
+// ToMap converts DiscardAllocationRecovery to a map for DAML arguments
+func (t DiscardAllocationRecovery) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t DiscardAllocationRecovery) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DiscardAllocationRecovery) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DiscardAllocationRecovery to hex string (Canton MCMS format)
+func (t DiscardAllocationRecovery) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DiscardAllocationRecovery from hex string (Canton MCMS format)
+func (t *DiscardAllocationRecovery) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // DiscardRecovery is a Record type
 type DiscardRecovery struct {
 }
@@ -1099,6 +1131,180 @@ func (t LinkAllocationAuthorization) MCMSReceiverEntrypointWithPackageID(contrac
 // Verify interface implementations for LinkAllocationAuthorization
 
 var _ api.IMCMSReceiver = (*LinkAllocationAuthorization)(nil)
+
+// LinkAllocationRecovery is a Template type
+type LinkAllocationRecovery struct {
+	CcipOwner     types.PARTY                              `json:"ccipOwner"`
+	InstanceId    types.TEXT                               `json:"instanceId"`
+	InstrumentId  splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	AllocationCid types.CONTRACT_ID                        `json:"allocationCid"`
+}
+
+// GetTemplateID returns the template ID for this template using the package name
+func (t LinkAllocationRecovery) GetTemplateID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "LinkAllocationRecovery")
+}
+
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t LinkAllocationRecovery) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "Link.TokenAdmin", "LinkAllocationRecovery")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t LinkAllocationRecovery) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["allocationCid"] = model.NestedToDAMLValue(t.AllocationCid)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t LinkAllocationRecovery) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["ccipOwner"] = t.CcipOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["allocationCid"] = model.NestedToDAMLValue(t.AllocationCid)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
+func (t LinkAllocationRecovery) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *LinkAllocationRecovery) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes LinkAllocationRecovery to hex string (Canton MCMS format)
+func (t LinkAllocationRecovery) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes LinkAllocationRecovery from hex string (Canton MCMS format)
+func (t *LinkAllocationRecovery) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Choice methods for LinkAllocationRecovery
+
+// Archive exercises the Archive choice on this LinkAllocationRecovery contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t LinkAllocationRecovery) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t LinkAllocationRecovery) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// DiscardAllocationRecovery exercises the DiscardAllocationRecovery choice on this LinkAllocationRecovery contract
+// This method uses the package name in the template ID
+func (t LinkAllocationRecovery) DiscardAllocationRecovery(contractID string, args DiscardAllocationRecovery) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "LinkAllocationRecovery"),
+		ContractID: contractID,
+		Choice:     "DiscardAllocationRecovery",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DiscardAllocationRecoveryWithPackageID exercises the DiscardAllocationRecovery choice using the provided package ID instead of package name
+func (t LinkAllocationRecovery) DiscardAllocationRecoveryWithPackageID(contractID string, packageID string, args DiscardAllocationRecovery) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkAllocationRecovery"),
+		ContractID: contractID,
+		Choice:     "DiscardAllocationRecovery",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// WithdrawAllocation exercises the WithdrawAllocation choice on this LinkAllocationRecovery contract
+// This method uses the package name in the template ID
+func (t LinkAllocationRecovery) WithdrawAllocation(contractID string, args WithdrawAllocation) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "LinkAllocationRecovery"),
+		ContractID: contractID,
+		Choice:     "WithdrawAllocation",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// WithdrawAllocationWithPackageID exercises the WithdrawAllocation choice using the provided package ID instead of package name
+func (t LinkAllocationRecovery) WithdrawAllocationWithPackageID(contractID string, packageID string, args WithdrawAllocation) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkAllocationRecovery"),
+		ContractID: contractID,
+		Choice:     "WithdrawAllocation",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this LinkAllocationRecovery contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t LinkAllocationRecovery) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t LinkAllocationRecovery) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for LinkAllocationRecovery
+
+var _ api.IMCMSReceiver = (*LinkAllocationRecovery)(nil)
 
 // LinkBurnAuthorization is a Template type
 type LinkBurnAuthorization struct {
@@ -2098,7 +2304,6 @@ type LinkTransferRecovery struct {
 	InstanceId             types.TEXT                               `json:"instanceId"`
 	InstrumentId           splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	TransferInstructionCid types.CONTRACT_ID                        `json:"transferInstructionCid"`
-	ExecuteBefore          types.TIMESTAMP                          `json:"executeBefore"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -2127,9 +2332,6 @@ func (t LinkTransferRecovery) CreateCommand() *model.CreateCommand {
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["transferInstructionCid"] = model.NestedToDAMLValue(t.TransferInstructionCid)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["executeBefore"] = t.ExecuteBefore
-
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -2151,9 +2353,6 @@ func (t LinkTransferRecovery) CreateCommandWithPackageID(packageID string) *mode
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["transferInstructionCid"] = model.NestedToDAMLValue(t.TransferInstructionCid)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["executeBefore"] = t.ExecuteBefore
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -2184,27 +2383,6 @@ func (t *LinkTransferRecovery) UnmarshalHex(data string) error {
 }
 
 // Choice methods for LinkTransferRecovery
-
-// WithdrawInstruction exercises the WithdrawInstruction choice on this LinkTransferRecovery contract
-// This method uses the package name in the template ID
-func (t LinkTransferRecovery) WithdrawInstruction(contractID string, args WithdrawInstruction) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "LinkTransferRecovery"),
-		ContractID: contractID,
-		Choice:     "WithdrawInstruction",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// WithdrawInstructionWithPackageID exercises the WithdrawInstruction choice using the provided package ID instead of package name
-func (t LinkTransferRecovery) WithdrawInstructionWithPackageID(contractID string, packageID string, args WithdrawInstruction) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkTransferRecovery"),
-		ContractID: contractID,
-		Choice:     "WithdrawInstruction",
-		Arguments:  argsToMap(args),
-	}
-}
 
 // Archive exercises the Archive choice on this LinkTransferRecovery contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
@@ -2244,6 +2422,27 @@ func (t LinkTransferRecovery) DiscardRecoveryWithPackageID(contractID string, pa
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkTransferRecovery"),
 		ContractID: contractID,
 		Choice:     "DiscardRecovery",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// WithdrawInstruction exercises the WithdrawInstruction choice on this LinkTransferRecovery contract
+// This method uses the package name in the template ID
+func (t LinkTransferRecovery) WithdrawInstruction(contractID string, args WithdrawInstruction) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "LinkTransferRecovery"),
+		ContractID: contractID,
+		Choice:     "WithdrawInstruction",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// WithdrawInstructionWithPackageID exercises the WithdrawInstruction choice using the provided package ID instead of package name
+func (t LinkTransferRecovery) WithdrawInstructionWithPackageID(contractID string, packageID string, args WithdrawInstruction) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkTransferRecovery"),
+		ContractID: contractID,
+		Choice:     "WithdrawInstruction",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -2513,6 +2712,38 @@ func (t *SetPausedParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// WithdrawAllocation is a Record type
+type WithdrawAllocation struct {
+}
+
+// ToMap converts WithdrawAllocation to a map for DAML arguments
+func (t WithdrawAllocation) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t WithdrawAllocation) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *WithdrawAllocation) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes WithdrawAllocation to hex string (Canton MCMS format)
+func (t WithdrawAllocation) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes WithdrawAllocation from hex string (Canton MCMS format)
+func (t *WithdrawAllocation) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // WithdrawAllocationAuthorization is a Record type
 type WithdrawAllocationAuthorization struct {
 }
@@ -2688,6 +2919,7 @@ type MCMSEncoder interface {
 	CleanupExpiredBurnAuthorization(args CleanupExpiredBurnAuthorization) (*bind.EncodedChoice, error)
 	CleanupExpiredMintAuthorization(args CleanupExpiredMintAuthorization) (*bind.EncodedChoice, error)
 	CleanupExpiredTransferAuthorization(args CleanupExpiredTransferAuthorization) (*bind.EncodedChoice, error)
+	DiscardAllocationRecovery(args DiscardAllocationRecovery) (*bind.EncodedChoice, error)
 	DiscardRecovery(args DiscardRecovery) (*bind.EncodedChoice, error)
 	ExecuteAllocate(args ExecuteAllocate) (*bind.EncodedChoice, error)
 	ExecuteBurn(args ExecuteBurn) (*bind.EncodedChoice, error)
@@ -2699,6 +2931,7 @@ type MCMSEncoder interface {
 	SetObserversParams(args SetObserversParams) (*bind.EncodedChoice, error)
 	SetPaused(args SetPaused) (*bind.EncodedChoice, error)
 	SetPausedParams(args SetPausedParams) (*bind.EncodedChoice, error)
+	WithdrawAllocation(args WithdrawAllocation) (*bind.EncodedChoice, error)
 	WithdrawAllocationAuthorization(args WithdrawAllocationAuthorization) (*bind.EncodedChoice, error)
 	WithdrawBurnAuthorization(args WithdrawBurnAuthorization) (*bind.EncodedChoice, error)
 	WithdrawInstruction(args WithdrawInstruction) (*bind.EncodedChoice, error)
@@ -2793,6 +3026,11 @@ func (e *encoder) CleanupExpiredTransferAuthorization(args CleanupExpiredTransfe
 	return e.EncodeChoiceArgs("CleanupExpiredTransferAuthorization", args)
 }
 
+// DiscardAllocationRecovery encodes parameters for the DiscardAllocationRecovery choice.
+func (e *encoder) DiscardAllocationRecovery(args DiscardAllocationRecovery) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DiscardAllocationRecovery", args)
+}
+
 // DiscardRecovery encodes parameters for the DiscardRecovery choice.
 func (e *encoder) DiscardRecovery(args DiscardRecovery) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("DiscardRecovery", args)
@@ -2846,6 +3084,11 @@ func (e *encoder) SetPaused(args SetPaused) (*bind.EncodedChoice, error) {
 // SetPausedParams encodes parameters for the SetPaused choice.
 func (e *encoder) SetPausedParams(args SetPausedParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetPaused", args)
+}
+
+// WithdrawAllocation encodes parameters for the WithdrawAllocation choice.
+func (e *encoder) WithdrawAllocation(args WithdrawAllocation) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("WithdrawAllocation", args)
 }
 
 // WithdrawAllocationAuthorization encodes parameters for the WithdrawAllocationAuthorization choice.
