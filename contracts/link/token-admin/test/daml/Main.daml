@@ -33,7 +33,7 @@ runAll = script do
   testTokenAdminRecoveryWithdrawRequiresCcipOwner
   testTokenAdminRecoveryDiscardAfterReject
   testTokenAdminAllocateCreatesRecovery
-  testTokenAdminAllocationRecoveryWithdrawAfterDeadline
+  testTokenAdminAllocationRecoveryWithdrawBeforeDeadline
   testTokenAdminAllocationRecoveryWithdrawRequiresCcipOwner
   testTokenAdminAllocationRecoveryDiscard
   testTokenAdminTransferRejectsZeroTimeout

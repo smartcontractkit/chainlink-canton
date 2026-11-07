@@ -1681,31 +1681,19 @@ testTokenAdminAllocateCreatesRecovery = script do
   recovery.instrumentId === HoldingV1.InstrumentId with admin = admin, id = "LINK"
   recovery.allocationCid === allocationCid
 
-  Some allocation <- queryContractId admin (fromInterfaceContractId @StubAllocation allocationCid)
-  recovery.settleBefore === allocation.stubAllocation.settlement.settleBefore
-
   None <- queryContractId admin allocateAuthCid
   pure ()
 
--- | Withdraw through the recovery is refused before settleBefore and reaches
--- | the allocation's Withdraw once the deadline has passed.
-testTokenAdminAllocationRecoveryWithdrawAfterDeadline : Script ()
-testTokenAdminAllocationRecoveryWithdrawAfterDeadline = script do
+-- | Withdraw through the recovery works before settleBefore and reaches the
+-- | allocation's Withdraw, returning the locked LINK to ccipOwner.
+testTokenAdminAllocationRecoveryWithdrawBeforeDeadline : Script ()
+testTokenAdminAllocationRecoveryWithdrawBeforeDeadline = script do
   (admin, _, recoveryCid, allocationCid) <-
     completedAllocationFixture "allocation-recovery-withdraw"
 
   let authInstAddr = InstanceAddress.makeText "allocate-auth" admin
       recoveryAsMcmsReceiver = toInterfaceContractId @MCMSReceiver recoveryCid
       recoveryContractIds = Map.fromList [(authInstAddr, toAnyContractId recoveryCid)]
-
-  tooEarly <- trySubmit admin do
-    exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with
-      functionName = "Withdraw"
-      operationData = ""
-      contractIds = recoveryContractIds
-  mustFailWith "settleBefore has not passed" tooEarly
-
-  passTime (hours 2)
 
   updatedMap <- submit admin do
     exerciseCmd recoveryAsMcmsReceiver MCMSReceiver_Entrypoint with

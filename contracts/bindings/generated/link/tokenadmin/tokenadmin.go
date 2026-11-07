@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "link-token-admin"
-	PackageID   = "92b782e3e6568b6b72c5b5fe9a0031c72331624d39931f3dae3eff639caaf8d4"
+	PackageID   = "3800c47e6c1ca8dbf4927c1ce49a370f97386e37a8d06c406ce6740c136a1c2a"
 	SDKVersion  = "3.4.11"
 )
 
@@ -1138,7 +1138,6 @@ type LinkAllocationRecovery struct {
 	InstanceId    types.TEXT                               `json:"instanceId"`
 	InstrumentId  splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	AllocationCid types.CONTRACT_ID                        `json:"allocationCid"`
-	SettleBefore  types.TIMESTAMP                          `json:"settleBefore"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -1167,9 +1166,6 @@ func (t LinkAllocationRecovery) CreateCommand() *model.CreateCommand {
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["allocationCid"] = model.NestedToDAMLValue(t.AllocationCid)
 
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["settleBefore"] = t.SettleBefore
-
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
@@ -1191,9 +1187,6 @@ func (t LinkAllocationRecovery) CreateCommandWithPackageID(packageID string) *mo
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["allocationCid"] = model.NestedToDAMLValue(t.AllocationCid)
-
-	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["settleBefore"] = t.SettleBefore
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -1224,27 +1217,6 @@ func (t *LinkAllocationRecovery) UnmarshalHex(data string) error {
 }
 
 // Choice methods for LinkAllocationRecovery
-
-// WithdrawAllocation exercises the WithdrawAllocation choice on this LinkAllocationRecovery contract
-// This method uses the package name in the template ID
-func (t LinkAllocationRecovery) WithdrawAllocation(contractID string, args WithdrawAllocation) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "LinkAllocationRecovery"),
-		ContractID: contractID,
-		Choice:     "WithdrawAllocation",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// WithdrawAllocationWithPackageID exercises the WithdrawAllocation choice using the provided package ID instead of package name
-func (t LinkAllocationRecovery) WithdrawAllocationWithPackageID(contractID string, packageID string, args WithdrawAllocation) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkAllocationRecovery"),
-		ContractID: contractID,
-		Choice:     "WithdrawAllocation",
-		Arguments:  argsToMap(args),
-	}
-}
 
 // Archive exercises the Archive choice on this LinkAllocationRecovery contract via the IMCMSReceiver interface
 // This method uses the package name in the template ID
@@ -1284,6 +1256,27 @@ func (t LinkAllocationRecovery) DiscardAllocationRecoveryWithPackageID(contractI
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkAllocationRecovery"),
 		ContractID: contractID,
 		Choice:     "DiscardAllocationRecovery",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// WithdrawAllocation exercises the WithdrawAllocation choice on this LinkAllocationRecovery contract
+// This method uses the package name in the template ID
+func (t LinkAllocationRecovery) WithdrawAllocation(contractID string, args WithdrawAllocation) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Link.TokenAdmin", "LinkAllocationRecovery"),
+		ContractID: contractID,
+		Choice:     "WithdrawAllocation",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// WithdrawAllocationWithPackageID exercises the WithdrawAllocation choice using the provided package ID instead of package name
+func (t LinkAllocationRecovery) WithdrawAllocationWithPackageID(contractID string, packageID string, args WithdrawAllocation) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Link.TokenAdmin", "LinkAllocationRecovery"),
+		ContractID: contractID,
+		Choice:     "WithdrawAllocation",
 		Arguments:  argsToMap(args),
 	}
 }
