@@ -211,6 +211,66 @@ testFeeTreasury_ExecuteFeeWithdrawal_Pending = script do
         _ -> abort "Expected TransferInstructionResult_Pending"
 
 -- ========================================================
+-- |   ExecuteFeeWithdrawal: partial keeps the remainder   |
+-- ========================================================
+
+testFeeTreasury_ExecuteFeeWithdrawal_PartialLeavesRemainder : Script ()
+testFeeTreasury_ExecuteFeeWithdrawal_PartialLeavesRemainder = script do
+    feeOwner  <- allocateParty "fee_owner"
+    recipient <- allocateParty "recipient"
+
+    let instrumentId = InstrumentId feeOwner "FeeToken"
+
+    firstHoldingCid <- submit (actAs feeOwner) do
+        createCmd TestToken.TestHolding with
+            owner = feeOwner; admin = feeOwner; instrumentId; amount = 200.0
+
+    -- Large enough for the 150.0 attempt, so only the cap can reject it.
+    secondHoldingCid <- submit (actAs feeOwner) do
+        createCmd TestToken.TestHolding with
+            owner = feeOwner; admin = feeOwner; instrumentId; amount = 200.0
+
+    factoryCid <- submit feeOwner do
+        createCmd TestToken.TestTransferFactory with admin = feeOwner
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId = "fee-treasury-partial-test"
+            feeOwner; mcmsController = feeOwner
+
+    authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-partial-test" treasuryCid
+        AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-partial-test"
+            recipient; instrumentId; maxAmount = 300.0; validitySecs = 3600
+
+    Some original <- queryContractId feeOwner authCid
+
+    now <- getTime
+    let execute cid holdingCid amount = exerciseCmd cid ExecuteFeeWithdrawal with
+            submitter          = feeOwner
+            transferFactoryCid = toInterfaceContractId @TransferFactory factoryCid
+            inputHoldingCids   = [toInterfaceContractId holdingCid]
+            amount
+            extraArgs          = ExtraArgs emptyChoiceContext emptyMetadata
+            requestedAt        = now
+
+    _ <- submit feeOwner do execute authCid firstHoldingCid 200.0
+
+    remaining <- query @FeeWithdrawalAuthorization feeOwner
+    length remaining === 1
+    let (remainderCid, remainder) = head remaining
+    remainder.maxAmount  === 100.0
+    remainder.instanceId === original.instanceId
+    remainder.expiresAt  === original.expiresAt
+
+    submitMustFail feeOwner do execute remainderCid secondHoldingCid 150.0
+
+    _ <- submit feeOwner do execute remainderCid secondHoldingCid 100.0
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 0
+
+-- ========================================================
 -- |   Negative: amount exceeds cap                        |
 -- ========================================================
 
