@@ -29,9 +29,13 @@ runAll = script do
   testTokenAdminWithdrawAuthorizationViaMCMS
   testTokenAdminCleanupExpiredAuthorization
   testTokenAdminTransferPendingCreatesRecovery
-  testTokenAdminRecoveryWithdrawAfterDeadline
+  testTokenAdminRecoveryWithdrawBeforeDeadline
   testTokenAdminRecoveryWithdrawRequiresCcipOwner
   testTokenAdminRecoveryDiscardAfterReject
+  testTokenAdminAllocateCreatesRecovery
+  testTokenAdminAllocationRecoveryWithdrawAfterDeadline
+  testTokenAdminAllocationRecoveryWithdrawRequiresCcipOwner
+  testTokenAdminAllocationRecoveryDiscard
   testTokenAdminTransferRejectsZeroTimeout
   testTokenAdminTransferRejectsTimeoutAboveCap
   testTokenAdminAllocateRejectsZeroAllocateBefore

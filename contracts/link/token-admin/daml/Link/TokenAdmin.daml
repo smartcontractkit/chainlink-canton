@@ -563,7 +563,6 @@ template LinkTransferAuthorization
               instanceId
               instrumentId
               transferInstructionCid
-              executeBefore
             pure ()
           _ -> pure ()
         pure result
@@ -599,30 +598,26 @@ template LinkTransferAuthorization
             pure (Map.delete instAddr contractIds)
           _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
--- | Withdraw path for a pending transfer whose receiver never acted. The
--- | instruction's Withdraw is sender-controlled and the sender is ccipOwner,
--- | which only acts through MCMS. Reuses the transfer authorization's id.
+-- | Withdraw path for a pending transfer. The instruction's Withdraw is
+-- | sender-controlled and the sender is ccipOwner, which only acts through
+-- | MCMS. Reuses the transfer authorization's id.
 template LinkTransferRecovery
   with
     ccipOwner : Party
     instanceId : Text                      -- MCMS target id; the transfer authorization's id
     instrumentId : HoldingV1.InstrumentId
     transferInstructionCid : ContractId TransferV1.TransferInstruction
-    executeBefore : Time
   where
     signatory ccipOwner
 
     ensure InstanceAddress.assertValidInstanceId instanceId
       && instrumentId.admin == ccipOwner
 
-    -- | Only once executeBefore has passed: until then the receiver keeps sole
-    -- | control of the outcome, matching the instruction's own accept deadline.
+    -- | Available at any time: a governance proposal must be able to stop a
+    -- | transfer to a party found unsafe after the instruction was created.
     choice WithdrawInstruction : TransferV1.TransferInstructionResult
       controller ccipOwner
       do
-        now <- getTime
-        assertMsg "LinkTransferRecovery.Withdraw: executeBefore has not passed"
-          (now >= executeBefore)
         exercise transferInstructionCid TransferV1.TransferInstruction_Withdraw with
           extraArgs = MetadataV1.ExtraArgs with
             context = MetadataV1.emptyChoiceContext
@@ -653,6 +648,62 @@ template LinkTransferRecovery
           "Discard" -> do
             assertMsg "E_TRAILING_BYTES: Discard" (byteCount operationData == 0)
             exercise selfCid DiscardRecovery
+            pure (Map.delete instAddr contractIds)
+          _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+-- | Withdraw path for an allocation that never settled. The allocation's
+-- | Withdraw is sender-controlled and the sender is ccipOwner, which only acts
+-- | through MCMS. Reuses the allocation authorization's id.
+template LinkAllocationRecovery
+  with
+    ccipOwner : Party
+    instanceId : Text                      -- MCMS target id; the allocation authorization's id
+    instrumentId : HoldingV1.InstrumentId
+    allocationCid : ContractId AllocationV1.Allocation
+    settleBefore : Time
+  where
+    signatory ccipOwner
+
+    ensure InstanceAddress.assertValidInstanceId instanceId
+      && instrumentId.admin == ccipOwner
+
+    -- | Only once settleBefore has passed: until then the settlement can run.
+    choice WithdrawAllocation : AllocationV1.Allocation_WithdrawResult
+      controller ccipOwner
+      do
+        now <- getTime
+        assertMsg "LinkAllocationRecovery.Withdraw: settleBefore has not passed"
+          (now >= settleBefore)
+        exercise allocationCid AllocationV1.Allocation_Withdraw with
+          extraArgs = MetadataV1.ExtraArgs with
+            context = MetadataV1.emptyChoiceContext
+            meta = MetadataV1.emptyMetadata
+
+    -- | Cleanup once the allocation is archived. The ledger cannot prove from
+    -- | here that it is gone, so this stays a governance judgment.
+    choice DiscardAllocationRecovery : ()
+      controller ccipOwner
+      do pure ()
+
+    interface instance MCMSReceiver for LinkAllocationRecovery where
+      view = MCMSReceiverView with
+        mcmsController = ccipOwner
+        instanceId
+
+      mcmsEntrypoint functionName operationData contractIds = do
+        let instAddr = InstanceAddress.makeText instanceId ccipOwner
+        selfCid <- case Map.lookup instAddr contractIds of
+          None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+          Some cid -> pure (coerceContractId cid : ContractId LinkAllocationRecovery)
+
+        case functionName of
+          "Withdraw" -> do
+            assertMsg "E_TRAILING_BYTES: Withdraw" (byteCount operationData == 0)
+            _ <- exercise selfCid WithdrawAllocation
+            pure (Map.delete instAddr contractIds)
+          "Discard" -> do
+            assertMsg "E_TRAILING_BYTES: Discard" (byteCount operationData == 0)
+            exercise selfCid DiscardAllocationRecovery
             pure (Map.delete instAddr contractIds)
           _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
@@ -718,7 +769,8 @@ template LinkAllocationAuthorization
         assertMsg "LinkAllocationAuthorization.Execute: factory admin mismatch"
           (factoryView.admin == instrumentId.admin)
 
-        exercise allocationFactoryCid AllocationInstructionV1.AllocationFactory_Allocate with
+        let settleBefore = addRelTime now (hours settleBeforeHours)
+        result <- exercise allocationFactoryCid AllocationInstructionV1.AllocationFactory_Allocate with
           expectedAdmin = instrumentId.admin
           allocation = AllocationV1.AllocationSpecification with
             settlement = AllocationV1.SettlementInfo with
@@ -728,7 +780,7 @@ template LinkAllocationAuthorization
                 cid = None
               requestedAt = now
               allocateBefore = addRelTime now (hours allocateBeforeHours)
-              settleBefore = addRelTime now (hours settleBeforeHours)
+              settleBefore = settleBefore
               meta = MetadataV1.emptyMetadata
             transferLegId = transferLegId
             transferLeg = AllocationV1.TransferLeg with
@@ -742,6 +794,20 @@ template LinkAllocationAuthorization
           extraArgs = MetadataV1.ExtraArgs with
             context = registryContext
             meta = meta
+        -- A completed allocation locks ccipOwner-held LINK until it settles, and
+        -- its Withdraw choice is sender-controlled, so only MCMS can ever reach
+        -- it. The recovery created here is that withdraw path.
+        case result.output of
+          AllocationInstructionV1.AllocationInstructionResult_Completed allocationCid -> do
+            _ <- create LinkAllocationRecovery with
+              ccipOwner
+              instanceId
+              instrumentId
+              allocationCid
+              settleBefore
+            pure ()
+          _ -> pure ()
+        pure result
 
     -- | Governance cancel, reached through MCMS.
     choice WithdrawAllocationAuthorization : ()
