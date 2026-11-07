@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-fee-treasury"
-	PackageID   = "4960a19fafbcd288150e4b72c01f6769f1151a3d9e32cc5c4c27c83071aca1cd"
+	PackageID   = "dedb435a8520e6e447924b1a076cd81ce30e4110260103b59d412f76810524bd"
 	SDKVersion  = "3.4.11"
 )
 
@@ -179,7 +179,7 @@ type ExecuteFeeWithdrawal struct {
 	Submitter          types.PARTY                            `json:"submitter"`
 	TransferFactoryCid types.CONTRACT_ID                      `json:"transferFactoryCid"`
 	InputHoldingCids   []types.CONTRACT_ID                    `json:"inputHoldingCids"`
-	Amount             types.NUMERIC                          `json:"amount" hex:"decimal"`
+	Amount             types.NUMERIC                          `json:"amount"`
 	ExtraArgs          splice_api_token_metadata_v1.ExtraArgs `json:"extraArgs"`
 	RequestedAt        types.TIMESTAMP                        `json:"requestedAt"`
 }
