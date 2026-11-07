@@ -7,6 +7,7 @@
 --      mining-round context). Not subject to MCMS validateTargetCidsSize cap.
 module CCIP.FeeTreasury where
 
+import DA.Action (when)
 import DA.Crypto.Text (byteCount)
 import DA.Map qualified as Map
 import DA.Time (addRelTime, seconds)
@@ -40,10 +41,10 @@ template MCMSFeeTreasury
 
         ensure assertValidInstanceId instanceId
 
-        -- Nonconsuming: authorizing does not mutate the treasury. The single-use
-        -- capability is the created FeeWithdrawalAuthorization contract itself (its
-        -- ContractId), consumed by ExecuteFeeWithdrawal, WithdrawAuthorization, or
-        -- CleanupExpiredAuthorization.
+        -- Nonconsuming: authorizing does not mutate the treasury. The capability is the
+        -- created FeeWithdrawalAuthorization contract itself, consumed by
+        -- ExecuteFeeWithdrawal, WithdrawAuthorization, or CleanupExpiredAuthorization.
+        -- A partial ExecuteFeeWithdrawal recreates it with the unused cap.
         nonconsuming choice AuthorizeFeeWithdrawal : ContractId FeeWithdrawalAuthorization
             with
                 params : AuthorizeFeeWithdrawalParams
@@ -84,10 +85,13 @@ template MCMSFeeTreasury
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 
--- | Single-use MCMS-approved authorization to withdraw fees from feeOwner.
+-- | MCMS-approved authorization to withdraw up to maxAmount of fees from feeOwner.
 -- Anyone can submit ExecuteFeeWithdrawal — security comes from the locked policy
 -- (recipient, instrument, amount cap, expiry), not from restricting who calls it.
--- instanceId makes this authorization independently addressable by MCMS for cancellation.
+-- A partial withdrawal recreates the contract with the unused cap, so a small amount
+-- cannot burn the approval and total spend stays within the approved maxAmount.
+-- instanceId makes this authorization independently addressable by MCMS for cancellation,
+-- and it carries over to the recreated contract.
 template FeeWithdrawalAuthorization
     with
         instanceId     : Text
@@ -137,7 +141,12 @@ template FeeWithdrawalAuthorization
                 case result.output of
                     TransferInstructionResult_Failed ->
                         abort "feetreasury: token transfer failed"
-                    _ -> pure result
+                    _ -> do
+                        let remainingAmount = maxAmount - amount
+                        when (remainingAmount > 0.0) do
+                            _ <- create this with maxAmount = remainingAmount
+                            pure ()
+                        pure result
 
         -- | Cancel an unused authorization (e.g. after expiry or policy change).
         choice WithdrawAuthorization : ()
