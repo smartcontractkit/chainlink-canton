@@ -409,7 +409,7 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 		Observers:    []types.PARTY{types.PARTY(partyCCIP)},
 		// Set directly at creation - Initialize only manages remoteChainConfigs/rate
 		// limiters/TAR registration, not the token-transfer fee overrides.
-		TokenTransferFeeConfigs: map[types.NUMERIC]registrybnm.TokenTransferFeeConfig2{
+		TokenTransferFeeConfigs: map[types.NUMERIC]registrybnm.TokenTransferFeeConfig{
 			types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): {
 				IsEnabled:         true,
 				DestGasOverhead:   25_000,

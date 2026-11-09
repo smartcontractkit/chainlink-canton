@@ -1,8 +1,10 @@
 sdk-version: 3.4.11
-name: ccip-registry-lock-release-token-pool
+name: ccip-registry-lock-release-token-pool-v2
 source: daml
-version: 1.0.2
-upgrades: ../../../dars/released/ccip-registry-lock-release-token-pool-1.0.0.dar
+version: 2.0.0
+# Fresh lineage: 2.0.0 decouples Initialize from ccip-core (choice-signature
+# change via the APIV2 TokenAdminRegistry interface), so it cannot upgrade the
+# released 1.0.0 artifacts — they are superseded, not upgraded.
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
@@ -18,9 +20,8 @@ data-dependencies:
   - ../../extension-api/.daml/dist/ccip-extension-api-v2-2.0.0.dar
   - ../../events/.daml/dist/ccip-events-v2-2.0.0.dar
   - ../../tickets/.daml/dist/ccip-tickets-v2-2.0.0.dar
-  - ../../core/.daml/dist/ccip-core-v2-2.1.1.dar
   - ../../utils/.daml/dist/ccip-utils-v2-2.1.0.dar
-  - ../rate-limiter/.daml/dist/ccip-registry-rate-limiter-1.0.1.dar
+  - ../rate-limiter/.daml/dist/ccip-registry-rate-limiter-v2-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib
