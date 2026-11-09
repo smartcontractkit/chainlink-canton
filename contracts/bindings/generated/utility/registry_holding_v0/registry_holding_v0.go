@@ -278,7 +278,7 @@ type Holding struct {
 	Owner      types.PARTY          `json:"owner"`
 	Instrument InstrumentIdentifier `json:"instrument"`
 	Label      types.TEXT           `json:"label"`
-	Amount     types.NUMERIC        `json:"amount"`
+	Amount     types.NUMERIC        `json:"amount" hex:"decimal"`
 	Lock       *Lock2               `json:"lock" hex:"optional"`
 }
 

@@ -9,6 +9,7 @@ import Daml.Script
 import DA.Foldable (mapA_)
 import DA.Assert ((===))
 import DA.Map qualified as Map
+import DA.Optional (fromSome)
 import DA.TextMap qualified as TextMap
 
 import qualified Splice.Api.Token.HoldingV1
@@ -16,6 +17,7 @@ import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
 
+import qualified CCIP.APIV2.TokenAdminRegistry
 import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.Registry.RateLimiterV2
 import CCIP.Registry.BurnMintTokenPoolV2
@@ -81,13 +83,15 @@ testInitializeBurnMintPool_SelfIssued = script do
                     feeQuoter = dummyAddr "dummy-fq"
                     rmnRemote = dummyAddr "dummy-rmn"
             CCIP.Registry.BurnMintTokenPoolV2.Initialize with
-                tokenAdminRegistryCid = tarCid
+                tokenAdminRegistryCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry tarCid
                 existingTokenConfigCid = None
                 admin = poolOwner
                 lanes = [lane]
 
     -- Registration landed: TokenConfig now has admin = poolOwner and points at the pool.
-    Some config <- queryContractId poolOwner result.tokenConfigCid
+    -- InitializeResult.tokenConfigCid is the APIV2 interface cid; downcast to the
+    -- concrete CoreV2 TokenConfig to assert on its record fields.
+    Some config <- queryContractId poolOwner (fromInterfaceContractId @TAR.TokenConfig result.tokenConfigCid)
     config.admin === Some poolOwner
     config.pendingAdmin === None
     config.tokenPool === Some (TAR.PoolRegistration poolOwner instanceId)
@@ -168,12 +172,14 @@ testInitializeLockReleasePool_SelfIssued = script do
                     feeQuoter = dummyAddr "dummy-fq"
                     rmnRemote = dummyAddr "dummy-rmn"
             CCIP.Registry.LockReleaseTokenPoolV2.Initialize with
-                tokenAdminRegistryCid = tarCid
+                tokenAdminRegistryCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry tarCid
                 existingTokenConfigCid = None
                 admin = poolOwner
                 lanes = [lane]
 
-    Some config <- queryContractId poolOwner result.tokenConfigCid
+    -- InitializeResult.tokenConfigCid is the APIV2 interface cid; downcast to the
+    -- concrete CoreV2 TokenConfig to assert on its record fields.
+    Some config <- queryContractId poolOwner (fromInterfaceContractId @TAR.TokenConfig result.tokenConfigCid)
     config.admin === Some poolOwner
     config.tokenPool === Some (TAR.PoolRegistration poolOwner instanceId)
 
@@ -186,4 +192,217 @@ testInitializeLockReleasePool_SelfIssued = script do
 
     length result.rateLimiterCids === 3
 
+    pure ()
+
+-- Reusing an already-registered config: the third-party-admin path. The registry
+-- owner proposed the pool owner as admin and they accepted before any pool
+-- existed; Initialize must reuse that config. (Previously it re-proposed
+-- unconditionally and the TAR aborted: "admin already set".)
+testInitializeLockReleasePool_ReusesExistingAcceptedConfig : Script ()
+testInitializeLockReleasePool_ReusesExistingAcceptedConfig = script do
+    issuer <- allocateParty "issuer"
+    registryOwner <- allocateParty "registry_owner"
+    poolOwner <- allocateParty "pool_owner" -- the accepted TAR admin (third party)
+    observerParty <- allocateParty "registry_observer"
+
+    let instanceId = "e2e-lr-reuse"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer "E2ELRREUSE"
+        dummyAddr label = Chainlink.InstanceAddress.make label poolOwner
+
+    tarCid <- submit registryOwner do
+        createCmd TAR.TokenAdminRegistry with
+            instanceId = "e2e-lr-tar-reuse"
+            ccipOwner = registryOwner
+            entryCount = 0
+
+    -- The instrument is already registered with poolOwner as accepted admin
+    -- (as if proposed by the registry owner and accepted) — before any pool exists.
+    -- Created directly: the standalone AcceptAdminRole would need the TAR
+    -- disclosed to the accepting party, which the real deploy flow provides
+    -- via the deploy submitter's disclosure.
+    existingConfigCid <- submit registryOwner do
+        createCmd TAR.TokenConfig with
+            instanceId = TAR.tokenConfigInstanceId instrumentId
+            registryInstanceId = "e2e-lr-tar-reuse"
+            registryOwner
+            index = 0
+            isCCIPManaged = False
+            instrumentId
+            admin = Some poolOwner
+            pendingAdmin = None
+            tokenPool = None
+            transferFactory = None
+            burnMintFactory = None
+
+    -- Disclose the TAR to the submitter (the real deploy submission carries the
+    -- TAR disclosure; the pool's Initialize exercises SetPool on it as admin).
+    tarDisclosure <- fromSome <$> queryDisclosure registryOwner tarCid
+    result <- submit (actAs poolOwner <> disclose tarDisclosure) do
+        createAndExerciseCmd
+            CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPool with
+                instanceId
+                poolOwner
+                ccipOwner = registryOwner
+                instrumentId
+                decimals = 18
+                rateLimitAdmin = None
+                observers = [observerParty]
+                remoteChainConfigs = Map.empty
+                tokenTransferFeeConfigs = Map.empty
+                poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                poolReceiveMetadata = Splice.Api.Token.MetadataV1.Metadata with
+                    values = TextMap.empty
+                transferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.Indefinite
+                deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
+                    tokenAdminRegistry = dummyAddr "dummy-tar"
+                    feeQuoter = dummyAddr "dummy-fq"
+                    rmnRemote = dummyAddr "dummy-rmn"
+            CCIP.Registry.LockReleaseTokenPoolV2.Initialize with
+                tokenAdminRegistryCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry tarCid
+                existingTokenConfigCid = Some (toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenConfig existingConfigCid)
+                admin = poolOwner
+                lanes = []
+
+    -- InitializeResult.tokenConfigCid is the APIV2 interface cid; downcast to the
+    -- concrete CoreV2 TokenConfig to assert on its record fields.
+    Some config <- queryContractId poolOwner (fromInterfaceContractId @TAR.TokenConfig result.tokenConfigCid)
+    config.admin === Some poolOwner
+    config.pendingAdmin === None
+    config.tokenPool === Some (TAR.PoolRegistration poolOwner instanceId)
+    pure ()
+
+-- An existing config whose accepted admin is someone else must be rejected
+-- (no silent takeover of another admin's registration).
+testInitializeLockReleasePool_RejectsAdminMismatch : Script ()
+testInitializeLockReleasePool_RejectsAdminMismatch = script do
+    issuer <- allocateParty "issuer"
+    registryOwner <- allocateParty "registry_owner"
+    acceptedAdmin <- allocateParty "accepted_admin"
+    poolOwner <- allocateParty "pool_owner"
+    observerParty <- allocateParty "registry_observer"
+
+    let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId issuer "E2ELRMISMATCH"
+        dummyAddr label = Chainlink.InstanceAddress.make label poolOwner
+
+    tarCid <- submit registryOwner do
+        createCmd TAR.TokenAdminRegistry with
+            instanceId = "e2e-lr-tar-mismatch"
+            ccipOwner = registryOwner
+            entryCount = 0
+
+    existingConfigCid <- submit registryOwner do
+        createCmd TAR.TokenConfig with
+            instanceId = TAR.tokenConfigInstanceId instrumentId
+            registryInstanceId = "e2e-lr-tar-mismatch"
+            registryOwner
+            index = 0
+            isCCIPManaged = False
+            instrumentId
+            admin = Some acceptedAdmin
+            pendingAdmin = None
+            tokenPool = None
+            transferFactory = None
+            burnMintFactory = None
+
+    -- poolOwner is NOT the config's accepted admin -> Initialize must abort.
+    submitMustFail poolOwner do
+        createAndExerciseCmd
+            CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPool with
+                instanceId = "e2e-lr-mismatch"
+                poolOwner
+                ccipOwner = registryOwner
+                instrumentId
+                decimals = 18
+                rateLimitAdmin = None
+                observers = [observerParty]
+                remoteChainConfigs = Map.empty
+                tokenTransferFeeConfigs = Map.empty
+                poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                poolReceiveMetadata = Splice.Api.Token.MetadataV1.Metadata with
+                    values = TextMap.empty
+                transferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.Indefinite
+                deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
+                    tokenAdminRegistry = dummyAddr "dummy-tar"
+                    feeQuoter = dummyAddr "dummy-fq"
+                    rmnRemote = dummyAddr "dummy-rmn"
+            CCIP.Registry.LockReleaseTokenPoolV2.Initialize with
+                tokenAdminRegistryCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry tarCid
+                existingTokenConfigCid = Some (toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenConfig existingConfigCid)
+                admin = poolOwner
+                lanes = []
+
+-- Transfer timeout validation: non-positive RelativeHours put executeBefore at
+-- or before the current ledger time (factories reject those) — rejected at both
+-- pool creation and SetTransferTimeout.
+testTransferTimeoutValidation : Script ()
+testTransferTimeoutValidation = script do
+    poolOwner <- allocateParty "pool_owner"
+    observerParty <- allocateParty "registry_observer"
+    let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId poolOwner "E2ETIMEOUT"
+        dummyAddr label = Chainlink.InstanceAddress.make label poolOwner
+        createArgs timeout = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPool with
+            instanceId = "e2e-lr-timeout"
+            poolOwner
+            ccipOwner = poolOwner
+            instrumentId
+            decimals = 18
+            rateLimitAdmin = None
+            observers = [observerParty]
+            remoteChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            poolReceiveMetadata = Splice.Api.Token.MetadataV1.Metadata with
+                values = TextMap.empty
+            transferTimeout = timeout
+            deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
+                tokenAdminRegistry = dummyAddr "dummy-tar"
+                feeQuoter = dummyAddr "dummy-fq"
+                rmnRemote = dummyAddr "dummy-rmn"
+
+    -- creation rejects non-positive RelativeHours (ensure)
+    submitMustFail poolOwner do
+        createCmd (createArgs (CCIP.Registry.LockReleaseTokenPoolV2.RelativeHours 0))
+    submitMustFail poolOwner do
+        createCmd (createArgs (CCIP.Registry.LockReleaseTokenPoolV2.RelativeHours (-1)))
+
+    poolCid <- submit poolOwner do
+        createCmd (createArgs CCIP.Registry.LockReleaseTokenPoolV2.Indefinite)
+
+    -- update path rejects non-positive RelativeHours
+    submitMustFail poolOwner do
+        exerciseCmd poolCid CCIP.Registry.LockReleaseTokenPoolV2.SetTransferTimeout with
+            newTransferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.RelativeHours 0
+
+    -- positive + Indefinite are accepted
+    submit poolOwner do
+        exerciseCmd poolCid CCIP.Registry.LockReleaseTokenPoolV2.SetTransferTimeout with
+            newTransferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.RelativeHours 24
+    pure ()
+
+-- RateLimiter ensure: an enabled limiter must satisfy rate <= capacity at
+-- creation, matching SetConfig's update-time check.
+testRateLimiterEnsureRateLeCapacity : Script ()
+testRateLimiterEnsureRateLeCapacity = script do
+    poolOwner <- allocateParty "pool_owner"
+    observerParty <- allocateParty "registry_observer"
+    now <- getTime
+    let mkArgs rate = CCIP.Registry.RateLimiterV2.RateLimiter with
+            instanceId = "e2e-rl"
+            poolInstanceId = "e2e-rl-pool"
+            poolOwner
+            remoteChainSelector = 1.0
+            direction = CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound
+            mode = CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality
+            isEnabled = True
+            capacity = 100.0
+            rate = rate
+            tokens = 0.0
+            lastUpdated = now
+            observers = [observerParty]
+
+    submitMustFail poolOwner do
+        createCmd (mkArgs 1000.0)
+
+    submit poolOwner do
+        createCmd (mkArgs 100.0)
     pure ()

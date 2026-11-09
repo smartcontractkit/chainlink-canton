@@ -28,8 +28,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-registry-lock-release-token-pool"
-	PackageID   = "dea9f7a2d1ce77df731377e30766da0ba5a26f408f34934cf463c72db61261cf"
+	PackageName = "ccip-registry-lock-release-token-pool-v2"
+	PackageID   = "893d6334c33ed28af4911f3f347be72e344e824cb9f659f1c1cc0d18e50abf27"
 	SDKVersion  = "3.4.11"
 )
 
@@ -940,7 +940,7 @@ type LockOrBurn struct {
 	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	SenderInputCids       []types.CONTRACT_ID                        `json:"senderInputCids"`
-	Amount                types.NUMERIC                              `json:"amount"`
+	Amount                types.NUMERIC                              `json:"amount" hex:"decimal"`
 	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
@@ -1026,7 +1026,7 @@ type LockReleaseTokenPool struct {
 	RateLimitAdmin          *types.PARTY                               `json:"rateLimitAdmin" hex:"optional"`
 	Observers               []types.PARTY                              `json:"observers"`
 	RemoteChainConfigs      map[types.NUMERIC]RemoteChainConfig        `json:"remoteChainConfigs"`
-	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig2  `json:"tokenTransferFeeConfigs"`
+	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig   `json:"tokenTransferFeeConfigs"`
 	PoolReceiveContext      splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
 	PoolReceiveMetadata     splice_api_token_metadata_v1.Metadata      `json:"poolReceiveMetadata"`
 	TransferTimeout         TransferTimeout                            `json:"transferTimeout"`
@@ -1872,6 +1872,45 @@ func (t *LockReleaseTokenPoolDeps) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// MetadataEntry is a Record type
+type MetadataEntry struct {
+	Key   types.TEXT `json:"key"`
+	Value types.TEXT `json:"value"`
+}
+
+// ToMap converts MetadataEntry to a map for DAML arguments
+func (t MetadataEntry) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["key"] = string(t.Key)
+
+	m["value"] = string(t.Value)
+
+	return m
+}
+
+func (t MetadataEntry) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *MetadataEntry) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes MetadataEntry to hex string (Canton MCMS format)
+func (t MetadataEntry) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes MetadataEntry from hex string (Canton MCMS format)
+func (t *MetadataEntry) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // RateLimitConfigArgs is a Record type
 type RateLimitConfigArgs struct {
 	RemoteChainSelector                        types.NUMERIC                   `json:"remoteChainSelector"`
@@ -2390,6 +2429,48 @@ func (t *SetPoolReceiveMetadata) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetPoolReceiveMetadataParams is a Record type
+type SetPoolReceiveMetadataParams struct {
+	MetadataEntries []MetadataEntry `json:"metadataEntries"`
+}
+
+// ToMap converts SetPoolReceiveMetadataParams to a map for DAML arguments
+func (t SetPoolReceiveMetadataParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["metadataEntries"] = func() []any {
+		res := make([]any, 0, len(t.MetadataEntries))
+		for _, e := range t.MetadataEntries {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SetPoolReceiveMetadataParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetPoolReceiveMetadataParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetPoolReceiveMetadataParams to hex string (Canton MCMS format)
+func (t SetPoolReceiveMetadataParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetPoolReceiveMetadataParams from hex string (Canton MCMS format)
+func (t *SetPoolReceiveMetadataParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetRateLimitConfig is a Record type
 type SetRateLimitConfig struct {
 	Caller         types.PARTY       `json:"caller"`
@@ -2662,8 +2743,8 @@ func (t *SetTransferTimeoutParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// TokenTransferFeeConfig2 is a Record type
-type TokenTransferFeeConfig2 struct {
+// TokenTransferFeeConfig is a Record type
+type TokenTransferFeeConfig struct {
 	IsEnabled         types.BOOL    `json:"isEnabled"`
 	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
@@ -2671,8 +2752,8 @@ type TokenTransferFeeConfig2 struct {
 	FeeBps            types.NUMERIC `json:"feeBps"`
 }
 
-// ToMap converts TokenTransferFeeConfig2 to a map for DAML arguments
-func (t TokenTransferFeeConfig2) ToMap() map[string]any {
+// ToMap converts TokenTransferFeeConfig to a map for DAML arguments
+func (t TokenTransferFeeConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["isEnabled"] = bool(t.IsEnabled)
@@ -2688,24 +2769,24 @@ func (t TokenTransferFeeConfig2) ToMap() map[string]any {
 	return m
 }
 
-func (t TokenTransferFeeConfig2) MarshalJSON() ([]byte, error) {
+func (t TokenTransferFeeConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *TokenTransferFeeConfig2) UnmarshalJSON(data []byte) error {
+func (t *TokenTransferFeeConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes TokenTransferFeeConfig2 to hex string (Canton MCMS format)
-func (t TokenTransferFeeConfig2) MarshalHex() (string, error) {
+// MarshalHex encodes TokenTransferFeeConfig to hex string (Canton MCMS format)
+func (t TokenTransferFeeConfig) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes TokenTransferFeeConfig2 from hex string (Canton MCMS format)
-func (t *TokenTransferFeeConfig2) UnmarshalHex(data string) error {
+// UnmarshalHex decodes TokenTransferFeeConfig from hex string (Canton MCMS format)
+func (t *TokenTransferFeeConfig) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2892,7 +2973,7 @@ type VerifyOutboundCCVs struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	Amount                types.NUMERIC                              `json:"amount"`
+	Amount                types.NUMERIC                              `json:"amount" hex:"decimal"`
 	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
@@ -2987,6 +3068,7 @@ type MCMSEncoder interface {
 	SetObservers(args SetObservers) (*bind.EncodedChoice, error)
 	SetObserversParams(args SetObserversParams) (*bind.EncodedChoice, error)
 	SetPoolReceiveMetadata(args SetPoolReceiveMetadata) (*bind.EncodedChoice, error)
+	SetPoolReceiveMetadataParams(args SetPoolReceiveMetadataParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
@@ -3159,6 +3241,11 @@ func (e *encoder) SetObserversParams(args SetObserversParams) (*bind.EncodedChoi
 
 // SetPoolReceiveMetadata encodes parameters for the SetPoolReceiveMetadata choice.
 func (e *encoder) SetPoolReceiveMetadata(args SetPoolReceiveMetadata) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetPoolReceiveMetadata", args)
+}
+
+// SetPoolReceiveMetadataParams encodes parameters for the SetPoolReceiveMetadata choice.
+func (e *encoder) SetPoolReceiveMetadataParams(args SetPoolReceiveMetadataParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetPoolReceiveMetadata", args)
 }
 

@@ -37,8 +37,7 @@ import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.CodecV2.Math
 import qualified CCIP.CodecV2.MessageCodecV1
 import qualified CCIP.CodecV2.Uint256
-import qualified CCIP.CoreV2.TokenAdminRegistry as TAR
-import CCIP.CoreV2.TokenAdminRegistryTypes (PoolRegistration(..))
+import CCIP.APIV2.TokenAdminRegistry (PoolRegistration(..))
 import qualified CCIP.EventsV2.Events
 import qualified CCIP.InterfacesV2.TokenPool
 import qualified CCIP.Registry.RateLimiterV2
@@ -53,6 +52,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2CodecGen (
     decodeSetRateLimiterReferencesParamsAt,
     decodeSetRateLimitConfigParamsAt,
     decodeSetTransferTimeoutParamsAt,
+    decodeSetPoolReceiveMetadataParamsAt,
     decodeAddPoolReceiveContextNonContractValueParamsAt,
     decodeAddPoolReceiveContextContractValueParamsAt,
     decodeRemovePoolReceiveContextValueParamsAt,
@@ -64,6 +64,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2Types (
     TokenTransferFeeConfigArgs(..),
     RateLimitConfigArgs(..),
     TransferTimeout(..),
+    isValidTransferTimeout,
     SetDynamicConfigParams(..),
     SetObserversParams(..),
     ApplyChainUpdatesParams(..),
@@ -71,6 +72,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2Types (
     SetRateLimiterReferencesParams(..),
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
+    SetPoolReceiveMetadataParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
     RemovePoolReceiveContextValueParams(..),
@@ -276,7 +278,7 @@ deployRateLimiter poolOwner poolInstanceId observers remoteChainSelector directi
 data InitializeResult = InitializeResult
     with
         rateLimiterCids : [ContractId CCIP.Registry.RateLimiterV2.RateLimiter]
-        tokenConfigCid : ContractId TAR.TokenConfig
+        tokenConfigCid : ContractId CCIP.APIV2.TokenAdminRegistry.ITokenConfig
     deriving (Eq, Show)
 
 -- | Lock/release token pool with dynamic CCV requirements per chain.
@@ -328,6 +330,7 @@ template LockReleaseTokenPool
         ensure Chainlink.InstanceAddress.assertValidInstanceId instanceId
             && not (null observers)
             && CCIP.CodecV2.Math.isValidTokenDecimals decimals
+            && isValidTransferTimeout transferTimeout
             && all
                 (\cfg -> CCIP.CodecV2.FinalityConfig.isValidFinalityConfig cfg.finalityConfig)
                 (Map.values remoteChainConfigs)
@@ -516,30 +519,50 @@ template LockReleaseTokenPool
         -- ApplyChainUpdates, and register with the shared TokenAdminRegistry - all as one atomic
         -- operation, callable via a single CreateAndExercise ledger command right after create.
         --
-        -- Only supports the self-issued/self-serve admin path: instrumentId.admin must equal
-        -- admin, since ProposeAdministrator requires caller == instrumentId.admin, and this
-        -- choice calls it with caller = admin. For instruments where the registry owner must
-        -- co-sign admin assignment, propose/accept admin separately first, then call this with
+        -- With existingTokenConfigCid = Some cid, the config is reused as-is (validated:
+        -- same instrument, `admin` already accepted) — no re-proposal, so third-party
+        -- admins work. With None, admin is proposed+accepted inline, which requires
+        -- proposal authority (instrumentId.admin or the registry owner).
+        -- For instruments where the registry owner must co-sign admin assignment,
+        -- propose/accept admin separately first, then call this with
         -- existingTokenConfigCid = Some (the resulting cid).
         nonconsuming choice Initialize : InitializeResult
             with
-                tokenAdminRegistryCid : ContractId TAR.TokenAdminRegistry
-                existingTokenConfigCid : Optional (ContractId TAR.TokenConfig)
+                tokenAdminRegistryCid : ContractId CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry
+                existingTokenConfigCid : Optional (ContractId CCIP.APIV2.TokenAdminRegistry.ITokenConfig)
                 admin : Party
                 lanes : [LaneDeploySpec]
             controller poolOwner, admin
             do
-                proposeResult <- exercise tokenAdminRegistryCid TAR.ProposeAdministrator with
-                    tokenConfigCid = existingTokenConfigCid
-                    instrumentId
-                    newAdmin = admin
-                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-                    caller = admin
-                acceptedTokenConfigCid <- exercise proposeResult.tokenAdminRegistryCid TAR.AcceptAdminRole with
-                    tokenConfigCid = proposeResult.tokenConfigCid
-                    instrumentId
-                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-                    caller = admin
+                acceptedTokenConfigCid <- case existingTokenConfigCid of
+                    -- Already registered with this admin accepted: validate + reuse.
+                    -- ProposeAdministrator requires proposal authority (issuer or
+                    -- registry owner), which an already-accepted admin lacks.
+                    Some cid -> do
+                        -- IsAdministrator fetches the config, asserts it belongs to this
+                        -- instrument, and returns config.admin == Some administrator —
+                        -- both original asserts in one interface call, with no
+                        -- CoreV2 record fetch.
+                        isAdmin <- exercise tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_IsAdministrator with
+                            tokenConfigCid = Some cid
+                            instrumentId = instrumentId
+                            administrator = admin
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                            caller = admin
+                        assertMsg "Initialize: existing config not accepted by this admin" isAdmin
+                        pure cid
+                    None -> do
+                        proposeResult <- exercise tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
+                            tokenConfigCid = None
+                            instrumentId
+                            newAdmin = admin
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                            caller = admin
+                        exercise proposeResult.tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
+                            tokenConfigCid = proposeResult.tokenConfigCid
+                            instrumentId
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                            caller = admin
 
                 now <- getTime
                 chainUpdatesAndCids <- mapA (\lane -> do
@@ -572,7 +595,7 @@ template LockReleaseTokenPool
                     remoteChainSelectorsToRemove = []
                     chainsToAdd = chainUpdates
 
-                newTokenConfigCid <- exercise proposeResult.tokenAdminRegistryCid TAR.SetPool with
+                newTokenConfigCid <- exercise tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_SetPool with
                     tokenConfigCid = acceptedTokenConfigCid
                     instrumentId
                     tokenPool = Some PoolRegistration with
@@ -734,7 +757,10 @@ template LockReleaseTokenPool
             with
                 newTransferTimeout : TransferTimeout
             controller poolOwner
-            do create this with transferTimeout = newTransferTimeout
+            do
+                assertMsg "SetTransferTimeout: RelativeHours must be strictly positive"
+                    (isValidTransferTimeout newTransferTimeout)
+                create this with transferTimeout = newTransferTimeout
 
         -- Get required CCV raw instance addresses based on chain and direction.
         nonconsuming choice GetRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
@@ -1335,7 +1361,7 @@ template LockReleaseTokenPool
                         transfer
                         extraArgs = mergedExtraArgs
 
-                receiverCids <- case transferResult.output of
+                (receiverCids, acceptSenderChangeCids) <- case transferResult.output of
                     Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
                             completedReceiverCids -> do
                         assertHoldingsMatchAndSum
@@ -1344,8 +1370,38 @@ template LockReleaseTokenPool
                             instrumentId
                             amount
                             completedReceiverCids
-                        pure completedReceiverCids
-                    _ -> abort "LockOrBurn: transfer did not complete directly"
+                        pure (completedReceiverCids, [])
+                    -- Transfers that cannot settle directly (e.g. named receiver labels —
+                    -- preapprovals only cover the "" label) pend; accept them in-transaction,
+                    -- like PerPartyRouter's fee collection. Requires a poolOwner→sender
+                    -- delegation so the accept (controller: receiver) is authorized.
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending instrCid -> do
+                        assertTransferInstructionMatches
+                            "LockOrBurn: pending lock transfer"
+                            caller
+                            poolOwner
+                            amount
+                            instrumentId
+                            instrCid
+                        acceptResult <- exercise instrCid
+                            Splice.Api.Token.TransferInstructionV1.TransferInstruction_Accept with
+                                extraArgs = mergedExtraArgs
+                        case acceptResult.output of
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Completed
+                                    acceptedReceiverCids -> do
+                                assertHoldingsMatchAndSum
+                                    "LockOrBurn: accepted receiver holdings"
+                                    poolOwner
+                                    instrumentId
+                                    amount
+                                    acceptedReceiverCids
+                                pure (acceptedReceiverCids, acceptResult.senderChangeCids)
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
+                                abort "LockOrBurn: lock transfer acceptance failed"
+                            Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Pending _ ->
+                                abort "LockOrBurn: lock transfer acceptance is still pending"
+                    Splice.Api.Token.TransferInstructionV1.TransferInstructionResult_Failed ->
+                        abort "LockOrBurn: lock transfer failed"
 
                 let amountAfterFeeBpsBytes = fromSomeNote
                         "LockOrBurn: amountAfterFeeBps does not fit uint256"
@@ -1365,7 +1421,7 @@ template LockReleaseTokenPool
 
                 pure CCIP.InterfacesV2.TokenPool.LockOrBurnResult with
                     poolChangeCids = receiverCids ++ tokenPoolHoldings
-                    senderChangeCids = transferResult.senderChangeCids
+                    senderChangeCids = dedup (transferResult.senderChangeCids ++ acceptSenderChangeCids)
                     sendingMessageCid = coerceContractId newSendingMessageCid
                     context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
@@ -1485,5 +1541,14 @@ template LockReleaseTokenPool
                             assertMsg "E_TRAILING_BYTES: SetTransferTimeout" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid SetTransferTimeout with
                                 newTransferTimeout = transferTimeout
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetPoolReceiveMetadata" -> do
+                    case decodeSetPoolReceiveMetadataParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: SetPoolReceiveMetadata"
+                        Some (SetPoolReceiveMetadataParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetPoolReceiveMetadata" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetPoolReceiveMetadata with
+                                metadata = Splice.Api.Token.MetadataV1.Metadata with
+                                    values = TextMap.fromList (map (\e -> (e.key, e.value)) metadataEntries)
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
                 _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName

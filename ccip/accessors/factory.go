@@ -162,3 +162,15 @@ func (a *accessor) ContractTransmitter() (chainaccess.ContractTransmitter, error
 func (a *accessor) CCTPCodec() (chainaccess.CCTPCodec, error) {
 	return nil, fmt.Errorf("not supported")
 }
+
+func (a *accessor) FeeQuoterReader() (chainaccess.FeeQuoterReader, error) {
+	return nil, fmt.Errorf("not supported")
+}
+
+func (a *accessor) FeeQuoterWriter() (chainaccess.FeeQuoterWriter, error) {
+	return nil, fmt.Errorf("not supported")
+}
+
+func (a *accessor) GasPriceReader() (chainaccess.GasPriceReader, error) {
+	return nil, fmt.Errorf("not supported")
+}

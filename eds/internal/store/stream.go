@@ -20,14 +20,46 @@ type StreamConfig struct {
 	BackoffMin    time.Duration // default 100ms
 	BackoffMax    time.Duration // default 3s
 	BackoffFactor float64       // default 2
+	// MaxEmptyReconnects fails closed after this many consecutive stream
+	// reconnects that never became live (no update received and broken
+	// before LivenessGrace elapsed) (0 means never fail on this).
+	MaxEmptyReconnects int
+	// MaxDisconnected fails closed after a single failure-to-connect gap
+	// longer than this (0 means never fail on this).
+	MaxDisconnected time.Duration
+	// LivenessGrace is how long a freshly established stream must survive
+	// without an error before it counts as live for the uptime metric
+	// (0 counts uptime immediately on establishment).
+	//
+	// This grace exists because gRPC does not confirm a server-streaming
+	// subscription up front: the GetUpdates call returns as soon as the
+	// request is on the wire, and the server's acceptance or rejection is
+	// only observed by the first Recv. Waiting on stream.Header() does not
+	// help either, because gRPC servers may defer response headers until
+	// the first message - a healthy stream with no traffic would block
+	// forever. The only reliable signal is therefore the absence of an
+	// immediate error: genuine rejections (bad URL, expired auth, bad
+	// offset) surface on the first Recv within milliseconds and never
+	// survive this grace, while an accepted stream does.
+	//
+	// A pre-subscribe gRPC health check (grpc.health.v1.Health, exposed by
+	// the Canton Ledger API) was considered as an alternative and deferred
+	// for now: it is a point-in-time signal that cannot detect per-RPC
+	// rejections (auth, invalid offset) and does not close the race between
+	// check and subscribe, so this grace window would still be needed
+	// alongside it.
+	LivenessGrace time.Duration
 }
 
 func DefaultStreamConfig() StreamConfig {
 	return StreamConfig{
-		MaxRetries:    0,
-		BackoffMin:    time.Millisecond * 100,
-		BackoffMax:    time.Second * 3,
-		BackoffFactor: 2,
+		MaxRetries:         0,
+		BackoffMin:         time.Millisecond * 100,
+		BackoffMax:         time.Second * 3,
+		BackoffFactor:      2,
+		MaxEmptyReconnects: 20,
+		MaxDisconnected:    time.Minute * 15,
+		LivenessGrace:      time.Second * 5,
 	}
 }
 
@@ -134,15 +166,33 @@ func (s *BackfilledStream) stream(
 	onExercisedEvent func(ctx context.Context, transaction *apiv2.Transaction, exercisedEvent *apiv2.ExercisedEvent) error,
 ) error {
 	// Create uptime ticker
-	// Ticking once a second to increase the uptime counter metric
-	// Checking if the metric is increasing can be used to verify that the ContractStore is still subscribed and ready to process updates
+	// Ticking once a second to increase the uptime counter metric, but only
+	// while the current stream incarnation is live. Liveness must not depend
+	// on updates arriving: a live stream may legitimately stay quiet for a
+	// long time (no user traffic), and basing the metric on events received
+	// would make it drop out exactly during those healthy-but-quiet periods.
+	//
+	// "Live" is approximated with a liveness grace instead of a synchronous
+	// establishment check, because gRPC streams are established lazily: the
+	// GetUpdates call returns before the server's status is known, and an
+	// error is only discovered by the first Recv (see LivenessGrace).
 	uptimeTicker := time.NewTicker(time.Second)
 	defer uptimeTicker.Stop()
+
+	// Fail-closed policy: reconnecting is pointless if streams never become
+	// live or cannot be re-established at all.
+	budget := &reconnectBudget{
+		maxEmptyReconnects: streamConfig.MaxEmptyReconnects,
+		maxDisconnected:    streamConfig.MaxDisconnected,
+	}
+	// Backoff between consecutive empty reconnects, so a burst of instant
+	// stream failures cannot spend the whole reconnect budget in a second.
+	reconnectBackoff := &backoff.Backoff{Min: streamConfig.BackoffMin, Max: streamConfig.BackoffMax, Factor: streamConfig.BackoffFactor}
 
 	for {
 		// Start streaming from offset (exclusive)
 		s.logger.Debug().Int64("offset", offset).Msg("Subscribing to update stream")
-		stream, err := s.getStreamWithRetry(ctx, offset, filters, streamConfig)
+		stream, err := s.getStreamWithRetry(ctx, offset, filters, streamConfig, budget)
 		if err != nil {
 			return fmt.Errorf("failed to create update stream: %w", err)
 		}
@@ -150,6 +200,15 @@ func (s *BackfilledStream) stream(
 		// Start receiving from stream
 		s.logger.Debug().Int64("offset", offset).Msg("Update stream created, listening for updates")
 		updateChan, errChan := ReceiveFromStream(ctx, stream)
+		// An incarnation is live once it delivers an update or survives the
+		// liveness grace. The timer carries the grace so that even short
+		// incarnations are credited; without it, one that dies between two
+		// uptime ticks could never become live (see LivenessGrace).
+		live := streamConfig.LivenessGrace <= 0
+		var graceTimer <-chan time.Time
+		if streamConfig.LivenessGrace > 0 {
+			graceTimer = time.After(streamConfig.LivenessGrace)
+		}
 	reconnect:
 		for {
 			select {
@@ -162,20 +221,31 @@ func (s *BackfilledStream) stream(
 					s.logger.Warn().Err(err).Msg("Update stream closed by server, reconnecting")
 					break reconnect
 				}
+			case <-graceTimer:
+				live = true
 			case <-ctx.Done():
 				s.logger.Debug().Msg("Context cancelled, stopping ContractStore")
 				_ = stream.CloseSend()
 
 				return ctx.Err()
 			case <-uptimeTicker.C:
-				// Increment uptime metric on every tick
-				s.metrics.IncrementStoreSubscriptionUptime(ctx)
+				// Increment uptime metric on every tick, but only while this
+				// stream incarnation is live. Liveness is proven by receiving
+				// an update or by surviving the liveness grace; see
+				// LivenessGrace for why gRPC cannot confirm the subscription
+				// up front.
+				if live {
+					s.metrics.IncrementStoreSubscriptionUptime(ctx)
+				}
 			case resp, ok := <-updateChan:
 				if !ok {
 					// updateChan closed; err was already sent on errChan, inner loop will handle it
 					break reconnect
 				}
 				if transaction, ok := resp.GetUpdate().(*apiv2.GetUpdatesResponse_Transaction); ok {
+					// A real update is proof of health: reset the reconnect backoff.
+					live = true
+					reconnectBackoff.Reset()
 					s.logger.Trace().Str("updateID", transaction.Transaction.GetUpdateId()).Int("events", len(transaction.Transaction.GetEvents())).Msg("Update received")
 					for _, event := range transaction.Transaction.GetEvents() {
 						switch event := event.GetEvent().(type) {
@@ -232,12 +302,77 @@ func (s *BackfilledStream) stream(
 				}
 			}
 		}
+
+		// Every path out of the receive loop ends this subscription: count the reconnect.
+		s.metrics.IncrementStoreReconnectCounter(ctx)
+
+		// Stream ended without a context cancellation. If this incarnation was
+		// demonstrably live - it delivered an update or survived the liveness
+		// grace - reset the empty-reconnect streak. Otherwise drain the
+		// reconnect budget and fail closed when it is spent: reconnecting is
+		// evidently not making progress.
+		if live {
+			budget.lived()
+			reconnectBackoff.Reset()
+		} else {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if budget.emptyReconnect() {
+				return fmt.Errorf("update stream reconnected %d times without becoming live (budget %d), failing closed", budget.emptyReconnects, budget.maxEmptyReconnects)
+			}
+
+			// Wait before resubscribing: a burst of instant stream failures must
+			// not spend the whole budget (or hot-spin) in under a second.
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(reconnectBackoff.Duration()):
+			}
+		}
 	}
 }
 
+// reconnectBudget implements the fail-closed policy for the update stream:
+// give up after maxEmptyReconnects consecutive stream incarnations that
+// never became live - delivered no update and broke before the liveness
+// grace elapsed - or after one failure-to-connect gap longer than
+// maxDisconnected. A zero value disables each check.
+type reconnectBudget struct {
+	maxEmptyReconnects int
+	maxDisconnected    time.Duration
+
+	emptyReconnects   int
+	disconnectedSince time.Time
+}
+
+// lived resets the empty-reconnect streak: the stream incarnation was
+// demonstrably live - it delivered an update or survived LivenessGrace.
+func (b *reconnectBudget) lived() { b.emptyReconnects = 0 }
+
+// emptyReconnect records a stream incarnation that never became live and
+// reports whether the empty-reconnect budget is spent.
+func (b *reconnectBudget) emptyReconnect() bool {
+	b.emptyReconnects++
+	return b.maxEmptyReconnects > 0 && b.emptyReconnects >= b.maxEmptyReconnects
+}
+
+// connectFailed records a failed connect attempt and reports the time spent so
+// far without an established stream.
+func (b *reconnectBudget) connectFailed(now time.Time) time.Duration {
+	if b.disconnectedSince.IsZero() {
+		b.disconnectedSince = now
+	}
+
+	return now.Sub(b.disconnectedSince)
+}
+
+// connected clears the disconnected timer: a stream is established again.
+func (b *reconnectBudget) connected() { b.disconnectedSince = time.Time{} }
+
 // GetStreamWithRetry creates a stream by calling createStream, retrying with backoff on failure.
 // The stream starts at the given offset (meaning is defined by the factory, e.g. BeginExclusive or ActiveAtOffset).
-func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64, filters FiltersByParty, streamConfig StreamConfig) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
+func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64, filters FiltersByParty, streamConfig StreamConfig, budget *reconnectBudget) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
 	b := &backoff.Backoff{Min: streamConfig.BackoffMin, Max: streamConfig.BackoffMax, Factor: streamConfig.BackoffFactor}
 	b.Reset()
 
@@ -256,6 +391,13 @@ func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64,
 			},
 		})
 		if err != nil {
+			s.metrics.IncrementStoreReconnectCounter(ctx)
+
+			// Fail closed if we have been unable to establish a stream for too long.
+			if gap := budget.connectFailed(time.Now()); budget.maxDisconnected > 0 && gap > budget.maxDisconnected {
+				return nil, fmt.Errorf("disconnected for %s (budget %s): %w", gap.Round(time.Second), budget.maxDisconnected, err)
+			}
+
 			// If MaxRetries is enabled/non-zero and the maximum number of retries has been reached, return an error.
 			if streamConfig.MaxRetries > 0 && attempt >= streamConfig.MaxRetries {
 				return nil, fmt.Errorf("max retries (%v) reached: %w", streamConfig.MaxRetries, err)
@@ -270,6 +412,8 @@ func (s *BackfilledStream) getStreamWithRetry(ctx context.Context, offset int64,
 				continue
 			}
 		}
+
+		budget.connected()
 
 		return stream, nil
 	}

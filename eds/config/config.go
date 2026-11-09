@@ -158,6 +158,11 @@ type Factory struct {
 
 	TokenStandardURL        *string                `toml:"token_standard_url" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests,required_if=Type url,required_if=Type urlRequests,omitnil,url"`
 	TokenStandardAuthConfig *authConfig.AuthConfig `toml:"token_standard_auth" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests"`
+
+	// BridgeHoldingsURL opts into fetching pool holdings via DA's bridge API
+	// (e.g. "https://<host>/api/bridge/v0/ccip/holdings") when the store can't
+	// see the owner's holdings. Unset: no bridge fetching.
+	BridgeHoldingsURL *string `toml:"bridge_holdings_url" validate:"excluded_unless=Type url|excluded_unless=Type urlRequests,omitempty,url"`
 }
 
 type TokenPool struct {
@@ -195,6 +200,10 @@ type RegistryAPIConfig struct {
 	// Required when enabled: without it, discovered pools get no factory and send/execute
 	// aborts on-ledger (the pool requires the factory CID in the choice context).
 	TokenStandardURL string `toml:"token_standard_url" validate:"required_if=Enabled true,omitempty,url"`
+	// BridgeHoldingsURL opts discovered pools into fetching pool holdings via
+	// DA's bridge API when the store can't see the owner's holdings. Unset: no
+	// bridge fetching.
+	BridgeHoldingsURL string `toml:"bridge_holdings_url" validate:"omitempty,url"`
 }
 
 // Token Standard API

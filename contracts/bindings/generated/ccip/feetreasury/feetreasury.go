@@ -179,7 +179,7 @@ type ExecuteFeeWithdrawal struct {
 	Submitter          types.PARTY                            `json:"submitter"`
 	TransferFactoryCid types.CONTRACT_ID                      `json:"transferFactoryCid"`
 	InputHoldingCids   []types.CONTRACT_ID                    `json:"inputHoldingCids"`
-	Amount             types.NUMERIC                          `json:"amount"`
+	Amount             types.NUMERIC                          `json:"amount" hex:"decimal"`
 	ExtraArgs          splice_api_token_metadata_v1.ExtraArgs `json:"extraArgs"`
 	RequestedAt        types.TIMESTAMP                        `json:"requestedAt"`
 }

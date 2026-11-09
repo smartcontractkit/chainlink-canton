@@ -25,7 +25,8 @@ const (
 
 	// LINK Token
 
-	Link = Package("link")
+	Link           = Package("link")
+	LinkTokenAdmin = Package("link-token-admin")
 
 	// MCMS
 
@@ -57,9 +58,18 @@ const (
 	// family from the production/LINK pools above, kept isolated so a bug or spam on
 	// the registry-discovery side can never affect production pool serving).
 
-	CCIPRegistryBurnMintTokenPoolV2    = Package("ccip-registry-burn-mint-token-pool")
-	CCIPRegistryLockReleaseTokenPoolV2 = Package("ccip-registry-lock-release-token-pool")
-	CCIPRegistryRateLimiterV2          = Package("ccip-registry-rate-limiter")
+	// Superseded 1.0.0 lineage: core-coupled, frozen in dars/released, not to be
+	// deployed. Kept so the released artifacts and their bindings stay resolvable.
+	CCIPRegistryBurnMintTokenPool    = Package("ccip-registry-burn-mint-token-pool")
+	CCIPRegistryLockReleaseTokenPool = Package("ccip-registry-lock-release-token-pool")
+	CCIPRegistryRateLimiter          = Package("ccip-registry-rate-limiter")
+
+	// Fresh 2.0.0 lineage: core-decoupled (APIV2 interfaces only). The -v2 name
+	// starts a new lineage — Canton infers upgrades by package name, so the
+	// decoupled choice signatures cannot live under the 1.0.0 names.
+	CCIPRegistryBurnMintTokenPoolV2    = Package("ccip-registry-burn-mint-token-pool-v2")
+	CCIPRegistryLockReleaseTokenPoolV2 = Package("ccip-registry-lock-release-token-pool-v2")
+	CCIPRegistryRateLimiterV2          = Package("ccip-registry-rate-limiter-v2")
 
 	// CCIP - Legacy
 
@@ -128,30 +138,30 @@ const CurrentVersion = "current"
 // CI will prevent any of the already committed release artifacts from being changed/altered. If a released package
 // is therefore updated without its version being bumped, CI is expected to fail.
 var ReleasedVersions map[Package][]string = map[Package][]string{
-	CCIPAPIV2:                          []string{"2.0.0"},
-	CCIPBurnMintTokenPoolV2:            []string{"2.0.0", "2.1.0", "2.1.1", "2.1.2"},
-	CCIPClientAPIV2:                    []string{"2.0.0"},
-	CCIPCodecV2:                        []string{"2.0.0"},
-	CCIPCommitteeVerifierV2:            []string{"2.0.0"},
-	CCIPCoreV2:                         []string{"2.0.0", "2.1.0", "2.1.1"},
-	CCIPEventsV2:                       []string{"2.0.0"},
-	CCIPExecutorV2:                     []string{"2.0.0"},
-	CCIPExtensionAPIV2:                 []string{"2.0.0"},
-	CCIPFactoryV2:                      []string{"2.0.0", "2.1.0", "2.1.1"},
-	CCIPLockReleaseTokenPoolV2:         []string{"2.0.0", "2.1.0", "2.1.1", "2.1.2"},
-	CCIPRateLimiterV2:                  []string{"2.0.0", "2.0.1", "2.0.2"},
-	CCIPReceiverV2:                     []string{"2.0.0", "2.1.0"},
-	CCIPRegistryBurnMintTokenPoolV2:    []string{},
-	CCIPRegistryLockReleaseTokenPoolV2: []string{},
-	CCIPRegistryRateLimiterV2:          []string{},
-	CCIPRuntimeV2:                      []string{"2.0.0", "2.1.0", "2.1.1"},
-	CCIPSenderV2:                       []string{"2.0.0", "2.1.0"},
-	CCIPTicketsV2:                      []string{"2.0.0"},
-	CCIPUtilsV2:                        []string{"2.0.0", "2.1.0"},
-	ChainlinkAPI:                       []string{"2.0.0"},
-	Link:                               []string{"2.0.0", "2.1.0"},
-	MCMSAPI:                            []string{"1.0.0"},
-	MCMSCore:                           []string{"2.0.0"},
+	CCIPAPIV2:                        []string{"2.0.0"},
+	CCIPBurnMintTokenPoolV2:          []string{"2.0.0", "2.1.0", "2.1.1", "2.1.2"},
+	CCIPClientAPIV2:                  []string{"2.0.0"},
+	CCIPCodecV2:                      []string{"2.0.0"},
+	CCIPCommitteeVerifierV2:          []string{"2.0.0"},
+	CCIPCoreV2:                       []string{"2.0.0", "2.1.0", "2.1.1"},
+	CCIPEventsV2:                     []string{"2.0.0"},
+	CCIPExecutorV2:                   []string{"2.0.0"},
+	CCIPExtensionAPIV2:               []string{"2.0.0"},
+	CCIPFactoryV2:                    []string{"2.0.0", "2.1.0", "2.1.1"},
+	CCIPLockReleaseTokenPoolV2:       []string{"2.0.0", "2.1.0", "2.1.1", "2.1.2"},
+	CCIPRateLimiterV2:                []string{"2.0.0", "2.0.1", "2.0.2"},
+	CCIPReceiverV2:                   []string{"2.0.0", "2.1.0"},
+	CCIPRegistryBurnMintTokenPool:    []string{"1.0.0"},
+	CCIPRegistryLockReleaseTokenPool: []string{"1.0.0"},
+	CCIPRegistryRateLimiter:          []string{"1.0.0"},
+	CCIPRuntimeV2:                    []string{"2.0.0", "2.1.0", "2.1.1"},
+	CCIPSenderV2:                     []string{"2.0.0", "2.1.0"},
+	CCIPTicketsV2:                    []string{"2.0.0"},
+	CCIPUtilsV2:                      []string{"2.0.0", "2.1.0"},
+	ChainlinkAPI:                     []string{"2.0.0"},
+	Link:                             []string{"2.0.0", "2.1.0"},
+	MCMSAPI:                          []string{"1.0.0"},
+	MCMSCore:                         []string{"2.0.0"},
 }
 
 const (
@@ -163,6 +173,9 @@ var Versions map[Package][]string = map[Package][]string{
 	ChainlinkAPI: append(ReleasedVersions[ChainlinkAPI], DevVersion),
 
 	Link: append(ReleasedVersions[Link], DevVersion),
+
+	// Unreleased: ships as a dev DAR until the migration is green-lit.
+	LinkTokenAdmin: []string{DevVersion},
 
 	MCMSAPI:  append(ReleasedVersions[MCMSAPI], DevVersion),
 	MCMSCore: append(ReleasedVersions[MCMSCore], DevVersion),
@@ -185,9 +198,11 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
 	CCIPFactoryV2:              append(ReleasedVersions[CCIPFactoryV2], DevVersion),
 
-	CCIPRegistryBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPRegistryBurnMintTokenPoolV2], DevVersion),
-	CCIPRegistryLockReleaseTokenPoolV2: append(ReleasedVersions[CCIPRegistryLockReleaseTokenPoolV2], DevVersion),
-	CCIPRegistryRateLimiterV2:          append(ReleasedVersions[CCIPRegistryRateLimiterV2], DevVersion),
+	// Fresh -v2 lineage: unreleased, dev DARs only until the 2.0.0 artifacts are
+	// frozen through the release pipeline.
+	CCIPRegistryBurnMintTokenPoolV2:    []string{DevVersion},
+	CCIPRegistryLockReleaseTokenPoolV2: []string{DevVersion},
+	CCIPRegistryRateLimiterV2:          []string{DevVersion},
 
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
@@ -364,8 +379,9 @@ func GetLegacyDar(packageName Package, version string) ([]byte, error) {
 }
 
 var BindingsOutputDirs = map[Package][]string{
-	Coin: []string{"coin"},
-	Link: []string{"link"},
+	Coin:           []string{"coin"},
+	Link:           []string{"link"},
+	LinkTokenAdmin: []string{"link", "tokenadmin"},
 
 	ChainlinkAPI: []string{"chainlink", "chainlinkapi"},
 	MCMSAPI:      []string{"mcms", "api"},

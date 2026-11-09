@@ -95,7 +95,7 @@ type AddressBurnMintFactory struct {
 	acs            store.ActiveContractStoreInterface
 }
 
-func (f AddressBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+func (f AddressBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, _ map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	activeBurnMintFactory, ok := f.acs.Get(f.factoryAddress)
 	if !ok {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no active contract found for transfer factory at address %s", f.factoryAddress)
@@ -126,7 +126,7 @@ type URLBurnMintFactory struct {
 	daRegistryClient daRegistry.ClientWithResponsesInterface
 }
 
-func (f URLBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+func (f URLBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, _ map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	if message.TokenTransfer == nil {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no TokenTransfer in message")
 	}
@@ -246,7 +246,7 @@ type RequestBurnMintFactory struct {
 	daRegistryClient daRegistry.ClientWithResponsesInterface
 }
 
-func (f RequestBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+func (f RequestBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, _ map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	if message.TokenTransfer == nil {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no TokenTransfer in message")
 	}
