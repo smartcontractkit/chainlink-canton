@@ -231,6 +231,19 @@ func resolveFactory(ctx context.Context, p canton.Participant, in ExecuteInput, 
 		return fetchBurnMintFactory(ctx, client, burnMintRequest(in.Kind, auth, in.InputHoldingCids))
 	}
 
+	if len(in.Registry.Disclosed) > 0 {
+		disclosed := make([]*apiv2.DisclosedContract, 0, len(in.Registry.Disclosed))
+		for _, dc := range in.Registry.Disclosed {
+			d, err := registryDisclosure(dc)
+			if err != nil {
+				return registryFactory{}, err
+			}
+			disclosed = append(disclosed, d)
+		}
+
+		return registryFactory{factoryCid: in.Registry.FactoryCid, context: in.Registry.ChoiceContext, disclosed: disclosed}, nil
+	}
+
 	disclosed, err := discloseAll(ctx, p, append([]string{in.Registry.FactoryCid}, in.Registry.DiscloseContractIDs...))
 	if err != nil {
 		return registryFactory{}, fmt.Errorf("registry contract: %w", err)

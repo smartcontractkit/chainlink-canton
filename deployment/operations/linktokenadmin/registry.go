@@ -25,12 +25,19 @@ type RegistryInput struct {
 	// DiscloseContractIDs are contracts the choice context references, such as the instrument
 	// configuration. They and the factory are disclosed from the participant's view.
 	DiscloseContractIDs []string `json:"discloseContractIds,omitempty"`
+	// Disclosed carries the created event blobs of the factory and the contracts the choice
+	// context references, in the DA Registry's disclosedContracts shape. Use it when the
+	// participant's parties cannot see those contracts: they are passed as given, and nothing is
+	// read from the participant.
+	Disclosed []daRegistry.DisclosedContract `json:"disclosed,omitempty"`
 }
 
 func (r RegistryInput) validate() error {
 	switch {
 	case r.URL != "" && r.FactoryCid != "":
 		return errors.New("registry: set either URL or FactoryCid, not both")
+	case len(r.Disclosed) > 0 && (r.URL != "" || len(r.DiscloseContractIDs) > 0):
+		return errors.New("registry: Disclosed goes with FactoryCid only, without URL or DiscloseContractIDs")
 	case r.URL == "" && r.FactoryCid == "":
 		return errors.New("registry: URL or FactoryCid is required")
 	}

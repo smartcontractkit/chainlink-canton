@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	spliceHolding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
+	"github.com/smartcontractkit/chainlink-canton/openapi/gen/daRegistry"
 )
 
 const (
@@ -45,6 +46,27 @@ func TestExecuteInputValidate(t *testing.T) {
 		{name: "authorization without owner", mutate: func(in *ExecuteInput) { in.Authorization = "auth-1" }, wantErr: "authorization:"},
 		{name: "no registry source", mutate: func(in *ExecuteInput) { in.Registry = RegistryInput{} }, wantErr: "URL or FactoryCid is required"},
 		{name: "both registry sources", mutate: func(in *ExecuteInput) { in.Registry.URL = "http://registry" }, wantErr: "not both"},
+		{
+			name: "valid supplied disclosures",
+			mutate: func(in *ExecuteInput) {
+				in.Registry.Disclosed = []daRegistry.DisclosedContract{{ContractId: "factory-cid"}}
+			},
+		},
+		{
+			name: "supplied disclosures with registry URL",
+			mutate: func(in *ExecuteInput) {
+				in.Registry = RegistryInput{URL: "http://registry", Disclosed: []daRegistry.DisclosedContract{{ContractId: "factory-cid"}}}
+			},
+			wantErr: "Disclosed goes with FactoryCid only",
+		},
+		{
+			name: "supplied disclosures with contract ids",
+			mutate: func(in *ExecuteInput) {
+				in.Registry.Disclosed = []daRegistry.DisclosedContract{{ContractId: "factory-cid"}}
+				in.Registry.DiscloseContractIDs = []string{"inst-config-cid"}
+			},
+			wantErr: "Disclosed goes with FactoryCid only",
+		},
 		{name: "mint with inputs", mutate: func(in *ExecuteInput) { in.InputHoldingCids = []string{"h1"} }, wantErr: "a mint takes no input holdings"},
 		{name: "burn without inputs", mutate: func(in *ExecuteInput) { in.Kind = KindBurn }, wantErr: "a burn requires InputHoldingCids"},
 	}

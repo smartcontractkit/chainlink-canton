@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -258,6 +259,39 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 	unpausedHoldingCid := executeMintOnRegistry(t, ctx, submitterChain, client, party, "lta-auth-mint-2", party, "30.0", registryInput)
 	require.NotEmpty(t, unpausedHoldingCid)
 
+	// Any party archives an expired authorization through the CleanupExpired operation.
+	mcmsCid = dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
+		"ApproveMint", encodeAdminParams(t, adminContract, tokenadmin.ApproveMintParams{
+			AuthorizationId: types.TEXT("lta-auth-mint-expire"),
+			Recipient:       types.PARTY(party),
+			Amount:          types.NUMERIC("1.0"),
+			Reference:       types.TEXT("itest-mint-expire"),
+			ValidForSeconds: types.INT64(1),
+		}),
+		adminInstanceAddr, liveAdminCid)
+	bypasserNonce++
+
+	findMintAuthorization(t, ctx, participant, party, "lta-auth-mint-expire")
+
+	// Retry while the ledger still reports the authorization as live; stop on any other result.
+	var cleanup linktokenadmin.CleanupOutput
+	var cleanupErr error
+	require.Eventually(t, func() bool {
+		bundle := cld_ops.NewBundle(t.Context, logger.Test(t), cld_ops.NewMemoryReporter())
+		report, err := cld_ops.ExecuteOperation(bundle, linktokenadmin.CleanupExpired, env.Chain, linktokenadmin.CleanupInput{
+			Kind:          linktokenadmin.KindMint,
+			Authorization: fmt.Sprintf("%s@%s", "lta-auth-mint-expire", party),
+		})
+		cleanup, cleanupErr = report.Output, err
+
+		return err == nil || !strings.Contains(err.Error(), "not expired")
+	}, 30*time.Second, time.Second, "authorization should expire")
+	require.NoError(t, cleanupErr, "CleanupExpired on an expired mint authorization")
+	require.NotEmpty(t, cleanup.UpdateID)
+
+	_, expireActive := lookupMintAuthorization(t, ctx, participant, party, "lta-auth-mint-expire")
+	require.False(t, expireActive, "cleaned up authorization must be archived")
+
 	// Governance withdraws an authorization through the authorization's own
 	// MCMS entrypoint.
 	mcmsCid = dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
@@ -273,6 +307,14 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 
 	cancelAuthCid := findMintAuthorization(t, ctx, participant, party, "lta-auth-mint-cancel")
 	cancelAuthInstanceAddr := fmt.Sprintf("%s@%s", "lta-auth-mint-cancel", party)
+
+	// A live authorization cannot be cleaned up.
+	_, err = cld_ops.ExecuteOperation(cld_ops.NewBundle(t.Context, logger.Test(t), cld_ops.NewMemoryReporter()),
+		linktokenadmin.CleanupExpired, env.Chain, linktokenadmin.CleanupInput{
+			Kind:          linktokenadmin.KindMint,
+			Authorization: cancelAuthInstanceAddr,
+		})
+	require.ErrorContains(t, err, "not expired", "CleanupExpired must reject a live authorization")
 
 	dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
 		"WithdrawAuthorization", "", cancelAuthInstanceAddr, cancelAuthCid)
