@@ -17,6 +17,7 @@ import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
 
+import qualified CCIP.APIV2.TokenAdminRegistry
 import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.Registry.RateLimiterV2
 import CCIP.Registry.BurnMintTokenPoolV2
@@ -82,13 +83,15 @@ testInitializeBurnMintPool_SelfIssued = script do
                     feeQuoter = dummyAddr "dummy-fq"
                     rmnRemote = dummyAddr "dummy-rmn"
             CCIP.Registry.BurnMintTokenPoolV2.Initialize with
-                tokenAdminRegistryCid = tarCid
+                tokenAdminRegistryCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry tarCid
                 existingTokenConfigCid = None
                 admin = poolOwner
                 lanes = [lane]
 
     -- Registration landed: TokenConfig now has admin = poolOwner and points at the pool.
-    Some config <- queryContractId poolOwner result.tokenConfigCid
+    -- InitializeResult.tokenConfigCid is the APIV2 interface cid; downcast to the
+    -- concrete CoreV2 TokenConfig to assert on its record fields.
+    Some config <- queryContractId poolOwner (fromInterfaceContractId @TAR.TokenConfig result.tokenConfigCid)
     config.admin === Some poolOwner
     config.pendingAdmin === None
     config.tokenPool === Some (TAR.PoolRegistration poolOwner instanceId)
@@ -169,12 +172,14 @@ testInitializeLockReleasePool_SelfIssued = script do
                     feeQuoter = dummyAddr "dummy-fq"
                     rmnRemote = dummyAddr "dummy-rmn"
             CCIP.Registry.LockReleaseTokenPoolV2.Initialize with
-                tokenAdminRegistryCid = tarCid
+                tokenAdminRegistryCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry tarCid
                 existingTokenConfigCid = None
                 admin = poolOwner
                 lanes = [lane]
 
-    Some config <- queryContractId poolOwner result.tokenConfigCid
+    -- InitializeResult.tokenConfigCid is the APIV2 interface cid; downcast to the
+    -- concrete CoreV2 TokenConfig to assert on its record fields.
+    Some config <- queryContractId poolOwner (fromInterfaceContractId @TAR.TokenConfig result.tokenConfigCid)
     config.admin === Some poolOwner
     config.tokenPool === Some (TAR.PoolRegistration poolOwner instanceId)
 
@@ -253,12 +258,14 @@ testInitializeLockReleasePool_ReusesExistingAcceptedConfig = script do
                     feeQuoter = dummyAddr "dummy-fq"
                     rmnRemote = dummyAddr "dummy-rmn"
             CCIP.Registry.LockReleaseTokenPoolV2.Initialize with
-                tokenAdminRegistryCid = tarCid
-                existingTokenConfigCid = Some existingConfigCid
+                tokenAdminRegistryCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry tarCid
+                existingTokenConfigCid = Some (toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenConfig existingConfigCid)
                 admin = poolOwner
                 lanes = []
 
-    Some config <- queryContractId poolOwner result.tokenConfigCid
+    -- InitializeResult.tokenConfigCid is the APIV2 interface cid; downcast to the
+    -- concrete CoreV2 TokenConfig to assert on its record fields.
+    Some config <- queryContractId poolOwner (fromInterfaceContractId @TAR.TokenConfig result.tokenConfigCid)
     config.admin === Some poolOwner
     config.pendingAdmin === None
     config.tokenPool === Some (TAR.PoolRegistration poolOwner instanceId)
@@ -319,8 +326,8 @@ testInitializeLockReleasePool_RejectsAdminMismatch = script do
                     feeQuoter = dummyAddr "dummy-fq"
                     rmnRemote = dummyAddr "dummy-rmn"
             CCIP.Registry.LockReleaseTokenPoolV2.Initialize with
-                tokenAdminRegistryCid = tarCid
-                existingTokenConfigCid = Some existingConfigCid
+                tokenAdminRegistryCid = toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry tarCid
+                existingTokenConfigCid = Some (toInterfaceContractId @CCIP.APIV2.TokenAdminRegistry.ITokenConfig existingConfigCid)
                 admin = poolOwner
                 lanes = []
 

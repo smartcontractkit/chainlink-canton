@@ -37,8 +37,7 @@ import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.CodecV2.Math
 import qualified CCIP.CodecV2.MessageCodecV1
 import qualified CCIP.CodecV2.Uint256
-import qualified CCIP.CoreV2.TokenAdminRegistry as TAR
-import CCIP.CoreV2.TokenAdminRegistryTypes (PoolRegistration(..))
+import CCIP.APIV2.TokenAdminRegistry (PoolRegistration(..))
 import qualified CCIP.EventsV2.Events
 import qualified CCIP.InterfacesV2.TokenPool
 import qualified CCIP.Registry.RateLimiterV2
@@ -279,7 +278,7 @@ deployRateLimiter poolOwner poolInstanceId observers remoteChainSelector directi
 data InitializeResult = InitializeResult
     with
         rateLimiterCids : [ContractId CCIP.Registry.RateLimiterV2.RateLimiter]
-        tokenConfigCid : ContractId TAR.TokenConfig
+        tokenConfigCid : ContractId CCIP.APIV2.TokenAdminRegistry.ITokenConfig
     deriving (Eq, Show)
 
 -- | Lock/release token pool with dynamic CCV requirements per chain.
@@ -529,8 +528,8 @@ template LockReleaseTokenPool
         -- existingTokenConfigCid = Some (the resulting cid).
         nonconsuming choice Initialize : InitializeResult
             with
-                tokenAdminRegistryCid : ContractId TAR.TokenAdminRegistry
-                existingTokenConfigCid : Optional (ContractId TAR.TokenConfig)
+                tokenAdminRegistryCid : ContractId CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry
+                existingTokenConfigCid : Optional (ContractId CCIP.APIV2.TokenAdminRegistry.ITokenConfig)
                 admin : Party
                 lanes : [LaneDeploySpec]
             controller poolOwner, admin
@@ -540,18 +539,26 @@ template LockReleaseTokenPool
                     -- ProposeAdministrator requires proposal authority (issuer or
                     -- registry owner), which an already-accepted admin lacks.
                     Some cid -> do
-                        config <- fetch cid
-                        assertMsg "Initialize: existing config instrument mismatch" (config.instrumentId == instrumentId)
-                        assertMsg "Initialize: existing config admin mismatch" (config.admin == Some admin)
+                        -- IsAdministrator fetches the config, asserts it belongs to this
+                        -- instrument, and returns config.admin == Some administrator —
+                        -- both original asserts in one interface call, with no
+                        -- CoreV2 record fetch.
+                        isAdmin <- exercise tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_IsAdministrator with
+                            tokenConfigCid = Some cid
+                            instrumentId = instrumentId
+                            administrator = admin
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                            caller = admin
+                        assertMsg "Initialize: existing config not accepted by this admin" isAdmin
                         pure cid
                     None -> do
-                        proposeResult <- exercise tokenAdminRegistryCid TAR.ProposeAdministrator with
+                        proposeResult <- exercise tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_ProposeAdministrator with
                             tokenConfigCid = None
                             instrumentId
                             newAdmin = admin
                             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
                             caller = admin
-                        exercise proposeResult.tokenAdminRegistryCid TAR.AcceptAdminRole with
+                        exercise proposeResult.tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_AcceptAdminRole with
                             tokenConfigCid = proposeResult.tokenConfigCid
                             instrumentId
                             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
@@ -588,7 +595,7 @@ template LockReleaseTokenPool
                     remoteChainSelectorsToRemove = []
                     chainsToAdd = chainUpdates
 
-                newTokenConfigCid <- exercise tokenAdminRegistryCid TAR.SetPool with
+                newTokenConfigCid <- exercise tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_SetPool with
                     tokenConfigCid = acceptedTokenConfigCid
                     instrumentId
                     tokenPool = Some PoolRegistration with

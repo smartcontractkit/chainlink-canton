@@ -413,7 +413,7 @@ func TestRegistryLockReleaseTokenPool_FullSendFlow(t *testing.T) {
 		InstrumentId: linkInstrumentId,
 		Decimals:     10,
 		Observers:    []types.PARTY{types.PARTY(partyCCIP)},
-		TokenTransferFeeConfigs: map[types.NUMERIC]registrylnr.TokenTransferFeeConfig2{
+		TokenTransferFeeConfigs: map[types.NUMERIC]registrylnr.TokenTransferFeeConfig{
 			types.NUMERIC(strconv.FormatUint(remoteSelector, 10)): {
 				IsEnabled:         true,
 				DestGasOverhead:   25_000,
