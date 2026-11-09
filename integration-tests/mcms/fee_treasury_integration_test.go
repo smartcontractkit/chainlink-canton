@@ -62,15 +62,34 @@ func TestFeeTreasury_WithdrawFeesEndToEndViaMCMS(t *testing.T) {
 	mcmsInstanceAddr := fmt.Sprintf("%s@%s", baseMcmsID, ccipOwner)
 	mcmsCid := createMCMSMultiRole(t, participant, ccipOwner, chainID, baseMcmsID, cfg, 0, nil)
 
-	feeInstanceID := "fee-treasury-itest-" + uuid.New().String()[:8]
-	feeInstanceAddr := fmt.Sprintf("%s@%s", feeInstanceID, ccipOwner)
-	treasuryCid := createMCMSFeeTreasury(t, participant, ccipOwner, feeInstanceID)
-
 	// Give the feeOwner Amulet fee holdings to later withdraw.
 	feeHoldingCid, err := testhelpers.MintAMT(t.Context(), participant, tokenMetadataClient, transferInstructionClient, scanProxyClient, ccipOwner, "10000.0")
 	require.NoError(t, err)
 
 	const withdrawAmount = "100.0"
+
+	// Probe the registry for the real TransferFactory + disclosed mining-round context.
+	probeTransferFactory := func() *testhelpers.TransferFactoryV2 {
+		tf, err := testhelpers.GetTransferFactoryV2(t.Context(), transferInstructionClient, registryAdmin, transferv1.Transfer{
+			Sender:           types.PARTY(ccipOwner),
+			Receiver:         types.PARTY(recipient),
+			Amount:           types.NUMERIC(withdrawAmount),
+			InstrumentId:     instrumentID,
+			RequestedAt:      types.TIMESTAMP(time.Now().Add(-time.Hour)),
+			ExecuteBefore:    types.TIMESTAMP(time.Now().Add(time.Hour)),
+			InputHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeHoldingCid)},
+			Meta:             metadatav1.Metadata{Values: map[string]types.TEXT{}},
+		})
+		require.NoError(t, err)
+
+		return tf
+	}
+
+	// The treasury pins the registry's TransferFactory, so the submitter cannot choose it.
+	pinnedFactoryCid := probeTransferFactory().FactoryID
+	feeInstanceID := "fee-treasury-itest-" + uuid.New().String()[:8]
+	feeInstanceAddr := fmt.Sprintf("%s@%s", feeInstanceID, ccipOwner)
+	treasuryCid := createMCMSFeeTreasury(t, participant, ccipOwner, feeInstanceID, pinnedFactoryCid)
 
 	// ---- Phase 1: authorize via the full MCMS batch ----
 	feeContract := feetreasury.NewContract(fmt.Sprintf("#%s", feetreasury.PackageName), "CCIP.FeeTreasury", "MCMSFeeTreasury")
@@ -123,22 +142,13 @@ func TestFeeTreasury_WithdrawFeesEndToEndViaMCMS(t *testing.T) {
 	require.Equal(t, authorizationID, string(auth.InstanceId))
 	require.Equal(t, recipient, string(auth.Recipient))
 	require.Equal(t, instrumentID, auth.InstrumentId)
+	require.Equal(t, pinnedFactoryCid, string(auth.TransferFactoryCid))
 
 	// ---- Phase 2: execute the real withdrawal (outside MCMS) ----
 	recipientBalanceBefore := holdingsBalance(t, recipientParticipant, &instrumentID, recipient)
 
-	// Probe the registry for the real TransferFactory + disclosed mining-round context.
-	tf, err := testhelpers.GetTransferFactoryV2(t.Context(), transferInstructionClient, registryAdmin, transferv1.Transfer{
-		Sender:           types.PARTY(ccipOwner),
-		Receiver:         types.PARTY(recipient),
-		Amount:           types.NUMERIC(withdrawAmount),
-		InstrumentId:     instrumentID,
-		RequestedAt:      types.TIMESTAMP(time.Now().Add(-time.Hour)),
-		ExecuteBefore:    types.TIMESTAMP(time.Now().Add(time.Hour)),
-		InputHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeHoldingCid)},
-		Meta:             metadatav1.Metadata{Values: map[string]types.TEXT{}},
-	})
-	require.NoError(t, err)
+	// Fresh disclosed context for the pinned factory.
+	tf := probeTransferFactory()
 
 	execRes := exerciseExecuteFeeWithdrawal(t, participant, ccipOwner, authCid, feeHoldingCid, withdrawAmount, tf)
 
@@ -185,10 +195,9 @@ func exerciseExecuteFeeWithdrawal(
 	require.NoError(t, err)
 
 	execArgs := feetreasury.ExecuteFeeWithdrawal{
-		Submitter:          types.PARTY(submitter),
-		TransferFactoryCid: types.CONTRACT_ID(tf.FactoryID),
-		InputHoldingCids:   []types.CONTRACT_ID{types.CONTRACT_ID(feeHoldingCid)},
-		Amount:             types.NUMERIC(amount),
+		Submitter:        types.PARTY(submitter),
+		InputHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(feeHoldingCid)},
+		Amount:           types.NUMERIC(amount),
 		ExtraArgs: metadatav1.ExtraArgs{
 			Context: metadatav1.ChoiceContext{Values: testhelpers.ExtractChoiceContextValues(choiceContext)},
 			Meta:    metadatav1.Metadata{Values: map[string]types.TEXT{}},
@@ -223,13 +232,15 @@ func createMCMSFeeTreasury(
 	participant canton.Participant,
 	owner string,
 	instanceID string,
+	transferFactoryCid string,
 ) string {
 	t.Helper()
 
 	treasury := feetreasury.MCMSFeeTreasury{
-		InstanceId:     types.TEXT(instanceID),
-		FeeOwner:       types.PARTY(owner),
-		McmsController: types.PARTY(owner),
+		InstanceId:         types.TEXT(instanceID),
+		FeeOwner:           types.PARTY(owner),
+		McmsController:     types.PARTY(owner),
+		TransferFactoryCid: types.CONTRACT_ID(transferFactoryCid),
 	}
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
