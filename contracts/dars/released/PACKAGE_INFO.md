@@ -810,6 +810,24 @@
 | `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
 | `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
 
+## <a name="506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a"></a>link-token-admin-1.0.0.dar
+- Name: `link-token-admin`
+- Version: `1.0.0`
+- Package ID: `506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a`
+
+### Dependencies:
+| Package Name | Version | Package ID |
+|---------|---------|---------|
+| `chainlink-api` | `2.0.0` | [`b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8`](#b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8) |
+| `link-token-admin` | `1.0.0` | [`506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a`](#506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a) |
+| `mcms-api` | `1.0.0` | [`674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240`](#674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240) |
+| `splice-api-token-allocation-instruction-v1` | `1.0.0` | [`275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520`](#275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520) |
+| `splice-api-token-allocation-v1` | `1.0.0` | [`93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d`](#93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d) |
+| `splice-api-token-burn-mint-v1` | `1.0.0` | [`9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e`](#9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e) |
+| `splice-api-token-holding-v1` | `1.0.0` | [`718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b`](#718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b) |
+| `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
+| `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
+
 ## <a name="674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240"></a>mcms-api-1.0.0.dar
 - Name: `mcms-api`
 - Version: `1.0.0`
