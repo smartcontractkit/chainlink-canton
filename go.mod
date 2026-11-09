@@ -42,7 +42,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.127.0
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20260915165527-3701875605f4
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.17.1
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.17.2-0.20261109124405-837566611a61
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.53.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/smartcontractkit/mcms v0.56.1
