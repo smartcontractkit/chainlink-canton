@@ -27,6 +27,7 @@ import MCMS.Codec
 import qualified Chainlink.InstanceAddress
 
 import qualified Link.Token
+import qualified Link.TokenAdmin
 
 import qualified CCIP.BurnMintTokenPoolV2
 import qualified CCIP.BurnMintTokenPoolV2CodecGen
@@ -45,6 +46,9 @@ import qualified CCIP.RuntimeV2.OffRamp
 import qualified CCIP.RuntimeV2.OnRamp
 import qualified CCIP.RuntimeV2.PerPartyRouter
 import qualified CCIP.RateLimiterV2
+import qualified CCIP.Registry.BurnMintTokenPoolV2
+import qualified CCIP.Registry.BurnMintTokenPoolV2CodecGen
+import qualified CCIP.Registry.BurnMintTokenPoolV2Types
 import qualified CCIP.UtilsV2.Context
 
 -- | Stable contract for CCIP system deployment orchestration.
@@ -111,6 +115,14 @@ template CCIPFactory
                 params <- requireDecoded "DeployLinkToken" (decodeDeployLinkTokenParams operationData)
                 deployResult <- exercise selfCid DeployLinkToken with
                   contract = mkLinkTokenContract owner params
+                let deployedAddress = Chainlink.InstanceAddress.makeText params.instanceId owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
+
+              "DeployLinkTokenAdmin" -> do
+                params <- requireDecoded "DeployLinkTokenAdmin" (decodeDeployLinkTokenAdminParams operationData)
+                deployResult <- exercise selfCid DeployLinkTokenAdmin with
+                  contract = mkLinkTokenAdminContract owner params
                 let deployedAddress = Chainlink.InstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
@@ -183,6 +195,14 @@ template CCIPFactory
                 params <- requireDecoded "DeployBurnMintTokenPool" (decodeDeployBurnMintTokenPoolParams operationData)
                 deployResult <- exercise selfCid DeployBurnMintTokenPool with
                   contract = mkBurnMintTokenPoolContract params
+                let deployedAddress = Chainlink.InstanceAddress.makeText params.instanceId owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
+
+              "DeployRegistryBurnMintTokenPool" -> do
+                params <- requireDecoded "DeployRegistryBurnMintTokenPool" (decodeDeployRegistryBurnMintTokenPoolParams operationData)
+                deployResult <- exercise selfCid DeployRegistryBurnMintTokenPool with
+                  contract = mkRegistryBurnMintTokenPoolContract owner params
                 let deployedAddress = Chainlink.InstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
@@ -272,6 +292,25 @@ template CCIPFactory
                 newFactoryCid <- create this with
                     usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
                     deployedContracts = Map.insert "link-token" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
+        choice DeployLinkTokenAdmin : DeployResult
+            with
+                contract : Link.TokenAdmin.LinkTokenAdmin
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "link-token-admin" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+                assertMsg "E_LINK_TOKEN_ADMIN_OWNER_MISMATCH" (contract.ccipOwner == owner)
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "link-token-admin" (coerceContractId deployedCid) deployedContracts
 
                 pure DeployResult with
                     factoryCid = newFactoryCid
@@ -445,6 +484,26 @@ template CCIPFactory
                     factoryCid = newFactoryCid
                     deployedCid = coerceContractId deployedCid
 
+        choice DeployRegistryBurnMintTokenPool : DeployResult
+            with
+                contract : CCIP.Registry.BurnMintTokenPoolV2.BurnMintTokenPool
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertMsg "E_REGISTRY_POOL_OWNER_MISMATCH" (contract.poolOwner == owner && contract.ccipOwner == owner)
+                let componentKey = "registry-burn-mint-token-pool:" <> contract.instanceId
+                assertComponentNotDeployed componentKey deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
         choice DeployRateLimiter : DeployResult
             with
                 contract : CCIP.RateLimiterV2.RateLimiter
@@ -496,6 +555,13 @@ data DeployLinkTokenParams = DeployLinkTokenParams
     with
         instanceId : Text
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+    deriving (Eq, Show)
+
+data DeployLinkTokenAdminParams = DeployLinkTokenAdminParams
+    with
+        instanceId : Text
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        observers : [Party]
     deriving (Eq, Show)
 
 data DeployTokenAdminRegistryParams = DeployTokenAdminRegistryParams
@@ -594,6 +660,20 @@ data DeployBurnMintTokenPoolParams = DeployBurnMintTokenPoolParams
         transferTimeout : CCIP.BurnMintTokenPoolV2.TransferTimeout
     deriving (Eq, Show)
 
+data DeployRegistryBurnMintTokenPoolParams = DeployRegistryBurnMintTokenPoolParams
+    with
+        instanceId : Text
+        instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
+        decimals : Int
+        rateLimitAdmin : Optional Party
+        observers : [Party]
+        tokenAdminRegistry : Chainlink.InstanceAddress.RawInstanceAddress
+        feeQuoter : Chainlink.InstanceAddress.RawInstanceAddress
+        rmnRemote : Chainlink.InstanceAddress.RawInstanceAddress
+        poolReceiveContext : Splice.Api.Token.MetadataV1.ChoiceContext
+        transferTimeout : CCIP.Registry.BurnMintTokenPoolV2Types.TransferTimeout
+    deriving (Eq, Show)
+
 data DeployRateLimiterParams = DeployRateLimiterParams
     with
         instanceId : Text
@@ -639,6 +719,14 @@ mkLinkTokenContract owner params = Link.Token.LinkRegistry with
     registryInstrumentId = params.instrumentId
     instanceId = params.instanceId
     registryMeta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+mkLinkTokenAdminContract : Party -> DeployLinkTokenAdminParams -> Link.TokenAdmin.LinkTokenAdmin
+mkLinkTokenAdminContract owner params = Link.TokenAdmin.LinkTokenAdmin with
+    ccipOwner = owner
+    instanceId = params.instanceId
+    instrumentId = params.instrumentId
+    paused = False
+    observers = params.observers
 
 mkTokenAdminRegistryContract : Party -> DeployTokenAdminRegistryParams -> CCIP.CoreV2.TokenAdminRegistry.TokenAdminRegistry
 mkTokenAdminRegistryContract ccipOwner params = CCIP.CoreV2.TokenAdminRegistry.TokenAdminRegistry with
@@ -749,6 +837,24 @@ mkBurnMintTokenPoolContract params = CCIP.BurnMintTokenPoolV2.BurnMintTokenPool 
         rmnRemote = params.rmnRemote
         feeQuoter = params.feeQuoter
 
+mkRegistryBurnMintTokenPoolContract : Party -> DeployRegistryBurnMintTokenPoolParams -> CCIP.Registry.BurnMintTokenPoolV2.BurnMintTokenPool
+mkRegistryBurnMintTokenPoolContract owner params = CCIP.Registry.BurnMintTokenPoolV2.BurnMintTokenPool with
+    instanceId = params.instanceId
+    poolOwner = owner
+    ccipOwner = owner
+    instrumentId = params.instrumentId
+    decimals = params.decimals
+    rateLimitAdmin = params.rateLimitAdmin
+    observers = params.observers
+    remoteChainConfigs = Map.empty
+    tokenTransferFeeConfigs = Map.empty
+    poolReceiveContext = params.poolReceiveContext
+    transferTimeout = params.transferTimeout
+    deps = CCIP.Registry.BurnMintTokenPoolV2.BurnMintTokenPoolDeps with
+        tokenAdminRegistry = params.tokenAdminRegistry
+        rmnRemote = params.rmnRemote
+        feeQuoter = params.feeQuoter
+
 mkRateLimiterContract : DeployRateLimiterParams -> Update CCIP.RateLimiterV2.RateLimiter
 mkRateLimiterContract params = do
     now <- getTime
@@ -796,6 +902,17 @@ decodeDeployLinkTokenParams encoded = do
     Some DeployLinkTokenParams with
         instanceId
         instrumentId
+
+decodeDeployLinkTokenAdminParams : BytesHex -> Optional DeployLinkTokenAdminParams
+decodeDeployLinkTokenAdminParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (instrumentId, offset2) <- decodeInstrumentId encoded offset1
+    (observers, finalOffset) <- decodePartyList encoded offset2
+    assertOffset finalOffset (byteCount encoded)
+    Some DeployLinkTokenAdminParams with
+        instanceId
+        instrumentId
+        observers
 
 decodeDeployTokenAdminRegistryParams : BytesHex -> Optional DeployTokenAdminRegistryParams
 decodeDeployTokenAdminRegistryParams encoded = do
@@ -955,6 +1072,31 @@ decodeDeployBurnMintTokenPoolParams encoded = do
         instrumentId
         decimals
         rateLimitAdmin
+        tokenAdminRegistry
+        feeQuoter
+        rmnRemote
+        poolReceiveContext
+        transferTimeout
+
+decodeDeployRegistryBurnMintTokenPoolParams : BytesHex -> Optional DeployRegistryBurnMintTokenPoolParams
+decodeDeployRegistryBurnMintTokenPoolParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (instrumentId, offset2) <- decodeInstrumentId encoded offset1
+    (decimals, offset3) <- decodeInt64At encoded offset2
+    (rateLimitAdmin, offset4) <- decodeOptional encoded offset3 decodePartyAt
+    (observers, offset5) <- decodePartyList encoded offset4
+    (tokenAdminRegistry, offset6) <- decodeRawInstanceAddressAt encoded offset5
+    (feeQuoter, offset7) <- decodeRawInstanceAddressAt encoded offset6
+    (rmnRemote, offset8) <- decodeRawInstanceAddressAt encoded offset7
+    (poolReceiveContext, offset9) <- CCIP.UtilsV2.Context.decodeChoiceContextAt encoded offset8
+    (transferTimeout, finalOffset) <- CCIP.Registry.BurnMintTokenPoolV2CodecGen.decodeTransferTimeoutAt encoded offset9
+    assertOffset finalOffset (byteCount encoded)
+    Some DeployRegistryBurnMintTokenPoolParams with
+        instanceId
+        instrumentId
+        decimals
+        rateLimitAdmin
+        observers
         tokenAdminRegistry
         feeQuoter
         rmnRemote

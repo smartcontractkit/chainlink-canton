@@ -63,9 +63,15 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Msg("Failed to get main package ID from DAR")
 		}
+		// Nested dirs (ccip/registry/burnminttokenpool) share a leaf with ccip/burnminttokenpool,
+		// and the factory imports both.
+		alias := s[len(s)-1]
+		if len(s) > 2 {
+			alias = strings.Join(s[1:], "")
+		}
 		externalPackage := model.ExternalPackage{
 			Import: fmt.Sprintf("%s/%s", *basePath, strings.Join(s, "/")),
-			Alias:  s[len(s)-1],
+			Alias:  alias,
 		}
 		log.Debug().Str("packageId", packageId).Str("alias", externalPackage.Alias).Str("import", externalPackage.Import).Msg("Collected external package information")
 		externalPackages.Packages[packageId] = externalPackage
