@@ -63,6 +63,7 @@ import CCIP.Registry.BurnMintTokenPoolV2Types (
     TokenTransferFeeConfigArgs(..),
     RateLimitConfigArgs(..),
     TransferTimeout(..),
+    isValidTransferTimeout,
     SetDynamicConfigParams(..),
     SetObserversParams(..),
     ApplyChainUpdatesParams(..),
@@ -350,6 +351,7 @@ template BurnMintTokenPool
             && instrumentId.admin == poolOwner
             && not (null observers)
             && CCIP.CodecV2.Math.isValidTokenDecimals decimals
+            && isValidTransferTimeout transferTimeout
             && all
                 (\cfg -> CCIP.CodecV2.FinalityConfig.isValidFinalityConfig cfg.finalityConfig)
                 (Map.values remoteChainConfigs)
@@ -539,10 +541,12 @@ template BurnMintTokenPool
         -- ApplyChainUpdates, and register with the shared TokenAdminRegistry - all as one atomic
         -- operation, callable via a single CreateAndExercise ledger command right after create.
         --
-        -- Only supports the self-issued/self-serve admin path: instrumentId.admin must equal
-        -- admin, since ProposeAdministrator requires caller == instrumentId.admin, and this
-        -- choice calls it with caller = admin. For instruments where the registry owner must
-        -- co-sign admin assignment, propose/accept admin separately first, then call this with
+        -- With existingTokenConfigCid = Some cid, the config is reused as-is (validated:
+        -- same instrument, `admin` already accepted) — no re-proposal, so third-party
+        -- admins work. With None, admin is proposed+accepted inline, which requires
+        -- proposal authority (instrumentId.admin or the registry owner).
+        -- For instruments where the registry owner must co-sign admin assignment,
+        -- propose/accept admin separately first, then call this with
         -- existingTokenConfigCid = Some (the resulting cid).
         nonconsuming choice Initialize : InitializeResult
             with
@@ -552,17 +556,27 @@ template BurnMintTokenPool
                 lanes : [LaneDeploySpec]
             controller poolOwner, admin
             do
-                proposeResult <- exercise tokenAdminRegistryCid TAR.ProposeAdministrator with
-                    tokenConfigCid = existingTokenConfigCid
-                    instrumentId
-                    newAdmin = admin
-                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-                    caller = admin
-                acceptedTokenConfigCid <- exercise proposeResult.tokenAdminRegistryCid TAR.AcceptAdminRole with
-                    tokenConfigCid = proposeResult.tokenConfigCid
-                    instrumentId
-                    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-                    caller = admin
+                acceptedTokenConfigCid <- case existingTokenConfigCid of
+                    -- Already registered with this admin accepted: validate + reuse.
+                    -- ProposeAdministrator requires proposal authority (issuer or
+                    -- registry owner), which an already-accepted admin lacks.
+                    Some cid -> do
+                        config <- fetch cid
+                        assertMsg "Initialize: existing config instrument mismatch" (config.instrumentId == instrumentId)
+                        assertMsg "Initialize: existing config admin mismatch" (config.admin == Some admin)
+                        pure cid
+                    None -> do
+                        proposeResult <- exercise tokenAdminRegistryCid TAR.ProposeAdministrator with
+                            tokenConfigCid = None
+                            instrumentId
+                            newAdmin = admin
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                            caller = admin
+                        exercise proposeResult.tokenAdminRegistryCid TAR.AcceptAdminRole with
+                            tokenConfigCid = proposeResult.tokenConfigCid
+                            instrumentId
+                            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                            caller = admin
 
                 now <- getTime
                 chainUpdatesAndCids <- mapA (\lane -> do
@@ -595,7 +609,7 @@ template BurnMintTokenPool
                     remoteChainSelectorsToRemove = []
                     chainsToAdd = chainUpdates
 
-                newTokenConfigCid <- exercise proposeResult.tokenAdminRegistryCid TAR.SetPool with
+                newTokenConfigCid <- exercise tokenAdminRegistryCid TAR.SetPool with
                     tokenConfigCid = acceptedTokenConfigCid
                     instrumentId
                     tokenPool = Some PoolRegistration with
@@ -750,7 +764,10 @@ template BurnMintTokenPool
             with
                 newTransferTimeout : TransferTimeout
             controller poolOwner
-            do create this with transferTimeout = newTransferTimeout
+            do
+                assertMsg "SetTransferTimeout: RelativeHours must be strictly positive"
+                    (isValidTransferTimeout newTransferTimeout)
+                create this with transferTimeout = newTransferTimeout
 
         -- Get required CCV raw instance addresses based on chain and direction.
         nonconsuming choice GetRequiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
