@@ -11,7 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/smartcontractkit/chainlink-common/pkg/logger"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
+	cld_ops "github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
@@ -22,6 +24,7 @@ import (
 	splice "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	spliceMeta "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	registryholding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/utility/registry_holding_v0"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/linktokenadmin"
 	rkledger "github.com/smartcontractkit/chainlink-canton/registry-kit/ledger"
 	"github.com/smartcontractkit/chainlink-canton/registry-kit/registry"
 	"github.com/smartcontractkit/chainlink-canton/testhelpers"
@@ -102,6 +105,12 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 	instDisclosed, err := registry.DiscloseByID(ctx, client, party, bootstrap.InstrumentConfiguration)
 	require.NoError(t, err)
 	mintCtx := registry.MintChoiceContext(bootstrap.InstrumentConfiguration, false)
+	// The CTF registry has no utility backend, so the factory and choice context are passed in.
+	registryInput := linktokenadmin.RegistryInput{
+		FactoryCid:          bootstrap.AllocationFactory,
+		ChoiceContext:       mintCtx,
+		DiscloseContractIDs: []string{bootstrap.InstrumentConfiguration},
+	}
 
 	// Governed mint to the registrar itself.
 	mcmsCid = dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
@@ -129,8 +138,7 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 		[]*apiv2.DisclosedContract{instDisclosed})
 	require.Error(t, err, "ExecuteMint must require the named submitter")
 
-	mintedHoldingCid := executeMintOnRegistry(t, ctx, client, []string{submitter}, party, mintAuthCid, liveAdminCid,
-		bootstrap.AllocationFactory, party, "10.0", mintCtx, instDisclosed)
+	mintedHoldingCid := executeMintOnRegistry(t, ctx, env.Chain, client, submitter, party, "lta-auth-mint-1", party, "10.0", registryInput)
 
 	// Governed burn round-trip of the registrar-held holding.
 	mcmsCid = dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
@@ -162,10 +170,7 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 		adminInstanceAddr, liveAdminCid)
 	bypasserNonce++
 
-	recipientAuthCid := findMintAuthorization(t, ctx, participant, party, "lta-auth-mint-3")
-
-	recipientHoldingCid := executeMintOnRegistry(t, ctx, client, []string{submitter, recipient}, party, recipientAuthCid, liveAdminCid,
-		bootstrap.AllocationFactory, recipient, "5.0", mintCtx, instDisclosed)
+	recipientHoldingCid := executeMintOnRegistry(t, ctx, env.Chain, client, submitter, party, "lta-auth-mint-3", recipient, "5.0", registryInput)
 
 	// Burn the recipient-held holding: the burn-side extraActors path.
 	mcmsCid = dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
@@ -250,8 +255,7 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 
 	liveAdminCid = findLinkTokenAdminCid(t, ctx, participant, party, adminInstanceID)
 
-	unpausedHoldingCid := executeMintOnRegistry(t, ctx, client, []string{submitter}, party, pausedAuthCid, liveAdminCid,
-		bootstrap.AllocationFactory, party, "30.0", mintCtx, instDisclosed)
+	unpausedHoldingCid := executeMintOnRegistry(t, ctx, env.Chain, client, submitter, party, "lta-auth-mint-2", party, "30.0", registryInput)
 	require.NotEmpty(t, unpausedHoldingCid)
 
 	// Governance withdraws an authorization through the authorization's own
@@ -427,32 +431,28 @@ func activeRegistryHoldings(t *testing.T, ctx context.Context, client rkledger.C
 	return holdings
 }
 
-// executeMintOnRegistry submits ExecuteMint as actAs[0] and returns the created
-// registry Holding cid. `actAs` also holds the recipient when it differs from
-// ccipOwner.
+// executeMintOnRegistry runs the ExecuteMint operation as submitter and returns the created
+// registry Holding cid. The operation co-signs as the recipient when it is not ccipOwner.
 func executeMintOnRegistry(
 	t *testing.T,
 	ctx context.Context,
+	chain canton.Chain,
 	client rkledger.Client,
-	actAs []string,
-	ccipOwner, mintAuthCid, liveAdminCid, burnMintFactoryCid, expectedOwner, expectedAmount string,
-	mintCtx spliceMeta.ChoiceContext,
-	instDisclosed *apiv2.DisclosedContract,
+	submitter, ccipOwner, authorizationID, expectedOwner, expectedAmount string,
+	registryInput linktokenadmin.RegistryInput,
 ) string {
 	t.Helper()
 
 	before := activeRegistryHoldings(t, ctx, client)
 
-	_, err := client.SubmitExerciseMulti(ctx, actAs, tokenadmin.LinkMintAuthorization{}, mintAuthCid, "ExecuteMint",
-		tokenadmin.ExecuteMint{
-			Submitter:          types.PARTY(actAs[0]),
-			TokenAdminCid:      types.CONTRACT_ID(liveAdminCid),
-			BurnMintFactoryCid: types.CONTRACT_ID(burnMintFactoryCid),
-			RegistryContext:    mintCtx,
-			Meta:               spliceMeta.Metadata{},
-		},
-		executeDisclosures(t, ctx, client, ccipOwner, mintAuthCid, liveAdminCid, burnMintFactoryCid, instDisclosed))
-	require.NoError(t, err, "ExecuteMint one-step against the registry factory")
+	bundle := cld_ops.NewBundle(t.Context, logger.Test(t), cld_ops.NewMemoryReporter())
+	report, err := cld_ops.ExecuteOperation(bundle, linktokenadmin.Execute, chain, linktokenadmin.ExecuteInput{
+		Kind:          linktokenadmin.KindMint,
+		Authorization: fmt.Sprintf("%s@%s", authorizationID, ccipOwner),
+		Submitter:     submitter,
+		Registry:      registryInput,
+	})
+	require.NoError(t, err, "ExecuteMint operation against the registry factory")
 
 	var minted []string
 	for cid, holding := range activeRegistryHoldings(t, ctx, client) {
@@ -464,6 +464,7 @@ func executeMintOnRegistry(
 		minted = append(minted, cid)
 	}
 	require.Len(t, minted, 1, "ExecuteMint must create exactly one registry Holding")
+	require.Equal(t, minted, report.Output.ResultContractIDs, "operation returns the minted holding")
 
 	return minted[0]
 }
