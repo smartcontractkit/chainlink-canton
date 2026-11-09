@@ -1,7 +1,8 @@
 sdk-version: 3.4.11
 name: ccip-registry-rate-limiter
 source: daml
-version: 1.0.0
+version: 1.0.1
+upgrades: ../../../dars/released/ccip-registry-rate-limiter-1.0.0.dar
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
