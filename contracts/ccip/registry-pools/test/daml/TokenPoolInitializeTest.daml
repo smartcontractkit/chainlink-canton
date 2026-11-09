@@ -9,6 +9,7 @@ import Daml.Script
 import DA.Foldable (mapA_)
 import DA.Assert ((===))
 import DA.Map qualified as Map
+import DA.Optional (fromSome)
 import DA.TextMap qualified as TextMap
 
 import qualified Splice.Api.Token.HoldingV1
@@ -210,22 +211,28 @@ testInitializeLockReleasePool_ReusesExistingAcceptedConfig = script do
             entryCount = 0
 
     -- The instrument is already registered with poolOwner as accepted admin
-    -- (registry owner proposes, poolOwner accepts) — before any pool exists.
-    proposeResult <- submit registryOwner do
-        exerciseCmd tarCid TAR.ProposeAdministrator with
-            tokenConfigCid = None
+    -- (as if proposed by the registry owner and accepted) — before any pool exists.
+    -- Created directly: the standalone AcceptAdminRole would need the TAR
+    -- disclosed to the accepting party, which the real deploy flow provides
+    -- via the deploy submitter's disclosure.
+    existingConfigCid <- submit registryOwner do
+        createCmd TAR.TokenConfig with
+            instanceId = TAR.tokenConfigInstanceId instrumentId
+            registryInstanceId = "e2e-lr-tar-reuse"
+            registryOwner
+            index = 0
+            isCCIPManaged = False
             instrumentId
-            newAdmin = poolOwner
-            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            caller = registryOwner
-    existingConfigCid <- submit poolOwner do
-        exerciseCmd tarCid TAR.AcceptAdminRole with
-            tokenConfigCid = proposeResult.tokenConfigCid
-            instrumentId
-            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            caller = poolOwner
+            admin = Some poolOwner
+            pendingAdmin = None
+            tokenPool = None
+            transferFactory = None
+            burnMintFactory = None
 
-    result <- submit poolOwner do
+    -- Disclose the TAR to the submitter (the real deploy submission carries the
+    -- TAR disclosure; the pool's Initialize exercises SetPool on it as admin).
+    tarDisclosure <- fromSome <$> queryDisclosure registryOwner tarCid
+    result <- submit (actAs poolOwner <> disclose tarDisclosure) do
         createAndExerciseCmd
             CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPool with
                 instanceId
@@ -276,19 +283,19 @@ testInitializeLockReleasePool_RejectsAdminMismatch = script do
             ccipOwner = registryOwner
             entryCount = 0
 
-    proposeResult <- submit registryOwner do
-        exerciseCmd tarCid TAR.ProposeAdministrator with
-            tokenConfigCid = None
+    existingConfigCid <- submit registryOwner do
+        createCmd TAR.TokenConfig with
+            instanceId = TAR.tokenConfigInstanceId instrumentId
+            registryInstanceId = "e2e-lr-tar-mismatch"
+            registryOwner
+            index = 0
+            isCCIPManaged = False
             instrumentId
-            newAdmin = acceptedAdmin
-            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            caller = registryOwner
-    existingConfigCid <- submit acceptedAdmin do
-        exerciseCmd tarCid TAR.AcceptAdminRole with
-            tokenConfigCid = proposeResult.tokenConfigCid
-            instrumentId
-            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
-            caller = acceptedAdmin
+            admin = Some acceptedAdmin
+            pendingAdmin = None
+            tokenPool = None
+            transferFactory = None
+            burnMintFactory = None
 
     -- poolOwner is NOT the config's accepted admin -> Initialize must abort.
     submitMustFail poolOwner do
