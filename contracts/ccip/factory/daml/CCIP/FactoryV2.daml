@@ -49,6 +49,7 @@ import qualified CCIP.RateLimiterV2
 import qualified CCIP.Registry.BurnMintTokenPoolV2
 import qualified CCIP.Registry.BurnMintTokenPoolV2CodecGen
 import qualified CCIP.Registry.BurnMintTokenPoolV2Types
+import qualified CCIP.Registry.RateLimiterV2
 import qualified CCIP.UtilsV2.Context
 
 -- | Stable contract for CCIP system deployment orchestration.
@@ -211,6 +212,15 @@ template CCIPFactory
                 params <- requireDecoded "DeployRateLimiter" (decodeDeployRateLimiterParams operationData)
                 rateLimiterContract <- mkRateLimiterContract params
                 deployResult <- exercise selfCid DeployRateLimiter with
+                  contract = rateLimiterContract
+                let deployedAddress = Chainlink.InstanceAddress.makeText params.instanceId owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
+
+              "DeployRegistryRateLimiter" -> do
+                params <- requireDecoded "DeployRegistryRateLimiter" (decodeDeployRegistryRateLimiterParams operationData)
+                rateLimiterContract <- mkRegistryRateLimiterContract owner params
+                deployResult <- exercise selfCid DeployRegistryRateLimiter with
                   contract = rateLimiterContract
                 let deployedAddress = Chainlink.InstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
@@ -523,6 +533,26 @@ template CCIPFactory
                     factoryCid = newFactoryCid
                     deployedCid = coerceContractId deployedCid
 
+        choice DeployRegistryRateLimiter : DeployResult
+            with
+                contract : CCIP.Registry.RateLimiterV2.RateLimiter
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertMsg "E_REGISTRY_RATE_LIMITER_OWNER_MISMATCH" (contract.poolOwner == owner)
+                let componentKey = "registry-rate-limiter:" <> contract.instanceId
+                assertComponentNotDeployed componentKey deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert componentKey (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
 data DeployResult = DeployResult
     with
         factoryCid : ContractId CCIPFactory
@@ -685,6 +715,19 @@ data DeployRateLimiterParams = DeployRateLimiterParams
         isEnabled : Bool
         capacity : Numeric 0
         rate : Numeric 0
+    deriving (Eq, Show)
+
+data DeployRegistryRateLimiterParams = DeployRegistryRateLimiterParams
+    with
+        instanceId : Text
+        poolInstanceId : Text
+        remoteChainSelector : Numeric 0
+        direction : CCIP.Registry.RateLimiterV2.RateLimitDirection
+        mode : CCIP.Registry.RateLimiterV2.RateLimitMode
+        isEnabled : Bool
+        capacity : Numeric 0
+        rate : Numeric 0
+        observers : [Party]
     deriving (Eq, Show)
 
 requireDecoded : Text -> Optional a -> Update a
@@ -870,6 +913,24 @@ mkRateLimiterContract params = do
         rate = params.rate
         tokens = params.capacity
         lastUpdated = now
+      )
+
+mkRegistryRateLimiterContract : Party -> DeployRegistryRateLimiterParams -> Update CCIP.Registry.RateLimiterV2.RateLimiter
+mkRegistryRateLimiterContract owner params = do
+    now <- getTime
+    pure (CCIP.Registry.RateLimiterV2.RateLimiter with
+        instanceId = params.instanceId
+        poolInstanceId = params.poolInstanceId
+        poolOwner = owner
+        remoteChainSelector = params.remoteChainSelector
+        direction = params.direction
+        mode = params.mode
+        isEnabled = params.isEnabled
+        capacity = params.capacity
+        rate = params.rate
+        tokens = params.capacity
+        lastUpdated = now
+        observers = params.observers
       )
 
 -- | Helper to assert that all bytes have been consumed (no trailing bytes)
@@ -1143,6 +1204,47 @@ decodeDeployRateLimiterParams encoded = do
         isEnabled
         capacity
         rate
+
+decodeRegistryRateLimitDirectionAt : BytesHex -> Int -> Optional (CCIP.Registry.RateLimiterV2.RateLimitDirection, Int)
+decodeRegistryRateLimitDirectionAt encoded offset = do
+    directionHex <- extractBytes encoded offset 1
+    direction <- decodeUint8 directionHex
+    case direction of
+        0 -> Some (CCIP.Registry.RateLimiterV2.RateLimitDirection_Outbound, offset + 1)
+        1 -> Some (CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound, offset + 1)
+        _ -> None
+
+decodeRegistryRateLimitModeAt : BytesHex -> Int -> Optional (CCIP.Registry.RateLimiterV2.RateLimitMode, Int)
+decodeRegistryRateLimitModeAt encoded offset = do
+    modeHex <- extractBytes encoded offset 1
+    mode <- decodeUint8 modeHex
+    case mode of
+        0 -> Some (CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality, offset + 1)
+        1 -> Some (CCIP.Registry.RateLimiterV2.RateLimitMode_CustomFinality, offset + 1)
+        _ -> None
+
+decodeDeployRegistryRateLimiterParams : BytesHex -> Optional DeployRegistryRateLimiterParams
+decodeDeployRegistryRateLimiterParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (poolInstanceId, offset2) <- decodeTextAt encoded offset1
+    (remoteChainSelector, offset3) <- decodeNumeric0At encoded offset2
+    (direction, offset4) <- decodeRegistryRateLimitDirectionAt encoded offset3
+    (mode, offset5) <- decodeRegistryRateLimitModeAt encoded offset4
+    (isEnabled, offset6) <- decodeBoolAt encoded offset5
+    (capacity, offset7) <- decodeNumeric0At encoded offset6
+    (rate, offset8) <- decodeNumeric0At encoded offset7
+    (observers, finalOffset) <- decodePartyList encoded offset8
+    assertOffset finalOffset (byteCount encoded)
+    Some DeployRegistryRateLimiterParams with
+        instanceId
+        poolInstanceId
+        remoteChainSelector
+        direction
+        mode
+        isEnabled
+        capacity
+        rate
+        observers
 
 assertFactoryIsMCMSControlled : CCIPFactory -> Update ()
 assertFactoryIsMCMSControlled factory =
