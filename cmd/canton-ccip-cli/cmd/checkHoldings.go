@@ -179,6 +179,10 @@ func newCantonCheckHoldingsCmd(g *Globals) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Only the registrar is a stakeholder of every registry holding; any other party sees a partial ACS.
+			if b.Participant.PartyID != admin {
+				return fmt.Errorf("configured party %s is not --admin %s; run as the registrar so every holding is visible", b.Participant.PartyID, admin)
+			}
 			viewed, err := testhelpers.ListActiveContractsByInterfaceId(ctx, b.Participant, contracts.MustTemplateIDFromString(splice_api_token_holding_v1.IHoldingInterfaceID()).ToLedgerIdentifier())
 			if err != nil {
 				return fmt.Errorf("list holdings: %w", err)
