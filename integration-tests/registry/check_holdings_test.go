@@ -35,6 +35,7 @@ func TestCheckHoldings(t *testing.T) {
 		testhelpers.ContractCleanup(t, ctx, env.Chain.Participants)
 	})
 
+	// Load the Registry and legacy LINK DARs.
 	dars, err := registry.LoadUtilityDARs()
 	require.NoError(t, err)
 	linkDAR, err := contracts.GetDar(contracts.Link, contracts.DevVersion)
@@ -44,6 +45,7 @@ func TestCheckHoldings(t *testing.T) {
 	require.NoError(t, err)
 
 	client := rkledger.NewCTFClient(participant)
+	// Create Registry services and the LINK instrument configuration.
 	bootstrap, err := registry.BootstrapServices(t.Context(), client, party, "LINK")
 	require.NoError(t, err)
 

@@ -1,7 +1,7 @@
 name: Registry Integration Tests
 on:
   push:
-    branches: [develop, main]
+    branches: [main]
   pull_request:
 permissions:
   contents: read
