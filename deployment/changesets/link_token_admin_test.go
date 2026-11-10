@@ -58,6 +58,8 @@ func TestRequireNoLiveAuthorization(t *testing.T) {
 		{name: "two live authorizations", actions: []sequences.LinkTokenAdminAction{approveMint}, acs: []*apiv2.GetActiveContractsResponse{liveMint("cid-1"), liveMint("cid-2")}, lookups: 1, wantErr: "already live"},
 		{name: "no live authorization", actions: []sequences.LinkTokenAdminAction{approveMint}, lookups: 1},
 		{name: "lookup fails", actions: []sequences.LinkTokenAdminAction{approveMint}, acsErr: errors.New("unavailable"), lookups: 1, wantErr: "unavailable"},
+		{name: "withdraw then approve same id", actions: []sequences.LinkTokenAdminAction{{Withdraw: &sequences.LinkAuthorizationRef{Kind: linkadmingov.KindMint, AuthorizationID: authID}}, approveMint}},
+		{name: "withdraw other kind then approve", actions: []sequences.LinkTokenAdminAction{{Withdraw: &sequences.LinkAuthorizationRef{Kind: linkadmingov.KindBurn, AuthorizationID: authID}}, approveMint}, acs: []*apiv2.GetActiveContractsResponse{liveMint("cid-1")}, lookups: 1, wantErr: "already live"},
 		{name: "withdraw only", actions: []sequences.LinkTokenAdminAction{{Withdraw: &sequences.LinkAuthorizationRef{Kind: linkadmingov.KindMint, AuthorizationID: authID}}}},
 	}
 

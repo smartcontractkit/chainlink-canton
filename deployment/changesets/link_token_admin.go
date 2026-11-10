@@ -117,12 +117,22 @@ func (g GovernLinkTokenAdmin) VerifyPreconditions(e cldf.Environment, config Can
 
 // requireNoLiveAuthorization rejects an approval whose kind and id already name a live authorization.
 // Daml allows a second one, and a later withdraw of that id would archive only one of the two.
+// An approval after a withdraw of the same kind and id in this proposal is not looked up:
+// the batch runs in order, so the withdraw archives the live one first.
 func requireNoLiveAuthorization(e cldf.Environment, config CantonCSDeps[GovernLinkTokenAdminConfig], input sequences.GovernLinkTokenAdminInput) error {
 	participant := e.BlockChains.CantonChains()[config.ChainSelector].Participants[config.Participant]
 	owner := types.PARTY(input.AdminAddress.Owner())
+	withdrawn := make(map[string]bool)
 	for i, action := range input.Actions {
+		if action.Withdraw != nil {
+			withdrawn[string(action.Withdraw.Kind)+"/"+action.Withdraw.AuthorizationID] = true
+			continue
+		}
 		id, kind, templateID, ok := approvedAuthorization(action)
 		if !ok {
+			continue
+		}
+		if withdrawn[string(kind)+"/"+string(id)] {
 			continue
 		}
 		addr := contracts.InstanceID(id).RawInstanceAddress(owner)
