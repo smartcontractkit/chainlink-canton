@@ -35,12 +35,9 @@ func TestCheckHoldings(t *testing.T) {
 		testhelpers.ContractCleanup(t, ctx, env.Chain.Participants)
 	})
 
-	// Load the Registry and legacy LINK DARs.
+	// Load the Registry DARs. The legacy LINK DAR is uploaded after the first subtest.
 	dars, err := registry.LoadUtilityDARs()
 	require.NoError(t, err)
-	linkDAR, err := contracts.GetDar(contracts.Link, contracts.DevVersion)
-	require.NoError(t, err)
-	dars = append(dars, linkDAR)
 	_, err = testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, participant)
 	require.NoError(t, err)
 
@@ -60,6 +57,18 @@ func TestCheckHoldings(t *testing.T) {
 	require.NoError(t, err)
 	binary, configPath := buildCheckHoldingsCLI(t, participant.Endpoints.GRPCLedgerAPIURL,
 		participant.Endpoints.ValidatorAPIURL, participant.UserID, party, token.AccessToken)
+
+	t.Run("participant without legacy link package", func(t *testing.T) {
+		output, err := runCheckHoldings(t, binary, configPath, party, "15.0")
+		require.NoError(t, err, output)
+		require.Contains(t, output, "15.0000000000")
+		require.NotContains(t, output, "Findings")
+	})
+
+	linkDAR, err := contracts.GetDar(contracts.Link, contracts.DevVersion)
+	require.NoError(t, err)
+	_, err = testhelpers.UploadDARstoMultipleParticipants(t.Context(), [][]byte{linkDAR}, participant)
+	require.NoError(t, err)
 
 	t.Run("registry holdings and expected supply", func(t *testing.T) {
 		output, err := runCheckHoldings(t, binary, configPath, party, "15.0")

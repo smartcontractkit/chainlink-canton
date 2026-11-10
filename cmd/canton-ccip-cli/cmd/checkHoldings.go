@@ -189,7 +189,11 @@ func newCantonCheckHoldingsCmd(g *Globals) *cobra.Command {
 			}
 			lockedLegacy, err := testhelpers.ListActiveContractsByTemplateId(ctx, b.Participant, legacyLockedLinkTemplate.ToLedgerIdentifier())
 			if err != nil {
-				return fmt.Errorf("list LockedLinkHolding: %w", err)
+				// A participant without the legacy link package cannot hold LockedLinkHolding.
+				if !strings.Contains(err.Error(), "PACKAGE_NAMES_NOT_FOUND") {
+					return fmt.Errorf("list LockedLinkHolding: %w", err)
+				}
+				lockedLegacy = nil
 			}
 			events, err := holdingEventsFromViews(viewed)
 			if err != nil {
