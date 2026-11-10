@@ -145,6 +145,21 @@ func TestLinkTokenAdmin_ChangesetsThroughMCMS(t *testing.T) {
 	require.Equal(t, types.PARTY(ccipOwner), auth.Recipient)
 	require.Equal(t, types.TEXT(adminRaw.InstanceID()), auth.AdminInstanceId)
 
+	// A second approval with the live id must be rejected before signing.
+	err = changesets.GovernLinkTokenAdmin{}.VerifyPreconditions(updateMCMSConfigEnv(t, deployer, ds.Seal()), changesets.CantonCSDeps[changesets.GovernLinkTokenAdminConfig]{
+		ChainSelector: selector,
+		Config: changesets.GovernLinkTokenAdminConfig{
+			Actions: []sequences.LinkTokenAdminAction{{ApproveMint: &tokenadmin.ApproveMint{
+				AuthorizationId: types.TEXT(authorizationRaw.InstanceID()),
+				Recipient:       types.PARTY(ccipOwner),
+				Amount:          "1",
+				ValidForSeconds: 3600,
+			}}},
+			Description: "approve LINK mint again",
+		},
+	})
+	require.ErrorContains(t, err, "already live")
+
 	govern(t, "withdraw LINK mint authorization", sequences.LinkTokenAdminAction{Withdraw: &sequences.LinkAuthorizationRef{
 		Kind:            linkadmingov.KindMint,
 		AuthorizationID: authorizationRaw.InstanceID(),

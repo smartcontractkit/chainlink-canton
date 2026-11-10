@@ -52,6 +52,11 @@ var DeployLinkTokenAdminFromFactory = operations.NewSequence(
 		if instrumentID.Admin != ccipOwnerParty {
 			return sequences.OnChainOutput{}, fmt.Errorf("instrument admin must match ccipOwnerParty")
 		}
+		for _, p := range input.Observers {
+			if err := validateParty(p); err != nil {
+				return sequences.OnChainOutput{}, fmt.Errorf("observers: %w", err)
+			}
+		}
 
 		factoryRaw, err := rawInstanceAddressFromAddressRef(input.FactoryAddressRef)
 		if err != nil {
