@@ -16,10 +16,12 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link/tokenadmin"
 	mcmsApi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/api"
 	mcmsCore "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/core"
 	splice "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
@@ -367,8 +369,34 @@ func TestCCIP_MCMSFactoryDeploy_FullGovernance(t *testing.T) {
 	tarParams := factory.DeployTokenAdminRegistryParams{
 		InstanceId: types.TEXT(tarInstanceID),
 	}
-	factoryCid, _ = mcmsFactoryDeploy(t, participant, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployTokenAdminRegistryParams", tarParams)
+	factoryCid, mcmsCid = mcmsFactoryDeploy(t, participant, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployTokenAdminRegistryParams", tarParams)
 	t.Logf("TokenAdminRegistry deployed via MCMS: %s", tarInstanceID)
+
+	// 3. Deploy LinkTokenAdmin. The factory sets ccipOwner to its owner (mcmsParty) and starts it unpaused.
+	ltaInstanceID := "lta-gov-" + uid
+	ltaInstrumentID := splice.InstrumentId{Admin: types.PARTY(mcmsParty), Id: types.TEXT("LINK-" + uid)}
+	ltaParams := factory.DeployLinkTokenAdminParams{
+		InstanceId:   types.TEXT(ltaInstanceID),
+		InstrumentId: ltaInstrumentID,
+		Observers:    []types.PARTY{},
+	}
+	factoryCid, _ = mcmsFactoryDeploy(t, participant, mcmsEncoder, mcmsParty, mcmsCid, mcmsInstanceAddr, factoryCid, factoryInstanceAddr, chainID, sortedSigners, factoryEncoder, "DeployLinkTokenAdminParams", ltaParams)
+	t.Logf("LinkTokenAdmin deployed via MCMS: %s", ltaInstanceID)
+
+	ltaCid := findNewContractCid(t, participant, contracts.IdentifierFromBinding(tokenadmin.LinkTokenAdmin{}), mcmsParty, fmt.Sprintf("%s@%s", ltaInstanceID, mcmsParty))
+	ltaContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, contracts.IdentifierFromBinding(tokenadmin.LinkTokenAdmin{}))
+	require.NoError(t, err)
+	var linkTokenAdmin *tokenadmin.LinkTokenAdmin
+	for _, ac := range ltaContracts {
+		if ac.GetCreatedEvent().GetContractId() == ltaCid {
+			linkTokenAdmin, err = bindings.UnmarshalCreatedEvent[tokenadmin.LinkTokenAdmin](ac.GetCreatedEvent())
+			require.NoError(t, err)
+		}
+	}
+	require.NotNil(t, linkTokenAdmin, "LinkTokenAdmin %s not found", ltaCid)
+	require.Equal(t, mcmsParty, string(linkTokenAdmin.CcipOwner), "LinkTokenAdmin ccipOwner should be the MCMS party")
+	require.False(t, bool(linkTokenAdmin.Paused), "LinkTokenAdmin should start unpaused")
+	require.Equal(t, ltaInstrumentID, linkTokenAdmin.InstrumentId)
 
 	// --- Step 5: Verify factory state ---
 	finalFactoryFields := queryContractFields(t, participant, factoryCid)
@@ -391,6 +419,7 @@ type encodableParams interface {
 		factory.DeployPerPartyRouterFactoryParams |
 		factory.DeployLockReleaseTokenPoolParams |
 		factory.DeployBurnMintTokenPoolParams |
+		factory.DeployLinkTokenAdminParams |
 		factory.DeployRateLimiterParams
 }
 
@@ -505,6 +534,8 @@ func encodeFactoryParams[T encodableParams](t *testing.T, enc factory.MCMSEncode
 		result, err = enc.DeployLockReleaseTokenPoolParams(any(params).(factory.DeployLockReleaseTokenPoolParams))
 	case "DeployBurnMintTokenPoolParams":
 		result, err = enc.DeployBurnMintTokenPoolParams(any(params).(factory.DeployBurnMintTokenPoolParams))
+	case "DeployLinkTokenAdminParams":
+		result, err = enc.DeployLinkTokenAdminParams(any(params).(factory.DeployLinkTokenAdminParams))
 	case "DeployRateLimiterParams":
 		result, err = enc.DeployRateLimiterParams(any(params).(factory.DeployRateLimiterParams))
 	default:

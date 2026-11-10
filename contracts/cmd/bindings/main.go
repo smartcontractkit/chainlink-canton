@@ -132,6 +132,12 @@ func main() {
 				"Indefinite":    0x00,
 				"RelativeHours": 0x01,
 			},
+			// Tags must match decodeTransferTimeoutAt in
+			// contracts/ccip/registry-pools/burn-mint-token-pool/daml/CCIP/Registry/BurnMintTokenPoolV2CodecGen.daml.
+			"CCIP.Registry.BurnMintTokenPoolV2Types.TransferTimeout": {
+				"Indefinite":    0x00,
+				"RelativeHours": 0x01,
+			},
 			// Tags must match encode/decode in contracts/ccip/codec/daml/CCIP/CodecV2/FinalityConfig.daml.
 			"CCIP.CodecV2.FinalityConfig.FinalityConfig": {
 				"WaitForFinality": 0x00,
