@@ -166,6 +166,9 @@ func TestGovernLinkTokenAdmin_validation(t *testing.T) {
 		{"unknown withdraw kind", GovernLinkTokenAdminInput{AdminAddress: testAdminAddress, Actions: []LinkTokenAdminAction{{
 			Withdraw: &LinkAuthorizationRef{Kind: "recovery", AuthorizationID: "a"},
 		}}}, `unknown authorization kind "recovery"`},
+		{"observer without fingerprint", GovernLinkTokenAdminInput{AdminAddress: testAdminAddress, Actions: []LinkTokenAdminAction{{
+			SetObservers: &tokenadmin.SetObservers{Observers: []types.PARTY{"alice"}},
+		}}}, "setObservers"},
 	}
 
 	for _, tc := range cases {
@@ -233,6 +236,12 @@ func TestDeployLinkTokenAdminFromFactory_rejectsBadInstrument(t *testing.T) {
 	otherAdmin.InstrumentID = splice_api_token_holding_v1.InstrumentId{Admin: "someone::else", Id: "LINK"}
 	_, err = operations.ExecuteSequence(newTestBundle(t), DeployLinkTokenAdminFromFactory, canton.Chain{Selector: testChainSelector}, otherAdmin)
 	require.ErrorContains(t, err, "instrument admin must match ccipOwnerParty")
+
+	badObserver := base
+	badObserver.InstrumentID = splice_api_token_holding_v1.InstrumentId{Id: "LINK"}
+	badObserver.Observers = []types.PARTY{"alice"}
+	_, err = operations.ExecuteSequence(newTestBundle(t), DeployLinkTokenAdminFromFactory, canton.Chain{Selector: testChainSelector}, badObserver)
+	require.ErrorContains(t, err, "observers")
 }
 
 func newTestBundle(t *testing.T) operations.Bundle {
