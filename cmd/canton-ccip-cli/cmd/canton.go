@@ -76,6 +76,7 @@ func NewCantonCmd(g *Globals) *cobra.Command {
 	c.AddCommand(newCantonListEventsCmd(g))
 	c.AddCommand(newCantonListReceiversCmd(g))
 	c.AddCommand(newCantonListHoldingsCmd(g))
+	c.AddCommand(newCantonCheckHoldingsCmd(g))
 	c.AddCommand(newCantonListTransferInstructionsCmd(g))
 	c.AddCommand(newCantonCreateTransferCmd(g))
 	c.AddCommand(newCantonAcceptTransferCmd(g))
