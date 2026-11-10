@@ -177,6 +177,26 @@ var DeployRateLimiter = contract.NewExercise(contract.ExerciseParams[factorybind
 	EncodeMethod: encodeDeployRateLimiter,
 })
 
+var DeployRegistryBurnMintTokenPool = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployRegistryBurnMintTokenPool]{
+	Name:         "canton/ccip/factory/deploy_registry_burn_mint_token_pool",
+	Version:      Version,
+	Description:  "Deploys a registry BurnMintTokenPool through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployRegistryBurnMintTokenPool,
+	EncodeMethod: encodeDeployRegistryBurnMintTokenPool,
+})
+
+var DeployRegistryRateLimiter = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployRegistryRateLimiter]{
+	Name:         "canton/ccip/factory/deploy_registry_rate_limiter",
+	Version:      Version,
+	Description:  "Deploys a registry token pool rate limiter through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployRegistryRateLimiter,
+	EncodeMethod: encodeDeployRegistryRateLimiter,
+})
+
 func encodeDeployRMNRemote(args factorybindings.DeployRMNRemote) (*bind.EncodedChoice, error) {
 	return factoryEncoder.DeployRMNRemoteParams(factorybindings.DeployRMNRemoteParams{
 		InstanceId:      args.Contract.InstanceId,
@@ -307,6 +327,37 @@ func encodeDeployRateLimiter(args factorybindings.DeployRateLimiter) (*bind.Enco
 		IsEnabled:           c.IsEnabled,
 		Capacity:            c.Capacity,
 		Rate:                c.Rate,
+	})
+}
+
+func encodeDeployRegistryBurnMintTokenPool(args factorybindings.DeployRegistryBurnMintTokenPool) (*bind.EncodedChoice, error) {
+	c := args.Contract
+	return factoryEncoder.DeployRegistryBurnMintTokenPoolParams(factorybindings.DeployRegistryBurnMintTokenPoolParams{
+		InstanceId:         c.InstanceId,
+		InstrumentId:       c.InstrumentId,
+		Decimals:           c.Decimals,
+		RateLimitAdmin:     c.RateLimitAdmin,
+		Observers:          c.Observers,
+		TokenAdminRegistry: c.Deps.TokenAdminRegistry,
+		FeeQuoter:          c.Deps.FeeQuoter,
+		RmnRemote:          c.Deps.RmnRemote,
+		PoolReceiveContext: c.PoolReceiveContext,
+		TransferTimeout:    c.TransferTimeout,
+	})
+}
+
+func encodeDeployRegistryRateLimiter(args factorybindings.DeployRegistryRateLimiter) (*bind.EncodedChoice, error) {
+	c := args.Contract
+	return factoryEncoder.DeployRegistryRateLimiterParams(factorybindings.DeployRegistryRateLimiterParams{
+		InstanceId:          c.InstanceId,
+		PoolInstanceId:      c.PoolInstanceId,
+		RemoteChainSelector: c.RemoteChainSelector,
+		Direction:           c.Direction,
+		Mode:                c.Mode,
+		IsEnabled:           c.IsEnabled,
+		Capacity:            c.Capacity,
+		Rate:                c.Rate,
+		Observers:           c.Observers,
 	})
 }
 
