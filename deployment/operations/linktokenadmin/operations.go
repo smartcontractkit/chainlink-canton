@@ -1,6 +1,6 @@
 // Package linktokenadmin runs the submitter side of a LinkTokenAdmin authorization: after MCMS
-// approves a mint, burn, transfer or allocation, any party executes it with the contract ids MCMS
-// cannot carry, or cleans it up once it has expired.
+// approves a mint or burn, the participant's party executes it with the contract ids MCMS cannot
+// carry, or cleans up any expired authorization.
 package linktokenadmin
 
 import (
@@ -12,7 +12,6 @@ import (
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
@@ -24,42 +23,27 @@ import (
 
 var Version = semver.MustParse("1.0.0")
 
-// ExecuteInput runs on a participant whose PartyID or ReadAsPartyIDs can see the authorization,
-// the LinkTokenAdmin and, for a burn, the holder's holdings.
+// ExecuteInput runs as the participant's PartyID, whose PartyID or ReadAsPartyIDs must see the
+// authorization, the LinkTokenAdmin and, for a burn, the input holdings.
 type ExecuteInput struct {
+	// Kind is KindMint or KindBurn.
 	Kind Kind `json:"kind"`
 	// Authorization is the authorization's MCMS target address, "authorizationId@ccipOwner".
-	Authorization string `json:"authorization"`
-	// Submitter defaults to the participant's party. A mint or burn also acts as the recipient or
-	// holder when that is not ccipOwner, so the participant user needs CanActAs for it.
-	Submitter        string        `json:"submitter,omitempty"`
+	Authorization    string        `json:"authorization"`
 	ParticipantIndex int           `json:"participantIndex,omitempty"`
 	Registry         RegistryInput `json:"registry"`
-	// InputHoldingCids pins the holdings a burn, transfer or allocation consumes. When empty they
-	// are selected from the unlocked holdings visible to the participant.
-	InputHoldingCids     []string         `json:"inputHoldingCids,omitempty"`
-	TransferTimeoutHours *int64           `json:"transferTimeoutHours,omitempty"`
-	Allocation           *AllocationInput `json:"allocation,omitempty"`
-}
-
-type AllocationInput struct {
-	SettlementExecutor  string `json:"settlementExecutor"`
-	SettlementRefID     string `json:"settlementRefId"`
-	AllocateBeforeHours int64  `json:"allocateBeforeHours"`
-	SettleBeforeHours   int64  `json:"settleBeforeHours"`
+	// InputHoldingCids are the holdings a burn consumes.
+	InputHoldingCids []string `json:"inputHoldingCids,omitempty"`
 }
 
 type ExecuteOutput struct {
-	UpdateID string `json:"updateId"`
-	// ResultContractIDs lists the contract ids in the choice result in order, for example the
-	// minted holdings, or a transfer's pending instruction followed by the sender's change.
-	ResultContractIDs []string `json:"resultContractIds"`
+	UpdateID          string   `json:"updateId"`
+	MintedHoldingCids []string `json:"mintedHoldingCids,omitempty"`
 }
 
 type CleanupInput struct {
 	Kind             Kind   `json:"kind"`
 	Authorization    string `json:"authorization"`
-	Submitter        string `json:"submitter,omitempty"`
 	ParticipantIndex int    `json:"participantIndex,omitempty"`
 }
 
@@ -70,20 +54,32 @@ type CleanupOutput struct {
 var Execute = operations.NewOperation(
 	"canton/link_token_admin/execute_authorization",
 	Version,
-	"Executes an MCMS-approved LinkTokenAdmin mint, burn, transfer or allocation authorization",
-	func(b operations.Bundle, chain canton.Chain, input ExecuteInput) (ExecuteOutput, error) {
-		return execute(b.GetContext(), chain, input)
-	},
+	"Executes an MCMS-approved LinkTokenAdmin mint or burn authorization",
+	execute,
 )
 
 var CleanupExpired = operations.NewOperation(
 	"canton/link_token_admin/cleanup_expired_authorization",
 	Version,
 	"Archives an expired LinkTokenAdmin authorization",
-	func(b operations.Bundle, chain canton.Chain, input CleanupInput) (CleanupOutput, error) {
-		return cleanupExpired(b.GetContext(), chain, input)
-	},
+	cleanupExpired,
 )
+
+var exerciseMint = contract.NewExercise(contract.ExerciseParams[tokenadmin.ExecuteMint]{
+	Name:        "canton/link_token_admin/execute_mint",
+	Version:     Version,
+	Description: "Exercises ExecuteMint on a LinkMintAuthorization",
+	Template:    tokenadmin.LinkMintAuthorization{},
+	Method:      tokenadmin.LinkMintAuthorization{}.ExecuteMint,
+})
+
+var exerciseBurn = contract.NewExercise(contract.ExerciseParams[tokenadmin.ExecuteBurn]{
+	Name:        "canton/link_token_admin/execute_burn",
+	Version:     Version,
+	Description: "Exercises ExecuteBurn on a LinkBurnAuthorization",
+	Template:    tokenadmin.LinkBurnAuthorization{},
+	Method:      tokenadmin.LinkBurnAuthorization{}.ExecuteBurn,
+})
 
 // Validate checks the input without touching the ledger or the registry.
 func (in ExecuteInput) Validate() error {
@@ -117,26 +113,33 @@ func (in ExecuteInput) validate() (kindSpec, contracts.RawInstanceAddress, error
 	if err != nil {
 		return kindSpec{}, "", err
 	}
-	if err := in.Registry.validate(in.Kind); err != nil {
-		return kindSpec{}, "", err
-	}
-	if in.Kind == KindMint && len(in.InputHoldingCids) > 0 {
+	switch {
+	case in.Kind != KindMint && in.Kind != KindBurn:
+		return kindSpec{}, "", fmt.Errorf("execute supports mint and burn, not %s", in.Kind)
+	case in.Kind == KindMint && len(in.InputHoldingCids) > 0:
 		return kindSpec{}, "", errors.New("a mint takes no input holdings")
+	case in.Kind == KindBurn && len(in.InputHoldingCids) == 0:
+		return kindSpec{}, "", errors.New("a burn requires InputHoldingCids")
 	}
-	if in.Kind == KindAllocate && in.Allocation == nil {
-		return kindSpec{}, "", errors.New("allocation settlement parameters are required for an allocate")
-	}
-	if in.Kind != KindAllocate && in.Allocation != nil {
-		return kindSpec{}, "", errors.New("allocation settlement parameters apply only to an allocate")
-	}
-	if in.Kind != KindTransfer && in.TransferTimeoutHours != nil {
-		return kindSpec{}, "", errors.New("a transfer timeout applies only to a transfer")
+	if err := in.Registry.validate(); err != nil {
+		return kindSpec{}, "", err
 	}
 
 	return spec, addr, nil
 }
 
-func execute(ctx context.Context, chain canton.Chain, in ExecuteInput) (ExecuteOutput, error) {
+// checkCounterparty rejects an authorization whose recipient or holder would have to co-sign:
+// Execute acts only as the submitter, so the counterparty must be ccipOwner or the submitter.
+func checkCounterparty(kind Kind, auth authorization, submitter string) error {
+	if auth.counterparty == auth.ccipOwner || auth.counterparty == submitter {
+		return nil
+	}
+
+	return fmt.Errorf("%s authorization names %s, which is neither ccipOwner %s nor the submitter %s; it must execute from that party's participant",
+		kind, auth.counterparty, auth.ccipOwner, submitter)
+}
+
+func execute(b operations.Bundle, chain canton.Chain, in ExecuteInput) (ExecuteOutput, error) {
 	spec, addr, err := in.validate()
 	if err != nil {
 		return ExecuteOutput{}, err
@@ -145,113 +148,95 @@ func execute(ctx context.Context, chain canton.Chain, in ExecuteInput) (ExecuteO
 	if err != nil {
 		return ExecuteOutput{}, err
 	}
-	submitter := in.Submitter
-	if submitter == "" {
-		submitter = p.PartyID
-	}
+	ctx := b.GetContext()
 
 	auth, authDisclosed, err := findAuthorization(ctx, p, spec, addr)
 	if err != nil {
+		return ExecuteOutput{}, err
+	}
+	if err := checkCounterparty(in.Kind, auth, p.PartyID); err != nil {
 		return ExecuteOutput{}, err
 	}
 	adminCid, adminDisclosed, err := findAdmin(ctx, p, auth)
 	if err != nil {
 		return ExecuteOutput{}, err
 	}
-	inputs, inputsDisclosed, err := resolveInputs(ctx, p, in, spec, auth)
+	inputsDisclosed, err := discloseAll(ctx, p, in.InputHoldingCids)
 	if err != nil {
-		return ExecuteOutput{}, err
+		return ExecuteOutput{}, fmt.Errorf("input holding: %w", err)
 	}
-	factory, err := resolveFactory(ctx, p, in, auth, inputs)
-	if err != nil {
-		return ExecuteOutput{}, err
-	}
-
-	cmd, err := executeCommand(in, auth.contractID, executeArgs{
-		submitter:  submitter,
-		adminCid:   adminCid,
-		factoryCid: factory.factoryCid,
-		inputs:     inputs,
-		context:    factory.context,
-	})
+	factory, err := resolveFactory(ctx, p, in, auth)
 	if err != nil {
 		return ExecuteOutput{}, err
 	}
 
 	disclosed := append([]*apiv2.DisclosedContract{authDisclosed, adminDisclosed}, factory.disclosed...)
 	disclosed = append(disclosed, inputsDisclosed...)
-	updateID, result, err := submit(ctx, p, actAs(spec, auth, submitter), cmd, dedupDisclosures(disclosed...))
+	disclosedContracts := contract.DisclosedContractsFromProto(dedupDisclosures(disclosed...))
+	submitter := types.PARTY(p.PartyID)
+	meta := spliceMeta.Metadata{Values: map[string]types.TEXT{}}
+
+	if in.Kind == KindBurn {
+		report, err := operations.ExecuteOperation(b, exerciseBurn, chain, contract.ChoiceInput[tokenadmin.ExecuteBurn]{
+			ContractID:         auth.contractID,
+			DisclosedContracts: disclosedContracts,
+			ParticipantIndex:   in.ParticipantIndex,
+			Args: tokenadmin.ExecuteBurn{
+				Submitter:          submitter,
+				TokenAdminCid:      types.CONTRACT_ID(adminCid),
+				BurnMintFactoryCid: types.CONTRACT_ID(factory.factoryCid),
+				InputHoldingCids:   contractIDs(in.InputHoldingCids),
+				RegistryContext:    factory.context,
+				Meta:               meta,
+			},
+		})
+		if err != nil {
+			return ExecuteOutput{}, err
+		}
+
+		return ExecuteOutput{UpdateID: report.Output.ExecInfo.UpdateID}, nil
+	}
+
+	report, err := operations.ExecuteOperation(b, exerciseMint, chain, contract.ChoiceInput[tokenadmin.ExecuteMint]{
+		ContractID:         auth.contractID,
+		DisclosedContracts: disclosedContracts,
+		ParticipantIndex:   in.ParticipantIndex,
+		Args: tokenadmin.ExecuteMint{
+			Submitter:          submitter,
+			TokenAdminCid:      types.CONTRACT_ID(adminCid),
+			BurnMintFactoryCid: types.CONTRACT_ID(factory.factoryCid),
+			RegistryContext:    factory.context,
+			Meta:               meta,
+		},
+	})
+	if err != nil {
+		return ExecuteOutput{}, err
+	}
+	updateID := report.Output.ExecInfo.UpdateID
+	minted, err := mintedHoldingCids(ctx, p, updateID, auth.contractID)
 	if err != nil {
 		return ExecuteOutput{}, err
 	}
 
-	return ExecuteOutput{UpdateID: updateID, ResultContractIDs: resultContractIDs(result)}, nil
+	return ExecuteOutput{UpdateID: updateID, MintedHoldingCids: minted}, nil
 }
 
-func resolveInputs(ctx context.Context, p canton.Participant, in ExecuteInput, spec kindSpec, auth authorization) ([]string, []*apiv2.DisclosedContract, error) {
-	if in.Kind == KindMint {
-		return nil, nil, nil
-	}
-
-	if len(in.InputHoldingCids) > 0 {
-		disclosed := make([]*apiv2.DisclosedContract, 0, len(in.InputHoldingCids))
-		for _, cid := range in.InputHoldingCids {
-			d, err := discloseByID(ctx, p, cid)
-			if err != nil {
-				return nil, nil, fmt.Errorf("input holding: %w", err)
-			}
-			disclosed = append(disclosed, d)
-		}
-
-		return in.InputHoldingCids, disclosed, nil
-	}
-
-	owner := holdingOwner(spec, auth)
-	candidates, byID, err := listHoldings(ctx, p, owner, auth.instrumentID)
-	if err != nil {
-		return nil, nil, err
-	}
-	picked, err := selectHoldings(in.Kind, candidates, auth.amount)
-	if err != nil {
-		return nil, nil, fmt.Errorf("select holdings of %s: %w", owner, err)
-	}
-	disclosed := make([]*apiv2.DisclosedContract, 0, len(picked))
-	for _, cid := range picked {
-		disclosed = append(disclosed, byID[cid])
-	}
-
-	return picked, disclosed, nil
-}
-
-func resolveFactory(ctx context.Context, p canton.Participant, in ExecuteInput, auth authorization, inputs []string) (registryFactory, error) {
+func resolveFactory(ctx context.Context, p canton.Participant, in ExecuteInput, auth authorization) (registryFactory, error) {
 	if in.Registry.URL != "" {
 		client, err := daRegistry.NewClientWithResponses(in.Registry.URL)
 		if err != nil {
 			return registryFactory{}, fmt.Errorf("registry client for %q: %w", in.Registry.URL, err)
 		}
 
-		return fetchBurnMintFactory(ctx, client, burnMintRequest(in.Kind, auth, inputs))
+		return fetchBurnMintFactory(ctx, client, burnMintRequest(in.Kind, auth, in.InputHoldingCids))
 	}
 
-	ids := append([]string{in.Registry.FactoryCid}, in.Registry.DiscloseContractIDs...)
-	disclosed := make([]*apiv2.DisclosedContract, 0, len(ids))
-	for _, cid := range ids {
-		d, err := discloseByID(ctx, p, cid)
-		if err != nil {
-			return registryFactory{}, fmt.Errorf("registry contract: %w", err)
-		}
-		disclosed = append(disclosed, d)
+	disclosed, err := discloseAll(ctx, p, append([]string{in.Registry.FactoryCid}, in.Registry.DiscloseContractIDs...))
+	if err != nil {
+		return registryFactory{}, fmt.Errorf("registry contract: %w", err)
 	}
 
 	return registryFactory{factoryCid: in.Registry.FactoryCid, context: in.Registry.ChoiceContext, disclosed: disclosed}, nil
-}
-
-type executeArgs struct {
-	submitter  string
-	adminCid   string
-	factoryCid string
-	inputs     []string
-	context    spliceMeta.ChoiceContext
 }
 
 func contractIDs(cids []string) []types.CONTRACT_ID {
@@ -263,64 +248,7 @@ func contractIDs(cids []string) []types.CONTRACT_ID {
 	return out
 }
 
-func executeCommand(in ExecuteInput, authCid string, a executeArgs) (*model.ExerciseCommand, error) {
-	submitter := types.PARTY(a.submitter)
-	adminCid := types.CONTRACT_ID(a.adminCid)
-	factoryCid := types.CONTRACT_ID(a.factoryCid)
-	meta := spliceMeta.Metadata{Values: map[string]types.TEXT{}}
-
-	switch in.Kind {
-	case KindMint:
-		return tokenadmin.LinkMintAuthorization{}.ExecuteMint(authCid, tokenadmin.ExecuteMint{
-			Submitter:          submitter,
-			TokenAdminCid:      adminCid,
-			BurnMintFactoryCid: factoryCid,
-			RegistryContext:    a.context,
-			Meta:               meta,
-		}), nil
-	case KindBurn:
-		return tokenadmin.LinkBurnAuthorization{}.ExecuteBurn(authCid, tokenadmin.ExecuteBurn{
-			Submitter:          submitter,
-			TokenAdminCid:      adminCid,
-			BurnMintFactoryCid: factoryCid,
-			InputHoldingCids:   contractIDs(a.inputs),
-			RegistryContext:    a.context,
-			Meta:               meta,
-		}), nil
-	case KindTransfer:
-		var timeout *types.INT64
-		if in.TransferTimeoutHours != nil {
-			timeout = new(types.INT64(*in.TransferTimeoutHours))
-		}
-
-		return tokenadmin.LinkTransferAuthorization{}.ExecuteTransfer(authCid, tokenadmin.ExecuteTransfer{
-			Submitter:            submitter,
-			TokenAdminCid:        adminCid,
-			TransferFactoryCid:   factoryCid,
-			InputHoldingCids:     contractIDs(a.inputs),
-			TransferTimeoutHours: timeout,
-			RegistryContext:      a.context,
-			Meta:                 meta,
-		}), nil
-	case KindAllocate:
-		return tokenadmin.LinkAllocationAuthorization{}.ExecuteAllocate(authCid, tokenadmin.ExecuteAllocate{
-			Submitter:            submitter,
-			TokenAdminCid:        adminCid,
-			AllocationFactoryCid: factoryCid,
-			SettlementExecutor:   types.PARTY(in.Allocation.SettlementExecutor),
-			SettlementRefId:      types.TEXT(in.Allocation.SettlementRefID),
-			InputHoldingCids:     contractIDs(a.inputs),
-			AllocateBeforeHours:  types.INT64(in.Allocation.AllocateBeforeHours),
-			SettleBeforeHours:    types.INT64(in.Allocation.SettleBeforeHours),
-			RegistryContext:      a.context,
-			Meta:                 meta,
-		}), nil
-	}
-
-	return nil, fmt.Errorf("unknown authorization kind %q", in.Kind)
-}
-
-func cleanupExpired(ctx context.Context, chain canton.Chain, in CleanupInput) (CleanupOutput, error) {
+func cleanupExpired(b operations.Bundle, chain canton.Chain, in CleanupInput) (CleanupOutput, error) {
 	spec, addr, err := parseTarget(in.Kind, in.Authorization)
 	if err != nil {
 		return CleanupOutput{}, err
@@ -329,19 +257,20 @@ func cleanupExpired(ctx context.Context, chain canton.Chain, in CleanupInput) (C
 	if err != nil {
 		return CleanupOutput{}, err
 	}
-	submitter := in.Submitter
-	if submitter == "" {
-		submitter = p.PartyID
-	}
 
-	auth, authDisclosed, err := findAuthorization(ctx, p, spec, addr)
+	ac, err := findByInstance(b.GetContext(), p, spec.template.GetTemplateID(), addr.InstanceID(), addr.Owner())
+	if err != nil {
+		return CleanupOutput{}, fmt.Errorf("find authorization %s: %w", addr, err)
+	}
+	report, err := operations.ExecuteOperation(b, cleanupOps[in.Kind], chain, contract.ChoiceInput[types.PARTY]{
+		ContractID:         ac.GetCreatedEvent().GetContractId(),
+		Args:               types.PARTY(p.PartyID),
+		DisclosedContracts: contract.DisclosedContractsFromProto([]*apiv2.DisclosedContract{disclosureOf(ac.GetCreatedEvent(), ac.GetSynchronizerId())}),
+		ParticipantIndex:   in.ParticipantIndex,
+	})
 	if err != nil {
 		return CleanupOutput{}, err
 	}
-	updateID, _, err := submit(ctx, p, []string{submitter}, spec.cleanup(auth.contractID, types.PARTY(submitter)), []*apiv2.DisclosedContract{authDisclosed})
-	if err != nil {
-		return CleanupOutput{}, err
-	}
 
-	return CleanupOutput{UpdateID: updateID}, nil
+	return CleanupOutput{UpdateID: report.Output.ExecInfo.UpdateID}, nil
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/linktokenadmin"
 )
 
-// ExecuteLinkTokenAdminAuthorization executes an MCMS-approved LinkTokenAdmin authorization as the
+// ExecuteLinkTokenAdminAuthorization executes an MCMS-approved LinkTokenAdmin mint or burn authorization as the
 // selected participant's party. Config.ParticipantIndex is ignored in favor of Participant.
 type ExecuteLinkTokenAdminAuthorization struct{}
 

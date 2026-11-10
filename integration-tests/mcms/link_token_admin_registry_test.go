@@ -138,7 +138,9 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 		[]*apiv2.DisclosedContract{instDisclosed})
 	require.Error(t, err, "ExecuteMint must require the named submitter")
 
-	mintedHoldingCid := executeMintOnRegistry(t, ctx, env.Chain, client, submitter, party, "lta-auth-mint-1", party, "10.0", registryInput)
+	// The operation acts as the participant's party; this view makes that the submitter.
+	submitterChain := chainActingAs(env.Chain, submitter, party)
+	mintedHoldingCid := executeMintOnRegistry(t, ctx, submitterChain, client, party, "lta-auth-mint-1", party, "10.0", registryInput)
 
 	// Governed burn round-trip of the registrar-held holding.
 	mcmsCid = dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
@@ -152,13 +154,9 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 		adminInstanceAddr, liveAdminCid)
 	bypasserNonce++
 
-	burnAuthCid := findBurnAuthorization(t, ctx, participant, party, "lta-auth-burn-1")
+	executeBurnOnRegistry(t, ctx, submitterChain, client, party, "lta-auth-burn-1", []string{mintedHoldingCid}, registryInput)
 
-	executeBurnOnRegistry(t, ctx, client, []string{submitter}, party, burnAuthCid, liveAdminCid,
-		bootstrap.AllocationFactory, []string{mintedHoldingCid}, mintCtx, instDisclosed)
-
-	// Governed mint to the third-party recipient: the extraActors path against
-	// the real registry factory.
+	// Governed mint to a third-party recipient, executed by the recipient itself.
 	mcmsCid = dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
 		"ApproveMint", encodeAdminParams(t, adminContract, tokenadmin.ApproveMintParams{
 			AuthorizationId: types.TEXT("lta-auth-mint-3"),
@@ -170,7 +168,12 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 		adminInstanceAddr, liveAdminCid)
 	bypasserNonce++
 
-	recipientHoldingCid := executeMintOnRegistry(t, ctx, env.Chain, client, submitter, party, "lta-auth-mint-3", recipient, "5.0", registryInput)
+	// The operation does not co-sign, so a submitter other than the recipient is refused up front.
+	_, err = cld_ops.ExecuteOperation(cld_ops.NewBundle(t.Context, logger.Test(t), cld_ops.NewMemoryReporter()), linktokenadmin.Execute, submitterChain,
+		linktokenadmin.ExecuteInput{Kind: linktokenadmin.KindMint, Authorization: "lta-auth-mint-3@" + party, Registry: registryInput})
+	require.ErrorContains(t, err, "neither ccipOwner", "Execute must refuse a third-party recipient it cannot co-sign for")
+
+	recipientHoldingCid := executeMintOnRegistry(t, ctx, chainActingAs(env.Chain, recipient, party), client, party, "lta-auth-mint-3", recipient, "5.0", registryInput)
 
 	// Burn the recipient-held holding: the burn-side extraActors path.
 	mcmsCid = dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
@@ -184,10 +187,7 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 		adminInstanceAddr, liveAdminCid)
 	bypasserNonce++
 
-	recipientBurnAuthCid := findBurnAuthorization(t, ctx, participant, party, "lta-auth-burn-2")
-
-	executeBurnOnRegistry(t, ctx, client, []string{submitter, recipient}, party, recipientBurnAuthCid, liveAdminCid,
-		bootstrap.AllocationFactory, []string{recipientHoldingCid}, mintCtx, instDisclosed)
+	executeBurnOnRegistry(t, ctx, chainActingAs(env.Chain, recipient, party), client, party, "lta-auth-burn-2", []string{recipientHoldingCid}, registryInput)
 
 	// Pause enforcement: a fresh approval that must not survive rotation or pause.
 	mcmsCid = dispatchViaMCMS(t, participant, party, mcmsEncoder, mcmsCid, mcmsInstanceAddr, bypasserNonce, sortedSigners,
@@ -255,7 +255,7 @@ func TestLinkTokenAdminRegistry_ApproveAndExecute(t *testing.T) {
 
 	liveAdminCid = findLinkTokenAdminCid(t, ctx, participant, party, adminInstanceID)
 
-	unpausedHoldingCid := executeMintOnRegistry(t, ctx, env.Chain, client, submitter, party, "lta-auth-mint-2", party, "30.0", registryInput)
+	unpausedHoldingCid := executeMintOnRegistry(t, ctx, submitterChain, client, party, "lta-auth-mint-2", party, "30.0", registryInput)
 	require.NotEmpty(t, unpausedHoldingCid)
 
 	// Governance withdraws an authorization through the authorization's own
@@ -431,14 +431,25 @@ func activeRegistryHoldings(t *testing.T, ctx context.Context, client rkledger.C
 	return holdings
 }
 
-// executeMintOnRegistry runs the ExecuteMint operation as submitter and returns the created
-// registry Holding cid. The operation co-signs as the recipient when it is not ccipOwner.
+// chainActingAs returns chain with its first participant acting as actAs and reading as
+// ccipOwner, the operator setup the LinkTokenAdmin operations expect.
+func chainActingAs(chain canton.Chain, actAs, ccipOwner string) canton.Chain {
+	p := chain.Participants[0]
+	p.PartyID = actAs
+	p.ReadAsPartyIDs = append([]string{ccipOwner}, p.ReadAsPartyIDs...)
+	chain.Participants = append([]canton.Participant{p}, chain.Participants[1:]...)
+
+	return chain
+}
+
+// executeMintOnRegistry runs the ExecuteMint operation as the chain's first participant party
+// and returns the created registry Holding cid.
 func executeMintOnRegistry(
 	t *testing.T,
 	ctx context.Context,
 	chain canton.Chain,
 	client rkledger.Client,
-	submitter, ccipOwner, authorizationID, expectedOwner, expectedAmount string,
+	ccipOwner, authorizationID, expectedOwner, expectedAmount string,
 	registryInput linktokenadmin.RegistryInput,
 ) string {
 	t.Helper()
@@ -449,7 +460,6 @@ func executeMintOnRegistry(
 	report, err := cld_ops.ExecuteOperation(bundle, linktokenadmin.Execute, chain, linktokenadmin.ExecuteInput{
 		Kind:          linktokenadmin.KindMint,
 		Authorization: fmt.Sprintf("%s@%s", authorizationID, ccipOwner),
-		Submitter:     submitter,
 		Registry:      registryInput,
 	})
 	require.NoError(t, err, "ExecuteMint operation against the registry factory")
@@ -464,55 +474,36 @@ func executeMintOnRegistry(
 		minted = append(minted, cid)
 	}
 	require.Len(t, minted, 1, "ExecuteMint must create exactly one registry Holding")
-	require.Equal(t, minted, report.Output.ResultContractIDs, "operation returns the minted holding")
+	require.Equal(t, minted, report.Output.MintedHoldingCids, "operation returns the minted holding")
 
 	return minted[0]
 }
 
-// executeBurnOnRegistry submits ExecuteBurn as actAs[0] and asserts every input
-// holding is archived. `actAs` also holds the holder when it differs from
-// ccipOwner.
+// executeBurnOnRegistry runs the Execute operation for a burn and asserts every input holding is archived.
 func executeBurnOnRegistry(
 	t *testing.T,
 	ctx context.Context,
+	chain canton.Chain,
 	client rkledger.Client,
-	actAs []string,
-	ccipOwner, burnAuthCid, liveAdminCid, burnMintFactoryCid string,
+	ccipOwner, authorizationID string,
 	inputHoldingCids []string,
-	mintCtx spliceMeta.ChoiceContext,
-	instDisclosed *apiv2.DisclosedContract,
+	registryInput linktokenadmin.RegistryInput,
 ) {
 	t.Helper()
-
-	inputs := make([]types.CONTRACT_ID, 0, len(inputHoldingCids))
-	for _, cid := range inputHoldingCids {
-		inputs = append(inputs, types.CONTRACT_ID(cid))
-	}
 
 	before := activeRegistryHoldings(t, ctx, client)
 	for _, cid := range inputHoldingCids {
 		require.Contains(t, before, cid, "input holding %s must be active before ExecuteBurn", cid)
 	}
 
-	// The submitter is not a stakeholder of the input holdings either.
-	disclosed := executeDisclosures(t, ctx, client, ccipOwner, burnAuthCid, liveAdminCid, burnMintFactoryCid, instDisclosed)
-	for _, cid := range inputHoldingCids {
-		holdingDisclosed, err := registry.DiscloseByID(ctx, client, ccipOwner, cid)
-		require.NoError(t, err, "disclose input holding")
-		disclosed = append(disclosed, holdingDisclosed)
-	}
-
-	_, err := client.SubmitExerciseMulti(ctx, actAs, tokenadmin.LinkBurnAuthorization{}, burnAuthCid, "ExecuteBurn",
-		tokenadmin.ExecuteBurn{
-			Submitter:          types.PARTY(actAs[0]),
-			TokenAdminCid:      types.CONTRACT_ID(liveAdminCid),
-			BurnMintFactoryCid: types.CONTRACT_ID(burnMintFactoryCid),
-			InputHoldingCids:   inputs,
-			RegistryContext:    mintCtx,
-			Meta:               spliceMeta.Metadata{},
-		},
-		disclosed)
-	require.NoError(t, err, "ExecuteBurn against the registry factory")
+	bundle := cld_ops.NewBundle(t.Context, logger.Test(t), cld_ops.NewMemoryReporter())
+	_, err := cld_ops.ExecuteOperation(bundle, linktokenadmin.Execute, chain, linktokenadmin.ExecuteInput{
+		Kind:             linktokenadmin.KindBurn,
+		Authorization:    fmt.Sprintf("%s@%s", authorizationID, ccipOwner),
+		Registry:         registryInput,
+		InputHoldingCids: inputHoldingCids,
+	})
+	require.NoError(t, err, "ExecuteBurn operation against the registry factory")
 
 	after := activeRegistryHoldings(t, ctx, client)
 	for _, cid := range inputHoldingCids {
@@ -589,28 +580,4 @@ func lookupMintAuthorization(
 	}
 
 	return "", false
-}
-
-func findBurnAuthorization(
-	t *testing.T,
-	ctx context.Context,
-	participant canton.Participant,
-	party, authorizationID string,
-) string {
-	t.Helper()
-
-	active, err := testhelpers.ListActiveContractsByTemplateId(ctx, participant, contracts.IdentifierFromBinding(tokenadmin.LinkBurnAuthorization{}))
-	require.NoError(t, err)
-
-	for _, ac := range active {
-		auth, err := bindings.UnmarshalCreatedEvent[tokenadmin.LinkBurnAuthorization](ac.GetCreatedEvent())
-		require.NoError(t, err)
-		if string(auth.CcipOwner) == party && string(auth.InstanceId) == authorizationID {
-			return ac.GetCreatedEvent().GetContractId()
-		}
-	}
-
-	t.Fatalf("no active LinkBurnAuthorization with instanceId %s", authorizationID)
-
-	return ""
 }

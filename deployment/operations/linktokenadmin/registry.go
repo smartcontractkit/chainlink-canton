@@ -15,8 +15,8 @@ import (
 )
 
 // RegistryInput says where the registry factory and its choice context come from.
-// Set URL to ask a DA Registry utility backend (mint and burn only), or set FactoryCid and
-// ChoiceContext for a registry without a backend or for a transfer or allocation.
+// Set URL to ask a DA Registry utility backend, or set FactoryCid and ChoiceContext for a
+// registry without a backend.
 type RegistryInput struct {
 	URL string `json:"url,omitempty"`
 
@@ -27,12 +27,10 @@ type RegistryInput struct {
 	DiscloseContractIDs []string `json:"discloseContractIds,omitempty"`
 }
 
-func (r RegistryInput) validate(kind Kind) error {
+func (r RegistryInput) validate() error {
 	switch {
 	case r.URL != "" && r.FactoryCid != "":
 		return errors.New("registry: set either URL or FactoryCid, not both")
-	case r.URL != "" && kind != KindMint && kind != KindBurn:
-		return fmt.Errorf("registry: URL lookup supports mint and burn only; set FactoryCid and ChoiceContext for %s", kind)
 	case r.URL == "" && r.FactoryCid == "":
 		return errors.New("registry: URL or FactoryCid is required")
 	}
