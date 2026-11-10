@@ -37,7 +37,8 @@ type ExecuteInput struct {
 }
 
 type ExecuteOutput struct {
-	UpdateID          string   `json:"updateId"`
+	UpdateID string `json:"updateId"`
+	// MintedHoldingCids can be empty after a committed mint when reading the update back fails.
 	MintedHoldingCids []string `json:"mintedHoldingCids,omitempty"`
 }
 
@@ -215,7 +216,8 @@ func execute(b operations.Bundle, chain canton.Chain, in ExecuteInput) (ExecuteO
 	updateID := report.Output.ExecInfo.UpdateID
 	minted, err := mintedHoldingCids(ctx, p, updateID, auth.contractID)
 	if err != nil {
-		return ExecuteOutput{}, err
+		// The mint has committed; reporting a failure would invite a retry against an archived authorization.
+		b.Logger.Warnf("mint committed in update %s but its holding ids could not be read: %v", updateID, err)
 	}
 
 	return ExecuteOutput{UpdateID: updateID, MintedHoldingCids: minted}, nil
