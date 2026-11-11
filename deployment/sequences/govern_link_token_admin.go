@@ -93,7 +93,6 @@ func (in GovernLinkTokenAdminInput) Validate() error {
 		}
 		if id, _, _, ok := action.approval(); ok {
 			// Two live authorizations with one id make every later withdraw of that id ambiguous.
-			// This catches repeats in one proposal; the GovernLinkTokenAdmin changeset also checks the ledger.
 			key := string(action.approvalKind()) + "/" + string(id)
 			if approvedKind[key] {
 				return fmt.Errorf("action %d: authorization %q is approved twice in this proposal", i, id)

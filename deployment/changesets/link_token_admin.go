@@ -2,21 +2,16 @@ package changesets
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
-	"github.com/smartcontractkit/go-daml/pkg/types"
 
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link/tokenadmin"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/linkadmingov"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
-	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 // --- DeployLinkTokenAdminFromFactory ---
@@ -105,67 +100,11 @@ func (g GovernLinkTokenAdmin) VerifyPreconditions(e cldf.Environment, config Can
 	if err := input.Validate(); err != nil {
 		return err
 	}
-	if err := requireNoLiveAuthorization(e, config, input); err != nil {
-		return err
-	}
 	if input.ProposalDriven {
 		return requireCCIPOwnerMCMSRef(e, config.ChainSelector)
 	}
 
 	return nil
-}
-
-// requireNoLiveAuthorization rejects an approval whose kind and id already name a live authorization.
-// Daml allows a second one, and a later withdraw of that id would archive only one of the two.
-// An approval after a withdraw of the same kind and id in this proposal is not looked up:
-// the batch runs in order, so the withdraw archives the live one first.
-func requireNoLiveAuthorization(e cldf.Environment, config CantonCSDeps[GovernLinkTokenAdminConfig], input sequences.GovernLinkTokenAdminInput) error {
-	participant := e.BlockChains.CantonChains()[config.ChainSelector].Participants[config.Participant]
-	owner := types.PARTY(input.AdminAddress.Owner())
-	withdrawn := make(map[string]bool)
-	for i, action := range input.Actions {
-		if action.Withdraw != nil {
-			withdrawn[string(action.Withdraw.Kind)+"/"+action.Withdraw.AuthorizationID] = true
-			continue
-		}
-		id, kind, templateID, ok := approvedAuthorization(action)
-		if !ok {
-			continue
-		}
-		if withdrawn[string(kind)+"/"+string(id)] {
-			continue
-		}
-		addr := contracts.InstanceID(id).RawInstanceAddress(owner)
-		_, err := opcontract.FindActiveContractByInstanceAddress(
-			e.GetContext(), participant.LedgerServices.State, opcontract.LedgerQueryParties(participant), templateID, addr.InstanceAddress(),
-		)
-		switch {
-		case err == nil, strings.Contains(err.Error(), "multiple active contracts found"):
-			return fmt.Errorf("action %d: authorization %q of kind %s is already live; withdraw it first", i, id, kind)
-		case strings.Contains(err.Error(), "no active contract found"):
-			continue
-		default:
-			return fmt.Errorf("action %d: look up authorization %q of kind %s: %w", i, id, kind, err)
-		}
-	}
-
-	return nil
-}
-
-// approvedAuthorization returns the id, kind and template of the authorization an approve action creates.
-func approvedAuthorization(a sequences.LinkTokenAdminAction) (types.TEXT, linkadmingov.Kind, string, bool) {
-	switch {
-	case a.ApproveMint != nil:
-		return a.ApproveMint.AuthorizationId, linkadmingov.KindMint, tokenadmin.LinkMintAuthorization{}.GetTemplateID(), true
-	case a.ApproveBurn != nil:
-		return a.ApproveBurn.AuthorizationId, linkadmingov.KindBurn, tokenadmin.LinkBurnAuthorization{}.GetTemplateID(), true
-	case a.ApproveTransfer != nil:
-		return a.ApproveTransfer.AuthorizationId, linkadmingov.KindTransfer, tokenadmin.LinkTransferAuthorization{}.GetTemplateID(), true
-	case a.ApproveAllocate != nil:
-		return a.ApproveAllocate.AuthorizationId, linkadmingov.KindAllocate, tokenadmin.LinkAllocationAuthorization{}.GetTemplateID(), true
-	}
-
-	return "", "", "", false
 }
 
 func (g GovernLinkTokenAdmin) Apply(e cldf.Environment, config CantonCSDeps[GovernLinkTokenAdminConfig]) (cldf.ChangesetOutput, error) {
