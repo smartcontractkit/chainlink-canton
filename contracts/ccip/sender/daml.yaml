@@ -1,11 +1,14 @@
 sdk-version: 3.4.11
 name: ccip-sender-v2
 source: daml
-version: 2.1.0
-upgrades: ../../dars/released/ccip-sender-v2-2.0.0.dar
+version: 2.1.1
+upgrades: ../../dars/released/ccip-sender-v2-2.1.0.dar
 build-options:
   - "-Wno-crypto-text-is-alpha"
   - "-Werror=unused-dependency"
+  # The new ICCIPSender client interface instance is a pure addition; existing
+  # contracts keep their old package behavior.
+  - "-Wno-template-has-new-interface-instance"
 data-dependencies:
   - ../../dependencies/splice/splice-api-token-metadata-v1-1.0.0.dar
   - ../../dependencies/splice/splice-api-token-holding-v1-1.0.0.dar
@@ -17,6 +20,7 @@ data-dependencies:
   - ../api/.daml/dist/ccip-api-v2-2.0.0.dar
   - ../extension-api/.daml/dist/ccip-extension-api-v2-2.0.0.dar
   - ../client-api/.daml/dist/ccip-client-api-v2-2.0.0.dar
+  - ../client/.daml/dist/ccip-client-v2-2.0.0.dar
   - ../utils/.daml/dist/ccip-utils-v2-2.1.0.dar
 dependencies:
   - daml-prim

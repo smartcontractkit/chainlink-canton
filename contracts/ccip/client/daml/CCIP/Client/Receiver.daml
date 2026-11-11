@@ -1,0 +1,102 @@
+-- | Receiver-side client interface for CCIP message execution contracts.
+--
+-- Lets the SDK drive any conforming receiver contract (the global
+-- GlobalTokenSenderReceiver as well as the per-user CCIPReceiver) through one
+-- stable interface. Input types are the canonical definitions referenced by
+-- the interface choices; implementations convert from their local types.
+--
+-- Every choice carries a ChoiceContext so arbitrary data can be passed along
+-- without touching this (un-upgradeable) interface.
+module CCIP.Client.Receiver where
+
+import DA.Crypto.Text (BytesHex)
+
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.APIV2.ExecutingMessage
+import qualified CCIP.ClientV2
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CodecV2.MessageCodecV1
+import qualified CCIP.InterfacesV2.CrossChainVerifier
+import qualified CCIP.InterfacesV2.TokenPool
+
+-- | Per-CCV verification input. Pairs a verifier contract (via interface)
+-- with the attestation data and per-CCV extra context.
+data ReceiverCCVInput = ReceiverCCVInput
+    with
+        ccvCid : ContractId CCIP.InterfacesV2.CrossChainVerifier.ICrossChainVerifier
+        verifierResults : BytesHex
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+-- | Token transfer input, provided only when the message includes a
+-- token transfer. Mirrors how TokenReceiveTicket is Optional on the OffRamp.
+--
+-- Named ...Receiver... to disambiguate from the sender-side
+-- CCIP.Client.Sender.TokenTransferInput in generated (module-flat) Go bindings.
+data ReceiverTokenTransferInput = ReceiverTokenTransferInput
+    with
+        tokenPoolCid : ContractId CCIP.InterfacesV2.TokenPool.ITokenPool
+        tokenReceiverParty : Party
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+-- | Result of executing an inbound message. No extra template is created;
+-- everything the caller needs is returned by the choice.
+data ReceiverExecuteResult = ReceiverExecuteResult
+    with
+        router : ContractId CCIP.ClientV2.PerPartyRouter
+        messageId : BytesHex
+        message : CCIP.CodecV2.MessageCodecV1.MessageV1
+        state : CCIP.APIV2.ExecutingMessage.MessageExecutionState
+        -- Result of releasing/minting the transferred tokens with the token
+        -- pool, if the message included a token transfer.
+        tokenReleaseResult : Optional CCIP.InterfacesV2.TokenPool.ReleaseOrMintResult
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+data ICCIPReceiverView = ICCIPReceiverView
+    with
+        -- The party that operates and endorses the receiver contract.
+        ccipOwner : Party
+        -- Receiver-side CCV policy. Inert for token-only transfers, where the
+        -- token pool decides CCV and finality requirements.
+        requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        receiverFinalityConfig : CCIP.CodecV2.FinalityConfig.FinalityConfig
+
+interface ICCIPReceiver where
+    viewtype ICCIPReceiverView
+
+    iccipReceiver_getRequiredCCVsImpl : ContractId ICCIPReceiver -> ICCIPReceiver_GetRequiredCCVs -> Update [Chainlink.InstanceAddress.RawInstanceAddress]
+    iccipReceiver_executeImpl : ContractId ICCIPReceiver -> ICCIPReceiver_Execute -> Update ReceiverExecuteResult
+
+    -- | Query the final required CCVs for executing an inbound message.
+    nonconsuming choice ICCIPReceiver_GetRequiredCCVs
+        : [Chainlink.InstanceAddress.RawInstanceAddress]
+        with
+            receiverParty : Party
+            routerCid : ContractId CCIP.ClientV2.PerPartyRouter
+            encodedMessage : BytesHex
+            tokenPoolCid : Optional (ContractId CCIP.InterfacesV2.TokenPool.ITokenPool)
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller receiverParty
+        do iccipReceiver_getRequiredCCVsImpl this self arg
+
+    -- | Execute an inbound message end-to-end.
+    nonconsuming choice ICCIPReceiver_Execute : ReceiverExecuteResult
+        with
+            -- Who the message is addressed to; the OffRamp asserts
+            -- message.receiver == encodePartyAddress(receiverParty), so the
+            -- caller cannot redirect execution to a party of their choosing.
+            receiverParty : Party
+            routerCid : ContractId CCIP.ClientV2.PerPartyRouter
+            encodedMessage : BytesHex
+            -- None for message-only, Some for token transfers.
+            tokenTransfer : Optional ReceiverTokenTransferInput
+            -- One entry per CCV that should verify this message.
+            ccvInputs : [ReceiverCCVInput]
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller receiverParty
+        do iccipReceiver_executeImpl this self arg

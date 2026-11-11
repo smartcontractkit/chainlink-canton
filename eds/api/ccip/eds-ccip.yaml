@@ -60,6 +60,30 @@ paths:
         '500':
           $ref: '../common/eds-common.yaml#/components/responses/500'
 
+  /ccip/v1/global/tokenSenderReceiver:
+    get:
+      operationId: getTokenSenderReceiver
+      tags:
+        - general
+      description: |
+        Get the GlobalTokenSenderReceiver contract, a single Chainlink-operated
+        orchestrator used for all DA Registry token transfers in both directions.
+        The returned disclosure is static (the contract is created once and never
+        consumed), so it can be cached aggressively.
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalTokenSenderReceiverResponse'
+        '400':
+          $ref: '../common/eds-common.yaml#/components/responses/400'
+        '404':
+          $ref: '../common/eds-common.yaml#/components/responses/404'
+        '500':
+          $ref: '../common/eds-common.yaml#/components/responses/500'
+
   /ccip/v1/global/message/send:
     post:
       operationId: postCCIPSend
@@ -124,6 +148,26 @@ tags:
 
 components:
   schemas:
+    GlobalTokenSenderReceiverResponse:
+      type: object
+      required:
+        - contractId
+        - instanceAddress
+        - rawInstanceAddress
+        - disclosedContracts
+      properties:
+        contractId:
+          $ref: "../common/eds-common.yaml#/components/schemas/ContractId"
+        instanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/InstanceAddress"
+        rawInstanceAddress:
+          $ref: "../common/eds-common.yaml#/components/schemas/RawInstanceAddress"
+        disclosedContracts:
+          description: Disclosures for the GlobalTokenSenderReceiver contract
+          type: array
+          items:
+            $ref: '../common/eds-common.yaml#/components/schemas/DisclosedContract'
+
     CCIPPerPartyRouterFactoryRequest:
       type: object
       required:

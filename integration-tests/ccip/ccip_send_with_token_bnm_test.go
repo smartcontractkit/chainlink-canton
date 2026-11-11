@@ -40,17 +40,16 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/events"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_burn_mint_v1"
@@ -62,6 +61,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_token_sender_receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -118,8 +118,10 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	linkTokenDar, err := contracts.GetDar(contracts.Link, contracts.DevVersion)
 	require.NoError(t, err)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV2, contracts.DevVersion)
+	require.NoError(t, err)
 
-	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, linkTokenDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, linkTokenDar, globalSenderReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, senderParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -141,7 +143,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
-	versionTag := "e9a05a20"
 	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 
@@ -197,7 +198,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
-							VersionTag:                   types.TEXT(versionTag),
+							VersionTag:                   committeeverifier.VersionTagV200,
 							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-send"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
@@ -273,6 +274,8 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err, "failed to get RMNRemote address")
 	_, perPartyRouterFactoryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), per_party_router_factory.ContractType, per_party_router_factory.Version, "")
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+	_, globalTokenSenderReceiverAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_token_sender_receiver.ContractType, global_token_sender_receiver.Version, "")
+	require.NoError(t, err, "failed to get GlobalTokenSenderReceiver address")
 	executorRef, executorAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), executor.ContractType, executor.Version, devenvcommon.DefaultExecutorQualifier)
 	require.NoError(t, err, "failed to get Executor address")
 
@@ -518,6 +521,10 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
+				GlobalTokenSenderReceiver: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: globalTokenSenderReceiverAddress.InstanceAddress(),
+				},
 				CcipOwner: partyCCIP,
 				FeeTokens: map[string]config.FeeToken{
 					string(nativeInstrumentId.Id): {
@@ -667,11 +674,11 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 					TemplateId: contracts.IdentifierFromBinding(ccipruntime.PerPartyRouterFactory{}),
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "partyOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partySender}}},
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-router-receiver"}}},
-						{Label: "feeTransferLifetime", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
-					}}}},
+					ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
+						PartyOwner:          types.PARTY(partySender),
+						InstanceId:          types.TEXT("test-router-sender"),
+						FeeTransferLifetime: nil,
+					}),
 				}},
 			}},
 			ActAs:              []string{partySender},
@@ -690,31 +697,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	}
 	require.NotEmpty(t, routerCid)
 	t.Logf("Created PerPartyRouter for sender: %s", routerCid)
-
-	// Build test payload
-	testPayload := []byte("Hello CCIP - this is a test send message!")
-	testPayloadHex := hex.EncodeToString(testPayload)
-	t.Logf("Test payload: %s", string(testPayload))
-
-	// Deploy CCIPSender for sender
-	res, err = senderParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: contracts.IdentifierFromBinding(sender.CCIPSender{}),
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipsender"}}},
-						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partySender}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partySender},
-		},
-	})
-	require.NoError(t, err)
-	ccipSenderCid := extractCreatedContractId(res)
-	t.Logf("Deployed CCIPSender: %s", ccipSenderCid)
 
 	// Prepare EVM receiver address
 	receiver := hexutil.MustDecode("0xcf8def9adfe3dd90b3dffe42c8eabbf7cd4ee6ca")
@@ -807,7 +789,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			Admin: oapiCommon.PartyId(nativeInstrumentId.Admin),
 			Id:    string(nativeInstrumentId.Id),
 		},
-		Payload:  testPayloadHex,
+		Payload:  "",
 		Sender:   partySender,
 		Receiver: receiverHex,
 		TokenTransfer: &oapiCommon.TokenTransfer{
@@ -833,6 +815,8 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	executorSendDisclosure, err := edsTesthelpers.GetExecutorSendDisclosure(t.Context(), executorAPIClient, msg, executorAddressEDS.InstanceAddress(), ccipSendDisclosure.CCVs)
 	require.NoError(t, err)
+	globalSenderReceiverDisclosure, err := edsTesthelpers.GetTokenSenderReceiverDisclosure(t.Context(), ccipAPIClient)
+	require.NoError(t, err)
 
 	// Sanity check - CCIP global batch covers P0 contracts only (LinkRegistry lives on pool EDS).
 	disclosedContracts, err := edsTesthelpers.GetGlobalDisclosureBatch(t.Context(), globalAPIClient, []contracts.InstanceAddress{
@@ -845,20 +829,21 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		rmnRemoteAddress.InstanceAddress(),
 		committeeVerifierAddress.InstanceAddress(),
 		executorAddress.InstanceAddress(),
+		globalTokenSenderReceiverAddress.InstanceAddress(),
 	})
 	require.NoError(t, err)
-	require.Lenf(t, disclosedContracts, 9, "expected to retrieve disclosures for all CCIP global addresses")
+	require.Lenf(t, disclosedContracts, 10, "expected to retrieve disclosures for all CCIP global addresses")
 
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
 	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;
 	// after 5% pool fee the bridged amount should be 9,500.
-	sendArgs := sender.Send{
+	sendArgs := ccipclient.ICCIPSenderSend{
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
 		Message: clientapi.Canton2AnyMessage{
 			Receiver: types.TEXT(receiverHex),
-			Payload:  types.TEXT(testPayloadHex),
+			Payload:  types.TEXT(""),
 			TokenTransfer: &clientapi.TokenTransfer{
 				Token:  linkInstrumentId,
 				Amount: types.NUMERIC(tokenTransferAmountDecimal),
@@ -884,7 +869,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 		},
-		FeeTokenInput: sender.FeeTokenInput{
+		FeeTokenInput: ccipclient.SenderFeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 			FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
 			FeeTokenTransferFactory: types.CONTRACT_ID(ccipSendDisclosure.FeeTokenTransferFactoryCid),
@@ -895,19 +880,19 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 		},
-		CcvSendInputs: []sender.CCVSendInput{
+		CcvSendInputs: []ccipclient.SenderCCVSendInput{
 			{
 				CcvAddress: ccvSendDisclosure.Address.Binding(),
 				CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
 				Context:    ccvSendDisclosure.ChoiceContext,
 			},
 		},
-		TokenTransferInput: &sender.TokenTransferInput{
+		TokenTransferInput: &ccipclient.SenderTokenTransferInput{
 			SenderInputCids: senderHoldingCids,
 			TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
 			Context:         tokenPoolSendDisclosure.ChoiceContext,
 		},
-		ExecutorInput: &sender.ExecutorInput{
+		ExecutorInput: &ccipclient.SenderExecutorInput{
 			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
 			Context:     executorSendDisclosure.ChoiceContext,
 		},
@@ -919,12 +904,22 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		ccvSendDisclosure.DisclosedContracts,
 		executorSendDisclosure.DisclosedContracts,
 	)...)
-	quotedFee := quoteCCIPSenderFee(t, senderParticipant, partySender, ccipSenderCid, sendArgs, sendDisclosures)
-	feeStr := strings.TrimSuffix(string(quotedFee.FeeTokenAmount), ".")
-	poolFeeStr := strings.TrimSuffix(string(quotedFee.PoolFeeTokenAmount), ".")
-	t.Logf("GetFee: feeTokenAmount=%s poolFeeTokenAmount=%s", feeStr, poolFeeStr)
-	require.NotEqual(t, "0", feeStr, "GetFee should return a positive fee")
-	require.NotEqual(t, "0", poolFeeStr, "GetFee should return a positive pool fee")
+	feeResult := quoteICCIPSenderFee(t, senderParticipant, partySender, globalSenderReceiverDisclosure.ContractId, sendArgs, sendDisclosures)
+	// CCIP Send Fee
+	quotedFeeAmount, ok := new(big.Rat).SetString(strings.TrimSuffix(string(feeResult.FeeResult.FeeTokenAmount), "."))
+	require.True(t, ok, "quoted fee should parse as a decimal value")
+	// Quoted fee is Numeric 0, smallest token denomination
+	// Fee token is native at Decimal / 10 decimals, scale the quoted fee accordingly
+	quotedFeeAmount.Quo(quotedFeeAmount, big.NewRat(1e10, 1))
+	// Pool Fee
+	poolFeeBps, ok := new(big.Rat).SetString(strings.TrimSuffix(string(feeResult.PoolQuote.TokenFeeBps), "."))
+	require.True(t, ok, "pool fee should parse as a decimal value")
+	tokenTransferAmountRat, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
+	require.True(t, ok, "token transfer amount should parse as a decimal value")
+	poolFee := new(big.Rat).Quo(new(big.Rat).Mul(tokenTransferAmountRat, poolFeeBps), big.NewRat(10000, 1))
+	// When poolOwner == sender, pool feeBps is retained by the sender's pool; only net LINK leaves total balance.
+	netLinkTransferAmountRat := new(big.Rat).Sub(tokenTransferAmountRat, poolFee)
+	t.Logf("GetFee: feeTokenAmount=%s poolFeeBps=%s poolFeeTokenAmount=%s", quotedFeeAmount.String(), poolFeeBps.String(), poolFee.String())
 
 	// quoteCCIPSenderFee uses TRANSACTION_SHAPE_LEDGER_EFFECTS; refresh EDS disclosures so the
 	// follow-up Send exercises current contract witnesses (avoids LOCAL_VERDICT_INACTIVE_CONTRACTS).
@@ -968,9 +963,9 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     contracts.IdentifierFromBinding(sender.CCIPSender{}),
-					ContractId:     ccipSenderCid,
-					Choice:         "Send",
+					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.Client.Sender", EntityName: "ICCIPSender"},
+					ContractId:     globalSenderReceiverDisclosure.ContractId,
+					Choice:         "ICCIPSender_Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),
 				}},
 			}},
@@ -981,22 +976,8 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 
 	// Extract CIPMessageSent event to verify success
-	eventTemplateId := events.CCIPMessageSent{}.GetTemplateID()
-	var ccipMessageSent *events.CCIPMessageSent
-	for _, event := range res.GetTransaction().GetEvents() {
-		if createdEvent := event.GetCreated(); createdEvent != nil {
-			if templateId := createdEvent.GetTemplateId(); templateId != nil {
-				gotTemplateId := fmt.Sprintf("#%s:%s:%s", createdEvent.GetPackageName(), templateId.GetModuleName(), templateId.GetEntityName())
-				if gotTemplateId == eventTemplateId {
-					// Found CCIPMessageSent event
-					ccipMessageSent, err = bindings.UnmarshalCreatedEvent[events.CCIPMessageSent](createdEvent)
-					require.NoError(t, err)
-					break
-				}
-			}
-		}
-	}
-	require.NotNil(t, ccipMessageSent, "CCIPMessageSent event not found")
+	ccipMessageSent, _, err := testhelpers.GetCreatedEventFromTransaction[events.CCIPMessageSent](res.GetTransaction(), contracts.IdentifierFromBinding(events.CCIPMessageSent{}))
+	require.NoError(t, err)
 	require.NotEmpty(t, ccipMessageSent.Event.MessageId, "CCIPMessageSent should be created")
 	require.NotEmpty(t, ccipMessageSent.Event.EncodedMessage, "CCIPMessageSent should contain encoded message")
 
@@ -1012,20 +993,12 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.True(t, ok, "token amount before token pool fees should parse as a decimal value")
 	require.Equal(t, 0, wantAmount.Cmp(gotAmount), "token amount before token pool fees should match original transfer amount")
 
-	quotedFeeAmount, ok := new(big.Rat).SetString(feeStr)
-	require.True(t, ok, "quoted fee should parse as a decimal value")
-	poolFeeAmountRat, ok := new(big.Rat).SetString(poolFeeStr)
-	require.True(t, ok, "pool fee should parse as a decimal value")
-	tokenTransferAmountRat, ok := new(big.Rat).SetString(tokenTransferAmountDecimal)
-	require.True(t, ok, "token transfer amount should parse as a decimal value")
-	// When poolOwner == sender, pool feeBps is retained by the sender's pool; only net LINK leaves total balance.
-	netLinkTransferAmountRat := new(big.Rat).Sub(tokenTransferAmountRat, poolFeeAmountRat)
-
 	require.Eventually(t, func() bool {
 		senderBalanceAfter, balanceErr := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
 		if balanceErr != nil {
 			return false
 		}
+		fmt.Println("senderBalanceBefore:", senderBalanceBefore.FloatString(10), "senderBalanceAfter:", senderBalanceAfter.FloatString(10), "quotedFeeAmount:", quotedFeeAmount.FloatString(10))
 		senderDelta := new(big.Rat).Sub(senderBalanceBefore, senderBalanceAfter)
 
 		return senderDelta.Cmp(quotedFeeAmount) == 0
@@ -1063,7 +1036,6 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 
 	t.Logf("Send completed")
 	t.Logf("  Message ID: %s", ccipMessageSent.Event.MessageId)
-	t.Logf("  Original payload: %s", string(testPayload))
 
 	t.Logf("✅ Success")
 }

@@ -32,6 +32,7 @@ data-dependencies:
   - ../rate-limiter/.daml/dist/ccip-rate-limiter-v2-2.0.3.dar
   - ../pools/lock-release-token-pool/.daml/dist/ccip-lock-release-token-pool-v2-2.1.3.dar
   - ../pools/burn-mint-token-pool/.daml/dist/ccip-burn-mint-token-pool-v2-2.1.3.dar
+  - ../global-token-sender-receiver/.daml/dist/ccip-global-token-sender-receiver-v2-2.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib

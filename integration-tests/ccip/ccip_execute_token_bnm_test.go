@@ -21,6 +21,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/stretchr/testify/require"
 
 	config2 "github.com/smartcontractkit/chainlink-canton/authentication/config"
@@ -46,7 +47,6 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
-	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
@@ -56,6 +56,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_token_sender_receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -130,9 +131,11 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	executorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV2, contracts.DevVersion)
+	require.NoError(t, err)
 
 	// Upload DARs to all participants
-	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, tokenPoolDar, linkTokenDar, ccipReceiverDar, executorDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, tokenPoolDar, linkTokenDar, ccipReceiverDar, executorDar, globalSenderReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant, tokenPoolOwnerParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -179,7 +182,6 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
-	versionTag := "e9a05a20"
 	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
 
 	reporter := cld_ops.NewMemoryReporter()
@@ -210,7 +212,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
-							VersionTag:                   types.TEXT(versionTag),
+							VersionTag:                   committeeverifier.VersionTagV200,
 							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
@@ -280,6 +282,8 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	require.NoError(t, err, "failed to get RMNRemote address")
 	_, perPartyRouterFactoryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), per_party_router_factory.ContractType, per_party_router_factory.Version, "")
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+	_, globalTokenSenderReceiverAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_token_sender_receiver.ContractType, global_token_sender_receiver.Version, "")
+	require.NoError(t, err, "failed to get GlobalTokenSenderReceiver address")
 
 	// Deploy and configure lane (CCIP 2.0 lanes sequence, same as ccip_execute_test)
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
@@ -505,6 +509,10 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
 				},
+				GlobalTokenSenderReceiver: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: globalTokenSenderReceiverAddress.InstanceAddress(),
+				},
 				CcipOwner: partyCCIP,
 			},
 			CCVAPIConfig: config.CCVAPIConfig{
@@ -570,11 +578,11 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 					TemplateId: contracts.IdentifierFromBinding(ccipruntime.PerPartyRouterFactory{}),
 					ContractId: perPartyRouterFactoryDisclosure.ContractId,
 					Choice:     "CreateRouter",
-					ChoiceArgument: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "partyOwner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-router-receiver"}}},
-						{Label: "feeTransferLifetime", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{Value: nil}}}},
-					}}}},
+					ChoiceArgument: ledger.MapToValue(ccipruntime.CreateRouter{
+						PartyOwner:          types.PARTY(partyReceiver),
+						InstanceId:          types.TEXT("test-router-receiver"),
+						FeeTransferLifetime: nil,
+					}),
 				}},
 			}},
 			ActAs:              []string{partyReceiver},
@@ -605,7 +613,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 		DestChainSelector:    protocol.ChainSelector(env.Chain.ChainSelector()),
 		SequenceNumber:       1,
 		ExecutionGasLimit:    200000,
-		CcipReceiveGasLimit:  100000,
+		CcipReceiveGasLimit:  0,
 		Finality:             protocol.NewFinality().WithBlockDepth(2000),
 		CcvAndExecutorHash:   [32]byte{},
 		OnRampAddress:        gethcommon.LeftPadBytes(gethcommon.HexToAddress("0xf6eced5e96fff2de4f0ecd722beb57556fc443fd").Bytes(), 32),
@@ -635,30 +643,6 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	verifierResultsHex := hex.EncodeToString(verifierResults)
 
-	// Deploy CCIPReceiver for receiver
-	res, err = receiverParticipant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
-		Commands: &apiv2.Commands{
-			CommandId: uuid.NewString(),
-			Commands: []*apiv2.Command{{
-				Command: &apiv2.Command_Create{Create: &apiv2.CreateCommand{
-					TemplateId: contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
-					CreateArguments: &apiv2.Record{Fields: []*apiv2.RecordField{
-						{Label: "instanceId", Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "test-ccipreceiver"}}},
-						{Label: "owner", Value: &apiv2.Value{Sum: &apiv2.Value_Party{Party: partyReceiver}}},
-						{Label: "receiverFinalityConfig", Value: finalityConfigValueFromBlockConfirmations()},
-						{Label: "requiredCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-						{Label: "optionalCCVs", Value: &apiv2.Value{Sum: &apiv2.Value_List{List: &apiv2.List{Elements: nil}}}},
-						{Label: "optionalThreshold", Value: &apiv2.Value{Sum: &apiv2.Value_Int64{Int64: 0}}},
-					}},
-				}},
-			}},
-			ActAs: []string{partyReceiver},
-		},
-	})
-	require.NoError(t, err)
-	ccipReceiverCid := extractCreatedContractId(res)
-	t.Logf("Deployed CCIPReceiver: %s", ccipReceiverCid)
-
 	// Capture receiver's balance before execute (LINK for this receiver).
 	receiverBalanceRatBefore, err := testhelpers.GetHoldingsBalance(t.Context(), receiverParticipant, &linkInstrumentId, testhelpers.WithHoldingOwner(partyReceiver))
 	require.NoError(t, err)
@@ -672,17 +656,20 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	tokenPoolDisclosure, err := edsTesthelpers.GetTokenPoolExecuteDisclosure(t.Context(), tokenPoolAPIClient, encodedMessageHex, tokenPoolAddressEDS.InstanceAddress(), types.PARTY(partyReceiver))
 	require.NoError(t, err)
+	globalSenderReceiverDisclosure, err := edsTesthelpers.GetTokenSenderReceiverDisclosure(t.Context(), ccipAPIClient)
+	require.NoError(t, err)
 
-	executeArgs := receiver.Execute{
+	executeArgs := ccipclient.ICCIPReceiverExecute{
+		ReceiverParty:  types.PARTY(partyReceiver),
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
-		TokenTransfer: &receiver.TokenTransferInput{
+		TokenTransfer: &ccipclient.ReceiverTokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(partyReceiver),
 			Context:            tokenPoolDisclosure.ChoiceContext,
 		},
-		CcvInputs: []receiver.CCVInput{
+		CcvInputs: []ccipclient.ReceiverCCVInput{
 			{
 				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 				VerifierResults: types.TEXT(verifierResultsHex),
@@ -698,9 +685,9 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
-					ContractId:     ccipReceiverCid,
-					Choice:         "Execute",
+					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.Client.Receiver", EntityName: "ICCIPReceiver"},
+					ContractId:     globalSenderReceiverDisclosure.ContractId,
+					Choice:         "ICCIPReceiver_Execute",
 					ChoiceArgument: ledger.MapToValue(executeArgs),
 				}},
 			}},
@@ -709,6 +696,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 				tokenPoolDisclosure.DisclosedContracts,
 				ccipExecuteDisclosure.DisclosedContracts,
 				ccvExecuteDisclosure.DisclosedContracts,
+				globalSenderReceiverDisclosure.DisclosedContracts,
 			),
 		},
 	})

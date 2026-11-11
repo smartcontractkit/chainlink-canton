@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	ccipcodec "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
+	client "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	extensionapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/extensionapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
@@ -27,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-receiver-v2"
-	PackageID   = "95c3cdc53c172c7202f5b2711ad01d591c84e0aa00cbce4fd0d9ad8f75c11552"
+	PackageID   = "9ca8e5f3807001ba90e3dd58527c766544bdf7d39c73d0371a39b3caf21a5f03"
 	SDKVersion  = "3.4.11"
 )
 
@@ -311,7 +312,7 @@ func (t *CCIPReceiver) UnmarshalHex(data string) error {
 
 // Choice methods for CCIPReceiver
 
-// Archive exercises the Archive choice on this CCIPReceiver contract
+// Archive exercises the Archive choice on this CCIPReceiver contract via the IICCIPReceiver interface
 // This method uses the package name in the template ID
 func (t CCIPReceiver) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
@@ -394,6 +395,52 @@ func (t CCIPReceiver) UpdateRequiredCCVsWithPackageID(contractID string, package
 		Arguments:  argsToMap(args),
 	}
 }
+
+// ICCIPReceiverGetRequiredCCVs exercises the ICCIPReceiver_GetRequiredCCVs choice on this CCIPReceiver contract via the IICCIPReceiver interface
+// This method uses the package name in the template ID
+func (t CCIPReceiver) ICCIPReceiverGetRequiredCCVs(contractID string, args client.ICCIPReceiverGetRequiredCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPReceiver", "ICCIPReceiver"),
+		ContractID: contractID,
+		Choice:     "ICCIPReceiver_GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPReceiverGetRequiredCCVsWithPackageID exercises the ICCIPReceiver_GetRequiredCCVs choice using the provided package ID instead of package name
+func (t CCIPReceiver) ICCIPReceiverGetRequiredCCVsWithPackageID(contractID string, packageID string, args client.ICCIPReceiverGetRequiredCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPReceiver", "ICCIPReceiver"),
+		ContractID: contractID,
+		Choice:     "ICCIPReceiver_GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPReceiverExecute exercises the ICCIPReceiver_Execute choice on this CCIPReceiver contract via the IICCIPReceiver interface
+// This method uses the package name in the template ID
+func (t CCIPReceiver) ICCIPReceiverExecute(contractID string, args client.ICCIPReceiverExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPReceiver", "ICCIPReceiver"),
+		ContractID: contractID,
+		Choice:     "ICCIPReceiver_Execute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPReceiverExecuteWithPackageID exercises the ICCIPReceiver_Execute choice using the provided package ID instead of package name
+func (t CCIPReceiver) ICCIPReceiverExecuteWithPackageID(contractID string, packageID string, args client.ICCIPReceiverExecute) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPReceiver", "ICCIPReceiver"),
+		ContractID: contractID,
+		Choice:     "ICCIPReceiver_Execute",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for CCIPReceiver
+
+var _ client.IICCIPReceiver = (*CCIPReceiver)(nil)
 
 // CCVInput is a Record type
 type CCVInput struct {

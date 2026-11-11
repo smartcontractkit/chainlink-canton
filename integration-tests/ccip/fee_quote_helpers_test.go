@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
 )
 
@@ -90,6 +92,73 @@ func quoteCCIPSenderFee(
 	}
 
 	return quote
+}
+
+func quoteICCIPSenderFee(
+	t *testing.T,
+	participant canton.Participant,
+	partySender string,
+	ccipSenderCid string,
+	sendArgs ccipclient.ICCIPSenderSend,
+	disclosures []*apiv2.DisclosedContract,
+) ccipclient.SenderGetFeeResult {
+	t.Helper()
+
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+		Commands: &apiv2.Commands{
+			CommandId: uuid.NewString(),
+			Commands: []*apiv2.Command{{
+				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.Client.Sender", EntityName: "ICCIPSender"},
+					ContractId: ccipSenderCid,
+					Choice:     "ICCIPSender_GetFee",
+					ChoiceArgument: ledger.MapToValue(ccipclient.ICCIPSenderGetFee{
+						SenderParty:              sendArgs.SenderParty,
+						DestinationChainSelector: sendArgs.DestinationChainSelector,
+						Message:                  sendArgs.Message,
+						RouterCid:                sendArgs.RouterCid,
+						CcvSendInputs:            sendArgs.CcvSendInputs,
+						TokenTransferInput:       sendArgs.TokenTransferInput,
+						ExecutorInput:            sendArgs.ExecutorInput,
+						Context:                  sendArgs.Context,
+					}),
+				}},
+			}},
+			ActAs:              []string{partySender},
+			DisclosedContracts: disclosures,
+		},
+		// Ledger-effects shape is required for exercised choice results to appear in the
+		// transaction event stream; without it GetFee returns no matching Exercised events.
+		TransactionFormat: &apiv2.TransactionFormat{
+			EventFormat: &apiv2.EventFormat{
+				FiltersByParty: map[string]*apiv2.Filters{
+					partySender: {},
+				},
+				Verbose: true,
+			},
+			TransactionShape: apiv2.TransactionShape_TRANSACTION_SHAPE_LEDGER_EFFECTS,
+		},
+	})
+	require.NoError(t, err)
+
+	var resultRecord *apiv2.Record
+	for _, event := range res.GetTransaction().GetEvents() {
+		exercised := event.GetExercised()
+		if exercised == nil || exercised.GetChoice() != "ICCIPSender_GetFee" {
+			continue
+		}
+		resultRecord = exercised.GetExerciseResult().GetRecord()
+
+		break
+	}
+	require.NotNil(t, resultRecord, "GetFee should return an exercised record result")
+
+	fmt.Printf("GetFee result record: %+v\n", resultRecord)
+	var result ccipclient.SenderGetFeeResult
+	err = ledger.RecordToStruct(resultRecord, &result)
+	require.NoError(t, err)
+
+	return result
 }
 
 // evmFeeQuoterDestChainConfigForLane returns the FeeQuoter dest-chain defaults that the EVM 2.0

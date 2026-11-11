@@ -109,6 +109,27 @@ type CCIPSendResponse struct {
 	FeeTokenTransferFactoryContext *map[string]interface{} `json:"feeTokenTransferFactoryContext,omitempty"`
 }
 
+// GlobalTokenSenderReceiverResponse defines model for GlobalTokenSenderReceiverResponse.
+type GlobalTokenSenderReceiverResponse struct {
+	// ContractId The unique identifier of a contract.
+	//
+	// Example: 00929f6a675c128bb54bef77a8cad8d330badd4330cf71f6a19b596b01f4b66b2dca121220cd655ce27fae64bdf6a203fcd987727de81c3762e46b1882ce2c2fbf0a72c64f
+	ContractId externalRef0.ContractId `json:"contractId"`
+
+	// DisclosedContracts Disclosures for the GlobalTokenSenderReceiver contract
+	DisclosedContracts []externalRef0.DisclosedContract `json:"disclosedContracts"`
+
+	// InstanceAddress The InstanceAddress of a contract, the keccak256 hash of the RawInstanceAddress.
+	//
+	// Example: 0x9d24274102a5d2f57506d48dee1394e33f7cef9a9c0920ee714d6f4a216a21a9
+	InstanceAddress externalRef0.InstanceAddress `json:"instanceAddress"`
+
+	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
+	//
+	// Example: some-contract-fgtlw@ccipOwner::1220131b86f50178e6f7aabe62ef79e79b4964a526a1c557776409f448cbcd2406ce
+	RawInstanceAddress externalRef0.RawInstanceAddress `json:"rawInstanceAddress"`
+}
+
 // LookupTokenPoolResponse defines model for LookupTokenPoolResponse.
 type LookupTokenPoolResponse struct {
 	// RawInstanceAddress The raw InstanceAddress of a contract, in the form of "prefix@owner", where prefix is the InstanceId of the contract.
@@ -240,6 +261,14 @@ type ClientInterface interface {
 	//
 	// Get the explicit disclosure for sending a CCIP message from Canton.
 	PostCCIPSend(ctx context.Context, body PostCCIPSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTokenSenderReceiver performs a GET /ccip/v1/global/tokenSenderReceiver (the `GetTokenSenderReceiver` operationId) request.
+	//
+	// Get the GlobalTokenSenderReceiver contract, a single Chainlink-operated
+	// orchestrator used for all DA Registry token transfers in both directions.
+	// The returned disclosure is static (the contract is created once and never
+	// consumed), so it can be cached aggressively.
+	GetTokenSenderReceiver(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // PostPerPartyRouterFactoryWithBody performs a POST /ccip/v1/global/PerPartyRouter/factory (the `PostPerPartyRouterFactory` operationId) request,
@@ -343,6 +372,24 @@ func (c *Client) PostCCIPSendWithBody(ctx context.Context, contentType string, b
 // Get the explicit disclosure for sending a CCIP message from Canton.
 func (c *Client) PostCCIPSend(ctx context.Context, body PostCCIPSendJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostCCIPSendRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTokenSenderReceiver performs a GET /ccip/v1/global/tokenSenderReceiver (the `GetTokenSenderReceiver` operationId) request.
+//
+// Get the GlobalTokenSenderReceiver contract, a single Chainlink-operated
+// orchestrator used for all DA Registry token transfers in both directions.
+// The returned disclosure is static (the contract is created once and never
+// consumed), so it can be cached aggressively.
+func (c *Client) GetTokenSenderReceiver(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTokenSenderReceiverRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -507,6 +554,33 @@ func NewPostCCIPSendRequestWithBody(server string, contentType string, body io.R
 	return req, nil
 }
 
+// NewGetTokenSenderReceiverRequest constructs an http.Request for the GetTokenSenderReceiver method
+func NewGetTokenSenderReceiverRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/ccip/v1/global/tokenSenderReceiver")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -599,6 +673,16 @@ type ClientWithResponsesInterface interface {
 	//
 	// Get the explicit disclosure for sending a CCIP message from Canton.
 	PostCCIPSendWithResponse(ctx context.Context, body PostCCIPSendJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCCIPSendResponse, error)
+
+	// GetTokenSenderReceiverWithResponse performs a GET /ccip/v1/global/tokenSenderReceiver (the `GetTokenSenderReceiver` operationId) request.
+	//
+	// Get the GlobalTokenSenderReceiver contract, a single Chainlink-operated
+	// orchestrator used for all DA Registry token transfers in both directions.
+	// The returned disclosure is static (the contract is created once and never
+	// consumed), so it can be cached aggressively.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetTokenSenderReceiverWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTokenSenderReceiverResponse, error)
 }
 
 type PostPerPartyRouterFactoryResponse struct {
@@ -849,6 +933,68 @@ func (r PostCCIPSendResponse) ContentType() string {
 	return ""
 }
 
+type GetTokenSenderReceiverResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *GlobalTokenSenderReceiverResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *externalRef0.N400
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *externalRef0.N404
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *externalRef0.N500
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTokenSenderReceiverResponse) GetJSON200() *GlobalTokenSenderReceiverResponse {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetTokenSenderReceiverResponse) GetJSON400() *externalRef0.N400 {
+	return r.JSON400
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetTokenSenderReceiverResponse) GetJSON404() *externalRef0.N404 {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetTokenSenderReceiverResponse) GetJSON500() *externalRef0.N500 {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTokenSenderReceiverResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTokenSenderReceiverResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTokenSenderReceiverResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTokenSenderReceiverResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // PostPerPartyRouterFactoryWithBodyWithResponse performs a POST /ccip/v1/global/PerPartyRouter/factory (the `PostPerPartyRouterFactory` operationId) request,
 // with any type of body and a specified content type.
 //
@@ -938,6 +1084,22 @@ func (c *ClientWithResponses) PostCCIPSendWithResponse(ctx context.Context, body
 		return nil, err
 	}
 	return ParsePostCCIPSendResponse(rsp)
+}
+
+// GetTokenSenderReceiverWithResponse performs a GET /ccip/v1/global/tokenSenderReceiver (the `GetTokenSenderReceiver` operationId) request.
+//
+// Get the GlobalTokenSenderReceiver contract, a single Chainlink-operated
+// orchestrator used for all DA Registry token transfers in both directions.
+// The returned disclosure is static (the contract is created once and never
+// consumed), so it can be cached aggressively.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetTokenSenderReceiverWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTokenSenderReceiverResponse, error) {
+	rsp, err := c.GetTokenSenderReceiver(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTokenSenderReceiverResponse(rsp)
 }
 
 // ParsePostPerPartyRouterFactoryResponse parses an HTTP response from a PostPerPartyRouterFactoryWithResponse call
@@ -1128,6 +1290,53 @@ func ParsePostCCIPSendResponse(rsp *http.Response) (*PostCCIPSendResponse, error
 	return response, nil
 }
 
+// ParseGetTokenSenderReceiverResponse parses an HTTP response from a GetTokenSenderReceiverWithResponse call
+func ParseGetTokenSenderReceiverResponse(rsp *http.Response) (*GetTokenSenderReceiverResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTokenSenderReceiverResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GlobalTokenSenderReceiverResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest externalRef0.N400
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest externalRef0.N404
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest externalRef0.N500
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
@@ -1142,6 +1351,9 @@ type ServerInterface interface {
 
 	// (POST /ccip/v1/global/message/send)
 	PostCCIPSend(c *gin.Context)
+
+	// (GET /ccip/v1/global/tokenSenderReceiver)
+	GetTokenSenderReceiver(c *gin.Context)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -1217,6 +1429,19 @@ func (siw *ServerInterfaceWrapper) PostCCIPSend(c *gin.Context) {
 	siw.Handler.PostCCIPSend(c)
 }
 
+// GetTokenSenderReceiver operation middleware
+func (siw *ServerInterfaceWrapper) GetTokenSenderReceiver(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.GetTokenSenderReceiver(c)
+}
+
 // GinServerOptions provides options for the Gin server.
 type GinServerOptions struct {
 	BaseURL      string
@@ -1246,6 +1471,7 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 
 	router.POST(options.BaseURL+"/ccip/v1/global/PerPartyRouter/factory", wrapper.PostPerPartyRouterFactory)
 	router.GET(options.BaseURL+"/ccip/v1/global/TokenAdminRegistry/token/:instrumentId", wrapper.GetTokenAdminRegistryToken)
+	router.GET(options.BaseURL+"/ccip/v1/global/tokenSenderReceiver", wrapper.GetTokenSenderReceiver)
 	router.POST(options.BaseURL+"/ccip/v1/global/message/send", wrapper.PostCCIPSend)
 	router.POST(options.BaseURL+"/ccip/v1/global/message/execute", wrapper.PostCCIPExecute)
 }

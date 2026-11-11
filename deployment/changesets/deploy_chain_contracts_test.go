@@ -70,7 +70,6 @@ func TestDeployChainContracts(t *testing.T) {
 		pubKeyHex := hex.EncodeToString(crypto.FromECDSAPub(&pk.PublicKey))
 		ccvSignerPubKeys = append(ccvSignerPubKeys, types.TEXT(pubKeyHex))
 	}
-	versionTag := "e9a05a20"
 	_ = ccvSignerPubKeys // The signers are set during lane deployment
 	// ccvID := versionTag + "@" + user.PrimaryParty
 
@@ -87,7 +86,7 @@ func TestDeployChainContracts(t *testing.T) {
 						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(ccipOwnerParty),
 							CcipOwner:                    types.PARTY(ccipOwnerParty),
-							VersionTag:                   types.TEXT(versionTag),
+							VersionTag:                   committeeverifier.VersionTagV200,
 							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(ccipOwnerParty),

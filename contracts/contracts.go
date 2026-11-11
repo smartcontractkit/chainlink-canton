@@ -53,6 +53,11 @@ const (
 	CCIPBurnMintTokenPoolV2    = Package("ccip-burn-mint-token-pool-v2")
 	CCIPFactoryV2              = Package("ccip-factory-v2")
 
+	// Fresh packages: unreleased, ships as a dev DAR until the 2.0.0
+	// artifacts are frozen through the release pipeline.
+	CCIPClientV2                    = Package("ccip-client-v2")
+	CCIPGlobalTokenSenderReceiverV2 = Package("ccip-global-token-sender-receiver-v2")
+
 	// CCIP - Registry pools (EDS auto-detection observer field; separate template
 	// family from the production/LINK pools above, kept isolated so a bug or spam on
 	// the registry-discovery side can never affect production pool serving).
@@ -88,7 +93,7 @@ const (
 	Coin                                  = Package("coin")
 	GlobalConfig                          = Package("globalconfig")
 	MCMSTest                              = Package("mcms-test")
-	CCIPTest                              = Package("ccip-test")
+	CCIPTest                              = Package("ccip-test-v2")
 	SpliceApiFeaturedAppV1                = Package("splice-api-featured-app-v1")
 	SpliceApiTokenAllocationV1            = Package("splice-api-token-allocation-v1")
 	SpliceApiTokenAllocationInstructionV1 = Package("splice-api-token-allocation-instruction-v1")
@@ -197,11 +202,18 @@ var Versions map[Package][]string = map[Package][]string{
 	CCIPBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
 	CCIPFactoryV2:              append(ReleasedVersions[CCIPFactoryV2], DevVersion),
 
+	// Fresh -v2 lineages: unreleased, dev DARs only until the 2.0.0 artifacts
+	// are frozen through the release pipeline.
+	CCIPClientV2:                    []string{DevVersion},
+	CCIPGlobalTokenSenderReceiverV2: []string{DevVersion},
+
 	// Fresh -v2 lineage: unreleased, dev DARs only until the 2.0.0 artifacts are
 	// frozen through the release pipeline.
 	CCIPRegistryBurnMintTokenPoolV2:    []string{DevVersion},
 	CCIPRegistryLockReleaseTokenPoolV2: []string{DevVersion},
 	CCIPRegistryRateLimiterV2:          []string{DevVersion},
+
+	CCIPTest: []string{DevVersion},
 
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
@@ -402,6 +414,9 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2: []string{"ccip", "lockreleasetokenpool"},
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
+
+	CCIPClientV2:                    []string{"ccip", "client"},
+	CCIPGlobalTokenSenderReceiverV2: []string{"ccip", "globaltokensenderreceiver"},
 
 	CCIPRegistryBurnMintTokenPoolV2:    []string{"ccip", "registry", "burnminttokenpool"},
 	CCIPRegistryLockReleaseTokenPoolV2: []string{"ccip", "registry", "lockreleasetokenpool"},

@@ -7,7 +7,7 @@
 -- because ccipOwner is not a party on this contract.
 module CCIP.CCIPReceiver where
 
-import DA.Crypto.Text (BytesHex)
+import DA.Crypto.Text (BytesHex, keccak256)
 import DA.Action (foldlA)
 import DA.List (unique)
 import DA.Optional (fromSomeNote)
@@ -16,10 +16,12 @@ import qualified Splice.Api.Token.MetadataV1
 
 import qualified Chainlink.InstanceAddress
 
+import qualified CCIP.APIV2.ExecutingMessage
 import qualified CCIP.APIV2.RMNRemote
 import qualified CCIP.APIV2.TokenAdminRegistry
 import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.CodecV2.MessageCodecV1
+import qualified CCIP.Client.Receiver
 import qualified CCIP.ClientV2
 import qualified CCIP.InterfacesV2.CrossChainVerifier
 import qualified CCIP.InterfacesV2.TokenPool
@@ -203,6 +205,44 @@ template CCIPReceiver
                     message = result.message
                     tokenReleaseResult
 
+        -- | Client interface implementation, so the SDK can drive this
+        -- orchestrator through the stable ICCIPReceiver interface. The
+        -- interface's canonical input types are converted to this template's
+        -- local types, and the local CCIPMessageReceived receipt is mapped
+        -- onto the interface's ReceiverExecuteResult (the execution state is
+        -- read back from the router).
+        interface instance CCIP.Client.Receiver.ICCIPReceiver for CCIPReceiver where
+            view = CCIP.Client.Receiver.ICCIPReceiverView with
+                ccipOwner = owner
+                requiredCCVs = requiredCCVs
+                receiverFinalityConfig = receiverFinalityConfig
+
+            iccipReceiver_getRequiredCCVsImpl self arg = exercise (fromInterfaceContractId @CCIPReceiver self) GetRequiredCCVs with
+                routerCid = arg.routerCid
+                encodedMessage = arg.encodedMessage
+                tokenPoolCid = arg.tokenPoolCid
+                context = arg.context
+
+            iccipReceiver_executeImpl self arg = do
+                receiptCid <- exercise (fromInterfaceContractId @CCIPReceiver self) Execute with
+                    routerCid = arg.routerCid
+                    encodedMessage = arg.encodedMessage
+                    tokenTransfer = fmap toLocalReceiverTokenTransferInput arg.tokenTransfer
+                    ccvInputs = map toLocalCCVInput arg.ccvInputs
+                    context = arg.context
+                receipt <- fetch receiptCid
+                pure CCIP.Client.Receiver.ReceiverExecuteResult with
+                    router = receipt.router
+                    messageId = receipt.messageId
+                    message = receipt.message
+                    -- shortcut, there are only two possible states: SUCCESS or UNTOUCHED
+                    -- Ideally, we would exercise PerPartyRouter_GetExecutionState on the PPR,
+                    -- but the PPR has been archived by the execution of the message, and we don't
+                    -- have access to it's contract ID here.
+                    state = CCIP.APIV2.ExecutingMessage.SUCCESS
+                    tokenReleaseResult = receipt.tokenReleaseResult
+                    context = arg.context
+
 -- | Record of a successfully received CCIP message.
 template CCIPMessageReceived
     with
@@ -213,3 +253,15 @@ template CCIPMessageReceived
         tokenReleaseResult : Optional CCIP.InterfacesV2.TokenPool.ReleaseOrMintResult
     where
         signatory owner
+
+toLocalCCVInput : CCIP.Client.Receiver.ReceiverCCVInput -> CCVInput
+toLocalCCVInput input = CCVInput with
+    ccvCid = input.ccvCid
+    verifierResults = input.verifierResults
+    context = input.context
+
+toLocalReceiverTokenTransferInput : CCIP.Client.Receiver.ReceiverTokenTransferInput -> TokenTransferInput
+toLocalReceiverTokenTransferInput input = TokenTransferInput with
+    tokenPoolCid = input.tokenPoolCid
+    tokenReceiverParty = input.tokenReceiverParty
+    context = input.context

@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/globaltokensenderreceiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
@@ -40,13 +41,14 @@ type Server struct {
 	logger              zerolog.Logger
 	activeContractStore store.ActiveContractStoreInterface
 
-	perPartyRouterFactory contracts.InstanceAddress
-	onRamp                contracts.InstanceAddress
-	offRamp               contracts.InstanceAddress
-	globalConfig          contracts.InstanceAddress
-	tokenAdminRegistry    contracts.InstanceAddress
-	rmnRemote             contracts.InstanceAddress
-	feeQuoter             contracts.InstanceAddress
+	perPartyRouterFactory     contracts.InstanceAddress
+	onRamp                    contracts.InstanceAddress
+	offRamp                   contracts.InstanceAddress
+	globalConfig              contracts.InstanceAddress
+	tokenAdminRegistry        contracts.InstanceAddress
+	rmnRemote                 contracts.InstanceAddress
+	feeQuoter                 contracts.InstanceAddress
+	globalTokenSenderReceiver contracts.InstanceAddress
 
 	// ccipOwner is the party that owns the CCIP contracts and receives the fees paid in the fee token.
 	ccipOwner types.PARTY
@@ -69,17 +71,18 @@ func NewServer(
 	config config.CCIPAPIConfig,
 ) (*Server, error) {
 	s := &Server{
-		logger:                logger.With().Str("component", "CCIPAPI").Logger(),
-		activeContractStore:   activeContractStore,
-		perPartyRouterFactory: config.PerPartyRouterFactory.InstanceAddress,
-		onRamp:                config.OnRamp.InstanceAddress,
-		offRamp:               config.OffRamp.InstanceAddress,
-		globalConfig:          config.GlobalConfig.InstanceAddress,
-		tokenAdminRegistry:    config.TokenAdminRegistry.InstanceAddress,
-		rmnRemote:             config.RMNRemote.InstanceAddress,
-		feeQuoter:             config.FeeQuoter.InstanceAddress,
-		ccipOwner:             types.PARTY(config.CcipOwner),
-		feeTokenFactories:     make(map[splice_api_token_holding_v1.InstrumentId]feeTokenFactory, len(config.FeeTokens)),
+		logger:                    logger.With().Str("component", "CCIPAPI").Logger(),
+		activeContractStore:       activeContractStore,
+		perPartyRouterFactory:     config.PerPartyRouterFactory.InstanceAddress,
+		onRamp:                    config.OnRamp.InstanceAddress,
+		offRamp:                   config.OffRamp.InstanceAddress,
+		globalConfig:              config.GlobalConfig.InstanceAddress,
+		tokenAdminRegistry:        config.TokenAdminRegistry.InstanceAddress,
+		rmnRemote:                 config.RMNRemote.InstanceAddress,
+		feeQuoter:                 config.FeeQuoter.InstanceAddress,
+		globalTokenSenderReceiver: config.GlobalTokenSenderReceiver.InstanceAddress,
+		ccipOwner:                 types.PARTY(config.CcipOwner),
+		feeTokenFactories:         make(map[splice_api_token_holding_v1.InstrumentId]feeTokenFactory, len(config.FeeTokens)),
 	}
 
 	s.activeContractStore.RegisterTemplates(
@@ -108,6 +111,9 @@ func NewServer(
 			}, {
 				TemplateID: contracts.TemplateIDFromBinding(core.FeeQuoter{}),
 				PartyID:    config.FeeQuoter.PartyID,
+			}, {
+				TemplateID: contracts.TemplateIDFromBinding(globaltokensenderreceiver.GlobalTokenSenderReceiver{}),
+				PartyID:    config.GlobalTokenSenderReceiver.PartyID,
 			},
 		}...,
 	)
@@ -168,6 +174,33 @@ func (s Server) PostPerPartyRouterFactory(c *gin.Context) {
 		RawInstanceAddress: parsedPerPartyRouterFactory.Address.String(),
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activePerPartyRouterFactoryContract),
+		},
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetTokenSenderReceiver (GET /ccip/v1/global/tokenSenderReceiver)
+func (s Server) GetTokenSenderReceiver(c *gin.Context) {
+	activeGlobalTokenSenderReceiverContract, ok := s.activeContractStore.Get(s.globalTokenSenderReceiver)
+	if !ok {
+		s.logger.Error().Stringer("address", s.globalTokenSenderReceiver).Msg("active globalTokenSenderReceiver contract not found")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	parsedGlobalTokenSenderReceiver, err := ParseGlobalTokenSenderReceiver(activeGlobalTokenSenderReceiverContract.GetCreatedEvent())
+	if err != nil {
+		s.logger.Err(err).Stringer("address", s.globalTokenSenderReceiver).Msg("failed to parse globalTokenSenderReceiver contract")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	resp := &oapiCCIP.GlobalTokenSenderReceiverResponse{
+		ContractId:         activeGlobalTokenSenderReceiverContract.GetCreatedEvent().GetContractId(),
+		InstanceAddress:    parsedGlobalTokenSenderReceiver.Address.InstanceAddress().Hex(),
+		RawInstanceAddress: parsedGlobalTokenSenderReceiver.Address.String(),
+		DisclosedContracts: []oapiCommon.DisclosedContract{
+			converters.ActiveContractToDisclosedContract(activeGlobalTokenSenderReceiverContract),
 		},
 	}
 	c.JSON(http.StatusOK, resp)
@@ -415,6 +448,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		converters.ActiveContractToDisclosedContract(activeRMNRemoteContract),
 		converters.ActiveContractToDisclosedContract(activeFeeQuoterContract),
 	}
+
 	var feeTokenConfigCid string
 
 	parsedTokenAdminRegistry, err := ParseTokenAdminRegistry(activeTokenAdminRegistryContract.GetCreatedEvent())
@@ -675,7 +709,8 @@ func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contrac
 			s.globalConfig,
 			s.tokenAdminRegistry,
 			s.rmnRemote,
-			s.feeQuoter:
+			s.feeQuoter,
+			s.globalTokenSenderReceiver:
 			out = append(out, address)
 		}
 	}

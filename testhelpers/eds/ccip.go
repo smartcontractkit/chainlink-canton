@@ -56,6 +56,72 @@ func GetPerPartyRouterFactoryDisclosure(
 	}, nil
 }
 
+type TokenSenderReceiverDisclosure struct {
+	ContractId         string
+	Address            contracts.RawInstanceAddress
+	DisclosedContracts []*apiv2.DisclosedContract
+}
+
+// GetTokenSenderReceiverDisclosure fetches the GlobalTokenSenderReceiver
+// contract's static disclosure for SDK bootstrap. The blob is created once and
+// never consumed, so it can be cached.
+func GetTokenSenderReceiverDisclosure(
+	ctx context.Context,
+	ccipAPIClient oapiCCIP.ClientWithResponsesInterface,
+) (*TokenSenderReceiverDisclosure, error) {
+	const (
+		retryDelay   = 200 * time.Millisecond
+		retryTimeout = 10 * time.Second
+	)
+
+	deadline := time.Now().Add(retryTimeout)
+	var lastErr error
+
+	for {
+		resp, err := ccipAPIClient.GetTokenSenderReceiverWithResponse(ctx)
+		if err == nil && resp.StatusCode() == http.StatusOK {
+			var disclosedContracts []*apiv2.DisclosedContract
+			for _, contract := range resp.JSON200.DisclosedContracts {
+				disclosedContract, err := DisclosedContractToProto(contract)
+				if err != nil {
+					return nil, err
+				}
+				disclosedContracts = append(disclosedContracts, disclosedContract)
+			}
+
+			address, err := contracts.RawInstanceAddressFromString(resp.JSON200.RawInstanceAddress)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse GlobalTokenSenderReceiver address: %w", err)
+			}
+
+			return &TokenSenderReceiverDisclosure{
+				ContractId:         resp.JSON200.ContractId,
+				Address:            address,
+				DisclosedContracts: disclosedContracts,
+			}, nil
+		}
+		if err == nil && resp.StatusCode() < http.StatusInternalServerError {
+			return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
+		}
+		lastErr = err
+
+		if time.Now().After(deadline) {
+			if lastErr != nil {
+				return nil, fmt.Errorf("failed to get global token sender receiver: %w", lastErr)
+			}
+			return nil, fmt.Errorf("failed to get global token sender receiver: unexpected status code: %d", resp.StatusCode())
+		}
+
+		timer := time.NewTimer(retryDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, fmt.Errorf("failed to get global token sender receiver: %w", ctx.Err())
+		case <-timer.C:
+		}
+	}
+}
+
 func postPerPartyRouterFactoryWithRetry(
 	ctx context.Context,
 	ccipAPIClient oapiCCIP.ClientWithResponsesInterface,

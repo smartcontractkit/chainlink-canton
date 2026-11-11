@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	client "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	clientapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-sender-v2"
-	PackageID   = "7ffa2b979e063523780a09ae70c71166410b177abb98094e448c658869335af3"
+	PackageID   = "21a710a83e1aa270bf1fa794668679109ed267b4f5237cefb8390ef11fffe9b3"
 	SDKVersion  = "3.4.11"
 )
 
@@ -168,7 +169,7 @@ func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, arg
 	}
 }
 
-// Archive exercises the Archive choice on this CCIPSender contract
+// Archive exercises the Archive choice on this CCIPSender contract via the IICCIPSender interface
 // This method uses the package name in the template ID
 func (t CCIPSender) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
@@ -209,6 +210,73 @@ func (t CCIPSender) GetRequiredCCVsWithPackageID(contractID string, packageID st
 		Arguments:  argsToMap(args),
 	}
 }
+
+// ICCIPSenderGetRequiredCCVs exercises the ICCIPSender_GetRequiredCCVs choice on this CCIPSender contract via the IICCIPSender interface
+// This method uses the package name in the template ID
+func (t CCIPSender) ICCIPSenderGetRequiredCCVs(contractID string, args client.ICCIPSenderGetRequiredCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderGetRequiredCCVsWithPackageID exercises the ICCIPSender_GetRequiredCCVs choice using the provided package ID instead of package name
+func (t CCIPSender) ICCIPSenderGetRequiredCCVsWithPackageID(contractID string, packageID string, args client.ICCIPSenderGetRequiredCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderGetFee exercises the ICCIPSender_GetFee choice on this CCIPSender contract via the IICCIPSender interface
+// This method uses the package name in the template ID
+func (t CCIPSender) ICCIPSenderGetFee(contractID string, args client.ICCIPSenderGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderGetFeeWithPackageID exercises the ICCIPSender_GetFee choice using the provided package ID instead of package name
+func (t CCIPSender) ICCIPSenderGetFeeWithPackageID(contractID string, packageID string, args client.ICCIPSenderGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderSend exercises the ICCIPSender_Send choice on this CCIPSender contract via the IICCIPSender interface
+// This method uses the package name in the template ID
+func (t CCIPSender) ICCIPSenderSend(contractID string, args client.ICCIPSenderSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_Send",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderSendWithPackageID exercises the ICCIPSender_Send choice using the provided package ID instead of package name
+func (t CCIPSender) ICCIPSenderSendWithPackageID(contractID string, packageID string, args client.ICCIPSenderSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_Send",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for CCIPSender
+
+var _ client.IICCIPSender = (*CCIPSender)(nil)
 
 // CCVSendInput is a Record type
 type CCVSendInput struct {

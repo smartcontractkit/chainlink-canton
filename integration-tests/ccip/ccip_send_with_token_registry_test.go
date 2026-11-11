@@ -53,6 +53,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_token_sender_receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -114,7 +115,7 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	tokenPoolDar, err := contracts.GetDar(contracts.CCIPBurnMintTokenPoolV2, contracts.DevVersion)
 	require.NoError(t, err)
-	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.CurrentVersion)
+	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.DevVersion)
 	require.NoError(t, err)
 
 	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, ccipTestDar}
@@ -140,7 +141,6 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 		ccvSignerPubKeys = append(ccvSignerPubKeys, pubKeyHex)
 	}
 
-	versionTag := "e9a05a20"
 	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 
@@ -186,7 +186,7 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
-							VersionTag:                   types.TEXT(versionTag),
+							VersionTag:                   committeeverifier.VersionTagV200,
 							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-registry-send"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
@@ -253,6 +253,9 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 	_, rmnRemoteAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), rmn_remote.ContractType, rmn_remote.Version, "")
 	require.NoError(t, err)
 	_, perPartyRouterFactoryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), per_party_router_factory.ContractType, per_party_router_factory.Version, "")
+	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+	_, globalTokenSenderReceiverAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_token_sender_receiver.ContractType, global_token_sender_receiver.Version, "")
+	require.NoError(t, err, "failed to get GlobalTokenSenderReceiver address")
 	require.NoError(t, err)
 	executorRef, executorAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), executor.ContractType, executor.Version, devenvcommon.DefaultExecutorQualifier)
 	require.NoError(t, err)
@@ -466,6 +469,10 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 				FeeQuoter: config.ContractIdentifier{
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
+				},
+				GlobalTokenSenderReceiver: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: globalTokenSenderReceiverAddress.InstanceAddress(),
 				},
 				CcipOwner: partyCCIP,
 				FeeTokens: map[string]config.FeeToken{

@@ -30,6 +30,7 @@ import CCIP.FactoryTest.FactoryCodecTest
   , encodeDeployOnRampParams
   , encodeDeployOffRampParams
   , encodeDeployPerPartyRouterFactoryParams
+  , encodeDeployGlobalTokenSenderReceiverParams
   , encodeDeployRMNRemoteParams
   , encodeDeployCommitteeVerifierParams
   , encodeDeployExecutorParams
@@ -549,6 +550,40 @@ testDeployPerPartyRouterFactory_MCMS = script do
   submit mcmsParty do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "DeployPerPartyRouterFactory"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
+-- | Test DeployGlobalTokenSenderReceiver via MCMS entrypoint
+testDeployGlobalTokenSenderReceiver_MCMS : Script ()
+testDeployGlobalTokenSenderReceiver_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+
+  let factoryInstanceId = "factory-global-sr"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = Chainlink.InstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = CCIP.FactoryV2.DeployGlobalTokenSenderReceiverParams with
+        instanceId = "global-sr-1"
+        requiredCCVs = []
+        optionalCCVs = []
+        optionalThreshold = 0
+        receiverFinalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
+      encoded = encodeDeployGlobalTokenSenderReceiverParams params
+
+  submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployGlobalTokenSenderReceiver"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 

@@ -1,0 +1,119 @@
+-- | Sender-side client interface for CCIP token/message orchestration contracts.
+--
+-- Lets the SDK drive any conforming sender contract (the global
+-- GlobalTokenSenderReceiver as well as the per-user CCIPSender) through one
+-- stable interface. Input types are the canonical definitions referenced by
+-- the interface choices; implementations convert from their local types.
+--
+-- Every choice carries a ChoiceContext so arbitrary data can be passed along
+-- without touching this (un-upgradeable) interface.
+module CCIP.Client.Sender where
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+import qualified Splice.Api.Token.TransferInstructionV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.APIV2.TokenAdminRegistry
+import qualified CCIP.ClientV2
+import qualified CCIP.InterfacesV2.CrossChainVerifier
+import qualified CCIP.InterfacesV2.Executor
+import qualified CCIP.InterfacesV2.TokenPool
+
+-- | Fee token inputs for paying CCIP fees.
+data SenderFeeTokenInput = SenderFeeTokenInput
+    with
+        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        feeTokenConfigCid : ContractId CCIP.APIV2.TokenAdminRegistry.ITokenConfig
+        feeTokenTransferFactory : ContractId Splice.Api.Token.TransferInstructionV1.TransferFactory
+        feeTokenExtraArgs : Splice.Api.Token.MetadataV1.ExtraArgs
+    deriving (Eq, Show)
+
+-- | Outbound token transfer inputs, provided only when the message includes
+-- a token transfer.
+data SenderTokenTransferInput = SenderTokenTransferInput
+    with
+        senderInputCids : [ContractId Splice.Api.Token.HoldingV1.Holding]
+        tokenPoolCid : ContractId CCIP.InterfacesV2.TokenPool.ITokenPool
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+-- | Executor inputs, provided when the message resolves to an executor.
+data SenderExecutorInput = SenderExecutorInput
+    with
+        executorCid : ContractId CCIP.InterfacesV2.Executor.IExecutor
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+-- | Per-CCV input used to quote and forward messages to verifiers.
+data SenderCCVSendInput = SenderCCVSendInput
+    with
+        -- Used to match this CCV to its verifier args in the client-provided CCVExtraArgs.
+        ccvAddress : Chainlink.InstanceAddress.RawInstanceAddress
+        ccvCid : ContractId CCIP.InterfacesV2.CrossChainVerifier.ICrossChainVerifier
+        context : Splice.Api.Token.MetadataV1.ChoiceContext
+    deriving (Eq, Show)
+
+-- | Return type of GetFee
+data SenderGetFeeResult = SenderGetFeeResult
+    with
+        -- The feeResult returned by the PerPartyRouter.
+        feeResult : CCIP.ClientV2.GetFeeResult
+        -- The pool's fee quote, optional and only present if the message contains a token transfer.
+        poolQuote : Optional (CCIP.InterfacesV2.TokenPool.TokenPoolFeeQuote)
+    deriving (Eq, Show)
+
+data ICCIPSenderView = ICCIPSenderView
+    with
+        -- The party that operates and endorses the sender contract.
+        ccipOwner : Party
+
+interface ICCIPSender where
+    viewtype ICCIPSenderView
+
+    iccipSender_getRequiredCCVsImpl : ContractId ICCIPSender -> ICCIPSender_GetRequiredCCVs -> Update [Chainlink.InstanceAddress.RawInstanceAddress]
+    iccipSender_getFeeImpl : ContractId ICCIPSender -> ICCIPSender_GetFee -> Update SenderGetFeeResult
+    iccipSender_sendImpl : ContractId ICCIPSender -> ICCIPSender_Send -> Update CCIP.ClientV2.CCIPSendResult
+
+    -- | Query the required CCVs for sending a message.
+    nonconsuming choice ICCIPSender_GetRequiredCCVs
+        : [Chainlink.InstanceAddress.RawInstanceAddress]
+        with
+            senderParty : Party
+            destinationChainSelector : Numeric 0
+            message : CCIP.ClientV2.Canton2AnyMessage
+            routerCid : ContractId CCIP.ClientV2.PerPartyRouter
+            tokenPoolCid : Optional (ContractId CCIP.InterfacesV2.TokenPool.ITokenPool)
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller senderParty
+        do iccipSender_getRequiredCCVsImpl this self arg
+
+    -- | Quote the fees for sending a message.
+    nonconsuming choice ICCIPSender_GetFee : SenderGetFeeResult
+        with
+            senderParty : Party
+            destinationChainSelector : Numeric 0
+            message : CCIP.ClientV2.Canton2AnyMessage
+            routerCid : ContractId CCIP.ClientV2.PerPartyRouter
+            ccvSendInputs : [SenderCCVSendInput]
+            tokenTransferInput : Optional SenderTokenTransferInput
+            executorInput : Optional SenderExecutorInput
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller senderParty
+        do iccipSender_getFeeImpl this self arg
+
+    -- | Send a message.
+    nonconsuming choice ICCIPSender_Send : CCIP.ClientV2.CCIPSendResult
+        with
+            senderParty : Party
+            destinationChainSelector : Numeric 0
+            message : CCIP.ClientV2.Canton2AnyMessage
+            routerCid : ContractId CCIP.ClientV2.PerPartyRouter
+            feeTokenInput : SenderFeeTokenInput
+            ccvSendInputs : [SenderCCVSendInput]
+            tokenTransferInput : Optional SenderTokenTransferInput
+            executorInput : Optional SenderExecutorInput
+            context : Splice.Api.Token.MetadataV1.ChoiceContext
+        controller senderParty
+        do iccipSender_sendImpl this self arg
