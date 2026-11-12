@@ -904,6 +904,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		tokenPoolSendDisclosure.DisclosedContracts,
 		ccvSendDisclosure.DisclosedContracts,
 		executorSendDisclosure.DisclosedContracts,
+		globalSenderReceiverDisclosure.DisclosedContracts,
 	)...)
 	feeResult := quoteICCIPSenderFee(t, senderParticipant, partySender, globalSenderReceiverDisclosure.ContractId, sendArgs, sendDisclosures)
 	// CCIP Send Fee
