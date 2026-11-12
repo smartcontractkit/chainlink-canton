@@ -28,8 +28,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-registry-burn-mint-token-pool"
-	PackageID   = "6bd9828f3ce9c4d52c3b56a54dd9ad17afffbb424a260fd5fe4edb8bbe3b351a"
+	PackageName = "ccip-registry-burn-mint-token-pool-v2"
+	PackageID   = "6528c6ab55d7fa7ecf01a21ba0ec822ee883db448d9c405a66c124d1653db686"
 	SDKVersion  = "3.4.11"
 )
 
@@ -434,7 +434,7 @@ type BurnMintTokenPool struct {
 	RateLimitAdmin          *types.PARTY                               `json:"rateLimitAdmin" hex:"optional"`
 	Observers               []types.PARTY                              `json:"observers"`
 	RemoteChainConfigs      map[types.NUMERIC]RemoteChainConfig        `json:"remoteChainConfigs"`
-	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig2  `json:"tokenTransferFeeConfigs"`
+	TokenTransferFeeConfigs map[types.NUMERIC]TokenTransferFeeConfig   `json:"tokenTransferFeeConfigs"`
 	PoolReceiveContext      splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
 	TransferTimeout         TransferTimeout                            `json:"transferTimeout"`
 	Deps                    BurnMintTokenPoolDeps                      `json:"deps"`
@@ -1771,7 +1771,7 @@ type LockOrBurn struct {
 	RmnRemoteCid          types.CONTRACT_ID                          `json:"rmnRemoteCid"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
 	SenderInputCids       []types.CONTRACT_ID                        `json:"senderInputCids"`
-	Amount                types.NUMERIC                              `json:"amount"`
+	Amount                types.NUMERIC                              `json:"amount" hex:"decimal"`
 	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }
@@ -2601,8 +2601,8 @@ func (t *SetTransferTimeoutParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// TokenTransferFeeConfig2 is a Record type
-type TokenTransferFeeConfig2 struct {
+// TokenTransferFeeConfig is a Record type
+type TokenTransferFeeConfig struct {
 	IsEnabled         types.BOOL    `json:"isEnabled"`
 	DestGasOverhead   types.INT64   `json:"destGasOverhead"`
 	DestBytesOverhead types.INT64   `json:"destBytesOverhead"`
@@ -2610,8 +2610,8 @@ type TokenTransferFeeConfig2 struct {
 	FeeBps            types.NUMERIC `json:"feeBps"`
 }
 
-// ToMap converts TokenTransferFeeConfig2 to a map for DAML arguments
-func (t TokenTransferFeeConfig2) ToMap() map[string]any {
+// ToMap converts TokenTransferFeeConfig to a map for DAML arguments
+func (t TokenTransferFeeConfig) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["isEnabled"] = bool(t.IsEnabled)
@@ -2627,24 +2627,24 @@ func (t TokenTransferFeeConfig2) ToMap() map[string]any {
 	return m
 }
 
-func (t TokenTransferFeeConfig2) MarshalJSON() ([]byte, error) {
+func (t TokenTransferFeeConfig) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshal(t)
 }
 
-func (t *TokenTransferFeeConfig2) UnmarshalJSON(data []byte) error {
+func (t *TokenTransferFeeConfig) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshal(data, t)
 }
 
-// MarshalHex encodes TokenTransferFeeConfig2 to hex string (Canton MCMS format)
-func (t TokenTransferFeeConfig2) MarshalHex() (string, error) {
+// MarshalHex encodes TokenTransferFeeConfig to hex string (Canton MCMS format)
+func (t TokenTransferFeeConfig) MarshalHex() (string, error) {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Marshal(t)
 }
 
-// UnmarshalHex decodes TokenTransferFeeConfig2 from hex string (Canton MCMS format)
-func (t *TokenTransferFeeConfig2) UnmarshalHex(data string) error {
+// UnmarshalHex decodes TokenTransferFeeConfig from hex string (Canton MCMS format)
+func (t *TokenTransferFeeConfig) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2831,7 +2831,7 @@ type VerifyOutboundCCVs struct {
 	TokenAdminRegistryCid types.CONTRACT_ID                          `json:"tokenAdminRegistryCid"`
 	TokenConfigCid        types.CONTRACT_ID                          `json:"tokenConfigCid"`
 	SendingMessageCid     types.CONTRACT_ID                          `json:"sendingMessageCid"`
-	Amount                types.NUMERIC                              `json:"amount"`
+	Amount                types.NUMERIC                              `json:"amount" hex:"decimal"`
 	Context               splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 	Caller                types.PARTY                                `json:"caller"`
 }

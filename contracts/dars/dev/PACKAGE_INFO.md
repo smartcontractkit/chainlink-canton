@@ -259,10 +259,10 @@
 | `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
 | `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
 
-## <a name="6bd9828f3ce9c4d52c3b56a54dd9ad17afffbb424a260fd5fe4edb8bbe3b351a"></a>ccip-registry-burn-mint-token-pool-dev.dar
-- Name: `ccip-registry-burn-mint-token-pool`
-- Version: `1.0.0`
-- Package ID: `6bd9828f3ce9c4d52c3b56a54dd9ad17afffbb424a260fd5fe4edb8bbe3b351a`
+## <a name="6528c6ab55d7fa7ecf01a21ba0ec822ee883db448d9c405a66c124d1653db686"></a>ccip-registry-burn-mint-token-pool-v2-dev.dar
+- Name: `ccip-registry-burn-mint-token-pool-v2`
+- Version: `2.0.0`
+- Package ID: `6528c6ab55d7fa7ecf01a21ba0ec822ee883db448d9c405a66c124d1653db686`
 
 ### Dependencies:
 | Package Name | Version | Package ID |
@@ -270,11 +270,10 @@
 | `ccip-api-v2` | `2.0.0` | [`7fffaf108129d37413d8edfbd91ffe373051b2cb0621c26e245093c6138daf58`](#7fffaf108129d37413d8edfbd91ffe373051b2cb0621c26e245093c6138daf58) |
 | `ccip-client-api-v2` | `2.0.0` | [`b8e4dfb8d64853c7f9aee4e93385462587745bdc703fceb750993f2723ebd984`](#b8e4dfb8d64853c7f9aee4e93385462587745bdc703fceb750993f2723ebd984) |
 | `ccip-codec-v2` | `2.0.0` | [`6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb`](#6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb) |
-| `ccip-core-v2` | `2.1.1` | [`7a08ead9e5158d6e493c144c63a91b1a7e23b9424359c1551ccfad991ba39c39`](#7a08ead9e5158d6e493c144c63a91b1a7e23b9424359c1551ccfad991ba39c39) |
 | `ccip-events-v2` | `2.0.0` | [`bfe1045f369796e1f8320e3c3d3b43142009ce1e8a6773b57b12f49c357c2f3f`](#bfe1045f369796e1f8320e3c3d3b43142009ce1e8a6773b57b12f49c357c2f3f) |
 | `ccip-extension-api-v2` | `2.0.0` | [`289011bdbefe42c7dbea0a4f101127095e8b5f5281d45c84f6eca06de11689a4`](#289011bdbefe42c7dbea0a4f101127095e8b5f5281d45c84f6eca06de11689a4) |
-| `ccip-registry-burn-mint-token-pool` | `1.0.0` | [`6bd9828f3ce9c4d52c3b56a54dd9ad17afffbb424a260fd5fe4edb8bbe3b351a`](#6bd9828f3ce9c4d52c3b56a54dd9ad17afffbb424a260fd5fe4edb8bbe3b351a) |
-| `ccip-registry-rate-limiter` | `1.0.0` | [`825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a`](#825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a) |
+| `ccip-registry-burn-mint-token-pool-v2` | `2.0.0` | [`6528c6ab55d7fa7ecf01a21ba0ec822ee883db448d9c405a66c124d1653db686`](#6528c6ab55d7fa7ecf01a21ba0ec822ee883db448d9c405a66c124d1653db686) |
+| `ccip-registry-rate-limiter-v2` | `2.0.0` | [`b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3`](#b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3) |
 | `ccip-tickets-v2` | `2.0.0` | [`506234a38fffe1945e3b5ff3a5e444a237fa9592b249b0f7444c194207df2c2d`](#506234a38fffe1945e3b5ff3a5e444a237fa9592b249b0f7444c194207df2c2d) |
 | `ccip-utils-v2` | `2.1.0` | [`e135acbb9955708adb809001c5c7de738b486cc0c54769719c2849f3e081238e`](#e135acbb9955708adb809001c5c7de738b486cc0c54769719c2849f3e081238e) |
 | `chainlink-api` | `2.0.0` | [`b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8`](#b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8) |
@@ -284,10 +283,10 @@
 | `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
 | `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
 
-## <a name="fbd2d9b8176bed61a07425b3b1952f21b763087c85eff24d6dfec8bd0300fad4"></a>ccip-registry-lock-release-token-pool-dev.dar
-- Name: `ccip-registry-lock-release-token-pool`
-- Version: `1.0.1`
-- Package ID: `fbd2d9b8176bed61a07425b3b1952f21b763087c85eff24d6dfec8bd0300fad4`
+## <a name="893d6334c33ed28af4911f3f347be72e344e824cb9f659f1c1cc0d18e50abf27"></a>ccip-registry-lock-release-token-pool-v2-dev.dar
+- Name: `ccip-registry-lock-release-token-pool-v2`
+- Version: `2.0.0`
+- Package ID: `893d6334c33ed28af4911f3f347be72e344e824cb9f659f1c1cc0d18e50abf27`
 
 ### Dependencies:
 | Package Name | Version | Package ID |
@@ -295,11 +294,10 @@
 | `ccip-api-v2` | `2.0.0` | [`7fffaf108129d37413d8edfbd91ffe373051b2cb0621c26e245093c6138daf58`](#7fffaf108129d37413d8edfbd91ffe373051b2cb0621c26e245093c6138daf58) |
 | `ccip-client-api-v2` | `2.0.0` | [`b8e4dfb8d64853c7f9aee4e93385462587745bdc703fceb750993f2723ebd984`](#b8e4dfb8d64853c7f9aee4e93385462587745bdc703fceb750993f2723ebd984) |
 | `ccip-codec-v2` | `2.0.0` | [`6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb`](#6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb) |
-| `ccip-core-v2` | `2.1.1` | [`7a08ead9e5158d6e493c144c63a91b1a7e23b9424359c1551ccfad991ba39c39`](#7a08ead9e5158d6e493c144c63a91b1a7e23b9424359c1551ccfad991ba39c39) |
 | `ccip-events-v2` | `2.0.0` | [`bfe1045f369796e1f8320e3c3d3b43142009ce1e8a6773b57b12f49c357c2f3f`](#bfe1045f369796e1f8320e3c3d3b43142009ce1e8a6773b57b12f49c357c2f3f) |
 | `ccip-extension-api-v2` | `2.0.0` | [`289011bdbefe42c7dbea0a4f101127095e8b5f5281d45c84f6eca06de11689a4`](#289011bdbefe42c7dbea0a4f101127095e8b5f5281d45c84f6eca06de11689a4) |
-| `ccip-registry-lock-release-token-pool` | `1.0.1` | [`fbd2d9b8176bed61a07425b3b1952f21b763087c85eff24d6dfec8bd0300fad4`](#fbd2d9b8176bed61a07425b3b1952f21b763087c85eff24d6dfec8bd0300fad4) |
-| `ccip-registry-rate-limiter` | `1.0.0` | [`825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a`](#825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a) |
+| `ccip-registry-lock-release-token-pool-v2` | `2.0.0` | [`893d6334c33ed28af4911f3f347be72e344e824cb9f659f1c1cc0d18e50abf27`](#893d6334c33ed28af4911f3f347be72e344e824cb9f659f1c1cc0d18e50abf27) |
+| `ccip-registry-rate-limiter-v2` | `2.0.0` | [`b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3`](#b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3) |
 | `ccip-tickets-v2` | `2.0.0` | [`506234a38fffe1945e3b5ff3a5e444a237fa9592b249b0f7444c194207df2c2d`](#506234a38fffe1945e3b5ff3a5e444a237fa9592b249b0f7444c194207df2c2d) |
 | `ccip-utils-v2` | `2.1.0` | [`e135acbb9955708adb809001c5c7de738b486cc0c54769719c2849f3e081238e`](#e135acbb9955708adb809001c5c7de738b486cc0c54769719c2849f3e081238e) |
 | `chainlink-api` | `2.0.0` | [`b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8`](#b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8) |
@@ -309,10 +307,10 @@
 | `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
 | `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
 
-## <a name="f075120bad76b36968c72dc7c8da5861ca4d510fa14d7f237e5e1a15611d48e3"></a>ccip-registry-pools-test-dev.dar
+## <a name="63562d1e2d53fb4db050e2c7476ec5b8b301ec3507fe66cdbe754369e5753a39"></a>ccip-registry-pools-test-dev.dar
 - Name: `ccip-registry-pools-test`
 - Version: `1.0.0`
-- Package ID: `f075120bad76b36968c72dc7c8da5861ca4d510fa14d7f237e5e1a15611d48e3`
+- Package ID: `63562d1e2d53fb4db050e2c7476ec5b8b301ec3507fe66cdbe754369e5753a39`
 
 ### Dependencies:
 | Package Name | Version | Package ID |
@@ -323,10 +321,10 @@
 | `ccip-core-v2` | `2.1.1` | [`7a08ead9e5158d6e493c144c63a91b1a7e23b9424359c1551ccfad991ba39c39`](#7a08ead9e5158d6e493c144c63a91b1a7e23b9424359c1551ccfad991ba39c39) |
 | `ccip-events-v2` | `2.0.0` | [`bfe1045f369796e1f8320e3c3d3b43142009ce1e8a6773b57b12f49c357c2f3f`](#bfe1045f369796e1f8320e3c3d3b43142009ce1e8a6773b57b12f49c357c2f3f) |
 | `ccip-extension-api-v2` | `2.0.0` | [`289011bdbefe42c7dbea0a4f101127095e8b5f5281d45c84f6eca06de11689a4`](#289011bdbefe42c7dbea0a4f101127095e8b5f5281d45c84f6eca06de11689a4) |
-| `ccip-registry-burn-mint-token-pool` | `1.0.0` | [`6bd9828f3ce9c4d52c3b56a54dd9ad17afffbb424a260fd5fe4edb8bbe3b351a`](#6bd9828f3ce9c4d52c3b56a54dd9ad17afffbb424a260fd5fe4edb8bbe3b351a) |
-| `ccip-registry-lock-release-token-pool` | `1.0.1` | [`fbd2d9b8176bed61a07425b3b1952f21b763087c85eff24d6dfec8bd0300fad4`](#fbd2d9b8176bed61a07425b3b1952f21b763087c85eff24d6dfec8bd0300fad4) |
-| `ccip-registry-pools-test` | `1.0.0` | [`f075120bad76b36968c72dc7c8da5861ca4d510fa14d7f237e5e1a15611d48e3`](#f075120bad76b36968c72dc7c8da5861ca4d510fa14d7f237e5e1a15611d48e3) |
-| `ccip-registry-rate-limiter` | `1.0.0` | [`825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a`](#825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a) |
+| `ccip-registry-burn-mint-token-pool-v2` | `2.0.0` | [`6528c6ab55d7fa7ecf01a21ba0ec822ee883db448d9c405a66c124d1653db686`](#6528c6ab55d7fa7ecf01a21ba0ec822ee883db448d9c405a66c124d1653db686) |
+| `ccip-registry-lock-release-token-pool-v2` | `2.0.0` | [`893d6334c33ed28af4911f3f347be72e344e824cb9f659f1c1cc0d18e50abf27`](#893d6334c33ed28af4911f3f347be72e344e824cb9f659f1c1cc0d18e50abf27) |
+| `ccip-registry-pools-test` | `1.0.0` | [`63562d1e2d53fb4db050e2c7476ec5b8b301ec3507fe66cdbe754369e5753a39`](#63562d1e2d53fb4db050e2c7476ec5b8b301ec3507fe66cdbe754369e5753a39) |
+| `ccip-registry-rate-limiter-v2` | `2.0.0` | [`b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3`](#b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3) |
 | `ccip-tickets-v2` | `2.0.0` | [`506234a38fffe1945e3b5ff3a5e444a237fa9592b249b0f7444c194207df2c2d`](#506234a38fffe1945e3b5ff3a5e444a237fa9592b249b0f7444c194207df2c2d) |
 | `ccip-utils-v2` | `2.1.0` | [`e135acbb9955708adb809001c5c7de738b486cc0c54769719c2849f3e081238e`](#e135acbb9955708adb809001c5c7de738b486cc0c54769719c2849f3e081238e) |
 | `chainlink-api` | `2.0.0` | [`b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8`](#b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8) |
@@ -337,15 +335,15 @@
 | `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
 | `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
 
-## <a name="825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a"></a>ccip-registry-rate-limiter-dev.dar
-- Name: `ccip-registry-rate-limiter`
-- Version: `1.0.0`
-- Package ID: `825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a`
+## <a name="b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3"></a>ccip-registry-rate-limiter-v2-dev.dar
+- Name: `ccip-registry-rate-limiter-v2`
+- Version: `2.0.0`
+- Package ID: `b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3`
 
 ### Dependencies:
 | Package Name | Version | Package ID |
 |---------|---------|---------|
-| `ccip-registry-rate-limiter` | `1.0.0` | [`825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a`](#825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a) |
+| `ccip-registry-rate-limiter-v2` | `2.0.0` | [`b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3`](#b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3) |
 | `chainlink-api` | `2.0.0` | [`b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8`](#b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8) |
 | `mcms-api` | `1.0.0` | [`674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240`](#674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240) |
 
@@ -522,6 +520,45 @@
 | `daml-script` | `3.4.11` | [`fe2e0175af21ba46d48cda3614edb9e30f2bc6972c20eb1d09666fa81703aa2e`](#fe2e0175af21ba46d48cda3614edb9e30f2bc6972c20eb1d09666fa81703aa2e) |
 | `link` | `2.1.0` | [`fc1fcb7dbfd1959cafbd54bfa6f6cc88c1678607b0f95ee3f6ee8e9ee8eb2b60`](#fc1fcb7dbfd1959cafbd54bfa6f6cc88c1678607b0f95ee3f6ee8e9ee8eb2b60) |
 | `link-test` | `0.0.1` | [`e9689cf061700e272e666b154522d7b4b51b760bfe975d01a66190df7b86210b`](#e9689cf061700e272e666b154522d7b4b51b760bfe975d01a66190df7b86210b) |
+| `splice-api-token-burn-mint-v1` | `1.0.0` | [`9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e`](#9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e) |
+| `splice-api-token-holding-v1` | `1.0.0` | [`718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b`](#718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b) |
+| `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
+| `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
+
+## <a name="506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a"></a>link-token-admin-dev.dar
+- Name: `link-token-admin`
+- Version: `1.0.0`
+- Package ID: `506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a`
+
+### Dependencies:
+| Package Name | Version | Package ID |
+|---------|---------|---------|
+| `chainlink-api` | `2.0.0` | [`b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8`](#b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8) |
+| `link-token-admin` | `1.0.0` | [`506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a`](#506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a) |
+| `mcms-api` | `1.0.0` | [`674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240`](#674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240) |
+| `splice-api-token-allocation-instruction-v1` | `1.0.0` | [`275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520`](#275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520) |
+| `splice-api-token-allocation-v1` | `1.0.0` | [`93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d`](#93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d) |
+| `splice-api-token-burn-mint-v1` | `1.0.0` | [`9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e`](#9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e) |
+| `splice-api-token-holding-v1` | `1.0.0` | [`718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b`](#718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b) |
+| `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |
+| `splice-api-token-transfer-instruction-v1` | `1.0.0` | [`55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281`](#55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281) |
+
+## <a name="a58375ecfb17d23cef98d3bfd4921415e09f22a3c2914652e40a03278dd6a6a4"></a>link-token-admin-test-dev.dar
+- Name: `link-token-admin-test`
+- Version: `0.0.1`
+- Package ID: `a58375ecfb17d23cef98d3bfd4921415e09f22a3c2914652e40a03278dd6a6a4`
+
+### Dependencies:
+| Package Name | Version | Package ID |
+|---------|---------|---------|
+| `chainlink-api` | `2.0.0` | [`b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8`](#b9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8) |
+| `daml-script` | `3.4.11` | [`fe2e0175af21ba46d48cda3614edb9e30f2bc6972c20eb1d09666fa81703aa2e`](#fe2e0175af21ba46d48cda3614edb9e30f2bc6972c20eb1d09666fa81703aa2e) |
+| `link` | `2.1.0` | [`fc1fcb7dbfd1959cafbd54bfa6f6cc88c1678607b0f95ee3f6ee8e9ee8eb2b60`](#fc1fcb7dbfd1959cafbd54bfa6f6cc88c1678607b0f95ee3f6ee8e9ee8eb2b60) |
+| `link-token-admin` | `1.0.0` | [`506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a`](#506338cda467b8dc4515e66cddaabd234e8d3f9bdb4a3222f252e205c7afd66a) |
+| `link-token-admin-test` | `0.0.1` | [`a58375ecfb17d23cef98d3bfd4921415e09f22a3c2914652e40a03278dd6a6a4`](#a58375ecfb17d23cef98d3bfd4921415e09f22a3c2914652e40a03278dd6a6a4) |
+| `mcms-api` | `1.0.0` | [`674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240`](#674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240) |
+| `splice-api-token-allocation-instruction-v1` | `1.0.0` | [`275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520`](#275064aacfe99cea72ee0c80563936129563776f67415ef9f13e4297eecbc520) |
+| `splice-api-token-allocation-v1` | `1.0.0` | [`93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d`](#93c942ae2b4c2ba674fb152fe38473c507bda4e82b4e4c5da55a552a9d8cce1d) |
 | `splice-api-token-burn-mint-v1` | `1.0.0` | [`9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e`](#9cc2cbc838ef38dc2c7f34014c9c452bcf71b8e2a4f939235fc0b5d0924b185e) |
 | `splice-api-token-holding-v1` | `1.0.0` | [`718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b`](#718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b) |
 | `splice-api-token-metadata-v1` | `1.0.0` | [`4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f`](#4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f) |

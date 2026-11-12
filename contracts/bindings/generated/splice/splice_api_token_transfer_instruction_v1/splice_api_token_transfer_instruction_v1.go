@@ -89,7 +89,7 @@ func argsToMap(args any) map[string]any {
 type Transfer struct {
 	Sender           types.PARTY                              `json:"sender"`
 	Receiver         types.PARTY                              `json:"receiver"`
-	Amount           types.NUMERIC                            `json:"amount"`
+	Amount           types.NUMERIC                            `json:"amount" hex:"decimal"`
 	InstrumentId     splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
 	RequestedAt      types.TIMESTAMP                          `json:"requestedAt"`
 	ExecuteBefore    types.TIMESTAMP                          `json:"executeBefore"`
