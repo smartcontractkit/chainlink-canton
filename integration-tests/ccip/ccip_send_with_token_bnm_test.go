@@ -838,6 +838,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;
 	// after 5% pool fee the bridged amount should be 9,500.
 	sendArgs := ccipclient.ICCIPSenderSend{
+		SenderParty:              types.PARTY(partySender),
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
 		DestinationChainSelector: types.NUMERIC(strconv.FormatUint(remoteSelector, 10)),
