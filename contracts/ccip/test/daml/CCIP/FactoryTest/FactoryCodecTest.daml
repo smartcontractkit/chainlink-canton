@@ -36,6 +36,7 @@ import qualified CCIP.LockReleaseTokenPoolV2CodecGen
 import qualified CCIP.RateLimiterV2
 import qualified CCIP.Registry.BurnMintTokenPoolV2CodecGen
 import qualified CCIP.Registry.BurnMintTokenPoolV2Types
+import qualified CCIP.Registry.RateLimiterV2
 import qualified CCIP.UtilsV2.Context
 
 finalityConfig n =
@@ -196,6 +197,26 @@ encodeDeployRateLimiterParams params =
   <> encodeNumeric0 params.capacity
   <> encodeNumeric0 params.rate
 
+encodeRegistryRateLimitDirection : CCIP.Registry.RateLimiterV2.RateLimitDirection -> BytesHex
+encodeRegistryRateLimitDirection CCIP.Registry.RateLimiterV2.RateLimitDirection_Outbound = fromSome (encodeUint8 0)
+encodeRegistryRateLimitDirection CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound = fromSome (encodeUint8 1)
+
+encodeRegistryRateLimitMode : CCIP.Registry.RateLimiterV2.RateLimitMode -> BytesHex
+encodeRegistryRateLimitMode CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality = fromSome (encodeUint8 0)
+encodeRegistryRateLimitMode CCIP.Registry.RateLimiterV2.RateLimitMode_CustomFinality = fromSome (encodeUint8 1)
+
+encodeDeployRegistryRateLimiterParams : CCIP.FactoryV2.DeployRegistryRateLimiterParams -> BytesHex
+encodeDeployRegistryRateLimiterParams params =
+  encodeText params.instanceId
+  <> encodeText params.poolInstanceId
+  <> encodeNumeric0 params.remoteChainSelector
+  <> encodeRegistryRateLimitDirection params.direction
+  <> encodeRegistryRateLimitMode params.mode
+  <> encodeBool params.isEnabled
+  <> encodeNumeric0 params.capacity
+  <> encodeNumeric0 params.rate
+  <> encodePartyList params.observers
+
 -- ===========================================================================
 -- ROUND-TRIP TESTS
 -- ===========================================================================
@@ -295,6 +316,30 @@ testDecodeDeployRegistryBurnMintTokenPoolParams = script do
         transferTimeout = CCIP.Registry.BurnMintTokenPoolV2Types.RelativeHours 24
 
   CCIP.FactoryV2.decodeDeployRegistryBurnMintTokenPoolParams (encodeDeployRegistryBurnMintTokenPoolParams params) === Some params
+
+testDecodeDeployRegistryRateLimiterParams : Script ()
+testDecodeDeployRegistryRateLimiterParams = script do
+  observer <- allocateParty "observer"
+
+  let outbound = CCIP.FactoryV2.DeployRegistryRateLimiterParams with
+        instanceId = "registry-rl-1"
+        poolInstanceId = "registry-bmtp-1"
+        remoteChainSelector = 137.0
+        direction = CCIP.Registry.RateLimiterV2.RateLimitDirection_Outbound
+        mode = CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality
+        isEnabled = True
+        capacity = 1000000.0
+        rate = 100.0
+        observers = [observer]
+      inboundCustom = outbound with
+        direction = CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound
+        mode = CCIP.Registry.RateLimiterV2.RateLimitMode_CustomFinality
+        isEnabled = False
+        capacity = 0.0
+        rate = 0.0
+
+  CCIP.FactoryV2.decodeDeployRegistryRateLimiterParams (encodeDeployRegistryRateLimiterParams outbound) === Some outbound
+  CCIP.FactoryV2.decodeDeployRegistryRateLimiterParams (encodeDeployRegistryRateLimiterParams inboundCustom) === Some inboundCustom
 
 testDecodeDeployTokenAdminRegistryParams : Script ()
 testDecodeDeployTokenAdminRegistryParams = script do
