@@ -90,10 +90,10 @@ type CCIPAPIConfig struct {
 	FeeQuoter             ContractIdentifier `toml:"fee_quoter" validate:"required_if=Enabled true,omitempty"`
 	// GlobalTokenSenderReceiver is the single Chainlink-operated orchestrator
 	// contract used for all DA Registry token transfers in both directions. Its
-	// disclosure is static (created once, never consumed) and served both via
-	// the dedicated lookup endpoint and as part of the send/execute disclosure
-	// sets.
-	GlobalTokenSenderReceiver ContractIdentifier `toml:"global_token_sender_receiver" validate:"required_if=Enabled true,omitempty"`
+	// disclosure is static (created once, never consumed) and served via the
+	// dedicated lookup endpoint.
+	// Optional: if not set, the CCIP API will not serve the API endpoint.
+	GlobalTokenSenderReceiver ContractIdentifier `toml:"global_token_sender_receiver,omitempty" validate:"omitempty"`
 
 	// FeeTokens configures the supported fee tokens, keyed by an alias that uniquely identifies
 	// the fee token within this config. A fee token itself is uniquely identified by the

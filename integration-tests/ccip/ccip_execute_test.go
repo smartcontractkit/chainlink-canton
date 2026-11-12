@@ -33,10 +33,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/stretchr/testify/require"
-
-	config2 "github.com/smartcontractkit/chainlink-canton/authentication/config"
 
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
@@ -51,9 +48,11 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	config2 "github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
+	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"

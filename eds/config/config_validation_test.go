@@ -314,6 +314,21 @@ func TestConfigValidation(t *testing.T) {
 					},
 					wantErr: false,
 				}, {
+					name: "enabled with empty globalTokenSenderReceiver valid",
+					s: CCIPAPIConfig{
+						Enabled:                   true,
+						PerPartyRouterFactory:     validContractIdentifier(),
+						OnRamp:                    validContractIdentifier(),
+						OffRamp:                   validContractIdentifier(),
+						GlobalConfig:              validContractIdentifier(),
+						TokenAdminRegistry:        validContractIdentifier(),
+						RMNRemote:                 validContractIdentifier(),
+						FeeQuoter:                 validContractIdentifier(),
+						GlobalTokenSenderReceiver: ContractIdentifier{},
+						CcipOwner:                 "ccipOwner",
+					},
+					wantErr: false,
+				}, {
 					name: "enabled without CcipOwner invalid",
 					s: CCIPAPIConfig{
 						Enabled:                   true,
