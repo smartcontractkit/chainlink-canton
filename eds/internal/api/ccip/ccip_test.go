@@ -587,19 +587,6 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				EntityName: "FeeQuoter",
 			},
 		}}, true)
-		mockActiveContractStore.EXPECT().Get(cfg.GlobalTokenSenderReceiver.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
-			ContractId: "globalTokenSenderReceiverContractId",
-			TemplateId: &apiv2.Identifier{
-				PackageId:  "package",
-				ModuleName: "module",
-				EntityName: "GlobalTokenSenderReceiver",
-			},
-			CreateArguments: bindings.MarshalTemplateToRecord(globaltokensenderreceiver.GlobalTokenSenderReceiver{
-				InstanceId:             "globaltokensenderreceiver",
-				CcipOwner:              "owner",
-				ReceiverFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
-			}),
-		}}, true)
 
 		t.Run("Message only", func(t *testing.T) {
 			t.Parallel()
@@ -652,9 +639,6 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				}, {
 					ContractId: "feeQuoterContractId",
 					TemplateId: "package:module:FeeQuoter",
-				}, {
-					ContractId: "globalTokenSenderReceiverContractId",
-					TemplateId: "package:module:GlobalTokenSenderReceiver",
 				}, {
 					ContractId: "feeTokenConfigContractId",
 					TemplateId: "package:module:TokenConfig",
@@ -728,9 +712,6 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				}, {
 					ContractId: "feeQuoterContractId",
 					TemplateId: "package:module:FeeQuoter",
-				}, {
-					ContractId: "globalTokenSenderReceiverContractId",
-					TemplateId: "package:module:GlobalTokenSenderReceiver",
 				}, {
 					ContractId: "feeTokenConfigContractId",
 					TemplateId: "package:module:TokenConfig",
@@ -808,9 +789,6 @@ func TestServer_PostCCIPSend(t *testing.T) {
 				}, {
 					ContractId: "feeQuoterContractId",
 					TemplateId: "package:module:FeeQuoter",
-				}, {
-					ContractId: "globalTokenSenderReceiverContractId",
-					TemplateId: "package:module:GlobalTokenSenderReceiver",
 				}, {
 					ContractId: "feeTokenConfigContractId",
 					TemplateId: "package:module:TokenConfig",
@@ -980,19 +958,6 @@ func TestServer_PostCCIPSend(t *testing.T) {
 					ModuleName: "module",
 					EntityName: "FeeQuoter",
 				},
-			}}, true)
-			mockActiveContractStore.EXPECT().Get(cfg.GlobalTokenSenderReceiver.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
-				ContractId: "globalTokenSenderReceiverContractId",
-				TemplateId: &apiv2.Identifier{
-					PackageId:  "package",
-					ModuleName: "module",
-					EntityName: "GlobalTokenSenderReceiver",
-				},
-				CreateArguments: bindings.MarshalTemplateToRecord(globaltokensenderreceiver.GlobalTokenSenderReceiver{
-					InstanceId:             "globaltokensenderreceiver",
-					CcipOwner:              "owner",
-					ReceiverFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
-				}),
 			}}, true)
 			mockActiveContractStore.EXPECT().Get(feeTokenConfigAddress.InstanceAddress()).Return(tokenConfigContract("feeTokenConfigContractId", feeInstrumentId, nil), true)
 			server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, cfgWithoutFeeTokens)
@@ -1610,19 +1575,6 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				},
 			}),
 		}}, true)
-		mockActiveContractStore.EXPECT().Get(cfg.GlobalTokenSenderReceiver.InstanceAddress).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
-			ContractId: "globalTokenSenderReceiverContractId",
-			TemplateId: &apiv2.Identifier{
-				PackageId:  "package",
-				ModuleName: "module",
-				EntityName: "GlobalTokenSenderReceiver",
-			},
-			CreateArguments: bindings.MarshalTemplateToRecord(globaltokensenderreceiver.GlobalTokenSenderReceiver{
-				InstanceId:             "globaltokensenderreceiver",
-				CcipOwner:              "owner",
-				ReceiverFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
-			}),
-		}}, true)
 
 		t.Run("Message only", func(t *testing.T) {
 			t.Parallel()
@@ -1650,9 +1602,6 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				}, {
 					ContractId: "rmnRemoteContractId",
 					TemplateId: "package:module:RMNRemote",
-				}, {
-					ContractId: "globalTokenSenderReceiverContractId",
-					TemplateId: "package:module:GlobalTokenSenderReceiver",
 				},
 			}, resp.JSON200.DisclosedContracts)
 			require.NotNil(t, resp.JSON200.ContextData)
@@ -1692,9 +1641,6 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 				}, {
 					ContractId: "tokenConfigContractId",
 					TemplateId: "package:module:TokenConfig",
-				}, {
-					ContractId: "globalTokenSenderReceiverContractId",
-					TemplateId: "package:module:GlobalTokenSenderReceiver",
 				},
 			}, resp.JSON200.DisclosedContracts)
 			require.NotNil(t, resp.JSON200.ContextData)
