@@ -138,6 +138,15 @@ func (a LinkTokenAdminAction) validate() error {
 
 		return validateApproval(id, amount, validForSeconds)
 	}
+	if a.SetObservers != nil {
+		for _, p := range a.SetObservers.Observers {
+			if err := validateParty(p); err != nil {
+				return fmt.Errorf("setObservers: %w", err)
+			}
+		}
+
+		return nil
+	}
 	if a.Withdraw == nil {
 		return nil
 	}
