@@ -117,8 +117,10 @@ func TestRegistryTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	ccipTestDar, err := contracts.GetDar(contracts.CCIPTest, contracts.DevVersion)
 	require.NoError(t, err)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV2, contracts.DevVersion)
+	require.NoError(t, err)
 
-	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, ccipTestDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, ccipTestDar, globalSenderReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, senderParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded CCIP DARs to all participants: %v", packageIds)

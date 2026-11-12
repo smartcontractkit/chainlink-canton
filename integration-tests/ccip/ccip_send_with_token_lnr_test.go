@@ -111,8 +111,10 @@ func TestLnRTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	lockReleaseTokenPoolDar, err := contracts.GetDar(contracts.CCIPLockReleaseTokenPoolV2, contracts.DevVersion)
 	require.NoError(t, err)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV2, contracts.DevVersion)
+	require.NoError(t, err)
 
-	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, lockReleaseTokenPoolDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, lockReleaseTokenPoolDar, globalSenderReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, senderParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)

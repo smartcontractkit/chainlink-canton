@@ -102,8 +102,10 @@ func TestCCIPSend(t *testing.T) {
 	require.NoError(t, err)
 	ccipExecutorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV2, contracts.DevVersion)
+	require.NoError(t, err)
 
-	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, globalSenderReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, senderParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
