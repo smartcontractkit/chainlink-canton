@@ -952,6 +952,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 		tokenPoolSendDisclosure.DisclosedContracts,
 		ccvSendDisclosure.DisclosedContracts,
 		executorSendDisclosure.DisclosedContracts,
+		globalSenderReceiverDisclosure.DisclosedContracts,
 	)...)
 
 	senderBalanceBefore, err := testhelpers.GetHoldingsBalance(t.Context(), senderParticipant, &nativeInstrumentId)
