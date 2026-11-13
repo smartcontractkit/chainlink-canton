@@ -688,8 +688,12 @@ func readChoiceArgument(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("reading choice args file %q: %w", path, err)
 	}
-	if err := protojson.Unmarshal(data, &apiv2.Value{}); err != nil {
+	var value apiv2.Value
+	if err := protojson.Unmarshal(data, &value); err != nil {
 		return "", fmt.Errorf("choice args file %q is not a Ledger API Value in proto JSON: %w", path, err)
+	}
+	if value.GetRecord() == nil {
+		return "", fmt.Errorf("choice args file %q must hold a record value: a Daml choice argument is always a record", path)
 	}
 
 	return string(data), nil

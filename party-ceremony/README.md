@@ -308,8 +308,9 @@ setup uses it for the `ccipOwner` provider and registrar choices.
 - Step 4 requires all participants to have granted rights in step 3.
 - Step 6 requires all participants to have signed in step 5.
 
-The last signer prints the update ID and each created contract as
-`<template-id> <contract-id>`. `inspect` shows the same after completion.
+The last signer prints the update ID, then `<template-id> <contract-id>` for
+each created contract that is still active and visible to the party. `inspect`
+shows the same after completion.
 
 ### Example (Mock)
 

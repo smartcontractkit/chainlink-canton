@@ -1,18 +1,5 @@
-// Package exercisechoice implements a ceremony that exercises a choice on an
-// existing contract as a decentralized party, using the Canton Ledger API's
-// InteractiveSubmissionService.
-//
-// It follows the contract deploy ceremony without the DAR upload:
-//
-//  1. VerifyPartyOp       – verify the decentralized party is visible on the Ledger API.
-//  2. FetchParticipantsOp – fetch the hosting participants from the topology store.
-//  3. GrantPartyRightsOp  – each participant grants its Ledger API user rights for the party.
-//  4. PrepareExerciseOp   – the coordinator prepares the exercise command.
-//  5. SignSubmissionOp    – each participant signs the prepared hash.
-//  6. ExecuteSubmissionOp – the coordinator submits with all signatures.
-//
-// The sequence is re-run by each participant. It returns [ErrThresholdNotMet]
-// until every participant has granted rights and signed.
+// Package exercisechoice exercises a choice on an existing contract as a
+// decentralized party. It is the contract deploy ceremony without the DAR upload.
 package exercisechoice
 
 import (

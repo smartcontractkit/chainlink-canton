@@ -79,7 +79,8 @@ type LedgerClient interface {
 // [LedgerClient.ExecuteSubmission].
 type SubmissionResult struct {
 	UpdateID string
-	// Created lists the contracts the transaction created, in event order.
+	// Created lists the created contracts that are still active after the
+	// transaction and visible to the submitting party, in event order.
 	Created []CreatedContract
 }
 

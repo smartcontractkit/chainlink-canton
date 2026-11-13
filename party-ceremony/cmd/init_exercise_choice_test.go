@@ -43,6 +43,13 @@ func TestReadChoiceArgument(t *testing.T) {
 	_, err = readChoiceArgument(recordNotValue)
 	require.ErrorContains(t, err, "not a Ledger API Value", "a bare Record is rejected before the ceremony starts")
 
+	for name, body := range map[string]string{"empty.json": `{}`, "text.json": `{"text":"LINK"}`} {
+		path := filepath.Join(dir, name)
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+		_, err = readChoiceArgument(path)
+		require.ErrorContains(t, err, "must hold a record value", "%s parses as a Value but is not a record", body)
+	}
+
 	_, err = readChoiceArgument(filepath.Join(dir, "missing.json"))
 	require.ErrorContains(t, err, "reading choice args file")
 }

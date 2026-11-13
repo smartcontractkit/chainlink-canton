@@ -127,6 +127,16 @@ func TestExerciseChoiceSequence_CollectsEverySignatureThenSubmitsTheExercise(t *
 	require.NoError(t, err, "a completed ceremony re-runs from cache")
 	assert.Equal(t, 1, lc.executions, "a re-run does not submit again")
 	assert.Equal(t, sr.Output.UpdateID, cached.Output.UpdateID)
+
+	inspected, found := exercisechoice.QueryState(reporter, input())
+	require.True(t, found, "inspect finds the completed run")
+	assert.Equal(t, "update-1", inspected.UpdateID)
+	assert.Len(t, inspected.CreatedContracts, 2)
+
+	other := input()
+	other.Choice = "ProviderService_CreateProviderConfiguration"
+	_, found = exercisechoice.QueryState(reporter, other)
+	assert.False(t, found, "inspect matches the full input, not just the party")
 }
 
 func TestExerciseChoiceSequence_RejectsMalformedChoiceArgument(t *testing.T) {
