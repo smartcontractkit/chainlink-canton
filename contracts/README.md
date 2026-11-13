@@ -166,6 +166,9 @@ contracts/ccip/
 ├── receiver/               # Receiver-side orchestrator (user-owned)
 │   └── daml/CCIP/
 │       └── CCIPReceiver.daml       # Inbound orchestration & CCV threading
+├── global-token-sender-receiver/ # Global token transfer orchestrator (Chainlink-owned)
+│   └── daml/CCIP/
+│       └── GlobalTokenSenderReceiver.daml # Single shared send/execute orchestrator
 ├── executor/               # Message executor (extensible)
 │   └── daml/CCIP/ExecutorV2/
 │       └── Executor.daml           # Remote chain execution wrapper
@@ -188,9 +191,13 @@ contracts/ccip/
 ├── tickets/                # Ticket templates
 │   └── daml/CCIP/
 │       └── TicketsV2.daml          # TokenReceiveTicket definition
-├── client/                 # Client interfaces for applications
+├── client-api/             # Client API interfaces (ClientV2)
 │   └── daml/CCIP/
 │       └── ClientV2.daml           # Public-facing PerPartyRouter interface
+├── user/                 # Stable user client interfaces (ICCIPSender / ICCIPReceiver)
+│   └── daml/CCIP/UserV1/
+│       ├── Sender.daml             # ICCIPSender interface + canonical sender input types
+│       └── Receiver.daml           # ICCIPReceiver interface + ReceiverExecuteResult
 ├── events/                 # Event contracts for off-chain observation
 │   └── daml/CCIP/EventsV2/
 │       ├── Events.daml             # CCIPMessageSent, ExecutionStateChanged
@@ -245,6 +252,16 @@ flowchart BT
     ccip-client-api-v2 --> ccip-events-v2
     ccip-client-api-v2 --> ccip-tickets-v2
     ccip-client-api-v2 --> ccip-extension-api-v2
+%% CCIP User V1
+    ccip-user-v1
+    ccip-user-v1 --> splice-metadata-v1
+    ccip-user-v1 --> splice-holding-v1
+    ccip-user-v1 --> splice-transfer-instruction-v1
+    ccip-user-v1 --> chainlink-api
+    ccip-user-v1 --> ccip-codec-v2
+    ccip-user-v1 --> ccip-api-v2
+    ccip-user-v1 --> ccip-extension-api-v2
+    ccip-user-v1 --> ccip-client-api-v2
 %% CCIP Codec
     ccip-codec-v2
     ccip-codec-v2 --> chainlink-api
@@ -351,6 +368,16 @@ flowchart BT
     ccip-runtime-v2 --> ccip-extension-api-v2
     ccip-runtime-v2 --> ccip-events-v2
     ccip-runtime-v2 --> ccip-client-api-v2
+%% CCIP GlobalTokenSenderReceiver
+    ccip-global-token-sender-receiver-v1
+    ccip-global-token-sender-receiver-v1 --> splice-metadata-v1
+    ccip-global-token-sender-receiver-v1 --> chainlink-api
+    ccip-global-token-sender-receiver-v1 --> ccip-codec-v2
+    ccip-global-token-sender-receiver-v1 --> ccip-api-v2
+    ccip-global-token-sender-receiver-v1 --> ccip-extension-api-v2
+    ccip-global-token-sender-receiver-v1 --> ccip-client-api-v2
+    ccip-global-token-sender-receiver-v1 --> ccip-utils-v2
+    ccip-global-token-sender-receiver-v1 --> ccip-user-v1
 %% CCIP Tickets
     ccip-tickets-v2
     ccip-tickets-v2 --> splice-metadata-v1

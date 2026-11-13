@@ -127,6 +127,16 @@ var DeployPerPartyRouterFactory = contract.NewExercise(contract.ExerciseParams[f
 	EncodeMethod: encodeDeployPerPartyRouterFactory,
 })
 
+var DeployGlobalTokenSenderReceiver = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployGlobalTokenSenderReceiver]{
+	Name:         "canton/ccip/factory/deploy_global_token_sender_receiver",
+	Version:      Version,
+	Description:  "Deploys a GlobalTokenSenderReceiver through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployGlobalTokenSenderReceiver,
+	EncodeMethod: encodeDeployGlobalTokenSenderReceiver,
+})
+
 var SetOwnerToMCMS = contract.NewExercise(contract.ExerciseParams[factorybindings.SetOwnerToMCMS]{
 	Name:         "canton/ccip/factory/set_owner_to_mcms",
 	Version:      Version,
@@ -258,6 +268,16 @@ func encodeDeployPerPartyRouterFactory(args factorybindings.DeployPerPartyRouter
 		TokenAdminRegistry: args.Contract.Deps.TokenAdminRegistry,
 		FeeQuoter:          args.Contract.Deps.FeeQuoter,
 		RmnRemote:          args.Contract.Deps.RmnRemote,
+	})
+}
+
+func encodeDeployGlobalTokenSenderReceiver(args factorybindings.DeployGlobalTokenSenderReceiver) (*bind.EncodedChoice, error) {
+	return factoryEncoder.DeployGlobalTokenSenderReceiverParams(factorybindings.DeployGlobalTokenSenderReceiverParams{
+		InstanceId:             args.Contract.InstanceId,
+		RequiredCCVs:           args.Contract.RequiredCCVs,
+		OptionalCCVs:           args.Contract.OptionalCCVs,
+		OptionalThreshold:      args.Contract.OptionalThreshold,
+		ReceiverFinalityConfig: args.Contract.ReceiverFinalityConfig,
 	})
 }
 

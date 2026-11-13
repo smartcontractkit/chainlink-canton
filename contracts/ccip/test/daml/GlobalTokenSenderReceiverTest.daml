@@ -1,0 +1,449 @@
+-- | Unit tests for the GlobalTokenSenderReceiver contract.
+--
+-- Covers the contract-specific guards (pure token transfers only), the baked-in
+-- receiver policy, and the ICCIPSender / ICCIPReceiver interface dispatch. The
+-- full end-to-end send/execute flows are covered by the Go integration tests.
+module GlobalTokenSenderReceiverTest where
+
+import Daml.Script
+
+import DA.Assert
+import DA.Crypto.Text (BytesHex, keccak256)
+import DA.Map qualified as Map
+import DA.Optional (fromSome, fromSomeNote)
+import qualified DA.TextMap as TextMap
+
+import qualified Splice.Api.Token.HoldingV1
+import qualified Splice.Api.Token.MetadataV1
+
+import qualified Chainlink.InstanceAddress
+
+import qualified CCIP.APIV2.GlobalConfig
+import qualified CCIP.APIV2.RMNRemote
+import qualified CCIP.APIV2.TokenAdminRegistry
+import qualified CCIP.UserV1.Receiver
+import qualified CCIP.UserV1.Sender
+import qualified CCIP.ClientV2
+import qualified CCIP.CodecV2.FinalityConfig
+import qualified CCIP.CodecV2.MessageCodecV1
+import qualified CCIP.CoreV2.GlobalConfig
+import qualified CCIP.CoreV2.RMNRemote
+import qualified CCIP.CoreV2.TokenAdminRegistry
+import qualified CCIP.GlobalTokenSenderReceiver
+import qualified CCIP.RuntimeV2.OffRamp
+import qualified CCIP.RuntimeV2.OnRamp
+import qualified CCIP.RuntimeV2.PerPartyRouter
+
+rawFinalityConfig : Int -> BytesHex
+rawFinalityConfig n =
+    if n == 0
+    then CCIP.CodecV2.FinalityConfig.waitForFinalityFlag
+    else fromSome do
+        flagsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 0
+        blockConfirmationsHex <- CCIP.CodecV2.MessageCodecV1.encodeUint16 n
+        pure (flagsHex <> blockConfirmationsHex)
+
+unsafeDecodeRequestedFinality : BytesHex -> CCIP.CodecV2.FinalityConfig.DecodedFinality
+unsafeDecodeRequestedFinality finalityConfig =
+    fromSomeNote "unsafeDecodeRequestedFinality: invalid finality config"
+        (CCIP.CodecV2.FinalityConfig.decodeRequestedFinality finalityConfig)
+
+messageFinality : Int -> CCIP.CodecV2.FinalityConfig.DecodedFinality
+messageFinality n = unsafeDecodeRequestedFinality (rawFinalityConfig n)
+
+-- | Default receiver policy baked into the deployed global contract (doc §4.4):
+-- for token-only transfers the token pool decides CCV and finality
+-- requirements, so the baked-in policy is inert.
+bakedInReceiverFinalityConfig : CCIP.CodecV2.FinalityConfig.FinalityConfig
+bakedInReceiverFinalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
+
+data Setup = Setup with
+    ccipOwner : Party
+    user : Party
+    receiver : Party
+    globalContract : ContractId CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver
+    disclosedGlobal : Disclosure
+    -- Router of the receiver party (used for inbound flows).
+    router : ContractId CCIP.ClientV2.PerPartyRouter
+    -- Router of the user party (used for outbound flows).
+    userRouter : ContractId CCIP.ClientV2.PerPartyRouter
+    rmnRemote : ContractId CCIP.CoreV2.RMNRemote.RMNRemote
+    globalConfig : ContractId CCIP.CoreV2.GlobalConfig.GlobalConfig
+    tokenAdminRegistry : ContractId CCIP.CoreV2.TokenAdminRegistry.TokenAdminRegistry
+    onRamp : ContractId CCIP.RuntimeV2.OnRamp.OnRamp
+    offRamp : ContractId CCIP.RuntimeV2.OffRamp.OffRamp
+    feeToken : Splice.Api.Token.HoldingV1.InstrumentId
+    sourceChainSelector : Numeric 0
+    destChainSelector : Numeric 0
+
+setup : Text -> Script Setup
+setup prefix = do
+    ccipOwner <- allocateParty (prefix <> "-ccip-owner")
+    user <- allocateParty (prefix <> "-user")
+    receiver <- allocateParty (prefix <> "-receiver")
+    rmnOwner <- allocateParty (prefix <> "-rmn-owner")
+
+    let sourceChainSelector : Numeric 0 = 1111111111.0
+    let destChainSelector : Numeric 0 = 2222222222.0
+    let globalConfigInstanceId = prefix <> "-globalconfig"
+    let onRampInstanceId = prefix <> "-onramp"
+    let offRampInstanceId = prefix <> "-offramp"
+    let rmnInstanceId = prefix <> "-rmn"
+    let tokenAdminRegistryInstanceId = prefix <> "-tar"
+    let factoryInstanceId = prefix <> "-pprfactory"
+    let globalInstanceId = prefix <> "-global-sr"
+
+    let globalConfigInstanceAddress = Chainlink.InstanceAddress.make globalConfigInstanceId ccipOwner
+    let rmnRemoteInstanceAddress = Chainlink.InstanceAddress.make rmnInstanceId rmnOwner
+    let tokenAdminRegistryInstanceAddress = Chainlink.InstanceAddress.make tokenAdminRegistryInstanceId ccipOwner
+    let onRampInstanceAddress = Chainlink.InstanceAddress.make onRampInstanceId ccipOwner
+    let offRampInstanceAddress = Chainlink.InstanceAddress.make offRampInstanceId ccipOwner
+    let feeQuoterInstanceAddress = Chainlink.InstanceAddress.make (prefix <> "-feequoter") ccipOwner
+
+    let feeToken = Splice.Api.Token.HoldingV1.InstrumentId with
+            admin = ccipOwner
+            id = "FEE"
+
+    globalConfig <- submit ccipOwner do
+        createCmd CCIP.CoreV2.GlobalConfig.GlobalConfig with
+            instanceId = globalConfigInstanceId
+            ccipOwner = ccipOwner
+            chainSelector = destChainSelector
+            destChainConfigs = Map.empty
+            sourceChainConfigs = Map.fromList [(sourceChainSelector, CCIP.CoreV2.GlobalConfig.SourceChainConfig with
+                isEnabled = True
+                onRampAddresses = ["0000000000000000000000000000000000000001"]
+                laneMandatedCCVs = []
+                defaultCCVs = [])]
+
+    rmnRemote <- submit rmnOwner do
+        createCmd CCIP.CoreV2.RMNRemote.RMNRemote with
+            instanceId = rmnInstanceId
+            rmnOwner = rmnOwner
+            ccipOwner = ccipOwner
+            customObservers = []
+            cursedSubjects = []
+
+    tokenAdminRegistry <- submit ccipOwner do
+        createCmd CCIP.CoreV2.TokenAdminRegistry.TokenAdminRegistry with
+            instanceId = tokenAdminRegistryInstanceId
+            ccipOwner = ccipOwner
+            entryCount = 0
+
+    onRamp <- submit ccipOwner do
+        createCmd CCIP.RuntimeV2.OnRamp.OnRamp with
+            instanceId = onRampInstanceId
+            ccipOwner = ccipOwner
+            maxUSDCentsPerMsg = 1000000000.0
+            deps = CCIP.RuntimeV2.OnRamp.OnRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = feeQuoterInstanceAddress
+
+    offRamp <- submit ccipOwner do
+        createCmd CCIP.RuntimeV2.OffRamp.OffRamp with
+            instanceId = offRampInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.RuntimeV2.OffRamp.OffRampDeps with
+                globalConfig = globalConfigInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+
+    factory <- submit ccipOwner do
+        createCmd CCIP.RuntimeV2.PerPartyRouter.PerPartyRouterFactory with
+            instanceId = factoryInstanceId
+            ccipOwner = ccipOwner
+            deps = CCIP.RuntimeV2.PerPartyRouter.PerPartyRouterDeps with
+                onRamp = onRampInstanceAddress
+                offRamp = offRampInstanceAddress
+                globalConfig = globalConfigInstanceAddress
+                tokenAdminRegistry = tokenAdminRegistryInstanceAddress
+                feeQuoter = feeQuoterInstanceAddress
+                rmnRemote = rmnRemoteInstanceAddress
+            registeredRouters = Map.empty
+
+    globalContract <- submit ccipOwner do
+        createCmd CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver with
+            instanceId = globalInstanceId
+            ccipOwner = ccipOwner
+            requiredCCVs = []
+            optionalCCVs = []
+            optionalThreshold = 0
+            receiverFinalityConfig = bakedInReceiverFinalityConfig
+
+    disclosedGlobal <- fromSome <$> queryDisclosure ccipOwner globalContract
+
+    -- Each user party creates their own router through the factory. The
+    -- factory is consuming and recreated on every CreateRouter, so the second
+    -- router needs a fresh disclosure of the recreated factory.
+    disclosedFactory <- fromSome <$> queryDisclosure ccipOwner factory
+    receiverRouterResult <- submit (actAs receiver <> disclose disclosedFactory)
+        (exerciseCmd factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
+            partyOwner = receiver
+            instanceId = prefix <> "-receiver-router"
+            feeTransferLifetime = None)
+    let router = coerceContractId receiverRouterResult.router
+
+    disclosedFactory2 <- fromSome <$> queryDisclosure ccipOwner receiverRouterResult.factory
+    userRouterResult <- submit (actAs user <> disclose disclosedFactory2)
+        (exerciseCmd receiverRouterResult.factory CCIP.RuntimeV2.PerPartyRouter.CreateRouter with
+            partyOwner = user
+            instanceId = prefix <> "-user-router"
+            feeTransferLifetime = None)
+    let userRouter = coerceContractId userRouterResult.router
+
+    pure Setup with
+        ccipOwner
+        user
+        receiver
+        globalContract
+        disclosedGlobal
+        router
+        userRouter
+        rmnRemote
+        globalConfig
+        tokenAdminRegistry
+        onRamp
+        offRamp
+        feeToken
+        sourceChainSelector
+        destChainSelector
+
+-- | The choice context the EDS execute endpoint would return for the receiver.
+receiverExecuteContext : Setup -> Splice.Api.Token.MetadataV1.ChoiceContext
+receiverExecuteContext s = Splice.Api.Token.MetadataV1.ChoiceContext with
+    values = TextMap.fromList
+        [ (CCIP.APIV2.RMNRemote.rmnRemoteContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId s.rmnRemote)
+        , (CCIP.APIV2.TokenAdminRegistry.tokenAdminRegistryContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId s.tokenAdminRegistry)
+        , (CCIP.APIV2.GlobalConfig.globalConfigContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId s.globalConfig)
+        , (CCIP.RuntimeV2.OffRamp.offRampContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId s.offRamp)
+        ]
+
+-- | The choice context the EDS send endpoint would return for the sender.
+senderSendContext : Setup -> Splice.Api.Token.MetadataV1.ChoiceContext
+senderSendContext s = Splice.Api.Token.MetadataV1.ChoiceContext with
+    values = TextMap.fromList
+        [ (CCIP.APIV2.RMNRemote.rmnRemoteContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId s.rmnRemote)
+        , (CCIP.APIV2.TokenAdminRegistry.tokenAdminRegistryContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId s.tokenAdminRegistry)
+        , (CCIP.APIV2.GlobalConfig.globalConfigContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId s.globalConfig)
+        , (CCIP.RuntimeV2.OnRamp.onRampContextKey, Splice.Api.Token.MetadataV1.AV_ContractId $ coerceContractId s.onRamp)
+        ]
+
+-- | Disclosures a receiver needs to exercise the global contract's
+-- receiver-side choices (global contract + router flow dependencies).
+receiverDisclosures : Setup -> Script [Disclosure]
+receiverDisclosures s = do
+    disclosedOffRamp <- fromSome <$> queryDisclosure s.ccipOwner s.offRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure s.ccipOwner s.globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure s.ccipOwner s.tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure s.ccipOwner s.rmnRemote
+    pure [s.disclosedGlobal, disclosedOffRamp, disclosedGlobalConfig, disclosedTokenAdminRegistry, disclosedRmnRemote]
+
+-- | Disclosures a sender needs to exercise the global contract's sender-side
+-- choices (global contract + router flow dependencies).
+senderDisclosures : Setup -> Script [Disclosure]
+senderDisclosures s = do
+    disclosedOnRamp <- fromSome <$> queryDisclosure s.ccipOwner s.onRamp
+    disclosedGlobalConfig <- fromSome <$> queryDisclosure s.ccipOwner s.globalConfig
+    disclosedTokenAdminRegistry <- fromSome <$> queryDisclosure s.ccipOwner s.tokenAdminRegistry
+    disclosedRmnRemote <- fromSome <$> queryDisclosure s.ccipOwner s.rmnRemote
+    pure [s.disclosedGlobal, disclosedOnRamp, disclosedGlobalConfig, disclosedTokenAdminRegistry, disclosedRmnRemote]
+
+-- | A message-only client message addressed to the given party (no token
+-- transfer, no payload).
+messageOnlyAnyMessage : Setup -> Party -> CCIP.ClientV2.Canton2AnyMessage
+messageOnlyAnyMessage s receiverParty = CCIP.ClientV2.Canton2AnyMessage with
+    receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiverParty
+    payload = ""
+    tokenTransfer = None
+    feeToken = s.feeToken
+    extraArgs = CCIP.ClientV2.V3 CCIP.ClientV2.GenericExtraArgsV3 with
+        gasLimit = 0
+        ccvs = []
+        executor = CCIP.ClientV2.Executor_NoExecutor
+        tokenReceiver = ""
+        tokenArgs = ""
+
+-- | A pure token-transfer wire message addressed to the receiver party.
+tokenOnlyMessage : Setup -> Party -> CCIP.CodecV2.MessageCodecV1.MessageV1
+tokenOnlyMessage s receiverParty = CCIP.CodecV2.MessageCodecV1.MessageV1 with
+    sourceChainSelector = s.sourceChainSelector
+    destChainSelector = s.destChainSelector
+    sequenceNumber = 1.0
+    executionGasLimit = 0
+    ccipReceiveGasLimit = 0
+    finality = messageFinality 0
+    ccvAndExecutorHash = "0000000000000000000000000000000000000000000000000000000000000000"
+    onRampAddress = "0000000000000000000000000000000000000001"
+    offRampAddress = Chainlink.InstanceAddress.toInstanceAddress (Chainlink.InstanceAddress.make "unused-offramp" s.ccipOwner)
+    sender = "0000000000000000000000000000000000000003"
+    receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiverParty
+    destBlob = ""
+    tokenTransfer = None
+    messageData = ""
+
+-- | Fee token input for tests where the payload guard aborts before the
+-- inputs are used; the CIDs are never dereferenced.
+dummyFeeTokenInput : ContractId CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver -> CCIP.UserV1.Sender.SenderFeeTokenInput
+dummyFeeTokenInput anyCid = CCIP.UserV1.Sender.SenderFeeTokenInput with
+    senderInputCids = []
+    feeTokenConfigCid = coerceContractId anyCid
+    feeTokenTransferFactory = coerceContractId anyCid
+    feeTokenExtraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
+        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+        meta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+-- | Send must reject payload-bearing messages.
+testGlobalSendRejectsPayload : Script ()
+testGlobalSendRejectsPayload = script do
+    s <- setup "send-payload"
+    let message = (messageOnlyAnyMessage s s.user) with
+        payload = "48656c6c6f20576f726c64"
+
+    submitMustFail (actAs s.user <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.Send with
+            senderParty = s.user
+            destinationChainSelector = s.destChainSelector
+            message = message
+            routerCid = s.userRouter
+            feeTokenInput = dummyFeeTokenInput s.globalContract
+            ccvSendInputs = []
+            tokenTransferInput = None
+            executorInput = None
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | GetFee must reject payload-bearing messages (early failure).
+testGlobalGetFeeRejectsPayload : Script ()
+testGlobalGetFeeRejectsPayload = script do
+    s <- setup "getfee-payload"
+    let message = (messageOnlyAnyMessage s s.user) with
+        payload = "48656c6c6f20576f726c64"
+
+    submitMustFail (actAs s.user <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.GetFee with
+            senderParty = s.user
+            destinationChainSelector = s.destChainSelector
+            message = message
+            routerCid = s.userRouter
+            ccvSendInputs = []
+            tokenTransferInput = None
+            executorInput = None
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | Execute must reject message-only messages (no token transfer).
+testGlobalExecuteRejectsMessageOnly : Script ()
+testGlobalExecuteRejectsMessageOnly = script do
+    s <- setup "execute-message-only"
+    let message = tokenOnlyMessage s s.receiver
+    let context = receiverExecuteContext s
+    disclosures <- receiverDisclosures s
+
+    submitMustFail (actAs s.receiver <> discloseMany disclosures) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.Execute with
+            receiverParty = s.receiver
+            routerCid = s.router
+            encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
+            tokenTransfer = None
+            ccvInputs = []
+            context = context
+
+-- | Execute must reject payload-bearing messages.
+testGlobalExecuteRejectsPayload : Script ()
+testGlobalExecuteRejectsPayload = script do
+    s <- setup "execute-payload"
+    let message = (tokenOnlyMessage s s.receiver) with
+        messageData = "48656c6c6f20576f726c64"
+    let context = receiverExecuteContext s
+    disclosures <- receiverDisclosures s
+
+    submitMustFail (actAs s.receiver <> discloseMany disclosures) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.Execute with
+            receiverParty = s.receiver
+            routerCid = s.router
+            encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
+            tokenTransfer = Some (CCIP.UserV1.Receiver.ReceiverTokenTransferInput with
+                tokenPoolCid = coerceContractId s.globalContract -- unused: guard aborts first
+                tokenReceiverParty = s.receiver
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext)
+            ccvInputs = []
+            context = context
+
+-- | Execute with a receiverParty that does not match the message's encoded
+-- receiver must be rejected by the OffRamp.
+testGlobalExecuteRejectsMisdirectedReceiverParty : Script ()
+testGlobalExecuteRejectsMisdirectedReceiverParty = script do
+    s <- setup "execute-misdirect"
+    let message = tokenOnlyMessage s s.receiver
+    let context = receiverExecuteContext s
+    disclosures <- receiverDisclosures s
+
+    submitMustFail (actAs s.receiver <> discloseMany disclosures) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.Execute with
+            receiverParty = s.user -- not the message receiver
+            routerCid = s.router
+            encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
+            tokenTransfer = Some (CCIP.UserV1.Receiver.ReceiverTokenTransferInput with
+                tokenPoolCid = coerceContractId s.globalContract -- unused: OffRamp rejects first
+                tokenReceiverParty = s.receiver
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext)
+            ccvInputs = []
+            context = context
+
+-- | The ICCIPSender interface dispatch must resolve required CCVs for sends.
+testGlobalInterfaceSenderGetRequiredCCVs : Script ()
+testGlobalInterfaceSenderGetRequiredCCVs = script do
+    s <- setup "iface-sender"
+    let message = messageOnlyAnyMessage s s.user
+    let context = senderSendContext s
+    disclosures <- senderDisclosures s
+
+    requiredCCVs <- submit (actAs s.user <> discloseMany disclosures) do
+        exerciseCmd (toInterfaceContractId @CCIP.UserV1.Sender.ICCIPSender s.globalContract)
+            CCIP.UserV1.Sender.ICCIPSender_GetRequiredCCVs with
+                senderParty = s.user
+                destinationChainSelector = s.destChainSelector
+                message = message
+                routerCid = s.userRouter
+                tokenPoolCid = None
+                context = context
+
+    -- No lane-mandated or default CCVs configured for the destination chain.
+    requiredCCVs === []
+
+-- | The ICCIPReceiver interface dispatch must resolve required CCVs for
+-- execution from the baked-in receiver policy plus the token pool and lane.
+testGlobalInterfaceReceiverGetRequiredCCVs : Script ()
+testGlobalInterfaceReceiverGetRequiredCCVs = script do
+    s <- setup "iface-receiver"
+    let message = tokenOnlyMessage s s.receiver
+    let context = receiverExecuteContext s
+    disclosures <- receiverDisclosures s
+
+    requiredCCVs <- submit (actAs s.receiver <> discloseMany disclosures) do
+        exerciseCmd (toInterfaceContractId @CCIP.UserV1.Receiver.ICCIPReceiver s.globalContract)
+            CCIP.UserV1.Receiver.ICCIPReceiver_GetRequiredCCVs with
+                receiverParty = s.receiver
+                routerCid = s.router
+                encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
+                tokenPoolCid = None
+                context = context
+
+    -- Token-only transfers: the baked-in receiver policy is empty and the pool
+    -- adds nothing here, so the resolved set is the router's resolution of the
+    -- lane configuration (no defaults configured in this setup).
+    requiredCCVs === []
+
+-- | The client interfaces on the global contract must surface the baked-in
+-- state through their views.
+testGlobalInterfaceViews : Script ()
+testGlobalInterfaceViews = script do
+    s <- setup "iface-views"
+
+    Some senderView <- queryInterfaceContractId s.ccipOwner (toInterfaceContractId @CCIP.UserV1.Sender.ICCIPSender s.globalContract)
+    CCIP.UserV1.Sender.ccipOwner senderView === s.ccipOwner
+
+    Some receiverView <- queryInterfaceContractId s.ccipOwner (toInterfaceContractId @CCIP.UserV1.Receiver.ICCIPReceiver s.globalContract)
+    CCIP.UserV1.Receiver.ccipOwner receiverView === s.ccipOwner
+    CCIP.UserV1.Receiver.requiredCCVs receiverView === []
+    CCIP.UserV1.Receiver.receiverFinalityConfig receiverView === bakedInReceiverFinalityConfig

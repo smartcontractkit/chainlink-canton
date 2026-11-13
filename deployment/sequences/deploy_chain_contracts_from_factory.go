@@ -14,16 +14,19 @@ import (
 	mcms_types "github.com/smartcontractkit/mcms/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	factorybindings "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/factory"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/globaltokensenderreceiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_token_sender_receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -261,6 +264,29 @@ var DeployChainContractsFromFactory = operations.NewSequence(
 		proposalOutputs = appendExerciseOutput(proposalOutputs, deployPerPartyRouterFactoryReport.Output, input.ProposalDriven)
 		perPartyRouterFactoryRawInstanceAddress := perPartyRouterFactoryInstanceID.RawInstanceAddress(ccipOwnerParty)
 		addresses = append(addresses, newAddressRef(deps.ChainSelector(), perPartyRouterFactoryRawInstanceAddress, per_party_router_factory.ContractType, per_party_router_factory.Version, ""))
+
+		// GlobalTokenSenderReceiver: one Chainlink-operated orchestrator for all
+		// DA Registry token transfers. Receiver-side policy is baked in; for
+		// token-only transfers the token pool decides CCV and finality
+		// requirements, so the defaults below are inert.
+		globalTokenSenderReceiverInstanceID, err := ensureInstanceID("", "globaltokensenderreceiver")
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to ensure GlobalTokenSenderReceiver instance ID: %w", err)
+		}
+		globalTokenSenderReceiverTemplate := globaltokensenderreceiver.GlobalTokenSenderReceiver{
+			InstanceId:             types.TEXT(globalTokenSenderReceiverInstanceID),
+			CcipOwner:              ccipOwnerParty,
+			RequiredCCVs:           nil,
+			OptionalCCVs:           nil,
+			ReceiverFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
+		}
+		deployGlobalTokenSenderReceiverReport, err := operations.ExecuteOperation(b, factoryops.DeployGlobalTokenSenderReceiver, deps, newChoiceInput(factoryRawInstanceAddress, factorybindings.DeployGlobalTokenSenderReceiver{Contract: globalTokenSenderReceiverTemplate}, input.ProposalDriven))
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy GlobalTokenSenderReceiver from factory: %w", err)
+		}
+		proposalOutputs = appendExerciseOutput(proposalOutputs, deployGlobalTokenSenderReceiverReport.Output, input.ProposalDriven)
+		globalTokenSenderReceiverRawInstanceAddress := globalTokenSenderReceiverInstanceID.RawInstanceAddress(ccipOwnerParty)
+		addresses = append(addresses, newAddressRef(deps.ChainSelector(), globalTokenSenderReceiverRawInstanceAddress, global_token_sender_receiver.ContractType, global_token_sender_receiver.Version, ""))
 
 		for i, params := range input.Executors {
 			executorInstanceID, err := ensureInstanceID(params.Template.InstanceId, "executor")

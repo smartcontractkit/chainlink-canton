@@ -32,8 +32,10 @@ data-dependencies:
   - ../pools/lock-release-token-pool/.daml/dist/ccip-lock-release-token-pool-v2-2.1.3.dar
   - ../pools/burn-mint-token-pool/.daml/dist/ccip-burn-mint-token-pool-v2-2.1.3.dar
 
-  - ../sender/.daml/dist/ccip-sender-v2-2.1.0.dar
-  - ../receiver/.daml/dist/ccip-receiver-v2-2.1.0.dar
+  - ../sender/.daml/dist/ccip-sender-v2-2.1.1.dar
+  - ../receiver/.daml/dist/ccip-receiver-v2-2.1.1.dar
+  - ../user/.daml/dist/ccip-user-v1-1.0.0.dar
+  - ../global-token-sender-receiver/.daml/dist/ccip-global-token-sender-receiver-v1-2.0.0.dar
   - ../factory/.daml/dist/ccip-factory-v2-2.1.2.dar
 dependencies:
   - daml-prim

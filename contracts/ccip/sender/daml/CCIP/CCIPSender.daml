@@ -20,7 +20,9 @@ import qualified CCIP.APIV2.RMNRemote
 import qualified CCIP.APIV2.TokenAdminRegistry
 import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.CodecV2.Math
+import DA.Numeric qualified as Numeric
 import qualified CCIP.CodecV2.Uint256
+import qualified CCIP.UserV1.Sender
 import qualified CCIP.ClientV2
 import qualified CCIP.InterfacesV2.CrossChainVerifier
 import qualified CCIP.InterfacesV2.Executor
@@ -100,6 +102,31 @@ validateCCVFeeQuote expectedCCV quote =
         quote.ccvInstanceId
         quote.ccvOwner
         expectedCCV
+
+
+toLocalCCVSendInput : CCIP.UserV1.Sender.SenderCCVSendInput -> CCVSendInput
+toLocalCCVSendInput input = CCVSendInput with
+    ccvAddress = input.ccvAddress
+    ccvCid = input.ccvCid
+    context = input.context
+
+toLocalFeeTokenInput : CCIP.UserV1.Sender.SenderFeeTokenInput -> FeeTokenInput
+toLocalFeeTokenInput input = FeeTokenInput with
+    senderInputCids = input.senderInputCids
+    feeTokenConfigCid = input.feeTokenConfigCid
+    feeTokenTransferFactory = input.feeTokenTransferFactory
+    feeTokenExtraArgs = input.feeTokenExtraArgs
+
+toLocalTokenTransferInput : CCIP.UserV1.Sender.SenderTokenTransferInput -> TokenTransferInput
+toLocalTokenTransferInput input = TokenTransferInput with
+    senderInputCids = input.senderInputCids
+    tokenPoolCid = input.tokenPoolCid
+    context = input.context
+
+toLocalExecutorInput : CCIP.UserV1.Sender.SenderExecutorInput -> ExecutorInput
+toLocalExecutorInput input = ExecutorInput with
+    executorCid = input.executorCid
+    context = input.context
 
 template CCIPSender
     with
@@ -411,3 +438,44 @@ template CCIPSender
                     feeTokenConfigCid = feeTokenInput.feeTokenConfigCid
                     feeTokenTransferFactory = feeTokenInput.feeTokenTransferFactory
                     feeTokenExtraArgs = feeTokenInput.feeTokenExtraArgs
+
+        -- | Client interface implementation, so the SDK can drive this
+        -- orchestrator through the stable ICCIPSender interface. The
+        -- interface's canonical input types are converted to this template's
+        -- local types, and the richer local GetFee result is projected onto
+        -- CCIP.ClientV2.GetFeeResult (rounded to Numeric 0).
+        interface instance CCIP.UserV1.Sender.ICCIPSender for CCIPSender where
+            view = CCIP.UserV1.Sender.ICCIPSenderView with
+                ccipOwner = owner
+
+            iccipSender_getRequiredCCVsImpl self arg = exercise (fromInterfaceContractId @CCIPSender self) GetRequiredCCVs with
+                destinationChainSelector = arg.destinationChainSelector
+                message = arg.message
+                routerCid = arg.routerCid
+                tokenPoolCid = arg.tokenPoolCid
+                context = arg.context
+
+            iccipSender_getFeeImpl self arg = do
+                localResult <- exercise (fromInterfaceContractId @CCIPSender self) GetFee with
+                    destinationChainSelector = arg.destinationChainSelector
+                    message = arg.message
+                    routerCid = arg.routerCid
+                    ccvSendInputs = map toLocalCCVSendInput arg.ccvSendInputs
+                    tokenTransferInput = fmap toLocalTokenTransferInput arg.tokenTransferInput
+                    executorInput = fmap toLocalExecutorInput arg.executorInput
+                    context = arg.context
+                pure CCIP.UserV1.Sender.SenderGetFeeResult with
+                    feeResult = CCIP.ClientV2.GetFeeResult with
+                        feeTokenAmount = CCIP.CodecV2.Math.decimalToNumeric0 localResult.feeTokenAmount
+                        context = arg.context
+                    poolQuote = None -- We don't have access to the pool quote at this level
+
+            iccipSender_sendImpl self arg = exercise (fromInterfaceContractId @CCIPSender self) Send with
+                destinationChainSelector = arg.destinationChainSelector
+                message = arg.message
+                routerCid = arg.routerCid
+                feeTokenInput = toLocalFeeTokenInput arg.feeTokenInput
+                ccvSendInputs = map toLocalCCVSendInput arg.ccvSendInputs
+                tokenTransferInput = fmap toLocalTokenTransferInput arg.tokenTransferInput
+                executorInput = fmap toLocalExecutorInput arg.executorInput
+                context = arg.context

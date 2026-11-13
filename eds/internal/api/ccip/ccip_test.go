@@ -21,8 +21,10 @@ import (
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/globaltokensenderreceiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
@@ -47,6 +49,84 @@ func makeClient(t *testing.T, server *Server) oapiCCIP.ClientWithResponsesInterf
 	require.NoError(t, err)
 
 	return client
+}
+
+func TestServer_GetTokenSenderReceiver(t *testing.T) {
+	t.Parallel()
+
+	globalTokenSenderReceiverAddress := contracts.NewRawInstanceAddress("globalTokenSenderReceiver", "owner")
+
+	setup := func(t *testing.T, withSenderReceiver bool) (*mocks.MockActiveContractStore, oapiCCIP.ClientWithResponsesInterface) {
+		t.Helper()
+		mockActiveContractStore := mocks.NewMockActiveContractStore(t)
+		mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything)
+		cfg := config.CCIPAPIConfig{
+			GlobalTokenSenderReceiver: config.ContractIdentifier{},
+		}
+		if withSenderReceiver {
+			cfg.GlobalTokenSenderReceiver = config.ContractIdentifier{
+				InstanceAddress: globalTokenSenderReceiverAddress.InstanceAddress(),
+			}
+		}
+		server, err := NewServer(t.Context(), zerolog.Nop(), mockActiveContractStore, cfg)
+		require.NoError(t, err)
+		client := makeClient(t, server)
+
+		return mockActiveContractStore, client
+	}
+
+	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
+		mockActiveContractStore, client := setup(t, true)
+
+		globalTokenSenderReceiver := globaltokensenderreceiver.GlobalTokenSenderReceiver{
+			InstanceId:             types.TEXT(globalTokenSenderReceiverAddress.InstanceID()),
+			CcipOwner:              types.PARTY(globalTokenSenderReceiverAddress.Owner()),
+			ReceiverFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
+		}
+		mockActiveContractStore.EXPECT().Get(globalTokenSenderReceiverAddress.InstanceAddress()).Return(&apiv2.ActiveContract{CreatedEvent: &apiv2.CreatedEvent{
+			ContractId: "contractId1",
+			TemplateId: &apiv2.Identifier{
+				PackageId:  "package1",
+				ModuleName: "module1",
+				EntityName: "entity1",
+			},
+			CreateArguments: bindings.MarshalTemplateToRecord(globalTokenSenderReceiver),
+		}}, true)
+
+		resp, err := client.GetTokenSenderReceiverWithResponse(t.Context())
+		require.NoError(t, err)
+		require.Equalf(t, http.StatusOK, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+		require.Equal(t, "contractId1", resp.JSON200.ContractId)
+		require.Equal(t, globalTokenSenderReceiverAddress.InstanceAddress().Hex(), resp.JSON200.InstanceAddress)
+		require.Equal(t, globalTokenSenderReceiverAddress.String(), resp.JSON200.RawInstanceAddress)
+		require.Equal(t, []oapiCommon.DisclosedContract{
+			{
+				ContractId: "contractId1",
+				TemplateId: "package1:module1:entity1",
+			},
+		}, resp.JSON200.DisclosedContracts)
+	})
+
+	t.Run("With Disabled", func(t *testing.T) {
+		t.Parallel()
+		_, client := setup(t, false)
+
+		resp, err := client.GetTokenSenderReceiverWithResponse(t.Context())
+		require.NoError(t, err)
+		require.Equalf(t, http.StatusNotFound, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+	})
+
+	t.Run("Not found in store", func(t *testing.T) {
+		t.Parallel()
+		mockActiveContractStore, client := setup(t, true)
+
+		mockActiveContractStore.EXPECT().Get(globalTokenSenderReceiverAddress.InstanceAddress()).Return(nil, false)
+
+		resp, err := client.GetTokenSenderReceiverWithResponse(t.Context())
+		require.NoError(t, err)
+		require.Equal(t, http.StatusInternalServerError, resp.StatusCode(), "unexpected response code, response: %s", string(resp.Body))
+	})
 }
 
 func TestServer_PostPerPartyRouterFactory(t *testing.T) {
@@ -1404,15 +1484,17 @@ func TestServer_PostCCIPExecute(t *testing.T) {
 	tokenAdminRegistryAddress := contracts.NewRawInstanceAddress("tokenAdminRegistry", "owner")
 	rmnRemoteAddress := contracts.NewRawInstanceAddress("rmnRemote", "owner")
 	feeQuoterAddress := contracts.NewRawInstanceAddress("feeQuoter", "owner")
+	globalTokenSenderReceiverAddress := contracts.NewRawInstanceAddress("globalTokenSenderReceiver", "owner")
 	tokenPoolAddress := contracts.NewRawInstanceAddress("tokenPool", "owner")
 	cfg := config.CCIPAPIConfig{
-		PerPartyRouterFactory: config.ContractIdentifier{InstanceAddress: perPartyRouterFactoryAddress.InstanceAddress()},
-		OnRamp:                config.ContractIdentifier{InstanceAddress: onRampAddress.InstanceAddress()},
-		OffRamp:               config.ContractIdentifier{InstanceAddress: offRampAddress.InstanceAddress()},
-		GlobalConfig:          config.ContractIdentifier{InstanceAddress: globalConfigAddress.InstanceAddress()},
-		TokenAdminRegistry:    config.ContractIdentifier{InstanceAddress: tokenAdminRegistryAddress.InstanceAddress()},
-		RMNRemote:             config.ContractIdentifier{InstanceAddress: rmnRemoteAddress.InstanceAddress()},
-		FeeQuoter:             config.ContractIdentifier{InstanceAddress: feeQuoterAddress.InstanceAddress()},
+		PerPartyRouterFactory:     config.ContractIdentifier{InstanceAddress: perPartyRouterFactoryAddress.InstanceAddress()},
+		OnRamp:                    config.ContractIdentifier{InstanceAddress: onRampAddress.InstanceAddress()},
+		OffRamp:                   config.ContractIdentifier{InstanceAddress: offRampAddress.InstanceAddress()},
+		GlobalConfig:              config.ContractIdentifier{InstanceAddress: globalConfigAddress.InstanceAddress()},
+		TokenAdminRegistry:        config.ContractIdentifier{InstanceAddress: tokenAdminRegistryAddress.InstanceAddress()},
+		RMNRemote:                 config.ContractIdentifier{InstanceAddress: rmnRemoteAddress.InstanceAddress()},
+		FeeQuoter:                 config.ContractIdentifier{InstanceAddress: feeQuoterAddress.InstanceAddress()},
+		GlobalTokenSenderReceiver: config.ContractIdentifier{InstanceAddress: globalTokenSenderReceiverAddress.InstanceAddress()},
 	}
 	tokenInstrumentId := splice_api_token_holding_v1.InstrumentId{
 		Admin: "tokenOwner",
@@ -1802,6 +1884,9 @@ func TestServer_FilterContracts(t *testing.T) {
 		FeeQuoter: config.ContractIdentifier{
 			InstanceAddress: contracts.HexToInstanceAddress("0x7"),
 		},
+		GlobalTokenSenderReceiver: config.ContractIdentifier{
+			InstanceAddress: contracts.HexToInstanceAddress("0x8"),
+		},
 	}
 	mockActiveContractStore := mocks.NewMockActiveContractStore(t)
 	mockActiveContractStore.EXPECT().RegisterTemplates(mock.Anything)
@@ -1820,9 +1905,10 @@ func TestServer_FilterContracts(t *testing.T) {
 				cfg.TokenAdminRegistry.InstanceAddress,
 				cfg.RMNRemote.InstanceAddress,
 				cfg.FeeQuoter.InstanceAddress,
+				cfg.GlobalTokenSenderReceiver.InstanceAddress,
 			},
 		)
-		assert.Len(t, res, 7)
+		assert.Len(t, res, 8)
 		assert.Contains(t, res, cfg.PerPartyRouterFactory.InstanceAddress)
 		assert.Contains(t, res, cfg.OnRamp.InstanceAddress)
 		assert.Contains(t, res, cfg.OffRamp.InstanceAddress)
@@ -1830,6 +1916,7 @@ func TestServer_FilterContracts(t *testing.T) {
 		assert.Contains(t, res, cfg.TokenAdminRegistry.InstanceAddress)
 		assert.Contains(t, res, cfg.RMNRemote.InstanceAddress)
 		assert.Contains(t, res, cfg.FeeQuoter.InstanceAddress)
+		assert.Contains(t, res, cfg.GlobalTokenSenderReceiver.InstanceAddress)
 	})
 	t.Run("Filters unknown address", func(t *testing.T) {
 		t.Parallel()

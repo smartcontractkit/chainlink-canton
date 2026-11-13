@@ -20,6 +20,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/globaltokensenderreceiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	oapiCCIP "github.com/smartcontractkit/chainlink-canton/eds/api/ccip"
@@ -47,6 +48,8 @@ type Server struct {
 	tokenAdminRegistry    contracts.InstanceAddress
 	rmnRemote             contracts.InstanceAddress
 	feeQuoter             contracts.InstanceAddress
+	// optional: only enable lookups for the GlobalTokenSenderReceiver if set
+	globalTokenSenderReceiver *contracts.InstanceAddress
 
 	// ccipOwner is the party that owns the CCIP contracts and receives the fees paid in the fee token.
 	ccipOwner types.PARTY
@@ -66,55 +69,65 @@ func NewServer(
 	ctx context.Context,
 	logger zerolog.Logger,
 	activeContractStore store.ActiveContractStoreInterface,
-	config config.CCIPAPIConfig,
+	cfg config.CCIPAPIConfig,
 ) (*Server, error) {
 	s := &Server{
-		logger:                logger.With().Str("component", "CCIPAPI").Logger(),
-		activeContractStore:   activeContractStore,
-		perPartyRouterFactory: config.PerPartyRouterFactory.InstanceAddress,
-		onRamp:                config.OnRamp.InstanceAddress,
-		offRamp:               config.OffRamp.InstanceAddress,
-		globalConfig:          config.GlobalConfig.InstanceAddress,
-		tokenAdminRegistry:    config.TokenAdminRegistry.InstanceAddress,
-		rmnRemote:             config.RMNRemote.InstanceAddress,
-		feeQuoter:             config.FeeQuoter.InstanceAddress,
-		ccipOwner:             types.PARTY(config.CcipOwner),
-		feeTokenFactories:     make(map[splice_api_token_holding_v1.InstrumentId]feeTokenFactory, len(config.FeeTokens)),
+		logger:                    logger.With().Str("component", "CCIPAPI").Logger(),
+		activeContractStore:       activeContractStore,
+		perPartyRouterFactory:     cfg.PerPartyRouterFactory.InstanceAddress,
+		onRamp:                    cfg.OnRamp.InstanceAddress,
+		offRamp:                   cfg.OffRamp.InstanceAddress,
+		globalConfig:              cfg.GlobalConfig.InstanceAddress,
+		tokenAdminRegistry:        cfg.TokenAdminRegistry.InstanceAddress,
+		rmnRemote:                 cfg.RMNRemote.InstanceAddress,
+		feeQuoter:                 cfg.FeeQuoter.InstanceAddress,
+		globalTokenSenderReceiver: nil,
+		ccipOwner:                 types.PARTY(cfg.CcipOwner),
+		feeTokenFactories:         make(map[splice_api_token_holding_v1.InstrumentId]feeTokenFactory, len(cfg.FeeTokens)),
+	}
+
+	// If GlobalTokenSenderReceiver is set in the config, enable the API endpoint and register its template
+	if cfg.GlobalTokenSenderReceiver != (config.ContractIdentifier{}) {
+		s.globalTokenSenderReceiver = &cfg.GlobalTokenSenderReceiver.InstanceAddress
+		s.activeContractStore.RegisterTemplates(store.RegisteredTemplate{
+			TemplateID: contracts.TemplateIDFromBinding(globaltokensenderreceiver.GlobalTokenSenderReceiver{}),
+			PartyID:    cfg.GlobalTokenSenderReceiver.PartyID,
+		})
 	}
 
 	s.activeContractStore.RegisterTemplates(
 		[]store.RegisteredTemplate{
 			{
 				TemplateID: contracts.TemplateIDFromBinding(ccipruntime.PerPartyRouterFactory{}),
-				PartyID:    config.OnRamp.PartyID,
+				PartyID:    cfg.OnRamp.PartyID,
 			}, {
 				TemplateID: contracts.TemplateIDFromBinding(ccipruntime.OnRamp{}),
-				PartyID:    config.OnRamp.PartyID,
+				PartyID:    cfg.OnRamp.PartyID,
 			}, {
 				TemplateID: contracts.TemplateIDFromBinding(ccipruntime.OffRamp{}),
-				PartyID:    config.OffRamp.PartyID,
+				PartyID:    cfg.OffRamp.PartyID,
 			}, {
 				TemplateID: contracts.TemplateIDFromBinding(core.GlobalConfig{}),
-				PartyID:    config.GlobalConfig.PartyID,
+				PartyID:    cfg.GlobalConfig.PartyID,
 			}, {
 				TemplateID: contracts.TemplateIDFromBinding(core.TokenAdminRegistry{}),
-				PartyID:    config.TokenAdminRegistry.PartyID,
+				PartyID:    cfg.TokenAdminRegistry.PartyID,
 			}, {
 				TemplateID: contracts.TemplateIDFromBinding(core.TokenConfig{}),
-				PartyID:    config.TokenAdminRegistry.PartyID,
+				PartyID:    cfg.TokenAdminRegistry.PartyID,
 			}, {
 				TemplateID: contracts.TemplateIDFromBinding(core.RMNRemote{}),
-				PartyID:    config.RMNRemote.PartyID,
+				PartyID:    cfg.RMNRemote.PartyID,
 			}, {
 				TemplateID: contracts.TemplateIDFromBinding(core.FeeQuoter{}),
-				PartyID:    config.FeeQuoter.PartyID,
+				PartyID:    cfg.FeeQuoter.PartyID,
 			},
 		}...,
 	)
 
 	// Set up the transfer factories of the configured fee tokens, so that the send API can
 	// return the fee token's transfer factory disclosures.
-	for _, feeToken := range config.FeeTokens {
+	for _, feeToken := range cfg.FeeTokens {
 		if feeToken.Factory == nil {
 			continue
 		}
@@ -168,6 +181,38 @@ func (s Server) PostPerPartyRouterFactory(c *gin.Context) {
 		RawInstanceAddress: parsedPerPartyRouterFactory.Address.String(),
 		DisclosedContracts: []oapiCommon.DisclosedContract{
 			converters.ActiveContractToDisclosedContract(activePerPartyRouterFactoryContract),
+		},
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetTokenSenderReceiver (GET /ccip/v1/global/tokenSenderReceiver)
+func (s Server) GetTokenSenderReceiver(c *gin.Context) {
+	if s.globalTokenSenderReceiver == nil {
+		c.AbortWithStatusJSON(http.StatusNotFound, oapiCommon.ErrorResponse{Error: "globalTokenSenderReceiver not configured"})
+		return
+	}
+
+	activeGlobalTokenSenderReceiverContract, ok := s.activeContractStore.Get(*s.globalTokenSenderReceiver)
+	if !ok {
+		s.logger.Error().Stringer("address", s.globalTokenSenderReceiver).Msg("active globalTokenSenderReceiver contract not found")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	parsedGlobalTokenSenderReceiver, err := ParseGlobalTokenSenderReceiver(activeGlobalTokenSenderReceiverContract.GetCreatedEvent())
+	if err != nil {
+		s.logger.Err(err).Stringer("address", s.globalTokenSenderReceiver).Msg("failed to parse globalTokenSenderReceiver contract")
+		c.AbortWithStatusJSON(http.StatusInternalServerError, oapiCommon.ErrorResponse{Error: "internal server error"})
+		return
+	}
+
+	resp := &oapiCCIP.GlobalTokenSenderReceiverResponse{
+		ContractId:         activeGlobalTokenSenderReceiverContract.GetCreatedEvent().GetContractId(),
+		InstanceAddress:    parsedGlobalTokenSenderReceiver.Address.InstanceAddress().Hex(),
+		RawInstanceAddress: parsedGlobalTokenSenderReceiver.Address.String(),
+		DisclosedContracts: []oapiCommon.DisclosedContract{
+			converters.ActiveContractToDisclosedContract(activeGlobalTokenSenderReceiverContract),
 		},
 	}
 	c.JSON(http.StatusOK, resp)
@@ -415,6 +460,7 @@ func (s Server) PostCCIPSend(c *gin.Context) {
 		converters.ActiveContractToDisclosedContract(activeRMNRemoteContract),
 		converters.ActiveContractToDisclosedContract(activeFeeQuoterContract),
 	}
+
 	var feeTokenConfigCid string
 
 	parsedTokenAdminRegistry, err := ParseTokenAdminRegistry(activeTokenAdminRegistryContract.GetCreatedEvent())
@@ -677,6 +723,10 @@ func (s Server) FilterContracts(addresses []contracts.InstanceAddress) []contrac
 			s.rmnRemote,
 			s.feeQuoter:
 			out = append(out, address)
+		default:
+			if s.globalTokenSenderReceiver != nil && address == *s.globalTokenSenderReceiver {
+				out = append(out, address)
+			}
 		}
 	}
 

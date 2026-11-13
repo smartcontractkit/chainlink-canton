@@ -98,6 +98,14 @@ encodeDeployPerPartyRouterFactoryParams params =
   <> CCIP.CodecV2.encodeRawInstanceAddress params.feeQuoter
   <> CCIP.CodecV2.encodeRawInstanceAddress params.rmnRemote
 
+encodeDeployGlobalTokenSenderReceiverParams : CCIP.FactoryV2.DeployGlobalTokenSenderReceiverParams -> BytesHex
+encodeDeployGlobalTokenSenderReceiverParams params =
+  encodeText params.instanceId
+  <> CCIP.CodecV2.encodeRawInstanceAddressList params.requiredCCVs
+  <> CCIP.CodecV2.encodeRawInstanceAddressList params.optionalCCVs
+  <> fromSome (encodeInt64 params.optionalThreshold)
+  <> encodeRequestedFinality params.receiverFinalityConfig
+
 encodeDeployRMNRemoteParams : CCIP.FactoryV2.DeployRMNRemoteParams -> BytesHex
 encodeDeployRMNRemoteParams params =
   encodeText params.instanceId
@@ -319,6 +327,27 @@ testDecodeDeployPerPartyRouterFactoryParams = script do
       decoded.tokenAdminRegistry === params.tokenAdminRegistry
       decoded.feeQuoter === params.feeQuoter
       decoded.rmnRemote === params.rmnRemote
+
+  pure ()
+
+testDecodeDeployGlobalTokenSenderReceiverParams : Script ()
+testDecodeDeployGlobalTokenSenderReceiverParams = script do
+  let params = CCIP.FactoryV2.DeployGlobalTokenSenderReceiverParams with
+        instanceId = "global-sr-1"
+        requiredCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "ccv1@owner"]
+        optionalCCVs = [Chainlink.InstanceAddress.RawInstanceAddress "ccv2@owner"]
+        optionalThreshold = 1
+        receiverFinalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
+      encoded = encodeDeployGlobalTokenSenderReceiverParams params
+
+  case CCIP.FactoryV2.decodeDeployGlobalTokenSenderReceiverParams encoded of
+    None -> abort "Failed to decode DeployGlobalTokenSenderReceiverParams"
+    Some decoded -> do
+      decoded.instanceId === params.instanceId
+      decoded.requiredCCVs === params.requiredCCVs
+      decoded.optionalCCVs === params.optionalCCVs
+      decoded.optionalThreshold === params.optionalThreshold
+      decoded.receiverFinalityConfig === params.receiverFinalityConfig
 
   pure ()
 

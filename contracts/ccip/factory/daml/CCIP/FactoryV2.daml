@@ -31,13 +31,14 @@ import qualified Link.Token
 import qualified CCIP.BurnMintTokenPoolV2
 import qualified CCIP.BurnMintTokenPoolV2CodecGen
 import qualified CCIP.CodecV2.FinalityConfig
-import CCIP.CodecV2 (decodeRawInstanceAddressAt, decodeInstrumentId, decodeRequestedFinalityAt)
+import CCIP.CodecV2 (decodeRawInstanceAddressAt, decodeRawInstanceAddressList, decodeInstrumentId, decodeRequestedFinalityAt)
 import qualified CCIP.CommitteeVerifierV2
 import qualified CCIP.CoreV2.FeeQuoter
 import qualified CCIP.CoreV2.GlobalConfig
 import qualified CCIP.CoreV2.RMNRemote
 import qualified CCIP.CoreV2.TokenAdminRegistry
 import qualified CCIP.ExecutorV2
+import qualified CCIP.GlobalTokenSenderReceiver
 import qualified CCIP.LockReleaseTokenPoolV2
 import CCIP.LockReleaseTokenPoolV2CodecGen (decodeTransferTimeoutAt)
 import CCIP.LockReleaseTokenPoolV2Types (TransferTimeout(..))
@@ -143,6 +144,14 @@ template CCIPFactory
                 params <- requireDecoded "DeployPerPartyRouterFactory" (decodeDeployPerPartyRouterFactoryParams operationData)
                 deployResult <- exercise selfCid DeployPerPartyRouterFactory with
                   contract = mkPerPartyRouterFactoryContract owner params
+                let deployedAddress = Chainlink.InstanceAddress.makeText params.instanceId owner
+                pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
+                     (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
+
+              "DeployGlobalTokenSenderReceiver" -> do
+                params <- requireDecoded "DeployGlobalTokenSenderReceiver" (decodeDeployGlobalTokenSenderReceiverParams operationData)
+                deployResult <- exercise selfCid DeployGlobalTokenSenderReceiver with
+                  contract = mkGlobalTokenSenderReceiverContract owner params
                 let deployedAddress = Chainlink.InstanceAddress.makeText params.instanceId owner
                 pure (Map.insert deployedAddress (coerceContractId deployResult.deployedCid)
                      (Map.insert selfAddress (coerceContractId deployResult.factoryCid) contractIds))
@@ -351,6 +360,24 @@ template CCIPFactory
                     factoryCid = newFactoryCid
                     deployedCid = coerceContractId deployedCid
 
+        choice DeployGlobalTokenSenderReceiver : DeployResult
+            with
+                contract : CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver
+            controller owner
+            do
+                assertFactoryIsMCMSControlled this
+                assertSingletonNotDeployed "global-token-sender-receiver" deployedContracts
+                assertInstanceIdUnused contract.instanceId usedInstanceIds
+
+                deployedCid <- create contract
+                newFactoryCid <- create this with
+                    usedInstanceIds = reserveInstanceId contract.instanceId usedInstanceIds
+                    deployedContracts = Map.insert "global-token-sender-receiver" (coerceContractId deployedCid) deployedContracts
+
+                pure DeployResult with
+                    factoryCid = newFactoryCid
+                    deployedCid = coerceContractId deployedCid
+
         choice DeployRMNRemote : DeployResult
             with
                 contract : CCIP.CoreV2.RMNRemote.RMNRemote
@@ -532,6 +559,15 @@ data DeployPerPartyRouterFactoryParams = DeployPerPartyRouterFactoryParams
         rmnRemote : Chainlink.InstanceAddress.RawInstanceAddress
     deriving (Eq, Show)
 
+data DeployGlobalTokenSenderReceiverParams = DeployGlobalTokenSenderReceiverParams
+    with
+        instanceId : Text
+        requiredCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        optionalCCVs : [Chainlink.InstanceAddress.RawInstanceAddress]
+        optionalThreshold : Int
+        receiverFinalityConfig : CCIP.CodecV2.FinalityConfig.FinalityConfig
+    deriving (Eq, Show)
+
 data DeployRMNRemoteParams = DeployRMNRemoteParams
     with
         instanceId : Text
@@ -678,6 +714,15 @@ mkPerPartyRouterFactoryContract ccipOwner params = CCIP.RuntimeV2.PerPartyRouter
         feeQuoter = params.feeQuoter
         rmnRemote = params.rmnRemote
     registeredRouters = Map.empty
+
+mkGlobalTokenSenderReceiverContract : Party -> DeployGlobalTokenSenderReceiverParams -> CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver
+mkGlobalTokenSenderReceiverContract ccipOwner params = CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver with
+    instanceId = params.instanceId
+    ccipOwner
+    requiredCCVs = params.requiredCCVs
+    optionalCCVs = params.optionalCCVs
+    optionalThreshold = params.optionalThreshold
+    receiverFinalityConfig = params.receiverFinalityConfig
 
 mkRMNRemoteContract : DeployRMNRemoteParams -> CCIP.CoreV2.RMNRemote.RMNRemote
 mkRMNRemoteContract params = CCIP.CoreV2.RMNRemote.RMNRemote with
@@ -851,6 +896,21 @@ decodeDeployPerPartyRouterFactoryParams encoded = do
         tokenAdminRegistry
         feeQuoter
         rmnRemote
+
+decodeDeployGlobalTokenSenderReceiverParams : BytesHex -> Optional DeployGlobalTokenSenderReceiverParams
+decodeDeployGlobalTokenSenderReceiverParams encoded = do
+    (instanceId, offset1) <- decodeTextAt encoded 0
+    (requiredCCVs, offset2) <- decodeRawInstanceAddressList encoded offset1
+    (optionalCCVs, offset3) <- decodeRawInstanceAddressList encoded offset2
+    (optionalThreshold, offset4) <- decodeInt64At encoded offset3
+    (receiverFinalityConfig, finalOffset) <- decodeRequestedFinalityAt encoded offset4
+    assertOffset finalOffset (byteCount encoded)
+    Some DeployGlobalTokenSenderReceiverParams with
+        instanceId
+        requiredCCVs
+        optionalCCVs
+        optionalThreshold
+        receiverFinalityConfig
 
 decodeDeployRMNRemoteParams : BytesHex -> Optional DeployRMNRemoteParams
 decodeDeployRMNRemoteParams encoded = do
