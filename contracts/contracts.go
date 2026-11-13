@@ -159,6 +159,7 @@ var ReleasedVersions map[Package][]string = map[Package][]string{
 	CCIPUtilsV2:                      []string{"2.0.0", "2.1.0"},
 	ChainlinkAPI:                     []string{"2.0.0"},
 	Link:                             []string{"2.0.0", "2.1.0"},
+	LinkTokenAdmin:                   []string{"1.0.0"},
 	MCMSAPI:                          []string{"1.0.0"},
 	MCMSCore:                         []string{"2.0.0"},
 }
@@ -173,8 +174,7 @@ var Versions map[Package][]string = map[Package][]string{
 
 	Link: append(ReleasedVersions[Link], DevVersion),
 
-	// Unreleased: ships as a dev DAR until the migration is green-lit.
-	LinkTokenAdmin: []string{DevVersion},
+	LinkTokenAdmin: append(ReleasedVersions[LinkTokenAdmin], DevVersion),
 
 	MCMSAPI:  append(ReleasedVersions[MCMSAPI], DevVersion),
 	MCMSCore: append(ReleasedVersions[MCMSCore], DevVersion),
