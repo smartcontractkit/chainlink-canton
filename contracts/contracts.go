@@ -35,28 +35,25 @@ const (
 
 	// CCIP - V2
 
-	CCIPAPIV2                  = Package("ccip-api-v2")
-	CCIPCodecV2                = Package("ccip-codec-v2")
-	CCIPTicketsV2              = Package("ccip-tickets-v2")
-	CCIPEventsV2               = Package("ccip-events-v2")
-	CCIPRateLimiterV2          = Package("ccip-rate-limiter-v2")
-	CCIPClientAPIV2            = Package("ccip-client-api-v2")
-	CCIPUtilsV2                = Package("ccip-utils-v2")
-	CCIPCoreV2                 = Package("ccip-core-v2")
-	CCIPExtensionAPIV2         = Package("ccip-extension-api-v2")
-	CCIPRuntimeV2              = Package("ccip-runtime-v2")
-	CCIPSenderV2               = Package("ccip-sender-v2")
-	CCIPReceiverV2             = Package("ccip-receiver-v2")
-	CCIPCommitteeVerifierV2    = Package("ccip-committee-verifier-v2")
-	CCIPExecutorV2             = Package("ccip-executor-v2")
-	CCIPLockReleaseTokenPoolV2 = Package("ccip-lock-release-token-pool-v2")
-	CCIPBurnMintTokenPoolV2    = Package("ccip-burn-mint-token-pool-v2")
-	CCIPFactoryV2              = Package("ccip-factory-v2")
-
-	// Fresh packages: unreleased, ships as a dev DAR until the 2.0.0
-	// artifacts are frozen through the release pipeline.
-	CCIPClientV2                    = Package("ccip-client-v2")
-	CCIPGlobalTokenSenderReceiverV2 = Package("ccip-global-token-sender-receiver-v2")
+	CCIPAPIV2                       = Package("ccip-api-v2")
+	CCIPCodecV2                     = Package("ccip-codec-v2")
+	CCIPTicketsV2                   = Package("ccip-tickets-v2")
+	CCIPEventsV2                    = Package("ccip-events-v2")
+	CCIPRateLimiterV2               = Package("ccip-rate-limiter-v2")
+	CCIPClientAPIV2                 = Package("ccip-client-api-v2")
+	CCIPUtilsV2                     = Package("ccip-utils-v2")
+	CCIPCoreV2                      = Package("ccip-core-v2")
+	CCIPExtensionAPIV2              = Package("ccip-extension-api-v2")
+	CCIPRuntimeV2                   = Package("ccip-runtime-v2")
+	CCIPSenderV2                    = Package("ccip-sender-v2")
+	CCIPReceiverV2                  = Package("ccip-receiver-v2")
+	CCIPCommitteeVerifierV2         = Package("ccip-committee-verifier-v2")
+	CCIPExecutorV2                  = Package("ccip-executor-v2")
+	CCIPLockReleaseTokenPoolV2      = Package("ccip-lock-release-token-pool-v2")
+	CCIPBurnMintTokenPoolV2         = Package("ccip-burn-mint-token-pool-v2")
+	CCIPFactoryV2                   = Package("ccip-factory-v2")
+	CCIPUserV1                      = Package("ccip-user-v1")
+	CCIPGlobalTokenSenderReceiverV1 = Package("ccip-global-token-sender-receiver-v1")
 
 	// CCIP - Registry pools (EDS auto-detection observer field; separate template
 	// family from the production/LINK pools above, kept isolated so a bug or spam on
@@ -184,28 +181,25 @@ var Versions map[Package][]string = map[Package][]string{
 	MCMSAPI:  append(ReleasedVersions[MCMSAPI], DevVersion),
 	MCMSCore: append(ReleasedVersions[MCMSCore], DevVersion),
 
-	CCIPAPIV2:                  append(ReleasedVersions[CCIPAPIV2], DevVersion),
-	CCIPCodecV2:                append(ReleasedVersions[CCIPCodecV2], DevVersion),
-	CCIPTicketsV2:              append(ReleasedVersions[CCIPTicketsV2], DevVersion),
-	CCIPEventsV2:               append(ReleasedVersions[CCIPEventsV2], DevVersion),
-	CCIPRateLimiterV2:          append(ReleasedVersions[CCIPRateLimiterV2], DevVersion),
-	CCIPClientAPIV2:            append(ReleasedVersions[CCIPClientAPIV2], DevVersion),
-	CCIPUtilsV2:                append(ReleasedVersions[CCIPUtilsV2], DevVersion),
-	CCIPCoreV2:                 append(ReleasedVersions[CCIPCoreV2], DevVersion),
-	CCIPExtensionAPIV2:         append(ReleasedVersions[CCIPExtensionAPIV2], DevVersion),
-	CCIPRuntimeV2:              append(ReleasedVersions[CCIPRuntimeV2], DevVersion),
-	CCIPSenderV2:               append(ReleasedVersions[CCIPSenderV2], DevVersion),
-	CCIPReceiverV2:             append(ReleasedVersions[CCIPReceiverV2], DevVersion),
-	CCIPCommitteeVerifierV2:    append(ReleasedVersions[CCIPCommitteeVerifierV2], DevVersion),
-	CCIPExecutorV2:             append(ReleasedVersions[CCIPExecutorV2], DevVersion),
-	CCIPLockReleaseTokenPoolV2: append(ReleasedVersions[CCIPLockReleaseTokenPoolV2], DevVersion),
-	CCIPBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
-	CCIPFactoryV2:              append(ReleasedVersions[CCIPFactoryV2], DevVersion),
-
-	// Fresh -v2 lineages: unreleased, dev DARs only until the 2.0.0 artifacts
-	// are frozen through the release pipeline.
-	CCIPClientV2:                    []string{DevVersion},
-	CCIPGlobalTokenSenderReceiverV2: []string{DevVersion},
+	CCIPAPIV2:                       append(ReleasedVersions[CCIPAPIV2], DevVersion),
+	CCIPCodecV2:                     append(ReleasedVersions[CCIPCodecV2], DevVersion),
+	CCIPTicketsV2:                   append(ReleasedVersions[CCIPTicketsV2], DevVersion),
+	CCIPEventsV2:                    append(ReleasedVersions[CCIPEventsV2], DevVersion),
+	CCIPRateLimiterV2:               append(ReleasedVersions[CCIPRateLimiterV2], DevVersion),
+	CCIPClientAPIV2:                 append(ReleasedVersions[CCIPClientAPIV2], DevVersion),
+	CCIPUtilsV2:                     append(ReleasedVersions[CCIPUtilsV2], DevVersion),
+	CCIPCoreV2:                      append(ReleasedVersions[CCIPCoreV2], DevVersion),
+	CCIPExtensionAPIV2:              append(ReleasedVersions[CCIPExtensionAPIV2], DevVersion),
+	CCIPRuntimeV2:                   append(ReleasedVersions[CCIPRuntimeV2], DevVersion),
+	CCIPSenderV2:                    append(ReleasedVersions[CCIPSenderV2], DevVersion),
+	CCIPReceiverV2:                  append(ReleasedVersions[CCIPReceiverV2], DevVersion),
+	CCIPCommitteeVerifierV2:         append(ReleasedVersions[CCIPCommitteeVerifierV2], DevVersion),
+	CCIPExecutorV2:                  append(ReleasedVersions[CCIPExecutorV2], DevVersion),
+	CCIPLockReleaseTokenPoolV2:      append(ReleasedVersions[CCIPLockReleaseTokenPoolV2], DevVersion),
+	CCIPBurnMintTokenPoolV2:         append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
+	CCIPFactoryV2:                   append(ReleasedVersions[CCIPFactoryV2], DevVersion),
+	CCIPUserV1:                      append(ReleasedVersions[CCIPUserV1], DevVersion),
+	CCIPGlobalTokenSenderReceiverV1: append(ReleasedVersions[CCIPGlobalTokenSenderReceiverV1], DevVersion),
 
 	// Fresh -v2 lineage: unreleased, dev DARs only until the 2.0.0 artifacts are
 	// frozen through the release pipeline.
@@ -415,8 +409,8 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
 
-	CCIPClientV2:                    []string{"ccip", "client"},
-	CCIPGlobalTokenSenderReceiverV2: []string{"ccip", "globaltokensenderreceiver"},
+	CCIPUserV1:                      []string{"ccip", "client"},
+	CCIPGlobalTokenSenderReceiverV1: []string{"ccip", "globaltokensenderreceiver"},
 
 	CCIPRegistryBurnMintTokenPoolV2:    []string{"ccip", "registry", "burnminttokenpool"},
 	CCIPRegistryLockReleaseTokenPoolV2: []string{"ccip", "registry", "lockreleasetokenpool"},

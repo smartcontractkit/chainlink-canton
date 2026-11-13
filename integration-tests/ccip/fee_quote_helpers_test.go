@@ -109,7 +109,7 @@ func quoteICCIPSenderFee(
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.Client.Sender", EntityName: "ICCIPSender"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.UserV1.Sender", EntityName: "ICCIPSender"},
 					ContractId: ccipSenderCid,
 					Choice:     "ICCIPSender_GetFee",
 					ChoiceArgument: ledger.MapToValue(ccipclient.ICCIPSenderGetFee{

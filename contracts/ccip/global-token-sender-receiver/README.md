@@ -1,6 +1,6 @@
 # GlobalTokenSenderReceiver
 
-A single, Chainlink-operated Daml contract (`ccip-global-token-sender-receiver-v2`) used for **all**
+A single, Chainlink-operated Daml contract (`ccip-global-token-sender-receiver-v1`) used for **all**
 DA Registry token transfers in both directions. It removes the need to deploy per-user orchestrator
 contracts: every user keeps their own `PerPartyRouter` (one-time `CreateRouter`, no code deployment)
 and drives this contract with `caller` = their own party.

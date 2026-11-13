@@ -21,7 +21,7 @@ import qualified CCIP.APIV2.RMNRemote
 import qualified CCIP.APIV2.TokenAdminRegistry
 import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.CodecV2.MessageCodecV1
-import qualified CCIP.Client.Receiver
+import qualified CCIP.UserV1.Receiver
 import qualified CCIP.ClientV2
 import qualified CCIP.InterfacesV2.CrossChainVerifier
 import qualified CCIP.InterfacesV2.TokenPool
@@ -211,8 +211,8 @@ template CCIPReceiver
         -- local types, and the local CCIPMessageReceived receipt is mapped
         -- onto the interface's ReceiverExecuteResult (the execution state is
         -- read back from the router).
-        interface instance CCIP.Client.Receiver.ICCIPReceiver for CCIPReceiver where
-            view = CCIP.Client.Receiver.ICCIPReceiverView with
+        interface instance CCIP.UserV1.Receiver.ICCIPReceiver for CCIPReceiver where
+            view = CCIP.UserV1.Receiver.ICCIPReceiverView with
                 ccipOwner = owner
                 requiredCCVs = requiredCCVs
                 receiverFinalityConfig = receiverFinalityConfig
@@ -231,7 +231,7 @@ template CCIPReceiver
                     ccvInputs = map toLocalCCVInput arg.ccvInputs
                     context = arg.context
                 receipt <- fetch receiptCid
-                pure CCIP.Client.Receiver.ReceiverExecuteResult with
+                pure CCIP.UserV1.Receiver.ReceiverExecuteResult with
                     router = receipt.router
                     messageId = receipt.messageId
                     message = receipt.message
@@ -254,13 +254,13 @@ template CCIPMessageReceived
     where
         signatory owner
 
-toLocalCCVInput : CCIP.Client.Receiver.ReceiverCCVInput -> CCVInput
+toLocalCCVInput : CCIP.UserV1.Receiver.ReceiverCCVInput -> CCVInput
 toLocalCCVInput input = CCVInput with
     ccvCid = input.ccvCid
     verifierResults = input.verifierResults
     context = input.context
 
-toLocalReceiverTokenTransferInput : CCIP.Client.Receiver.ReceiverTokenTransferInput -> TokenTransferInput
+toLocalReceiverTokenTransferInput : CCIP.UserV1.Receiver.ReceiverTokenTransferInput -> TokenTransferInput
 toLocalReceiverTokenTransferInput input = TokenTransferInput with
     tokenPoolCid = input.tokenPoolCid
     tokenReceiverParty = input.tokenReceiverParty

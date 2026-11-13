@@ -1,6 +1,6 @@
 # ccip-client
 
-Minimal Daml package (`ccip-client-v2`) containing the **stable client interfaces** for driving CCIP
+Minimal Daml package (`ccip-user-v1`) containing the **stable client interfaces** for driving CCIP
 sender/receiver orchestrator contracts, plus the canonical input/result types those interfaces
 reference.
 
@@ -10,10 +10,10 @@ The SDK (and any other client) needs to exercise sender/receiver functionality o
 contracts* without depending on a specific implementation. This package defines that contract
 surface:
 
-- **`CCIP.Client.Sender`** — the `ICCIPSender` interface (`ICCIPSender_GetRequiredCCVs`,
+- **`CCIP.UserV1.Sender`** — the `ICCIPSender` interface (`ICCIPSender_GetRequiredCCVs`,
   `ICCIPSender_GetFee`, `ICCIPSender_Send`) with the `SenderFeeTokenInput`, `SenderTokenTransferInput`,
   `SenderExecutorInput`, `SenderCCVSendInput` input types and the `SenderGetFeeResult` return type.
-- **`CCIP.Client.Receiver`** — the `ICCIPReceiver` interface (`ICCIPReceiver_GetRequiredCCVs`,
+- **`CCIP.UserV1.Receiver`** — the `ICCIPReceiver` interface (`ICCIPReceiver_GetRequiredCCVs`,
   `ICCIPReceiver_Execute`) with the `ReceiverCCVInput`, `ReceiverTokenTransferInput` input types and
   the `ReceiverExecuteResult` return type.
 

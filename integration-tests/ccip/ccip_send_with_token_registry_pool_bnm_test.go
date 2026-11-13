@@ -124,7 +124,7 @@ func TestRegistryBurnMintTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	linkTokenDar, err := contracts.GetDar(contracts.Link, contracts.DevVersion)
 	require.NoError(t, err)
-	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV2, contracts.DevVersion)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV1, contracts.DevVersion)
 	require.NoError(t, err)
 
 	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, registryTokenPoolDar, registryRateLimiterDar, linkTokenDar, globalSenderReceiverDar}

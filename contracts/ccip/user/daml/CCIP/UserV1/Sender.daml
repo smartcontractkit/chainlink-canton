@@ -7,7 +7,7 @@
 --
 -- Every choice carries a ChoiceContext so arbitrary data can be passed along
 -- without touching this (un-upgradeable) interface.
-module CCIP.Client.Sender where
+module CCIP.UserV1.Sender where
 
 import qualified Splice.Api.Token.HoldingV1
 import qualified Splice.Api.Token.MetadataV1

@@ -142,7 +142,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err)
 	executorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
-	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV2, contracts.DevVersion)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV1, contracts.DevVersion)
 	require.NoError(t, err)
 
 	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipReceiverDar, executorDar, globalSenderReceiverDar}
@@ -577,7 +577,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.Client.Receiver", EntityName: "ICCIPReceiver"},
+					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.UserV1.Receiver", EntityName: "ICCIPReceiver"},
 					ContractId:     ccipReceiverCid,
 					Choice:         "ICCIPReceiver_Execute",
 					ChoiceArgument: ledger.MapToValue(executeArgs),

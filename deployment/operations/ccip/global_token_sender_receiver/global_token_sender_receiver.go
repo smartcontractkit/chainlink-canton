@@ -27,6 +27,6 @@ var Deploy = contract.NewDeploy(contract.DeployParams[globalbindings.GlobalToken
 
 		return nil
 	},
-	PackageName: string(contracts.CCIPGlobalTokenSenderReceiverV2),
+	PackageName: string(contracts.CCIPGlobalTokenSenderReceiverV1),
 	Prefix:      "global-token-sender-receiver",
 })

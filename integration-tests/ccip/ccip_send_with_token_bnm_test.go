@@ -118,7 +118,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	require.NoError(t, err)
 	linkTokenDar, err := contracts.GetDar(contracts.Link, contracts.DevVersion)
 	require.NoError(t, err)
-	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV2, contracts.DevVersion)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV1, contracts.DevVersion)
 	require.NoError(t, err)
 
 	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipSenderDar, ccipExecutorDar, tokenPoolDar, linkTokenDar, globalSenderReceiverDar}
@@ -966,7 +966,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.Client.Sender", EntityName: "ICCIPSender"},
+					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.UserV1.Sender", EntityName: "ICCIPSender"},
 					ContractId:     globalSenderReceiverDisclosure.ContractId,
 					Choice:         "ICCIPSender_Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),

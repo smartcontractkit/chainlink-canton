@@ -34,8 +34,8 @@ data-dependencies:
 
   - ../sender/.daml/dist/ccip-sender-v2-2.1.1.dar
   - ../receiver/.daml/dist/ccip-receiver-v2-2.1.1.dar
-  - ../client/.daml/dist/ccip-client-v2-2.0.0.dar
-  - ../global-token-sender-receiver/.daml/dist/ccip-global-token-sender-receiver-v2-2.0.0.dar
+  - ../user/.daml/dist/ccip-user-v1-1.0.0.dar
+  - ../global-token-sender-receiver/.daml/dist/ccip-global-token-sender-receiver-v1-2.0.0.dar
   - ../factory/.daml/dist/ccip-factory-v2-2.1.2.dar
 dependencies:
   - daml-prim

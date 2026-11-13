@@ -27,8 +27,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-global-token-sender-receiver-v2"
-	PackageID   = "c20eaabe5afb812649be87c7f6fbd6345012869e6ae728e7c4be3cefd185aa57"
+	PackageName = "ccip-global-token-sender-receiver-v1"
+	PackageID   = "548a378d2a39a45df4ca843672201c2b1a809f7a77f20d7caa668c0e7807dee5"
 	SDKVersion  = "3.4.11"
 )
 

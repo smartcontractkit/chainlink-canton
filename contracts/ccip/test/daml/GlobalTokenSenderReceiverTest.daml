@@ -21,8 +21,8 @@ import qualified Chainlink.InstanceAddress
 import qualified CCIP.APIV2.GlobalConfig
 import qualified CCIP.APIV2.RMNRemote
 import qualified CCIP.APIV2.TokenAdminRegistry
-import qualified CCIP.Client.Receiver
-import qualified CCIP.Client.Sender
+import qualified CCIP.UserV1.Receiver
+import qualified CCIP.UserV1.Sender
 import qualified CCIP.ClientV2
 import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.CodecV2.MessageCodecV1
@@ -285,8 +285,8 @@ tokenOnlyMessage s receiverParty = CCIP.CodecV2.MessageCodecV1.MessageV1 with
 
 -- | Fee token input for tests where the payload guard aborts before the
 -- inputs are used; the CIDs are never dereferenced.
-dummyFeeTokenInput : ContractId CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver -> CCIP.Client.Sender.SenderFeeTokenInput
-dummyFeeTokenInput anyCid = CCIP.Client.Sender.SenderFeeTokenInput with
+dummyFeeTokenInput : ContractId CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver -> CCIP.UserV1.Sender.SenderFeeTokenInput
+dummyFeeTokenInput anyCid = CCIP.UserV1.Sender.SenderFeeTokenInput with
     senderInputCids = []
     feeTokenConfigCid = coerceContractId anyCid
     feeTokenTransferFactory = coerceContractId anyCid
@@ -362,7 +362,7 @@ testGlobalExecuteRejectsPayload = script do
             receiverParty = s.receiver
             routerCid = s.router
             encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
-            tokenTransfer = Some (CCIP.Client.Receiver.ReceiverTokenTransferInput with
+            tokenTransfer = Some (CCIP.UserV1.Receiver.ReceiverTokenTransferInput with
                 tokenPoolCid = coerceContractId s.globalContract -- unused: guard aborts first
                 tokenReceiverParty = s.receiver
                 context = Splice.Api.Token.MetadataV1.emptyChoiceContext)
@@ -383,7 +383,7 @@ testGlobalExecuteRejectsMisdirectedReceiverParty = script do
             receiverParty = s.user -- not the message receiver
             routerCid = s.router
             encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
-            tokenTransfer = Some (CCIP.Client.Receiver.ReceiverTokenTransferInput with
+            tokenTransfer = Some (CCIP.UserV1.Receiver.ReceiverTokenTransferInput with
                 tokenPoolCid = coerceContractId s.globalContract -- unused: OffRamp rejects first
                 tokenReceiverParty = s.receiver
                 context = Splice.Api.Token.MetadataV1.emptyChoiceContext)
@@ -399,8 +399,8 @@ testGlobalInterfaceSenderGetRequiredCCVs = script do
     disclosures <- senderDisclosures s
 
     requiredCCVs <- submit (actAs s.user <> discloseMany disclosures) do
-        exerciseCmd (toInterfaceContractId @CCIP.Client.Sender.ICCIPSender s.globalContract)
-            CCIP.Client.Sender.ICCIPSender_GetRequiredCCVs with
+        exerciseCmd (toInterfaceContractId @CCIP.UserV1.Sender.ICCIPSender s.globalContract)
+            CCIP.UserV1.Sender.ICCIPSender_GetRequiredCCVs with
                 senderParty = s.user
                 destinationChainSelector = s.destChainSelector
                 message = message
@@ -421,8 +421,8 @@ testGlobalInterfaceReceiverGetRequiredCCVs = script do
     disclosures <- receiverDisclosures s
 
     requiredCCVs <- submit (actAs s.receiver <> discloseMany disclosures) do
-        exerciseCmd (toInterfaceContractId @CCIP.Client.Receiver.ICCIPReceiver s.globalContract)
-            CCIP.Client.Receiver.ICCIPReceiver_GetRequiredCCVs with
+        exerciseCmd (toInterfaceContractId @CCIP.UserV1.Receiver.ICCIPReceiver s.globalContract)
+            CCIP.UserV1.Receiver.ICCIPReceiver_GetRequiredCCVs with
                 receiverParty = s.receiver
                 routerCid = s.router
                 encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
@@ -440,10 +440,10 @@ testGlobalInterfaceViews : Script ()
 testGlobalInterfaceViews = script do
     s <- setup "iface-views"
 
-    Some senderView <- queryInterfaceContractId s.ccipOwner (toInterfaceContractId @CCIP.Client.Sender.ICCIPSender s.globalContract)
-    CCIP.Client.Sender.ccipOwner senderView === s.ccipOwner
+    Some senderView <- queryInterfaceContractId s.ccipOwner (toInterfaceContractId @CCIP.UserV1.Sender.ICCIPSender s.globalContract)
+    CCIP.UserV1.Sender.ccipOwner senderView === s.ccipOwner
 
-    Some receiverView <- queryInterfaceContractId s.ccipOwner (toInterfaceContractId @CCIP.Client.Receiver.ICCIPReceiver s.globalContract)
-    CCIP.Client.Receiver.ccipOwner receiverView === s.ccipOwner
-    CCIP.Client.Receiver.requiredCCVs receiverView === []
-    CCIP.Client.Receiver.receiverFinalityConfig receiverView === bakedInReceiverFinalityConfig
+    Some receiverView <- queryInterfaceContractId s.ccipOwner (toInterfaceContractId @CCIP.UserV1.Receiver.ICCIPReceiver s.globalContract)
+    CCIP.UserV1.Receiver.ccipOwner receiverView === s.ccipOwner
+    CCIP.UserV1.Receiver.requiredCCVs receiverView === []
+    CCIP.UserV1.Receiver.receiverFinalityConfig receiverView === bakedInReceiverFinalityConfig

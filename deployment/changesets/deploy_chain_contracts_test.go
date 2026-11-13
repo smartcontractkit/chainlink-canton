@@ -45,7 +45,7 @@ func TestDeployChainContracts(t *testing.T) {
 		contracts.CCIPCoreV2,
 		contracts.CCIPCommitteeVerifierV2,
 		contracts.CCIPLockReleaseTokenPoolV2,
-		contracts.CCIPGlobalTokenSenderReceiverV2,
+		contracts.CCIPGlobalTokenSenderReceiverV1,
 	)
 
 	reporter := cld_ops.NewMemoryReporter()

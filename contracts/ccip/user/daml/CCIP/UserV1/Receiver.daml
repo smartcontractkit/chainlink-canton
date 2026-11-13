@@ -7,7 +7,7 @@
 --
 -- Every choice carries a ChoiceContext so arbitrary data can be passed along
 -- without touching this (un-upgradeable) interface.
-module CCIP.Client.Receiver where
+module CCIP.UserV1.Receiver where
 
 import DA.Crypto.Text (BytesHex)
 
@@ -35,7 +35,7 @@ data ReceiverCCVInput = ReceiverCCVInput
 -- token transfer. Mirrors how TokenReceiveTicket is Optional on the OffRamp.
 --
 -- Named ...Receiver... to disambiguate from the sender-side
--- CCIP.Client.Sender.TokenTransferInput in generated (module-flat) Go bindings.
+-- CCIP.UserV1.Sender.TokenTransferInput in generated (module-flat) Go bindings.
 data ReceiverTokenTransferInput = ReceiverTokenTransferInput
     with
         tokenPoolCid : ContractId CCIP.InterfacesV2.TokenPool.ITokenPool

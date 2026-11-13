@@ -32,8 +32,8 @@ import qualified CCIP.CodecV2.FinalityConfig
 import qualified CCIP.CodecV2.Math
 import qualified CCIP.CodecV2.MessageCodecV1
 import qualified CCIP.CodecV2.Uint256
-import qualified CCIP.Client.Receiver
-import qualified CCIP.Client.Sender
+import qualified CCIP.UserV1.Receiver
+import qualified CCIP.UserV1.Sender
 import qualified CCIP.ClientV2
 import qualified CCIP.InterfacesV2.CrossChainVerifier
 import qualified CCIP.InterfacesV2.Executor
@@ -139,15 +139,15 @@ template GlobalTokenSenderReceiver
                     poolReportedCCVs = poolReportedCCVs
 
         -- | Quote the fees for sending a message.
-        nonconsuming choice GetFee : CCIP.Client.Sender.SenderGetFeeResult
+        nonconsuming choice GetFee : CCIP.UserV1.Sender.SenderGetFeeResult
             with
                 senderParty : Party
                 destinationChainSelector : Numeric 0
                 message : CCIP.ClientV2.Canton2AnyMessage
                 routerCid : ContractId CCIP.ClientV2.PerPartyRouter
-                ccvSendInputs : [CCIP.Client.Sender.SenderCCVSendInput]
-                tokenTransferInput : Optional CCIP.Client.Sender.SenderTokenTransferInput
-                executorInput : Optional CCIP.Client.Sender.SenderExecutorInput
+                ccvSendInputs : [CCIP.UserV1.Sender.SenderCCVSendInput]
+                tokenTransferInput : Optional CCIP.UserV1.Sender.SenderTokenTransferInput
+                executorInput : Optional CCIP.UserV1.Sender.SenderExecutorInput
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller senderParty
             do
@@ -247,7 +247,7 @@ template GlobalTokenSenderReceiver
                     tokenPoolFeeQuote = quotedTokenSendFee
                     executorFeeQuote = executorFeeQuote
 
-                pure CCIP.Client.Sender.SenderGetFeeResult with
+                pure CCIP.UserV1.Sender.SenderGetFeeResult with
                     feeResult = quote
                     poolQuote = quotedTokenSendFee
 
@@ -258,10 +258,10 @@ template GlobalTokenSenderReceiver
                 destinationChainSelector : Numeric 0
                 message : CCIP.ClientV2.Canton2AnyMessage
                 routerCid : ContractId CCIP.ClientV2.PerPartyRouter
-                feeTokenInput : CCIP.Client.Sender.SenderFeeTokenInput
-                ccvSendInputs : [CCIP.Client.Sender.SenderCCVSendInput]
-                tokenTransferInput : Optional CCIP.Client.Sender.SenderTokenTransferInput
-                executorInput : Optional CCIP.Client.Sender.SenderExecutorInput
+                feeTokenInput : CCIP.UserV1.Sender.SenderFeeTokenInput
+                ccvSendInputs : [CCIP.UserV1.Sender.SenderCCVSendInput]
+                tokenTransferInput : Optional CCIP.UserV1.Sender.SenderTokenTransferInput
+                executorInput : Optional CCIP.UserV1.Sender.SenderExecutorInput
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller senderParty
             do
@@ -453,7 +453,7 @@ template GlobalTokenSenderReceiver
 
         -- | Execute an inbound message end-to-end. Only pure token transfers
         -- are supported; no contract is created by this choice.
-        nonconsuming choice Execute : CCIP.Client.Receiver.ReceiverExecuteResult
+        nonconsuming choice Execute : CCIP.UserV1.Receiver.ReceiverExecuteResult
             with
                 -- Who the message is addressed to; the OffRamp asserts
                 -- message.receiver == encodePartyAddress(receiverParty), so
@@ -464,8 +464,8 @@ template GlobalTokenSenderReceiver
                 encodedMessage : BytesHex
                 -- Includes tokenReceiverParty; also validated against the
                 -- message by the OffRamp.
-                tokenTransfer : Optional CCIP.Client.Receiver.ReceiverTokenTransferInput
-                ccvInputs : [CCIP.Client.Receiver.ReceiverCCVInput]
+                tokenTransfer : Optional CCIP.UserV1.Receiver.ReceiverTokenTransferInput
+                ccvInputs : [CCIP.UserV1.Receiver.ReceiverCCVInput]
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller receiverParty
             do
@@ -532,7 +532,7 @@ template GlobalTokenSenderReceiver
                     tokenReceiveTicketCid = ticketCid
                     caller = receiverParty
 
-                pure CCIP.Client.Receiver.ReceiverExecuteResult with
+                pure CCIP.UserV1.Receiver.ReceiverExecuteResult with
                     router = result.router
                     messageId = result.messageId
                     message = result.message
@@ -544,8 +544,8 @@ template GlobalTokenSenderReceiver
         --   Client Interfaces
         -- ====================
 
-        interface instance CCIP.Client.Sender.ICCIPSender for GlobalTokenSenderReceiver where
-            view = CCIP.Client.Sender.ICCIPSenderView with
+        interface instance CCIP.UserV1.Sender.ICCIPSender for GlobalTokenSenderReceiver where
+            view = CCIP.UserV1.Sender.ICCIPSenderView with
                 ccipOwner = ccipOwner
 
             iccipSender_getRequiredCCVsImpl self arg = exercise (fromInterfaceContractId @GlobalTokenSenderReceiver self) GetRequiredCCVsForSend with
@@ -577,8 +577,8 @@ template GlobalTokenSenderReceiver
                 executorInput = arg.executorInput
                 context = arg.context
 
-        interface instance CCIP.Client.Receiver.ICCIPReceiver for GlobalTokenSenderReceiver where
-            view = CCIP.Client.Receiver.ICCIPReceiverView with
+        interface instance CCIP.UserV1.Receiver.ICCIPReceiver for GlobalTokenSenderReceiver where
+            view = CCIP.UserV1.Receiver.ICCIPReceiverView with
                 ccipOwner = ccipOwner
                 requiredCCVs = requiredCCVs
                 receiverFinalityConfig = receiverFinalityConfig
