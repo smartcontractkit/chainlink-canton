@@ -6,12 +6,15 @@ import (
 	"slices"
 	"strings"
 
+	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipant"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/exercisechoice"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
@@ -581,6 +584,125 @@ func parsePackageRefs(raw string) ([]contractdeploy.PackageRef, error) {
 	}
 
 	return refs, nil
+}
+
+// initExerciseChoiceCmd initialises a ceremony that exercises a choice on an
+// existing contract as the decentralized party.
+//
+// Usage:
+//
+//	canton-party-ceremony init exercise-choice \
+//	  --decentralized-party-id "prefix::namespace" \
+//	  --synchronizer-id global \
+//	  --template-id "#utility-registry-app-v0:Utility.Registry.App.V0.Service.Provider:ProviderService" \
+//	  --contract-id "00abc..." \
+//	  --choice ProviderService_CreateProviderConfiguration \
+//	  --choice-args-file ./choice-args.json \
+//	  --config ./participant-config.json
+var initExerciseChoiceCmd = &cobra.Command{
+	Use:   "exercise-choice",
+	Short: "Initialise a ceremony that exercises a choice as the decentralized party",
+	Long: `Create the ceremony directory, write workflow.json, and run the first
+sequence step. Every hosting participant then runs resume to grant party rights
+and sign. The last signer submits the transaction and prints the update ID and
+the created contracts.
+
+--template-id is <package>:<module>:<entity>, where <package> is a package ID or
+a #<package-name> reference. The package must already be vetted on every
+hosting participant. --choice-args-file holds the choice argument as a Ledger
+API Value in proto JSON; omit it for a choice without fields.`,
+	RunE: runInitExerciseChoice,
+}
+
+func init() {
+	f := initExerciseChoiceCmd.Flags()
+
+	f.String("decentralized-party-id", "", "Full party ID in the format <prefix>::<namespace> (required)")
+	f.String("synchronizer-id", "", "Canton synchronizer ID (required)")
+	f.String("template-id", "", "Template of the target contract as <package>:<module>:<entity> (required)")
+	f.String("contract-id", "", "Contract to exercise the choice on (required)")
+	f.String("choice", "", "Choice name (required)")
+	f.String("choice-args-file", "", "Path to a JSON file holding the choice argument as a Ledger API Value in proto JSON")
+	f.String("config", "participant-config.json", "Path to participant config JSON file")
+	f.String("state-dir", "ceremonies", "Root directory under which ceremony state is stored")
+
+	for _, name := range []string{"decentralized-party-id", "synchronizer-id", "template-id", "contract-id", "choice"} {
+		_ = initExerciseChoiceCmd.MarkFlagRequired(name)
+	}
+
+	initCmd.AddCommand(initExerciseChoiceCmd)
+}
+
+func runInitExerciseChoice(cmd *cobra.Command, _ []string) error {
+	f := cmd.Flags()
+
+	partyID, _ := f.GetString("decentralized-party-id")
+	synchronizerID, _ := f.GetString("synchronizer-id")
+	templateID, _ := f.GetString("template-id")
+	contractID, _ := f.GetString("contract-id")
+	choice, _ := f.GetString("choice")
+	argsFile, _ := f.GetString("choice-args-file")
+	configPath, _ := f.GetString("config")
+	stateDir, _ := f.GetString("state-dir")
+
+	cfg, err := client.LoadConfig(configPath)
+	if err != nil {
+		return err
+	}
+
+	pkg, module, entity, err := parseTemplateID(templateID)
+	if err != nil {
+		return err
+	}
+
+	choiceArg, err := readChoiceArgument(argsFile)
+	if err != nil {
+		return err
+	}
+
+	input := exercisechoice.ExerciseChoiceInput{
+		DecentralizedPartyID: partyID,
+		SynchronizerID:       synchronizerID,
+		PackageID:            pkg,
+		TemplateModule:       module,
+		TemplateEntity:       entity,
+		ContractID:           contractID,
+		Choice:               choice,
+		ChoiceArgument:       choiceArg,
+	}
+
+	return executeExerciseChoiceSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
+}
+
+// emptyRecordValue is the proto JSON Ledger API Value for a record with no fields.
+const emptyRecordValue = `{"record":{}}`
+
+// readChoiceArgument returns the choice argument from path, or an empty
+// record when path is empty. workflow.json fixes the input, so a bad argument
+// found only at prepare time would leave the ceremony unrecoverable.
+func readChoiceArgument(path string) (string, error) {
+	if path == "" {
+		return emptyRecordValue, nil
+	}
+	data, err := readFileBytes(path)
+	if err != nil {
+		return "", fmt.Errorf("reading choice args file %q: %w", path, err)
+	}
+	if err := protojson.Unmarshal(data, &apiv2.Value{}); err != nil {
+		return "", fmt.Errorf("choice args file %q is not a Ledger API Value in proto JSON: %w", path, err)
+	}
+
+	return string(data), nil
+}
+
+// parseTemplateID splits "<package>:<module>:<entity>" into its parts.
+func parseTemplateID(raw string) (pkg, module, entity string, err error) {
+	parts := strings.Split(raw, ":")
+	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		return "", "", "", fmt.Errorf("invalid template ID %q: expected \"<package>:<module>:<entity>\"", raw)
+	}
+
+	return parts[0], parts[1], parts[2], nil
 }
 
 // initAddParticipantWithAcsCmd initialises a combined add-participant + ACS

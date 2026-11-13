@@ -156,8 +156,11 @@ func (m *mockLedgerClient) ExecuteSubmission(
 	_ *interactive.PreparedTransaction,
 	_ *interactive.PartySignatures,
 	_ interactive.HashingSchemeVersion,
-) (string, error) {
-	return "fake-contract-0xdeadbeef", nil
+) (client.SubmissionResult, error) {
+	return client.SubmissionResult{
+		UpdateID: "fake-update",
+		Created:  []client.CreatedContract{{TemplateID: "pkg:MCMS.Main:MCMS", ContractID: "fake-contract-0xdeadbeef"}},
+	}, nil
 }
 
 func (m *mockLedgerClient) GetActiveContractsByTemplate(

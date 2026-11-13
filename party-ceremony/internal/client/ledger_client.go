@@ -59,20 +59,43 @@ type LedgerClient interface {
 		entityName string,
 	) ([]*apiv2.CreatedEvent, error)
 
-	// ExecuteSubmission calls InteractiveSubmissionService.ExecuteSubmission
-	// to submit a prepared DAML transaction with its party signatures.
-	// Returns the contract ID of the first created contract in the committed
-	// transaction, or an empty string if no contracts were created.
+	// ExecuteSubmission submits a prepared DAML transaction with its party
+	// signatures and waits until it is committed.
 	ExecuteSubmission(
 		ctx context.Context,
 		preparedTx *interactive.PreparedTransaction,
 		partySignatures *interactive.PartySignatures,
 		hashingSchemeVersion interactive.HashingSchemeVersion,
-	) (string, error)
+	) (SubmissionResult, error)
 
 	// GrantPartyRights grants actAs and readAs Ledger API rights for partyID
 	// to the given userID. This is required in JWT-auth environments where
 	// decentralized parties created via topology are not automatically visible
 	// to any user. It is idempotent: granting an already-granted right is safe.
 	GrantPartyRights(ctx context.Context, userID, partyID string) error
+}
+
+// SubmissionResult is the committed transaction returned by
+// [LedgerClient.ExecuteSubmission].
+type SubmissionResult struct {
+	UpdateID string
+	// Created lists the contracts the transaction created, in event order.
+	Created []CreatedContract
+}
+
+// CreatedContract is one contract created by a committed transaction.
+type CreatedContract struct {
+	// TemplateID is "<package-id>:<module>:<entity>".
+	TemplateID string `json:"template_id"`
+	ContractID string `json:"contract_id"`
+}
+
+// FirstContractID returns the ID of the first created contract, or "" when
+// the transaction created none.
+func (r SubmissionResult) FirstContractID() string {
+	if len(r.Created) == 0 {
+		return ""
+	}
+
+	return r.Created[0].ContractID
 }
