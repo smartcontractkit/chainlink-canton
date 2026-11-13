@@ -15,8 +15,8 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
+	ccipuser "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/user"
 )
 
 // getFeeChoiceArgumentMap builds the GetFee choice argument from Send: same encoding as
@@ -99,9 +99,9 @@ func quoteICCIPSenderFee(
 	participant canton.Participant,
 	partySender string,
 	ccipSenderCid string,
-	sendArgs ccipclient.ICCIPSenderSend,
+	sendArgs ccipuser.ICCIPSenderSend,
 	disclosures []*apiv2.DisclosedContract,
-) ccipclient.SenderGetFeeResult {
+) ccipuser.SenderGetFeeResult {
 	t.Helper()
 
 	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
@@ -109,10 +109,10 @@ func quoteICCIPSenderFee(
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.UserV1.Sender", EntityName: "ICCIPSender"},
+					TemplateId: &apiv2.Identifier{PackageId: "#" + ccipuser.PackageName, ModuleName: "CCIP.UserV1.Sender", EntityName: "ICCIPSender"},
 					ContractId: ccipSenderCid,
 					Choice:     "ICCIPSender_GetFee",
-					ChoiceArgument: ledger.MapToValue(ccipclient.ICCIPSenderGetFee{
+					ChoiceArgument: ledger.MapToValue(ccipuser.ICCIPSenderGetFee{
 						SenderParty:              sendArgs.SenderParty,
 						DestinationChainSelector: sendArgs.DestinationChainSelector,
 						Message:                  sendArgs.Message,
@@ -154,7 +154,7 @@ func quoteICCIPSenderFee(
 	require.NotNil(t, resultRecord, "GetFee should return an exercised record result")
 
 	fmt.Printf("GetFee result record: %+v\n", resultRecord)
-	var result ccipclient.SenderGetFeeResult
+	var result ccipuser.SenderGetFeeResult
 	err = ledger.RecordToStruct(resultRecord, &result)
 	require.NoError(t, err)
 

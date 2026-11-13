@@ -409,7 +409,7 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
 
-	CCIPUserV1:                      []string{"ccip", "client"},
+	CCIPUserV1:                      []string{"ccip", "user"},
 	CCIPGlobalTokenSenderReceiverV1: []string{"ccip", "globaltokensenderreceiver"},
 
 	CCIPRegistryBurnMintTokenPoolV2:    []string{"ccip", "registry", "burnminttokenpool"},

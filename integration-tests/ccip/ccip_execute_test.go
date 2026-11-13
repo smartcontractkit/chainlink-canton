@@ -52,11 +52,11 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
+	ccipuser "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/user"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
@@ -555,13 +555,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress(), types.PARTY(partyReceiver))
 	require.NoError(t, err)
 
-	executeArgs := ccipclient.ICCIPReceiverExecute{
+	executeArgs := ccipuser.ICCIPReceiverExecute{
 		ReceiverParty:  types.PARTY(partyReceiver),
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
 		TokenTransfer:  nil,
-		CcvInputs: []ccipclient.ReceiverCCVInput{
+		CcvInputs: []ccipuser.ReceiverCCVInput{
 			{
 				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 				VerifierResults: types.TEXT(verifierResultsHex),
@@ -577,7 +577,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.UserV1.Receiver", EntityName: "ICCIPReceiver"},
+					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipuser.PackageName, ModuleName: "CCIP.UserV1.Receiver", EntityName: "ICCIPReceiver"},
 					ContractId:     ccipReceiverCid,
 					Choice:         "ICCIPReceiver_Execute",
 					ChoiceArgument: ledger.MapToValue(executeArgs),

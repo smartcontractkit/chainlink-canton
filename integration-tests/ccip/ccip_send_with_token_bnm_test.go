@@ -43,13 +43,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/events"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	ccipuser "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/user"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_burn_mint_v1"
@@ -837,7 +837,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 	// Pool takes a token amount cut at LockOrBurn: feeBps = 500 (5%).
 	// Message uses Decimal token amount 0.0000010000 → 10,000 smallest units;
 	// after 5% pool fee the bridged amount should be 9,500.
-	sendArgs := ccipclient.ICCIPSenderSend{
+	sendArgs := ccipuser.ICCIPSenderSend{
 		SenderParty:              types.PARTY(partySender),
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
@@ -870,7 +870,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 		},
-		FeeTokenInput: ccipclient.SenderFeeTokenInput{
+		FeeTokenInput: ccipuser.SenderFeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 			FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
 			FeeTokenTransferFactory: types.CONTRACT_ID(ccipSendDisclosure.FeeTokenTransferFactoryCid),
@@ -881,19 +881,19 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 				},
 			},
 		},
-		CcvSendInputs: []ccipclient.SenderCCVSendInput{
+		CcvSendInputs: []ccipuser.SenderCCVSendInput{
 			{
 				CcvAddress: ccvSendDisclosure.Address.Binding(),
 				CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
 				Context:    ccvSendDisclosure.ChoiceContext,
 			},
 		},
-		TokenTransferInput: &ccipclient.SenderTokenTransferInput{
+		TokenTransferInput: &ccipuser.SenderTokenTransferInput{
 			SenderInputCids: senderHoldingCids,
 			TokenPoolCid:    types.CONTRACT_ID(tokenPoolSendDisclosure.ContractId),
 			Context:         tokenPoolSendDisclosure.ChoiceContext,
 		},
-		ExecutorInput: &ccipclient.SenderExecutorInput{
+		ExecutorInput: &ccipuser.SenderExecutorInput{
 			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
 			Context:     executorSendDisclosure.ChoiceContext,
 		},
@@ -966,7 +966,7 @@ func TestBnMTokenPool_FullSendFlow(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.UserV1.Sender", EntityName: "ICCIPSender"},
+					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipuser.PackageName, ModuleName: "CCIP.UserV1.Sender", EntityName: "ICCIPSender"},
 					ContractId:     globalSenderReceiverDisclosure.ContractId,
 					Choice:         "ICCIPSender_Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),

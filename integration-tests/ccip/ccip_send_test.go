@@ -39,13 +39,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/events"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/sender"
+	ccipuser "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/user"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
@@ -546,7 +546,7 @@ func TestCCIPSend(t *testing.T) {
 
 	ccvRawAddr := chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(committeeVerifierAddress.String())}
 	execMcmsAddr := chainlinkapi.RawInstanceAddress{Unpack: types.TEXT(executorAddress.String())}
-	sendArgs := ccipclient.ICCIPSenderSend{
+	sendArgs := ccipuser.ICCIPSenderSend{
 		SenderParty:              types.PARTY(partySender),
 		Context:                  ccipSendDisclosure.ChoiceContext,
 		RouterCid:                types.CONTRACT_ID(routerCid),
@@ -575,7 +575,7 @@ func TestCCIPSend(t *testing.T) {
 				},
 			},
 		},
-		FeeTokenInput: ccipclient.SenderFeeTokenInput{
+		FeeTokenInput: ccipuser.SenderFeeTokenInput{
 			SenderInputCids:         []types.CONTRACT_ID{types.CONTRACT_ID(feeTokenHoldingCid)},
 			FeeTokenConfigCid:       types.CONTRACT_ID(ccipSendDisclosure.FeeTokenConfigCid),
 			FeeTokenTransferFactory: types.CONTRACT_ID(ccipSendDisclosure.FeeTokenTransferFactoryCid),
@@ -586,14 +586,14 @@ func TestCCIPSend(t *testing.T) {
 				},
 			},
 		},
-		CcvSendInputs: []ccipclient.SenderCCVSendInput{
+		CcvSendInputs: []ccipuser.SenderCCVSendInput{
 			{
 				CcvAddress: ccvSendDisclosure.Address.Binding(),
 				CcvCid:     types.CONTRACT_ID(ccvSendDisclosure.ContractId),
 				Context:    splice_api_token_metadata_v1.ChoiceContext{},
 			},
 		},
-		ExecutorInput: &ccipclient.SenderExecutorInput{
+		ExecutorInput: &ccipuser.SenderExecutorInput{
 			ExecutorCid: types.CONTRACT_ID(executorSendDisclosure.ContractId),
 			Context:     splice_api_token_metadata_v1.ChoiceContext{},
 		},
@@ -645,7 +645,7 @@ func TestCCIPSend(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.UserV1.Sender", EntityName: "ICCIPSender"},
+					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipuser.PackageName, ModuleName: "CCIP.UserV1.Sender", EntityName: "ICCIPSender"},
 					ContractId:     ccipSenderCid,
 					Choice:         "ICCIPSender_Send",
 					ChoiceArgument: ledger.MapToValue(sendArgs),

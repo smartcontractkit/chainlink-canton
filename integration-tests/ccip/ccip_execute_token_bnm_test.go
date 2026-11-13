@@ -41,11 +41,11 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
-	ccipclient "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	ccipuser "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/user"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
@@ -658,17 +658,17 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 	globalSenderReceiverDisclosure, err := edsTesthelpers.GetTokenSenderReceiverDisclosure(t.Context(), ccipAPIClient)
 	require.NoError(t, err)
 
-	executeArgs := ccipclient.ICCIPReceiverExecute{
+	executeArgs := ccipuser.ICCIPReceiverExecute{
 		ReceiverParty:  types.PARTY(partyReceiver),
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
-		TokenTransfer: &ccipclient.ReceiverTokenTransferInput{
+		TokenTransfer: &ccipuser.ReceiverTokenTransferInput{
 			TokenPoolCid:       types.CONTRACT_ID(tokenPoolDisclosure.ContractId),
 			TokenReceiverParty: types.PARTY(partyReceiver),
 			Context:            tokenPoolDisclosure.ChoiceContext,
 		},
-		CcvInputs: []ccipclient.ReceiverCCVInput{
+		CcvInputs: []ccipuser.ReceiverCCVInput{
 			{
 				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 				VerifierResults: types.TEXT(verifierResultsHex),
@@ -684,7 +684,7 @@ func runBnMTokenPoolReceiveFlowTest(t *testing.T, tc bnmTokenPoolReceiveFlowTest
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipclient.PackageName, ModuleName: "CCIP.UserV1.Receiver", EntityName: "ICCIPReceiver"},
+					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipuser.PackageName, ModuleName: "CCIP.UserV1.Receiver", EntityName: "ICCIPReceiver"},
 					ContractId:     globalSenderReceiverDisclosure.ContractId,
 					Choice:         "ICCIPReceiver_Execute",
 					ChoiceArgument: ledger.MapToValue(executeArgs),

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	ccipcodec "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
-	client "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/client"
 	clientapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
+	user "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/user"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -61,8 +61,8 @@ type Execute struct {
 	ReceiverParty  types.PARTY                                `json:"receiverParty"`
 	RouterCid      types.CONTRACT_ID                          `json:"routerCid"`
 	EncodedMessage types.TEXT                                 `json:"encodedMessage"`
-	TokenTransfer  *client.ReceiverTokenTransferInput         `json:"tokenTransfer" hex:"optional"`
-	CcvInputs      []client.ReceiverCCVInput                  `json:"ccvInputs"`
+	TokenTransfer  *user.ReceiverTokenTransferInput           `json:"tokenTransfer" hex:"optional"`
+	CcvInputs      []user.ReceiverCCVInput                    `json:"ccvInputs"`
 	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
@@ -129,9 +129,9 @@ type GetFee struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
 	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
-	CcvSendInputs            []client.SenderCCVSendInput                `json:"ccvSendInputs"`
-	TokenTransferInput       *client.SenderTokenTransferInput           `json:"tokenTransferInput" hex:"optional"`
-	ExecutorInput            *client.SenderExecutorInput                `json:"executorInput" hex:"optional"`
+	CcvSendInputs            []user.SenderCCVSendInput                  `json:"ccvSendInputs"`
+	TokenTransferInput       *user.SenderTokenTransferInput             `json:"tokenTransferInput" hex:"optional"`
+	ExecutorInput            *user.SenderExecutorInput                  `json:"executorInput" hex:"optional"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
@@ -577,7 +577,7 @@ func (t GlobalTokenSenderReceiver) ExecuteWithPackageID(contractID string, packa
 
 // ICCIPReceiverGetRequiredCCVs exercises the ICCIPReceiver_GetRequiredCCVs choice on this GlobalTokenSenderReceiver contract via the IICCIPReceiver interface
 // This method uses the package name in the template ID
-func (t GlobalTokenSenderReceiver) ICCIPReceiverGetRequiredCCVs(contractID string, args client.ICCIPReceiverGetRequiredCCVs) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPReceiverGetRequiredCCVs(contractID string, args user.ICCIPReceiverGetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalTokenSenderReceiver", "ICCIPReceiver"),
 		ContractID: contractID,
@@ -587,7 +587,7 @@ func (t GlobalTokenSenderReceiver) ICCIPReceiverGetRequiredCCVs(contractID strin
 }
 
 // ICCIPReceiverGetRequiredCCVsWithPackageID exercises the ICCIPReceiver_GetRequiredCCVs choice using the provided package ID instead of package name
-func (t GlobalTokenSenderReceiver) ICCIPReceiverGetRequiredCCVsWithPackageID(contractID string, packageID string, args client.ICCIPReceiverGetRequiredCCVs) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPReceiverGetRequiredCCVsWithPackageID(contractID string, packageID string, args user.ICCIPReceiverGetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalTokenSenderReceiver", "ICCIPReceiver"),
 		ContractID: contractID,
@@ -598,7 +598,7 @@ func (t GlobalTokenSenderReceiver) ICCIPReceiverGetRequiredCCVsWithPackageID(con
 
 // ICCIPReceiverExecute exercises the ICCIPReceiver_Execute choice on this GlobalTokenSenderReceiver contract via the IICCIPReceiver interface
 // This method uses the package name in the template ID
-func (t GlobalTokenSenderReceiver) ICCIPReceiverExecute(contractID string, args client.ICCIPReceiverExecute) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPReceiverExecute(contractID string, args user.ICCIPReceiverExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalTokenSenderReceiver", "ICCIPReceiver"),
 		ContractID: contractID,
@@ -608,7 +608,7 @@ func (t GlobalTokenSenderReceiver) ICCIPReceiverExecute(contractID string, args 
 }
 
 // ICCIPReceiverExecuteWithPackageID exercises the ICCIPReceiver_Execute choice using the provided package ID instead of package name
-func (t GlobalTokenSenderReceiver) ICCIPReceiverExecuteWithPackageID(contractID string, packageID string, args client.ICCIPReceiverExecute) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPReceiverExecuteWithPackageID(contractID string, packageID string, args user.ICCIPReceiverExecute) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalTokenSenderReceiver", "ICCIPReceiver"),
 		ContractID: contractID,
@@ -619,7 +619,7 @@ func (t GlobalTokenSenderReceiver) ICCIPReceiverExecuteWithPackageID(contractID 
 
 // ICCIPSenderGetRequiredCCVs exercises the ICCIPSender_GetRequiredCCVs choice on this GlobalTokenSenderReceiver contract via the IICCIPSender interface
 // This method uses the package name in the template ID
-func (t GlobalTokenSenderReceiver) ICCIPSenderGetRequiredCCVs(contractID string, args client.ICCIPSenderGetRequiredCCVs) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPSenderGetRequiredCCVs(contractID string, args user.ICCIPSenderGetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalTokenSenderReceiver", "ICCIPSender"),
 		ContractID: contractID,
@@ -629,7 +629,7 @@ func (t GlobalTokenSenderReceiver) ICCIPSenderGetRequiredCCVs(contractID string,
 }
 
 // ICCIPSenderGetRequiredCCVsWithPackageID exercises the ICCIPSender_GetRequiredCCVs choice using the provided package ID instead of package name
-func (t GlobalTokenSenderReceiver) ICCIPSenderGetRequiredCCVsWithPackageID(contractID string, packageID string, args client.ICCIPSenderGetRequiredCCVs) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPSenderGetRequiredCCVsWithPackageID(contractID string, packageID string, args user.ICCIPSenderGetRequiredCCVs) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalTokenSenderReceiver", "ICCIPSender"),
 		ContractID: contractID,
@@ -640,7 +640,7 @@ func (t GlobalTokenSenderReceiver) ICCIPSenderGetRequiredCCVsWithPackageID(contr
 
 // ICCIPSenderGetFee exercises the ICCIPSender_GetFee choice on this GlobalTokenSenderReceiver contract via the IICCIPSender interface
 // This method uses the package name in the template ID
-func (t GlobalTokenSenderReceiver) ICCIPSenderGetFee(contractID string, args client.ICCIPSenderGetFee) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPSenderGetFee(contractID string, args user.ICCIPSenderGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalTokenSenderReceiver", "ICCIPSender"),
 		ContractID: contractID,
@@ -650,7 +650,7 @@ func (t GlobalTokenSenderReceiver) ICCIPSenderGetFee(contractID string, args cli
 }
 
 // ICCIPSenderGetFeeWithPackageID exercises the ICCIPSender_GetFee choice using the provided package ID instead of package name
-func (t GlobalTokenSenderReceiver) ICCIPSenderGetFeeWithPackageID(contractID string, packageID string, args client.ICCIPSenderGetFee) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPSenderGetFeeWithPackageID(contractID string, packageID string, args user.ICCIPSenderGetFee) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalTokenSenderReceiver", "ICCIPSender"),
 		ContractID: contractID,
@@ -661,7 +661,7 @@ func (t GlobalTokenSenderReceiver) ICCIPSenderGetFeeWithPackageID(contractID str
 
 // ICCIPSenderSend exercises the ICCIPSender_Send choice on this GlobalTokenSenderReceiver contract via the IICCIPSender interface
 // This method uses the package name in the template ID
-func (t GlobalTokenSenderReceiver) ICCIPSenderSend(contractID string, args client.ICCIPSenderSend) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPSenderSend(contractID string, args user.ICCIPSenderSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.GlobalTokenSenderReceiver", "ICCIPSender"),
 		ContractID: contractID,
@@ -671,7 +671,7 @@ func (t GlobalTokenSenderReceiver) ICCIPSenderSend(contractID string, args clien
 }
 
 // ICCIPSenderSendWithPackageID exercises the ICCIPSender_Send choice using the provided package ID instead of package name
-func (t GlobalTokenSenderReceiver) ICCIPSenderSendWithPackageID(contractID string, packageID string, args client.ICCIPSenderSend) *model.ExerciseCommand {
+func (t GlobalTokenSenderReceiver) ICCIPSenderSendWithPackageID(contractID string, packageID string, args user.ICCIPSenderSend) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.GlobalTokenSenderReceiver", "ICCIPSender"),
 		ContractID: contractID,
@@ -682,9 +682,9 @@ func (t GlobalTokenSenderReceiver) ICCIPSenderSendWithPackageID(contractID strin
 
 // Verify interface implementations for GlobalTokenSenderReceiver
 
-var _ client.IICCIPReceiver = (*GlobalTokenSenderReceiver)(nil)
+var _ user.IICCIPReceiver = (*GlobalTokenSenderReceiver)(nil)
 
-var _ client.IICCIPSender = (*GlobalTokenSenderReceiver)(nil)
+var _ user.IICCIPSender = (*GlobalTokenSenderReceiver)(nil)
 
 // Send is a Record type
 type Send struct {
@@ -692,10 +692,10 @@ type Send struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
 	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
-	FeeTokenInput            client.SenderFeeTokenInput                 `json:"feeTokenInput"`
-	CcvSendInputs            []client.SenderCCVSendInput                `json:"ccvSendInputs"`
-	TokenTransferInput       *client.SenderTokenTransferInput           `json:"tokenTransferInput" hex:"optional"`
-	ExecutorInput            *client.SenderExecutorInput                `json:"executorInput" hex:"optional"`
+	FeeTokenInput            user.SenderFeeTokenInput                   `json:"feeTokenInput"`
+	CcvSendInputs            []user.SenderCCVSendInput                  `json:"ccvSendInputs"`
+	TokenTransferInput       *user.SenderTokenTransferInput             `json:"tokenTransferInput" hex:"optional"`
+	ExecutorInput            *user.SenderExecutorInput                  `json:"executorInput" hex:"optional"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
