@@ -28,6 +28,7 @@ A CLI tool for governing and managing **decentralized parties** on Canton distri
   - [init exercise-choice](#init-exercise-choice)
   - [resume](#resume)
   - [query-parties](#query-parties)
+  - [query-contracts](#query-contracts)
 - [Quick Start](#quick-start)
 - [Development](#development)
 
@@ -646,6 +647,28 @@ Namespace:           1220abcdef...
     - uid: PAR::p3::1220...  permission: CONFIRMATION
 ---
 ```
+
+### query-contracts
+
+List a party's active contracts of one template, as of the current ledger end.
+Use it to check what a ceremony committed when its result was lost.
+
+```bash
+canton-party-ceremony query-contracts \
+  --party <prefix::namespace> \
+  --template-id '#<package-name>:<module>:<entity>' \
+  [--config <path>]
+```
+
+It prints each contract's ID, creation offset and time, and create arguments.
+The package must be a package name; package IDs are rejected. The package name
+is the `name` field of the package's `daml.yaml`.
+The configured Ledger API user needs read rights for the party; the
+`contract-deploy` and `exercise-choice` ceremonies grant them.
+
+After a lost execute response, run it on the participant that submitted, and
+wait 10 minutes first. A transaction still in flight is not yet listed, so an
+early query can show 0 for a transaction that later commits.
 
 ---
 

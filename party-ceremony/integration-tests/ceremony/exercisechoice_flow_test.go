@@ -1,6 +1,12 @@
 package tests
 
 import (
+	"encoding/json"
+	"net"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -94,6 +100,11 @@ func (s *ExerciseChoiceFlowTestSuite) TestRegistrySetupFlow() {
 	require.Len(t, active, 1, "one InstrumentConfiguration is active for the party")
 	require.Equal(t, instrumentCfg, active[0].GetContractId())
 	require.Contains(t, protojson.Format(active[0].GetCreateArguments()), `"`+linkInstrumentID+`"`, "the configuration is for LINK")
+
+	out := s.runQueryContractsCLI(t, registryv0.InstrumentConfiguration{}.GetTemplateID())
+	require.Contains(t, out, "Active contracts: 1\n", "query-contracts finds exactly the configuration")
+	require.Contains(t, out, "Contract ID: "+instrumentCfg)
+	require.Contains(t, out, `"text":"`+linkInstrumentID+`"`)
 
 	assertRecordersMatchKMSConfig(t, kmsCfgs, recorders)
 }
@@ -214,4 +225,39 @@ func splitTemplateID(t *testing.T, templateID string) (pkg, module, entity strin
 	require.Len(t, parts, 3, "template ID %q", templateID)
 
 	return parts[0], parts[1], parts[2]
+}
+
+// runQueryContractsCLI builds the CLI and runs query-contracts as participant 1,
+// the recovery command the runbook gives operators.
+func (s *ExerciseChoiceFlowTestSuite) runQueryContractsCLI(t *testing.T, templateID string) string {
+	t.Helper()
+	p := s.chain.Participants[0]
+
+	bin := filepath.Join(t.TempDir(), "canton-party-ceremony")
+	build := exec.CommandContext(t.Context(), "go", "build", "-o", bin, ".")
+	build.Dir = filepath.Join("..", "..")
+	out, err := build.CombinedOutput()
+	require.NoError(t, err, "build CLI: %s", out)
+
+	host, portText, err := net.SplitHostPort(p.Endpoints.GRPCLedgerAPIURL)
+	require.NoError(t, err, "ledger API URL %q", p.Endpoints.GRPCLedgerAPIURL)
+	port, err := strconv.Atoi(portText)
+	require.NoError(t, err)
+	cfg := map[string]any{"participant_id": p.Name, "ledger_host": host, "ledger_port": port}
+	if p.TokenSource != nil {
+		tok, tokErr := p.TokenSource.Token()
+		require.NoError(t, tokErr)
+		cfg["ledger_jwt"] = tok.AccessToken
+	}
+	cfgJSON, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	cfgPath := filepath.Join(t.TempDir(), "participant-config.json")
+	require.NoError(t, os.WriteFile(cfgPath, cfgJSON, 0o600))
+
+	query := exec.CommandContext(t.Context(), bin, "query-contracts", "--party", s.PartyID, "--template-id", templateID, "--config", cfgPath)
+	out, err = query.CombinedOutput()
+	require.NoError(t, err, "query-contracts: %s", out)
+	t.Logf("query-contracts output:\n%s", out)
+
+	return string(out)
 }
