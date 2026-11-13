@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/exercisechoice"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
@@ -116,6 +117,14 @@ func runResume(cmd *cobra.Command, args []string) error {
 
 		return executeContractDeploySequence(cmd.Context(), cfg, state.Input, stateDir, workflowId, confirmerFromFlags(cmd))
 
+	case ceremony.WorkflowTypeExerciseChoice:
+		state, err := ceremony.LoadWorkflow[exercisechoice.ExerciseChoiceInput](ceremonyDir)
+		if err != nil {
+			return fmt.Errorf("ceremony %q: loading workflow: %w", workflowId, err)
+		}
+
+		return executeExerciseChoiceSequence(cmd.Context(), cfg, state.Input, stateDir, workflowId, confirmerFromFlags(cmd))
+
 	case ceremony.WorkflowTypeAddParticipant:
 		state, err := ceremony.LoadWorkflow[addparticipant.AddParticipantInput](ceremonyDir)
 		if err != nil {
@@ -141,8 +150,8 @@ func runResume(cmd *cobra.Command, args []string) error {
 		return executeAddParticipantWithAcsSequence(cmd.Context(), cfg, state.Input, stateDir, workflowId, confirmerFromFlags(cmd))
 
 	default:
-		return fmt.Errorf("ceremony %q: unknown workflow type %q; supported types: %s, %s, %s, %s, %s, %s, %s",
+		return fmt.Errorf("ceremony %q: unknown workflow type %q; supported types: %s, %s, %s, %s, %s, %s, %s, %s",
 			workflowId, workflowType,
-			ceremony.WorkflowTypeOnboarding, ceremony.WorkflowTypeExample, ceremony.WorkflowTypeKick, ceremony.WorkflowTypeContractDeploy, ceremony.WorkflowTypeAddParticipant, ceremony.WorkflowTypeKeyRotation, ceremony.WorkflowTypeAddParticipantWithAcs)
+			ceremony.WorkflowTypeOnboarding, ceremony.WorkflowTypeExample, ceremony.WorkflowTypeKick, ceremony.WorkflowTypeContractDeploy, ceremony.WorkflowTypeExerciseChoice, ceremony.WorkflowTypeAddParticipant, ceremony.WorkflowTypeKeyRotation, ceremony.WorkflowTypeAddParticipantWithAcs)
 	}
 }

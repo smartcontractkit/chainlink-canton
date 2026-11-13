@@ -198,14 +198,12 @@ var PrepareSubmissionOp = operations.NewOperation(
 	semver.MustParse("1.0.0"),
 	"Prepare contract creation via InteractiveSubmissionService",
 	func(b operations.Bundle, deps ContractDeployDeps, in PrepareSubmissionInput) (PrepareSubmissionOutput, error) {
-		ctx := b.GetContext()
-
 		var record apiv2.Record
 		if err := protojson.Unmarshal([]byte(in.ContractArgs), &record); err != nil {
 			return PrepareSubmissionOutput{}, fmt.Errorf("parsing contract args: %w", err)
 		}
 
-		commands := []*apiv2.Command{{
+		command := &apiv2.Command{
 			Command: &apiv2.Command_Create{
 				Create: &apiv2.CreateCommand{
 					TemplateId: &apiv2.Identifier{
@@ -216,39 +214,80 @@ var PrepareSubmissionOp = operations.NewOperation(
 					CreateArguments: &record,
 				},
 			},
-		}}
-
-		resp, err := deps.LedgerClient.PrepareSubmission(
-			ctx,
-			commands,
-			[]string{in.DecentralizedPartyID},
-			[]string{in.DecentralizedPartyID},
-			in.SynchronizerID,
-		)
-		if err != nil {
-			return PrepareSubmissionOutput{}, fmt.Errorf("preparing submission: %w", err)
 		}
 
-		hashHex := hex.EncodeToString(resp.GetPreparedTransactionHash())
-
-		txBytes, err := proto.Marshal(resp.GetPreparedTransaction())
-		if err != nil {
-			return PrepareSubmissionOutput{}, fmt.Errorf("marshalling prepared transaction: %w", err)
-		}
-		txB64 := base64.StdEncoding.EncodeToString(txBytes)
-
-		deps.Logger.Infow("Submission prepared",
-			"hash", hashHex,
-			"template", in.TemplateModule+":"+in.TemplateEntity,
-		)
-
-		return PrepareSubmissionOutput{
-			PreparedTransactionHash: hashHex,
-			PreparedTxB64:           txB64,
-			HashingSchemeVersion:    int32(resp.GetHashingSchemeVersion()),
-		}, nil
+		return prepare(b, deps, command, in.DecentralizedPartyID, in.SynchronizerID, in.TemplateModule+":"+in.TemplateEntity)
 	},
 )
+
+// PrepareExerciseOp prepares the exercise of a choice on an existing contract
+// via the InteractiveSubmissionService.
+var PrepareExerciseOp = operations.NewOperation(
+	"canton-ceremony/ledger/prepare-exercise",
+	semver.MustParse("1.0.0"),
+	"Prepare a choice exercise via InteractiveSubmissionService",
+	func(b operations.Bundle, deps ContractDeployDeps, in PrepareExerciseInput) (PrepareSubmissionOutput, error) {
+		var arg apiv2.Value
+		if err := protojson.Unmarshal([]byte(in.ChoiceArgument), &arg); err != nil {
+			return PrepareSubmissionOutput{}, fmt.Errorf("parsing choice argument: %w", err)
+		}
+
+		command := &apiv2.Command{
+			Command: &apiv2.Command_Exercise{
+				Exercise: &apiv2.ExerciseCommand{
+					TemplateId: &apiv2.Identifier{
+						PackageId:  in.PackageID,
+						ModuleName: in.TemplateModule,
+						EntityName: in.TemplateEntity,
+					},
+					ContractId:     in.ContractID,
+					Choice:         in.Choice,
+					ChoiceArgument: &arg,
+				},
+			},
+		}
+
+		return prepare(b, deps, command, in.DecentralizedPartyID, in.SynchronizerID, in.TemplateModule+":"+in.TemplateEntity+"."+in.Choice)
+	},
+)
+
+func prepare(
+	b operations.Bundle,
+	deps ContractDeployDeps,
+	command *apiv2.Command,
+	partyID string,
+	synchronizerID string,
+	action string,
+) (PrepareSubmissionOutput, error) {
+	resp, err := deps.LedgerClient.PrepareSubmission(
+		b.GetContext(),
+		[]*apiv2.Command{command},
+		[]string{partyID},
+		[]string{partyID},
+		synchronizerID,
+	)
+	if err != nil {
+		return PrepareSubmissionOutput{}, fmt.Errorf("preparing submission: %w", err)
+	}
+
+	hashHex := hex.EncodeToString(resp.GetPreparedTransactionHash())
+
+	txBytes, err := proto.Marshal(resp.GetPreparedTransaction())
+	if err != nil {
+		return PrepareSubmissionOutput{}, fmt.Errorf("marshalling prepared transaction: %w", err)
+	}
+
+	deps.Logger.Infow("Submission prepared",
+		"hash", hashHex,
+		"action", action,
+	)
+
+	return PrepareSubmissionOutput{
+		PreparedTransactionHash: hashHex,
+		PreparedTxB64:           base64.StdEncoding.EncodeToString(txBytes),
+		HashingSchemeVersion:    int32(resp.GetHashingSchemeVersion()),
+	}, nil
+}
 
 // SignSubmissionOp signs the prepared transaction hash with the participant's
 // signing key via [ContractDeployDeps.Signer].
@@ -356,7 +395,7 @@ var ExecuteSubmissionOp = operations.NewOperation(
 		}
 
 		hsv := interactive.HashingSchemeVersion(in.HashingSchemeVersion)
-		contractID, err := deps.LedgerClient.ExecuteSubmission(ctx, &preparedTx, partySignatures, hsv)
+		result, err := deps.LedgerClient.ExecuteSubmission(ctx, &preparedTx, partySignatures, hsv)
 		if err != nil {
 			return ExecuteSubmissionOutput{}, fmt.Errorf("executing submission: %w", err)
 		}
@@ -364,10 +403,15 @@ var ExecuteSubmissionOp = operations.NewOperation(
 		deps.Logger.Infow("Submission executed",
 			"party", in.DecentralizedPartyID,
 			"signatures", len(sigs),
-			"contract_id", contractID,
+			"update_id", result.UpdateID,
+			"created", len(result.Created),
 		)
 
-		return ExecuteSubmissionOutput{ContractID: contractID}, nil
+		return ExecuteSubmissionOutput{
+			ContractID:       result.FirstContractID(),
+			UpdateID:         result.UpdateID,
+			CreatedContracts: result.Created,
+		}, nil
 	},
 )
 

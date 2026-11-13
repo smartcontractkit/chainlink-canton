@@ -236,13 +236,12 @@ func ledgerPackageNameRef(name string) string {
 
 // ExecuteSubmission calls InteractiveSubmissionService.ExecuteSubmissionAndWaitForTransaction
 // to submit the prepared transaction and block until it is committed to the ledger.
-// Returns the contract ID of the first created contract in the committed transaction.
 func (c *GRPCLedgerClient) ExecuteSubmission(
 	ctx context.Context,
 	preparedTx *interactive.PreparedTransaction,
 	partySignatures *interactive.PartySignatures,
 	hashingSchemeVersion interactive.HashingSchemeVersion,
-) (string, error) {
+) (SubmissionResult, error) {
 	resp, err := c.interactive.ExecuteSubmissionAndWaitForTransaction(ctx, &interactive.ExecuteSubmissionAndWaitForTransactionRequest{
 		PreparedTransaction:  preparedTx,
 		PartySignatures:      partySignatures,
@@ -250,16 +249,24 @@ func (c *GRPCLedgerClient) ExecuteSubmission(
 		SubmissionId:         uuid.New().String(),
 	})
 	if err != nil {
-		return "", fmt.Errorf("ExecuteSubmission: %w", err)
-	}
-	// Extract the first created contract ID from the committed transaction.
-	for _, event := range resp.GetTransaction().GetEvents() {
-		if ce := event.GetCreated(); ce != nil && ce.GetContractId() != "" {
-			return ce.GetContractId(), nil
-		}
+		return SubmissionResult{}, fmt.Errorf("ExecuteSubmission: %w", err)
 	}
 
-	return "", nil
+	tx := resp.GetTransaction()
+	result := SubmissionResult{UpdateID: tx.GetUpdateId()}
+	for _, event := range tx.GetEvents() {
+		ce := event.GetCreated()
+		if ce == nil || ce.GetContractId() == "" {
+			continue
+		}
+		tid := ce.GetTemplateId()
+		result.Created = append(result.Created, CreatedContract{
+			TemplateID: tid.GetPackageId() + ":" + tid.GetModuleName() + ":" + tid.GetEntityName(),
+			ContractID: ce.GetContractId(),
+		})
+	}
+
+	return result, nil
 }
 
 func (c *GRPCLedgerClient) GrantPartyRights(ctx context.Context, userID, partyID string) error {
