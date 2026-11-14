@@ -93,6 +93,7 @@ func (in GovernLinkTokenAdminInput) Validate() error {
 		}
 		if id, _, _, ok := action.approval(); ok {
 			// Two live authorizations with one id make every later withdraw of that id ambiguous.
+			// This covers one proposal; GovernLinkTokenAdmin.VerifyPreconditions checks the ledger.
 			key := string(action.approvalKind()) + "/" + string(id)
 			if approvedKind[key] {
 				return fmt.Errorf("action %d: authorization %q is approved twice in this proposal", i, id)
@@ -107,9 +108,10 @@ func (in GovernLinkTokenAdminInput) Validate() error {
 		if approved[types.TEXT(action.Withdraw.AuthorizationID)] {
 			return fmt.Errorf("action %d: authorization %q is approved earlier in this proposal; withdraw it in a later one", i, action.Withdraw.AuthorizationID)
 		}
-		key := string(action.Withdraw.Kind) + "/" + action.Withdraw.AuthorizationID
+		// Every kind shares the address id@ccipOwner, and the executor maps one contract per address.
+		key := action.Withdraw.AuthorizationID
 		if withdrawn[key] {
-			return fmt.Errorf("action %d: authorization %q is withdrawn twice in this proposal", i, action.Withdraw.AuthorizationID)
+			return fmt.Errorf("action %d: authorization %q is withdrawn twice in this proposal; withdraw it in a later one", i, action.Withdraw.AuthorizationID)
 		}
 		withdrawn[key] = true
 	}
@@ -174,6 +176,16 @@ func (a LinkTokenAdminAction) approval() (types.TEXT, types.NUMERIC, types.INT64
 	}
 
 	return "", "", 0, false
+}
+
+// ApprovalRef names the authorization an Approve* action creates.
+func (a LinkTokenAdminAction) ApprovalRef() (LinkAuthorizationRef, bool) {
+	id, _, _, ok := a.approval()
+	if !ok {
+		return LinkAuthorizationRef{}, false
+	}
+
+	return LinkAuthorizationRef{Kind: a.approvalKind(), AuthorizationID: string(id)}, true
 }
 
 func (a LinkTokenAdminAction) approvalKind() linkadmingov.Kind {
