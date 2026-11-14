@@ -116,6 +116,11 @@ func TestRegistryBurnMintTokenPool_proposalMode(t *testing.T) {
 	}
 	tokenRef := deployOut.Output.Addresses[2]
 	require.Equal(t, datastore.ContractType("Token"), tokenRef.Type)
+	// The configure input has no observer labels: the limiters must still get the pool's observers.
+	configureTokenRef := tokenRef
+	configureTokenRef.Labels = datastore.NewLabelSet(
+		"instrument-admin:"+string(ccipOwner), "instrument-id:LINK", "ccip-owner:"+string(ccipOwner),
+	)
 
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 	remoteSelectorKey := types.NUMERIC("16015286601757825753")
@@ -124,7 +129,7 @@ func TestRegistryBurnMintTokenPool_proposalMode(t *testing.T) {
 		ChainSelector:    selector,
 		TokenPoolAddress: poolRaw.InstanceAddress().Hex(),
 		PoolType:         registryBurnMintPoolType.String(),
-		TokenRef:         tokenRef,
+		TokenRef:         configureTokenRef,
 		RemoteChains: map[uint64]tokenadapters.RemoteChainConfig[[]byte, string]{
 			remoteSelector: {
 				RemotePool:                common.HexToAddress("0x7e3febbdaf80e7e96c1ae107508ec3fafc36d7f3").Bytes(),
