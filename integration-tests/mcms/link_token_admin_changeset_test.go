@@ -145,6 +145,24 @@ func TestLinkTokenAdmin_ChangesetsThroughMCMS(t *testing.T) {
 	require.Equal(t, types.PARTY(ccipOwner), auth.Recipient)
 	require.Equal(t, types.TEXT(adminRaw.InstanceID()), auth.AdminInstanceId)
 
+	verifyGovern := func(actions ...sequences.LinkTokenAdminAction) error {
+		cfg := changesets.CantonCSDeps[changesets.GovernLinkTokenAdminConfig]{
+			ChainSelector: selector,
+			Config:        changesets.GovernLinkTokenAdminConfig{Actions: actions, Description: "rejected before signing"},
+		}
+
+		return changesets.GovernLinkTokenAdmin{}.VerifyPreconditions(updateMCMSConfigEnv(t, deployer, ds.Seal()), cfg)
+	}
+	err = verifyGovern(sequences.LinkTokenAdminAction{ApproveMint: &tokenadmin.ApproveMint{
+		AuthorizationId: types.TEXT(authorizationRaw.InstanceID()),
+		Recipient:       types.PARTY(ccipOwner),
+		Amount:          "1",
+		ValidForSeconds: 3600,
+	}})
+	require.ErrorContains(t, err, "already live", "a live authorization id must not be approved again")
+	err = verifyGovern(sequences.LinkTokenAdminAction{Withdraw: &sequences.LinkAuthorizationRef{Kind: linkadmingov.KindMint, AuthorizationID: "nope"}})
+	require.ErrorContains(t, err, "not live", "a withdraw needs a live target")
+
 	govern(t, "withdraw LINK mint authorization", sequences.LinkTokenAdminAction{Withdraw: &sequences.LinkAuthorizationRef{
 		Kind:            linkadmingov.KindMint,
 		AuthorizationID: authorizationRaw.InstanceID(),

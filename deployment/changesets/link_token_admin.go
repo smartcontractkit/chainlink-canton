@@ -2,16 +2,20 @@ package changesets
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
 	cldf "github.com/smartcontractkit/chainlink-deployments-framework/deployment"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/linkadmingov"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
 	cantonmcms "github.com/smartcontractkit/chainlink-canton/deployment/utils/mcms"
+	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
 
 // --- DeployLinkTokenAdminFromFactory ---
@@ -100,8 +104,52 @@ func (g GovernLinkTokenAdmin) VerifyPreconditions(e cldf.Environment, config Can
 	if err := input.Validate(); err != nil {
 		return err
 	}
+	if err := requireLiveAuthorizations(e, config, input); err != nil {
+		return err
+	}
 	if input.ProposalDriven {
 		return requireCCIPOwnerMCMSRef(e, config.ChainSelector)
+	}
+
+	return nil
+}
+
+// requireLiveAuthorizations checks the ledger: an approval must not reuse a live id, and a withdraw must have a live target.
+func requireLiveAuthorizations(e cldf.Environment, config CantonCSDeps[GovernLinkTokenAdminConfig], input sequences.GovernLinkTokenAdminInput) error {
+	participant := e.BlockChains.CantonChains()[config.ChainSelector].Participants[config.Participant]
+	owner := types.PARTY(input.AdminAddress.Owner())
+	withdrawn := make(map[sequences.LinkAuthorizationRef]bool)
+	for _, action := range input.Actions {
+		ref, approving := action.ApprovalRef()
+		if !approving {
+			if action.Withdraw == nil {
+				continue
+			}
+			ref = *action.Withdraw
+		}
+		// A withdraw earlier in the batch archives the live one before this approval creates its successor.
+		if approving && withdrawn[ref] {
+			continue
+		}
+		templateID, ok := linkadmingov.AuthorizationTemplateID(ref.Kind)
+		if !ok {
+			return fmt.Errorf("unknown authorization kind %q", ref.Kind)
+		}
+		addr := contracts.InstanceID(ref.AuthorizationID).RawInstanceAddress(owner)
+		_, err := opcontract.FindActiveContractByInstanceAddress(
+			e.GetContext(), participant.LedgerServices.State, opcontract.LedgerQueryParties(participant), templateID, addr.InstanceAddress(),
+		)
+		switch {
+		case approving && err == nil:
+			return fmt.Errorf("authorization %q of kind %s is already live; withdraw it first", ref.AuthorizationID, ref.Kind)
+		case approving && strings.Contains(err.Error(), "no active contract found"):
+			continue
+		case !approving && err != nil && strings.Contains(err.Error(), "no active contract found"):
+			return fmt.Errorf("authorization %q of kind %s is not live", ref.AuthorizationID, ref.Kind)
+		case err != nil:
+			return err
+		}
+		withdrawn[ref] = true
 	}
 
 	return nil

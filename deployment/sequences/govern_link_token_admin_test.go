@@ -163,6 +163,10 @@ func TestGovernLinkTokenAdmin_validation(t *testing.T) {
 			{Withdraw: &LinkAuthorizationRef{Kind: linkadmingov.KindBurn, AuthorizationID: "b"}},
 			{Withdraw: &LinkAuthorizationRef{Kind: linkadmingov.KindBurn, AuthorizationID: "b"}},
 		}}, "withdrawn twice in this proposal"},
+		{"same id withdrawn under two kinds", GovernLinkTokenAdminInput{AdminAddress: testAdminAddress, Actions: []LinkTokenAdminAction{
+			{Withdraw: &LinkAuthorizationRef{Kind: linkadmingov.KindMint, AuthorizationID: "X"}},
+			{Withdraw: &LinkAuthorizationRef{Kind: linkadmingov.KindBurn, AuthorizationID: "X"}},
+		}}, "withdrawn twice in this proposal"},
 		{"unknown withdraw kind", GovernLinkTokenAdminInput{AdminAddress: testAdminAddress, Actions: []LinkTokenAdminAction{{
 			Withdraw: &LinkAuthorizationRef{Kind: "recovery", AuthorizationID: "a"},
 		}}}, `unknown authorization kind "recovery"`},
