@@ -99,3 +99,19 @@ func newWithdraw[ARGS any](
 		},
 	})
 }
+
+// AuthorizationTemplateID returns the template id of the authorization contract of kind.
+func AuthorizationTemplateID(kind Kind) (string, bool) {
+	switch kind {
+	case KindMint:
+		return tokenadmin.LinkMintAuthorization{}.GetTemplateID(), true
+	case KindBurn:
+		return tokenadmin.LinkBurnAuthorization{}.GetTemplateID(), true
+	case KindTransfer:
+		return tokenadmin.LinkTransferAuthorization{}.GetTemplateID(), true
+	case KindAllocate:
+		return tokenadmin.LinkAllocationAuthorization{}.GetTemplateID(), true
+	}
+
+	return "", false
+}
