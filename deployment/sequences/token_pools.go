@@ -61,6 +61,7 @@ type configuredCantonTokenPool struct {
 	PoolOwner          types.PARTY
 	Decimals           types.INT64
 	RemoteChainConfigs map[types.NUMERIC]any
+	Observers          []types.PARTY
 }
 
 type tokenPoolChainUpdate struct {
@@ -146,7 +147,7 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 		for remoteSelector, remoteCfg := range input.RemoteChains {
 			remoteSelectorKeyStr := strconv.FormatUint(remoteSelector, 10)
 			remoteSelectorKey := types.NUMERIC(remoteSelectorKeyStr)
-			if _, found := parsedPool.RemoteChainConfigs[remoteSelectorKey]; found {
+			if remoteChainConfigured(parsedPool.RemoteChainConfigs, remoteSelectorKeyStr) {
 				return out, fmt.Errorf("remote chain %d is already configured on token pool", remoteSelector)
 			}
 
@@ -188,11 +189,15 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				lockReleasePoolType.String(),
 			)
 
+			observers := parsedPool.Observers
+			if len(observers) == 0 {
+				observers = observersFromTokenRefLabels(&input.TokenRef, parsedPool.CcipOwner)
+			}
 			meta := rateLimiterPoolMeta{
 				InstanceId: parsedPool.InstanceId,
 				PoolOwner:  parsedPool.PoolOwner,
 				PoolType:   logicalPoolType,
-				Observers:  observersFromTokenRefLabels(&input.TokenRef, parsedPool.CcipOwner),
+				Observers:  observers,
 			}
 			outboundRef, outboundRaw, err := deployTokenPoolRateLimiter(
 				b,
@@ -965,6 +970,17 @@ func observersFromTokenRefLabels(ref *datastore.AddressRef, fallback types.PARTY
 	return observers
 }
 
+// remoteChainConfigured matches ledger Numeric keys such as "123." against a bare selector.
+func remoteChainConfigured(configs map[types.NUMERIC]any, selector string) bool {
+	for key := range configs {
+		if whole, _, _ := strings.Cut(string(key), "."); whole == selector {
+			return true
+		}
+	}
+
+	return false
+}
+
 const defaultCantonTokenPoolDecimals int64 = 10
 
 // IsCantonPoolNotOnLedgerErr reports whether err is the standard "pool not yet deployed" ledger lookup failure.
@@ -1077,6 +1093,7 @@ func loadConfiguredCantonTokenPoolFromDataStore(
 		PoolOwner:          poolOwner,
 		Decimals:           decimalsFromRefLabels(poolRef, tokenRefs[0]),
 		RemoteChainConfigs: map[types.NUMERIC]any{},
+		Observers:          observersFromTokenRefLabels(&tokenRefs[0], ccipOwner),
 	}, nil
 }
 
@@ -1231,6 +1248,7 @@ func loadConfiguredCantonTokenPoolFromLedger(
 			PoolOwner:          parsedPool.PoolOwner,
 			Decimals:           parsedPool.Decimals,
 			RemoteChainConfigs: remoteChainConfigsAny,
+			Observers:          parsedPool.Observers,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported Canton token pool type %q", logicalPoolType)
