@@ -34,6 +34,8 @@ import qualified CCIP.FactoryV2
 import qualified CCIP.LockReleaseTokenPoolV2
 import qualified CCIP.LockReleaseTokenPoolV2CodecGen
 import qualified CCIP.RateLimiterV2
+import qualified CCIP.Registry.BurnMintTokenPoolV2CodecGen
+import qualified CCIP.Registry.BurnMintTokenPoolV2Types
 import qualified CCIP.UtilsV2.Context
 
 finalityConfig n =
@@ -67,6 +69,12 @@ encodeDeployLinkTokenParams : CCIP.FactoryV2.DeployLinkTokenParams -> BytesHex
 encodeDeployLinkTokenParams params =
   encodeText params.instanceId
   <> CCIP.CodecV2.encodeInstrumentId params.instrumentId
+
+encodeDeployLinkTokenAdminParams : CCIP.FactoryV2.DeployLinkTokenAdminParams -> BytesHex
+encodeDeployLinkTokenAdminParams params =
+  encodeText params.instanceId
+  <> CCIP.CodecV2.encodeInstrumentId params.instrumentId
+  <> encodePartyList params.observers
 
 encodeDeployTokenAdminRegistryParams : CCIP.FactoryV2.DeployTokenAdminRegistryParams -> BytesHex
 encodeDeployTokenAdminRegistryParams params =
@@ -155,6 +163,19 @@ encodeDeployBurnMintTokenPoolParams params =
   <> CCIP.UtilsV2.Context.encodeChoiceContext params.poolReceiveContext
   <> CCIP.BurnMintTokenPoolV2CodecGen.encodeTransferTimeout params.transferTimeout
 
+encodeDeployRegistryBurnMintTokenPoolParams : CCIP.FactoryV2.DeployRegistryBurnMintTokenPoolParams -> BytesHex
+encodeDeployRegistryBurnMintTokenPoolParams params =
+  encodeText params.instanceId
+  <> CCIP.CodecV2.encodeInstrumentId params.instrumentId
+  <> fromSome (encodeInt64 params.decimals)
+  <> encodeOptional params.rateLimitAdmin encodeParty
+  <> encodePartyList params.observers
+  <> CCIP.CodecV2.encodeRawInstanceAddress params.tokenAdminRegistry
+  <> CCIP.CodecV2.encodeRawInstanceAddress params.feeQuoter
+  <> CCIP.CodecV2.encodeRawInstanceAddress params.rmnRemote
+  <> CCIP.UtilsV2.Context.encodeChoiceContext params.poolReceiveContext
+  <> CCIP.Registry.BurnMintTokenPoolV2CodecGen.encodeTransferTimeout params.transferTimeout
+
 encodeRateLimitDirection : CCIP.RateLimiterV2.RateLimitDirection -> BytesHex
 encodeRateLimitDirection CCIP.RateLimiterV2.RateLimitDirection_Outbound = fromSome (encodeUint8 0)
 encodeRateLimitDirection CCIP.RateLimiterV2.RateLimitDirection_Inbound = fromSome (encodeUint8 1)
@@ -242,6 +263,38 @@ testDecodeDeployLinkTokenParams = script do
       decoded.instrumentId === params.instrumentId
 
   pure ()
+
+testDecodeDeployLinkTokenAdminParams : Script ()
+testDecodeDeployLinkTokenAdminParams = script do
+  ccipOwner <- allocateParty "ccipOwner"
+  observer <- allocateParty "observer"
+
+  let params = CCIP.FactoryV2.DeployLinkTokenAdminParams with
+        instanceId = "link-token-admin-1"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId ccipOwner "LINK"
+        observers = [observer]
+
+  CCIP.FactoryV2.decodeDeployLinkTokenAdminParams (encodeDeployLinkTokenAdminParams params) === Some params
+
+testDecodeDeployRegistryBurnMintTokenPoolParams : Script ()
+testDecodeDeployRegistryBurnMintTokenPoolParams = script do
+  owner <- allocateParty "owner"
+  rateLimitAdmin <- allocateParty "rateLimitAdmin"
+  observer <- allocateParty "observer"
+
+  let params = CCIP.FactoryV2.DeployRegistryBurnMintTokenPoolParams with
+        instanceId = "registry-bmtp-1"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId owner "LINK"
+        decimals = 10
+        rateLimitAdmin = Some rateLimitAdmin
+        observers = [observer]
+        tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-1" owner
+        feeQuoter = Chainlink.InstanceAddress.make "fq-1" owner
+        rmnRemote = Chainlink.InstanceAddress.make "rmn-1" owner
+        poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.Registry.BurnMintTokenPoolV2Types.RelativeHours 24
+
+  CCIP.FactoryV2.decodeDeployRegistryBurnMintTokenPoolParams (encodeDeployRegistryBurnMintTokenPoolParams params) === Some params
 
 testDecodeDeployTokenAdminRegistryParams : Script ()
 testDecodeDeployTokenAdminRegistryParams = script do
