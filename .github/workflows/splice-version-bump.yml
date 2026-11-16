@@ -129,7 +129,7 @@ jobs:
         # The repo enforces signed commits; this recreates the local commit on the remote
         # via createCommitOnBranch, which signs it with the GATI app identity.
         if: steps.compare.outputs.update == 'true' && steps.commit.outputs.has_changes == 'true'
-        uses: cfal/push-signed-commits@79a6e400798f7cb290f63bb16854f3f91afc08b4 # v1
+        uses: cfal/push-signed-commits@1e622e58ee8907ab6f3533175ae87ec2bad29cd3 # v1
         with:
           github-token: ${{ steps.setup-github-token.outputs.access-token }}
           local_branch_name: ${{ env.BRANCH }}
