@@ -228,6 +228,9 @@ func validateParty(party types.PARTY) error {
 // Daml Decimal is Numeric 10. The MCMS encoder truncates extra fractional digits instead of rejecting them.
 var damlDecimal = regexp.MustCompile(`^[0-9]{1,28}(\.[0-9]{1,10})?$`)
 
+// Withdrawing an approval early takes a full MCMS round, so expiry is the safety net.
+const maxValidForSeconds types.INT64 = 30 * 24 * 60 * 60
+
 // validateApproval rejects what LinkTokenAdmin would reject, before a proposal is signed.
 func validateApproval(authorizationID types.TEXT, amount types.NUMERIC, validForSeconds types.INT64) error {
 	if err := validateAuthorizationID(string(authorizationID)); err != nil {
@@ -239,6 +242,9 @@ func validateApproval(authorizationID types.TEXT, amount types.NUMERIC, validFor
 	}
 	if validForSeconds <= 0 {
 		return errors.New("validForSeconds must be positive")
+	}
+	if validForSeconds > maxValidForSeconds {
+		return fmt.Errorf("validForSeconds %d exceeds the maximum of %d (30 days)", validForSeconds, maxValidForSeconds)
 	}
 
 	return nil

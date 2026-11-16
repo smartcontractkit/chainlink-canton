@@ -150,6 +150,9 @@ func TestGovernLinkTokenAdmin_validation(t *testing.T) {
 		{"non-positive validity", GovernLinkTokenAdminInput{AdminAddress: testAdminAddress, Actions: []LinkTokenAdminAction{{
 			ApproveAllocate: &tokenadmin.ApproveAllocate{AuthorizationId: "a", Receiver: "r::1", Amount: "1", ValidForSeconds: 0},
 		}}}, "validForSeconds must be positive"},
+		{"validity over 30 days", GovernLinkTokenAdminInput{AdminAddress: testAdminAddress, Actions: []LinkTokenAdminAction{{
+			ApproveMint: &tokenadmin.ApproveMint{AuthorizationId: "a", Recipient: "r::1", Amount: "1", ValidForSeconds: 30*24*60*60 + 1},
+		}}}, "exceeds the maximum"},
 		{"missing authorization id", GovernLinkTokenAdminInput{AdminAddress: testAdminAddress, Actions: []LinkTokenAdminAction{{
 			ApproveMint: &tokenadmin.ApproveMint{Recipient: "r::1", Amount: "1", ValidForSeconds: 1},
 		}}}, "authorizationId is required"},
@@ -182,6 +185,15 @@ func TestGovernLinkTokenAdmin_validation(t *testing.T) {
 			require.ErrorContains(t, err, tc.wantErr)
 		})
 	}
+}
+
+func TestGovernLinkTokenAdmin_validityOfExactly30DaysIsAccepted(t *testing.T) {
+	t.Parallel()
+
+	input := GovernLinkTokenAdminInput{AdminAddress: testAdminAddress, Actions: []LinkTokenAdminAction{{
+		ApproveMint: &tokenadmin.ApproveMint{AuthorizationId: "a", Recipient: "r::1", Amount: "1", ValidForSeconds: 30 * 24 * 60 * 60},
+	}}}
+	require.NoError(t, input.Validate())
 }
 
 func TestDeployLinkTokenAdminFromFactory_proposalRoundTrip(t *testing.T) {
