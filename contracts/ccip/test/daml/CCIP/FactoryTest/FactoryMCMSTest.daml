@@ -24,6 +24,7 @@ import qualified CCIP.LockReleaseTokenPoolV2
 import qualified CCIP.RateLimiterV2
 import qualified CCIP.Registry.BurnMintTokenPoolV2
 import qualified CCIP.Registry.BurnMintTokenPoolV2Types
+import qualified CCIP.Registry.RateLimiterV2
 
 import CCIP.FactoryTest.FactoryCodecTest
   ( encodeDeployGlobalConfigParams
@@ -41,6 +42,7 @@ import CCIP.FactoryTest.FactoryCodecTest
   , encodeDeployBurnMintTokenPoolParams
   , encodeDeployRegistryBurnMintTokenPoolParams
   , encodeDeployRateLimiterParams
+  , encodeDeployRegistryRateLimiterParams
   )
 
 finalityConfig n =
@@ -966,6 +968,95 @@ testDeployRateLimiter_MCMS = script do
       functionName = "DeployRateLimiter"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
+testDeployRegistryRateLimiter_MCMS : Script ()
+testDeployRegistryRateLimiter_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+  edsObserver <- allocateParty "eds_observer"
+
+  let factoryInstanceId = "factory-registry-rl"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = Chainlink.InstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = CCIP.FactoryV2.DeployRegistryRateLimiterParams with
+        instanceId = "registry-rl-1"
+        poolInstanceId = "registry-bmtp-1"
+        remoteChainSelector = 137.0
+        direction = CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound
+        mode = CCIP.Registry.RateLimiterV2.RateLimitMode_CustomFinality
+        isEnabled = True
+        capacity = 1000000.0
+        rate = 100.0
+        observers = [edsObserver]
+
+  updatedContractIds <- submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployRegistryRateLimiter"
+      operationData = encodeDeployRegistryRateLimiterParams params
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  let limiterAddr = Chainlink.InstanceAddress.makeText params.instanceId mcmsParty
+  assertMsg "deployed registry rate limiter missing from returned contract ids" (Map.member limiterAddr updatedContractIds)
+
+  limiters <- query @CCIP.Registry.RateLimiterV2.RateLimiter edsObserver
+  case filter (\(_, rl) -> rl.instanceId == params.instanceId) limiters of
+    [(_, rl)] -> do
+      rl.poolOwner === mcmsParty
+      rl.poolInstanceId === params.poolInstanceId
+      rl.remoteChainSelector === params.remoteChainSelector
+      rl.direction === params.direction
+      rl.mode === params.mode
+      rl.isEnabled === True
+      rl.capacity === params.capacity
+      rl.rate === params.rate
+      rl.tokens === params.capacity
+      rl.observers === [edsObserver]
+    _ -> abort "Expected exactly one deployed registry RateLimiter"
+
+  pure ()
+
+-- | Direct exercisers cannot deploy a registry rate limiter owned by another party.
+testDeployRegistryRateLimiter_RejectsForeignOwner : Script ()
+testDeployRegistryRateLimiter_RejectsForeignOwner = script do
+  mcmsParty <- allocateParty "mcms_party"
+  other <- allocateParty "other"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = "factory-registry-rl-owner"
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  now <- getTime
+  submitMustFail mcmsParty do
+    exerciseCmd factoryCid CCIP.FactoryV2.DeployRegistryRateLimiter with
+      contract = CCIP.Registry.RateLimiterV2.RateLimiter with
+        instanceId = "registry-rl-foreign"
+        poolInstanceId = "registry-bmtp-1"
+        poolOwner = other
+        remoteChainSelector = 137.0
+        direction = CCIP.Registry.RateLimiterV2.RateLimitDirection_Outbound
+        mode = CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality
+        isEnabled = False
+        capacity = 0.0
+        rate = 0.0
+        tokens = 0.0
+        lastUpdated = now
+        observers = [mcmsParty]
 
   pure ()
 
