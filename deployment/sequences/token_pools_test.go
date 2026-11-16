@@ -24,6 +24,7 @@ func TestResolveCantonTokenPoolType(t *testing.T) {
 		{name: "empty defaults to lock release", input: "", want: lockReleasePoolType},
 		{name: "lock release", input: "LockReleaseTokenPool", want: lockReleasePoolType},
 		{name: "burn mint", input: "BurnMintTokenPool", want: burnMintPoolType},
+		{name: "registry burn mint", input: "RegistryBurnMintTokenPool", want: registryBurnMintPoolType},
 		{name: "invalid", input: "UnsupportedPool", wantErr: true},
 	}
 

@@ -30,6 +30,8 @@ import (
 	factorybindings "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/factory"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	registrybnm "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/burnminttokenpool"
+	registryratelimiter "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/ratelimiter"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
@@ -39,6 +41,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rate_limiter"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/registry_burn_mint_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/rmn_remote"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/token_admin_registry"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
@@ -46,8 +49,9 @@ import (
 )
 
 var (
-	lockReleasePoolType = datastore.ContractType("LockReleaseTokenPool")
-	burnMintPoolType    = datastore.ContractType("BurnMintTokenPool")
+	lockReleasePoolType      = datastore.ContractType("LockReleaseTokenPool")
+	burnMintPoolType         = datastore.ContractType("BurnMintTokenPool")
+	registryBurnMintPoolType = datastore.ContractType("RegistryBurnMintTokenPool")
 )
 
 type configuredCantonTokenPool struct {
@@ -74,6 +78,8 @@ type tokenPoolChainUpdate struct {
 type rateLimiterPoolMeta struct {
 	InstanceId types.TEXT
 	PoolOwner  types.PARTY
+	PoolType   datastore.ContractType
+	Observers  []types.PARTY
 }
 
 var ConfigureTokenForTransfers = operations.NewSequence(
@@ -182,7 +188,12 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				lockReleasePoolType.String(),
 			)
 
-			meta := rateLimiterPoolMeta{InstanceId: parsedPool.InstanceId, PoolOwner: parsedPool.PoolOwner}
+			meta := rateLimiterPoolMeta{
+				InstanceId: parsedPool.InstanceId,
+				PoolOwner:  parsedPool.PoolOwner,
+				PoolType:   logicalPoolType,
+				Observers:  observersFromTokenRefLabels(&input.TokenRef, parsedPool.CcipOwner),
+			}
 			outboundRef, outboundRaw, err := deployTokenPoolRateLimiter(
 				b,
 				cantonChain,
@@ -347,6 +358,30 @@ var ConfigureTokenForTransfers = operations.NewSequence(
 				}
 
 				return out, fmt.Errorf("apply remote chain updates to burn/mint pool: %w", err)
+			}
+			if mcmsEnabled && !applyReport.Output.Executed() {
+				proposalOutputs = append(proposalOutputs, applyReport.Output)
+			}
+		case registryBurnMintPoolType:
+			registryUpdates := make([]registrybnm.ChainUpdate, 0, len(updates))
+			for _, update := range updates {
+				registryUpdates = append(registryUpdates, registrybnm.ChainUpdate(update))
+			}
+			applyReport, err := operations.ExecuteOperation(b, registry_burn_mint_token_pool.ApplyChainUpdates, cantonChain, contract.ChoiceInput[registrybnm.ApplyChainUpdates]{
+				InstanceAddress:    poolRaw.InstanceAddress(),
+				RawInstanceAddress: poolRaw.String(),
+				MCMSEnabled:        mcmsEnabled,
+				Args: registrybnm.ApplyChainUpdates{
+					RemoteChainSelectorsToRemove: []types.NUMERIC{},
+					ChainsToAdd:                  registryUpdates,
+				},
+			})
+			if err != nil {
+				if strings.Contains(err.Error(), "ApplyChainUpdates: chain already exists:") {
+					return out, nil
+				}
+
+				return out, fmt.Errorf("apply remote chain updates to registry burn/mint pool: %w", err)
 			}
 			if mcmsEnabled && !applyReport.Output.Executed() {
 				proposalOutputs = append(proposalOutputs, applyReport.Output)
@@ -560,6 +595,39 @@ var DeployTokenPoolForToken = operations.NewSequence(
 			}
 			rawPoolAddr = poolInstanceID.RawInstanceAddress(poolOwner)
 			canonicalRef = newAddressRef(input.ChainSelector, rawPoolAddr, burn_mint_token_pool.ContractType, burn_mint_token_pool.Version, qualifier)
+		case registryBurnMintPoolType:
+			// The pool's ensure clause rejects this; failing here keeps it out of an MCMS proposal.
+			if instrumentID.Admin != poolOwner {
+				return ccipsequences.OnChainOutput{}, fmt.Errorf("registry burn/mint pool requires instrument admin %s to equal pool owner %s", instrumentID.Admin, poolOwner)
+			}
+			poolInstanceID := contracts.InstanceID(fmt.Sprintf("registryburnminttokenpool-%s", qualifier))
+			deployReport, err := operations.ExecuteOperation(b, factoryops.DeployRegistryBurnMintTokenPool, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployRegistryBurnMintTokenPool{
+				Contract: registrybnm.BurnMintTokenPool{
+					InstanceId:              types.TEXT(poolInstanceID),
+					PoolOwner:               poolOwner,
+					CcipOwner:               ccipOwner,
+					InstrumentId:            instrumentID,
+					Decimals:                types.INT64(10),
+					Observers:               observersFromTokenRefLabels(input.TokenRef, ccipOwner),
+					RemoteChainConfigs:      map[types.NUMERIC]registrybnm.RemoteChainConfig{},
+					TokenTransferFeeConfigs: map[types.NUMERIC]registrybnm.TokenTransferFeeConfig{},
+					PoolReceiveContext:      poolReceiveContext,
+					TransferTimeout:         registrybnm.TransferTimeout{RelativeHours: new(types.INT64(24))},
+					Deps: registrybnm.BurnMintTokenPoolDeps{
+						TokenAdminRegistry: tokenAdminRegistryRaw.Binding(),
+						RmnRemote:          rmnRemoteRaw.Binding(),
+						FeeQuoter:          feeQuoterRaw.Binding(),
+					},
+				},
+			}, mcmsEnabled))
+			if err != nil {
+				return ccipsequences.OnChainOutput{}, fmt.Errorf("deploy Canton registry burn/mint pool from factory: %w", err)
+			}
+			if mcmsEnabled && !deployReport.Output.Executed() {
+				proposalOutputs = append(proposalOutputs, deployReport.Output)
+			}
+			rawPoolAddr = poolInstanceID.RawInstanceAddress(poolOwner)
+			canonicalRef = newAddressRef(input.ChainSelector, rawPoolAddr, registry_burn_mint_token_pool.ContractType, registry_burn_mint_token_pool.Version, qualifier)
 		default:
 			return ccipsequences.OnChainOutput{}, fmt.Errorf("unsupported Canton token pool type %q", logicalPoolType)
 		}
@@ -729,26 +797,52 @@ func deployTokenPoolRateLimiter(
 	if err != nil {
 		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, err
 	}
-	report, err := operations.ExecuteOperation(b, factoryops.DeployRateLimiter, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployRateLimiter{
-		Contract: ratelimiter.RateLimiter{
-			InstanceId:          types.TEXT(limiterInstanceID),
-			PoolInstanceId:      poolMeta.InstanceId,
-			PoolOwner:           poolMeta.PoolOwner,
-			RemoteChainSelector: types.NUMERIC(remoteSelectorKey),
-			Direction:           dirEnum,
-			Mode:                mode,
-			IsEnabled:           types.BOOL(cfg.IsEnabled),
-			Capacity:            capacity,
-			Rate:                rate,
-			Tokens:              capacity,
-			LastUpdated:         types.TIMESTAMP(time.Now()),
-		},
-	}, mcmsEnabled))
-	if err != nil {
-		return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, err
+	var output contract.ExerciseOutput
+	if poolMeta.PoolType == registryBurnMintPoolType {
+		// Registry enums share constructor names with the legacy ones.
+		report, err := operations.ExecuteOperation(b, factoryops.DeployRegistryRateLimiter, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployRegistryRateLimiter{
+			Contract: registryratelimiter.RateLimiter{
+				InstanceId:          types.TEXT(limiterInstanceID),
+				PoolInstanceId:      poolMeta.InstanceId,
+				PoolOwner:           poolMeta.PoolOwner,
+				RemoteChainSelector: types.NUMERIC(remoteSelectorKey),
+				Direction:           registryratelimiter.RateLimitDirection(dirEnum),
+				Mode:                registryratelimiter.RateLimitMode(mode),
+				IsEnabled:           types.BOOL(cfg.IsEnabled),
+				Capacity:            capacity,
+				Rate:                rate,
+				Tokens:              capacity,
+				LastUpdated:         types.TIMESTAMP(time.Now()),
+				Observers:           poolMeta.Observers,
+			},
+		}, mcmsEnabled))
+		if err != nil {
+			return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, err
+		}
+		output = report.Output
+	} else {
+		report, err := operations.ExecuteOperation(b, factoryops.DeployRateLimiter, cantonChain, newChoiceInput(factoryRaw, factorybindings.DeployRateLimiter{
+			Contract: ratelimiter.RateLimiter{
+				InstanceId:          types.TEXT(limiterInstanceID),
+				PoolInstanceId:      poolMeta.InstanceId,
+				PoolOwner:           poolMeta.PoolOwner,
+				RemoteChainSelector: types.NUMERIC(remoteSelectorKey),
+				Direction:           dirEnum,
+				Mode:                mode,
+				IsEnabled:           types.BOOL(cfg.IsEnabled),
+				Capacity:            capacity,
+				Rate:                rate,
+				Tokens:              capacity,
+				LastUpdated:         types.TIMESTAMP(time.Now()),
+			},
+		}, mcmsEnabled))
+		if err != nil {
+			return datastore.AddressRef{}, chainlinkapi.RawInstanceAddress{}, err
+		}
+		output = report.Output
 	}
-	if mcmsEnabled && !report.Output.Executed() {
-		*proposalOutputs = append(*proposalOutputs, report.Output)
+	if mcmsEnabled && !output.Executed() {
+		*proposalOutputs = append(*proposalOutputs, output)
 	}
 
 	rawAddr := limiterInstanceID.RawInstanceAddress(poolMeta.PoolOwner)
@@ -797,6 +891,8 @@ func resolveCantonTokenPoolType(poolType string) (datastore.ContractType, error)
 		return lockReleasePoolType, nil
 	case burnMintPoolType:
 		return burnMintPoolType, nil
+	case registryBurnMintPoolType:
+		return registryBurnMintPoolType, nil
 	default:
 		return "", fmt.Errorf("unsupported Canton token pool type %q", poolType)
 	}
@@ -850,6 +946,23 @@ func partyFromTokenRefLabels(ref *datastore.AddressRef, prefix string) string {
 	}
 
 	return ""
+}
+
+// observersFromTokenRefLabels returns every "observer:<party>" label, or fallback when there are none.
+func observersFromTokenRefLabels(ref *datastore.AddressRef, fallback types.PARTY) []types.PARTY {
+	var observers []types.PARTY
+	if ref != nil {
+		for _, label := range ref.Labels.List() {
+			if party, ok := strings.CutPrefix(label, "observer:"); ok && strings.TrimSpace(party) != "" {
+				observers = append(observers, types.PARTY(strings.TrimSpace(party)))
+			}
+		}
+	}
+	if len(observers) == 0 {
+		return []types.PARTY{fallback}
+	}
+
+	return observers
 }
 
 const defaultCantonTokenPoolDecimals int64 = 10
@@ -1075,6 +1188,35 @@ func loadConfiguredCantonTokenPoolFromLedger(
 		parsedPool, err := bindings.UnmarshalCreatedEvent[burnminttokenpool.BurnMintTokenPool](activePool.GetCreatedEvent())
 		if err != nil {
 			return nil, fmt.Errorf("parse active burn/mint pool %s: %w", poolAddress.Hex(), err)
+		}
+
+		remoteChainConfigsAny := make(map[types.NUMERIC]any, len(parsedPool.RemoteChainConfigs))
+		for numeric, config := range parsedPool.RemoteChainConfigs {
+			remoteChainConfigsAny[numeric] = any(config)
+		}
+
+		return &configuredCantonTokenPool{
+			InstrumentId:       parsedPool.InstrumentId,
+			InstanceId:         parsedPool.InstanceId,
+			CcipOwner:          parsedPool.CcipOwner,
+			PoolOwner:          parsedPool.PoolOwner,
+			Decimals:           parsedPool.Decimals,
+			RemoteChainConfigs: remoteChainConfigsAny,
+		}, nil
+	case registryBurnMintPoolType:
+		activePool, err := contract.FindActiveContractByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			contract.LedgerQueryParties(participant),
+			registrybnm.BurnMintTokenPool{}.GetTemplateID(),
+			poolAddress,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("find active registry burn/mint pool %s: %w", poolAddress.Hex(), err)
+		}
+		parsedPool, err := bindings.UnmarshalCreatedEvent[registrybnm.BurnMintTokenPool](activePool.GetCreatedEvent())
+		if err != nil {
+			return nil, fmt.Errorf("parse active registry burn/mint pool %s: %w", poolAddress.Hex(), err)
 		}
 
 		remoteChainConfigsAny := make(map[types.NUMERIC]any, len(parsedPool.RemoteChainConfigs))
