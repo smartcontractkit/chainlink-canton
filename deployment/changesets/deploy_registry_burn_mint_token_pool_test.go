@@ -130,7 +130,7 @@ func TestDeployRegistryBurnMintTokenPool(t *testing.T) {
 
 	remoteSelector := chainsel.ETHEREUM_TESTNET_SEPOLIA.Selector
 	rateLimit := &tokenadapters.RateLimiterConfigFloatInput{IsEnabled: true, Capacity: 100, Rate: 1}
-	configureOut, err := cld_ops.ExecuteSequence(bundle, sequences.ConfigureTokenForTransfers, chain.NewBlockChainsFromSlice([]chain.BlockChain{bc}), tokenadapters.ConfigureTokenForTransfersInput{
+	configureInput := tokenadapters.ConfigureTokenForTransfersInput{
 		ChainSelector:    selector,
 		TokenPoolAddress: poolRef.Address,
 		PoolType:         "RegistryBurnMintTokenPool",
@@ -145,10 +145,16 @@ func TestDeployRegistryBurnMintTokenPool(t *testing.T) {
 		},
 		AllowedFinalityConfig: finality.Config{WaitForFinality: true},
 		ExistingDataStore:     ds.Seal(),
-	})
+	}
+	configureOut, err := cld_ops.ExecuteSequence(bundle, sequences.ConfigureTokenForTransfers, chain.NewBlockChainsFromSlice([]chain.BlockChain{bc}), configureInput)
 	require.NoError(t, err, "configure registry pool lane")
 	require.Empty(t, configureOut.Output.BatchOps, "direct execution must not produce MCMS batches")
 	require.Len(t, configureOut.Output.Addresses, 3, "one lane deploys three rate limiters")
+
+	// A fresh bundle, so the reporter does not return the first run's report.
+	rerunBundle := cld_ops.NewBundle(t.Context, logger.Test(t), cld_ops.NewMemoryReporter())
+	_, err = cld_ops.ExecuteSequence(rerunBundle, sequences.ConfigureTokenForTransfers, chain.NewBlockChainsFromSlice([]chain.BlockChain{bc}), configureInput)
+	require.ErrorContains(t, err, "is already configured on token pool", "a rerun for the same lane must stop before deploying limiters")
 
 	queryParties := contract.LedgerQueryParties(participant)
 	activePool, err := contract.FindActiveContractByInstanceAddress(t.Context(), participant.LedgerServices.State, queryParties,
