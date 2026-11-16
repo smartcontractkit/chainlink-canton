@@ -87,6 +87,16 @@ var DeployLinkToken = contract.NewExercise(contract.ExerciseParams[factorybindin
 	EncodeMethod: encodeDeployLinkToken,
 })
 
+var DeployLinkTokenAdmin = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployLinkTokenAdmin]{
+	Name:         "canton/ccip/factory/deploy_link_token_admin",
+	Version:      Version,
+	Description:  "Deploys a LinkTokenAdmin through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployLinkTokenAdmin,
+	EncodeMethod: encodeDeployLinkTokenAdmin,
+})
+
 var DeployCommitteeVerifier = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployCommitteeVerifier]{
 	Name:         "canton/ccip/factory/deploy_committee_verifier",
 	Version:      Version,
@@ -211,6 +221,14 @@ func encodeDeployLinkToken(args factorybindings.DeployLinkToken) (*bind.EncodedC
 	return factoryEncoder.DeployLinkTokenParams(factorybindings.DeployLinkTokenParams{
 		InstanceId:   args.Contract.InstanceId,
 		InstrumentId: args.Contract.RegistryInstrumentId,
+	})
+}
+
+func encodeDeployLinkTokenAdmin(args factorybindings.DeployLinkTokenAdmin) (*bind.EncodedChoice, error) {
+	return factoryEncoder.DeployLinkTokenAdminParams(factorybindings.DeployLinkTokenAdminParams{
+		InstanceId:   args.Contract.InstanceId,
+		InstrumentId: args.Contract.InstrumentId,
+		Observers:    args.Contract.Observers,
 	})
 }
 
