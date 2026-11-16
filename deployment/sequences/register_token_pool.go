@@ -82,6 +82,22 @@ func registerTokenPool(b operations.Bundle, deps canton.Chain, input RegisterTok
 	if err != nil {
 		return sequences.OnChainOutput{}, fmt.Errorf("failed to lookup token config: %w", err)
 	}
+	// An MCMS op carries no contract IDs and its target map holds only the TAR, so ProposeAdministrator
+	// would create a second TokenConfig for this instrument and SetPool would abort.
+	if tokenConfigFound && (proposeMcmsEnabled || adminMcmsEnabled) {
+		b.Logger.Warnf(
+			"TokenConfig %s for instrument %s@%s already exists and MCMS cannot update it; skipping TAR registration. "+
+				"Register pool %s@%s by exercising SetPool on TokenAdminRegistry %s as the TokenConfig admin",
+			existingTokenConfigCid,
+			instrumentId.Id,
+			instrumentId.Admin,
+			input.PoolInstanceID,
+			poolOwnerParty,
+			input.TokenAdminRegistryRawInstanceAddress,
+		)
+
+		return sequences.OnChainOutput{}, nil
+	}
 	var tokenConfigCid types.CONTRACT_ID
 	var tokenConfigCidArg *types.CONTRACT_ID
 	if tokenConfigFound {
