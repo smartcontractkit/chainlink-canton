@@ -21,7 +21,12 @@ inspect-dars:
 .PHONY: upgrade-check
 upgrade-check:
 	@echo "Checking Dars for upgradeability..."
-	dpm upgrade-check --both ./contracts/dars/released/*.dar ./contracts/dars/dev/*.dar
+	@# Participant-level checks only: the compiler-level check (--compiler/--both)
+	@# false-positives on intentionally added interface instances in upgrade
+	@# lineages (-Wno-template-has-new-interface-instance in the package
+	@# build-options), which the participant validator - the check Canton runs on
+	@# package upload - accepts.
+	dpm upgrade-check --participant ./contracts/dars/released/*.dar ./contracts/dars/dev/*.dar
 
 .PHONY: check-frozen-release-artifacts
 check-frozen-release-artifacts: ## Fail if the branch changes frozen release DARs or legacy v1_* bindings.

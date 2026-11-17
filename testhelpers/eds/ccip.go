@@ -56,6 +56,48 @@ func GetPerPartyRouterFactoryDisclosure(
 	}, nil
 }
 
+type TokenSenderReceiverDisclosure struct {
+	ContractId         string
+	Address            contracts.RawInstanceAddress
+	DisclosedContracts []*apiv2.DisclosedContract
+}
+
+// GetTokenSenderReceiverDisclosure fetches the GlobalTokenSenderReceiver
+// contract's static disclosure for SDK bootstrap. The blob is created once and
+// never consumed, so it can be cached.
+func GetTokenSenderReceiverDisclosure(
+	ctx context.Context,
+	ccipAPIClient oapiCCIP.ClientWithResponsesInterface,
+) (*TokenSenderReceiverDisclosure, error) {
+	resp, err := ccipAPIClient.GetTokenSenderReceiverWithResponse(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error calling GetTokenSenderReceiver: %w", err)
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d; response: %s", resp.StatusCode(), string(resp.Body))
+	}
+
+	var disclosedContracts []*apiv2.DisclosedContract
+	for _, contract := range resp.JSON200.DisclosedContracts {
+		disclosedContract, err := DisclosedContractToProto(contract)
+		if err != nil {
+			return nil, err
+		}
+		disclosedContracts = append(disclosedContracts, disclosedContract)
+	}
+
+	globalTokenSenderReceiverAddress, err := contracts.RawInstanceAddressFromString(resp.JSON200.RawInstanceAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse GlobalTokenSenderReceiver address: %w", err)
+	}
+
+	return &TokenSenderReceiverDisclosure{
+		ContractId:         resp.JSON200.ContractId,
+		Address:            globalTokenSenderReceiverAddress,
+		DisclosedContracts: disclosedContracts,
+	}, nil
+}
+
 func postPerPartyRouterFactoryWithRetry(
 	ctx context.Context,
 	ccipAPIClient oapiCCIP.ClientWithResponsesInterface,

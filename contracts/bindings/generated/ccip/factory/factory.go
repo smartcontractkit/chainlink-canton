@@ -12,6 +12,7 @@ import (
 	committeeverifier "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	core "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	executor "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
+	globaltokensenderreceiver "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/globaltokensenderreceiver"
 	lockreleasetokenpool "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
 	ratelimiter "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
 	registryburnminttokenpool "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/burnminttokenpool"
@@ -39,7 +40,7 @@ var (
 
 const (
 	PackageName = "ccip-factory-v2"
-	PackageID   = "5769f6c2fe46d2b5eb6f450a5b0b9ec67181916b68078dc834a6df150077ca18"
+	PackageID   = "960e73eeb27332051c7a2d7dafad3dc91318f5ba3bd5d147d9533b2adc54699b"
 	SDKVersion  = "3.4.11"
 )
 
@@ -351,6 +352,27 @@ func (t CCIPFactory) DeployPerPartyRouterFactoryWithPackageID(contractID string,
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FactoryV2", "CCIPFactory"),
 		ContractID: contractID,
 		Choice:     "DeployPerPartyRouterFactory",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployGlobalTokenSenderReceiver exercises the DeployGlobalTokenSenderReceiver choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployGlobalTokenSenderReceiver(contractID string, args DeployGlobalTokenSenderReceiver) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FactoryV2", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployGlobalTokenSenderReceiver",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployGlobalTokenSenderReceiverWithPackageID exercises the DeployGlobalTokenSenderReceiver choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployGlobalTokenSenderReceiverWithPackageID(contractID string, packageID string, args DeployGlobalTokenSenderReceiver) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FactoryV2", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployGlobalTokenSenderReceiver",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1074,6 +1096,102 @@ func (t DeployGlobalConfigParams) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes DeployGlobalConfigParams from hex string (Canton MCMS format)
 func (t *DeployGlobalConfigParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployGlobalTokenSenderReceiver is a Record type
+type DeployGlobalTokenSenderReceiver struct {
+	Contract globaltokensenderreceiver.GlobalTokenSenderReceiver `json:"contract"`
+}
+
+// ToMap converts DeployGlobalTokenSenderReceiver to a map for DAML arguments
+func (t DeployGlobalTokenSenderReceiver) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contract"] = model.NestedToDAMLValue(t.Contract)
+
+	return m
+}
+
+func (t DeployGlobalTokenSenderReceiver) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployGlobalTokenSenderReceiver) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployGlobalTokenSenderReceiver to hex string (Canton MCMS format)
+func (t DeployGlobalTokenSenderReceiver) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployGlobalTokenSenderReceiver from hex string (Canton MCMS format)
+func (t *DeployGlobalTokenSenderReceiver) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployGlobalTokenSenderReceiverParams is a Record type
+type DeployGlobalTokenSenderReceiverParams struct {
+	InstanceId             types.TEXT                        `json:"instanceId"`
+	RequiredCCVs           []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
+	OptionalCCVs           []chainlinkapi.RawInstanceAddress `json:"optionalCCVs"`
+	OptionalThreshold      types.INT64                       `json:"optionalThreshold"`
+	ReceiverFinalityConfig ccipcodec.FinalityConfig          `json:"receiverFinalityConfig"`
+}
+
+// ToMap converts DeployGlobalTokenSenderReceiverParams to a map for DAML arguments
+func (t DeployGlobalTokenSenderReceiverParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instanceId"] = string(t.InstanceId)
+
+	m["requiredCCVs"] = func() []any {
+		res := make([]any, 0, len(t.RequiredCCVs))
+		for _, e := range t.RequiredCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	m["optionalCCVs"] = func() []any {
+		res := make([]any, 0, len(t.OptionalCCVs))
+		for _, e := range t.OptionalCCVs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	m["optionalThreshold"] = int64(t.OptionalThreshold)
+
+	m["receiverFinalityConfig"] = model.NestedToDAMLValue(t.ReceiverFinalityConfig)
+
+	return m
+}
+
+func (t DeployGlobalTokenSenderReceiverParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployGlobalTokenSenderReceiverParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployGlobalTokenSenderReceiverParams to hex string (Canton MCMS format)
+func (t DeployGlobalTokenSenderReceiverParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployGlobalTokenSenderReceiverParams from hex string (Canton MCMS format)
+func (t *DeployGlobalTokenSenderReceiverParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -2286,6 +2404,8 @@ type MCMSEncoder interface {
 	DeployFeeQuoterParams(args DeployFeeQuoterParams) (*bind.EncodedChoice, error)
 	DeployGlobalConfig(args DeployGlobalConfig) (*bind.EncodedChoice, error)
 	DeployGlobalConfigParams(args DeployGlobalConfigParams) (*bind.EncodedChoice, error)
+	DeployGlobalTokenSenderReceiver(args DeployGlobalTokenSenderReceiver) (*bind.EncodedChoice, error)
+	DeployGlobalTokenSenderReceiverParams(args DeployGlobalTokenSenderReceiverParams) (*bind.EncodedChoice, error)
 	DeployLinkToken(args DeployLinkToken) (*bind.EncodedChoice, error)
 	DeployLinkTokenAdmin(args DeployLinkTokenAdmin) (*bind.EncodedChoice, error)
 	DeployLinkTokenAdminParams(args DeployLinkTokenAdminParams) (*bind.EncodedChoice, error)
@@ -2388,6 +2508,16 @@ func (e *encoder) DeployGlobalConfig(args DeployGlobalConfig) (*bind.EncodedChoi
 // DeployGlobalConfigParams encodes parameters for the DeployGlobalConfig choice.
 func (e *encoder) DeployGlobalConfigParams(args DeployGlobalConfigParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("DeployGlobalConfig", args)
+}
+
+// DeployGlobalTokenSenderReceiver encodes parameters for the DeployGlobalTokenSenderReceiver choice.
+func (e *encoder) DeployGlobalTokenSenderReceiver(args DeployGlobalTokenSenderReceiver) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployGlobalTokenSenderReceiver", args)
+}
+
+// DeployGlobalTokenSenderReceiverParams encodes parameters for the DeployGlobalTokenSenderReceiver choice.
+func (e *encoder) DeployGlobalTokenSenderReceiverParams(args DeployGlobalTokenSenderReceiverParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployGlobalTokenSenderReceiver", args)
 }
 
 // DeployLinkToken encodes parameters for the DeployLinkToken choice.
