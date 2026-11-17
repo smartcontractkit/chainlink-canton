@@ -172,6 +172,7 @@ func TestFactoriesWithoutMetrics(t *testing.T) {
 	f, err := NewTransferFactory(t.Context(), "owner", nil, urlFactoryConfig(server.URL))
 	require.NoError(t, err)
 
-	_, _, _, err = f.GetFeeTokenDisclosures(t.Context(), splice_api_token_holding_v1.InstrumentId{Admin: "admin", Id: "id"}, "sender", "receiver")
+	factoryCid, _, _, err := f.GetFeeTokenDisclosures(t.Context(), splice_api_token_holding_v1.InstrumentId{Admin: "admin", Id: "id"}, "sender", "receiver")
 	require.NoError(t, err)
+	assert.NotEmpty(t, factoryCid)
 }

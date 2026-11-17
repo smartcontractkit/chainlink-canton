@@ -57,6 +57,7 @@ func attrs(kv ...string) attribute.Set {
 	return attribute.NewSet(set...)
 }
 
+//nolint:paralleltest // swaps the global beholder client, so it cannot run in parallel
 func TestRecordDARequestExportedMetrics(t *testing.T) {
 	got := collectDAMetrics(t, func(l *EDSMetricLabeler) {
 		ctx := context.Background()
@@ -67,6 +68,7 @@ func TestRecordDARequestExportedMetrics(t *testing.T) {
 	})
 
 	t.Run("requests counter splits by operation and result", func(t *testing.T) {
+		t.Parallel()
 		m, ok := got["eds_da_requests_total"]
 		require.True(t, ok, "eds_da_requests_total was not exported")
 		sum, ok := m.Data.(metricdata.Sum[int64])
@@ -84,6 +86,7 @@ func TestRecordDARequestExportedMetrics(t *testing.T) {
 	})
 
 	t.Run("up gauge holds the latest result per operation", func(t *testing.T) {
+		t.Parallel()
 		m, ok := got["eds_da_up"]
 		require.True(t, ok, "eds_da_up was not exported")
 		gauge, ok := m.Data.(metricdata.Gauge[int64])
@@ -100,6 +103,7 @@ func TestRecordDARequestExportedMetrics(t *testing.T) {
 	})
 
 	t.Run("duration histogram is in seconds with the configured buckets", func(t *testing.T) {
+		t.Parallel()
 		m, ok := got["eds_da_request_duration_seconds"]
 		require.True(t, ok, "eds_da_request_duration_seconds was not exported")
 		assert.Equal(t, "seconds", m.Unit)
@@ -117,6 +121,7 @@ func TestRecordDARequestExportedMetrics(t *testing.T) {
 	})
 
 	t.Run("no label carries a URL or path", func(t *testing.T) {
+		t.Parallel()
 		for _, name := range []string{"eds_da_requests_total", "eds_da_up", "eds_da_request_duration_seconds"} {
 			for _, key := range exportedLabelKeys(got[name]) {
 				assert.Contains(t, []string{"operation", "result"}, key, "unexpected label on %s", name)
@@ -154,6 +159,8 @@ func exportedLabelKeys(m metricdata.Metrics) []string {
 }
 
 // Nothing recorded means nothing exported, so an idle service has no series to alert on.
+//
+//nolint:paralleltest // swaps the global beholder client, so it cannot run in parallel
 func TestRecordDARequestIdleExportsNoSamples(t *testing.T) {
 	got := collectDAMetrics(t, func(*EDSMetricLabeler) {})
 
