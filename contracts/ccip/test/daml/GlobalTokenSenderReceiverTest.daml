@@ -265,6 +265,23 @@ messageOnlyAnyMessage s receiverParty = CCIP.ClientV2.Canton2AnyMessage with
         tokenReceiver = ""
         tokenArgs = ""
 
+-- | A pure token-transfer client message addressed to the given party (no
+-- payload, zero gas limit).
+tokenOnlyAnyMessage : Setup -> Party -> CCIP.ClientV2.Canton2AnyMessage
+tokenOnlyAnyMessage s receiverParty = CCIP.ClientV2.Canton2AnyMessage with
+    receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiverParty
+    payload = ""
+    tokenTransfer = Some CCIP.ClientV2.TokenTransfer with
+        token = s.feeToken
+        amount = 100.0
+    feeToken = s.feeToken
+    extraArgs = CCIP.ClientV2.V3 CCIP.ClientV2.GenericExtraArgsV3 with
+        gasLimit = 0
+        ccvs = []
+        executor = CCIP.ClientV2.Executor_NoExecutor
+        tokenReceiver = ""
+        tokenArgs = ""
+
 -- | A pure token-transfer wire message addressed to the receiver party.
 tokenOnlyMessage : Setup -> Party -> CCIP.CodecV2.MessageCodecV1.MessageV1
 tokenOnlyMessage s receiverParty = CCIP.CodecV2.MessageCodecV1.MessageV1 with
@@ -280,11 +297,22 @@ tokenOnlyMessage s receiverParty = CCIP.CodecV2.MessageCodecV1.MessageV1 with
     sender = "0000000000000000000000000000000000000003"
     receiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiverParty
     destBlob = ""
-    tokenTransfer = None
+    tokenTransfer = Some CCIP.CodecV2.MessageCodecV1.TokenTransferV1 with
+        amount = "0000000000000000000000000000000000000000000000000000000000000064"
+        sourcePoolAddress = "0000000000000000000000000000000000000001"
+        sourceTokenAddress = "0000000000000000000000000000000000000002"
+        destTokenAddress = "0000000000000000000000000000000000000003"
+        tokenReceiver = CCIP.CodecV2.MessageCodecV1.encodePartyAddress receiverParty
+        extraData = ""
     messageData = ""
 
--- | Fee token input for tests where the payload guard aborts before the
--- inputs are used; the CIDs are never dereferenced.
+-- | A message-only wire message (no token transfer, no payload).
+messageOnlyMessage : Setup -> Party -> CCIP.CodecV2.MessageCodecV1.MessageV1
+messageOnlyMessage s receiverParty = (tokenOnlyMessage s receiverParty) with
+    tokenTransfer = None
+
+-- | Fee token input for tests where the guards abort before the inputs are
+-- used; the CIDs are never dereferenced.
 dummyFeeTokenInput : ContractId CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver -> CCIP.UserV1.Sender.SenderFeeTokenInput
 dummyFeeTokenInput anyCid = CCIP.UserV1.Sender.SenderFeeTokenInput with
     senderInputCids = []
@@ -293,6 +321,14 @@ dummyFeeTokenInput anyCid = CCIP.UserV1.Sender.SenderFeeTokenInput with
     feeTokenExtraArgs = Splice.Api.Token.MetadataV1.ExtraArgs with
         context = Splice.Api.Token.MetadataV1.emptyChoiceContext
         meta = Splice.Api.Token.MetadataV1.emptyMetadata
+
+-- | Token transfer input for tests where the guards abort before the pool is
+-- used; the CID is never dereferenced.
+dummyTokenTransferInput : ContractId CCIP.GlobalTokenSenderReceiver.GlobalTokenSenderReceiver -> CCIP.UserV1.Sender.SenderTokenTransferInput
+dummyTokenTransferInput anyCid = CCIP.UserV1.Sender.SenderTokenTransferInput with
+    senderInputCids = []
+    tokenPoolCid = coerceContractId anyCid
+    context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
 -- | Send must reject payload-bearing messages.
 testGlobalSendRejectsPayload : Script ()
@@ -309,7 +345,24 @@ testGlobalSendRejectsPayload = script do
             routerCid = s.userRouter
             feeTokenInput = dummyFeeTokenInput s.globalContract
             ccvSendInputs = []
-            tokenTransferInput = None
+            tokenTransferInput = dummyTokenTransferInput s.globalContract
+            executorInput = None
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | Send must reject message-only messages (no token transfer).
+testGlobalSendRejectsMessageOnly : Script ()
+testGlobalSendRejectsMessageOnly = script do
+    s <- setup "send-message-only"
+
+    submitMustFail (actAs s.user <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.Send with
+            senderParty = s.user
+            destinationChainSelector = s.destChainSelector
+            message = messageOnlyAnyMessage s s.user
+            routerCid = s.userRouter
+            feeTokenInput = dummyFeeTokenInput s.globalContract
+            ccvSendInputs = []
+            tokenTransferInput = dummyTokenTransferInput s.globalContract
             executorInput = None
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
@@ -327,15 +380,117 @@ testGlobalGetFeeRejectsPayload = script do
             message = message
             routerCid = s.userRouter
             ccvSendInputs = []
-            tokenTransferInput = None
+            tokenTransferInput = dummyTokenTransferInput s.globalContract
             executorInput = None
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | GetFee must reject message-only messages (no token transfer).
+testGlobalGetFeeRejectsMessageOnly : Script ()
+testGlobalGetFeeRejectsMessageOnly = script do
+    s <- setup "getfee-message-only"
+
+    submitMustFail (actAs s.user <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.GetFee with
+            senderParty = s.user
+            destinationChainSelector = s.destChainSelector
+            message = messageOnlyAnyMessage s s.user
+            routerCid = s.userRouter
+            ccvSendInputs = []
+            tokenTransferInput = dummyTokenTransferInput s.globalContract
+            executorInput = None
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | GetRequiredCCVsForSend must reject message-only messages (no token
+-- transfer); the pool is never dereferenced.
+testGlobalGetRequiredCCVsForSendRejectsMessageOnly : Script ()
+testGlobalGetRequiredCCVsForSendRejectsMessageOnly = script do
+    s <- setup "gccvs-send-message-only"
+
+    submitMustFail (actAs s.user <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.GetRequiredCCVsForSend with
+            senderParty = s.user
+            destinationChainSelector = s.destChainSelector
+            message = messageOnlyAnyMessage s s.user
+            routerCid = s.userRouter
+            tokenPoolCid = coerceContractId s.globalContract -- unused: guard aborts first
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | Send must reject messages with a non-zero callback gas limit (pure token
+-- transfers only).
+testGlobalSendRejectsGasLimit : Script ()
+testGlobalSendRejectsGasLimit = script do
+    s <- setup "send-gaslimit"
+    let message = (tokenOnlyAnyMessage s s.user) with
+        extraArgs = CCIP.ClientV2.V3 CCIP.ClientV2.GenericExtraArgsV3 with
+            gasLimit = 100000
+            ccvs = []
+            executor = CCIP.ClientV2.Executor_NoExecutor
+            tokenReceiver = ""
+            tokenArgs = ""
+
+    submitMustFail (actAs s.user <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.Send with
+            senderParty = s.user
+            destinationChainSelector = s.destChainSelector
+            message = message
+            routerCid = s.userRouter
+            feeTokenInput = dummyFeeTokenInput s.globalContract
+            ccvSendInputs = []
+            tokenTransferInput = dummyTokenTransferInput s.globalContract
+            executorInput = None
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | GetFee must reject messages with a non-zero callback gas limit (pure token
+-- transfers only).
+testGlobalGetFeeRejectsGasLimit : Script ()
+testGlobalGetFeeRejectsGasLimit = script do
+    s <- setup "getfee-gaslimit"
+    let message = (tokenOnlyAnyMessage s s.user) with
+        extraArgs = CCIP.ClientV2.V3 CCIP.ClientV2.GenericExtraArgsV3 with
+            gasLimit = 100000
+            ccvs = []
+            executor = CCIP.ClientV2.Executor_NoExecutor
+            tokenReceiver = ""
+            tokenArgs = ""
+
+    submitMustFail (actAs s.user <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.GetFee with
+            senderParty = s.user
+            destinationChainSelector = s.destChainSelector
+            message = message
+            routerCid = s.userRouter
+            ccvSendInputs = []
+            tokenTransferInput = dummyTokenTransferInput s.globalContract
+            executorInput = None
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | GetRequiredCCVsForSend must reject messages with a non-zero callback gas
+-- limit; the pool is never dereferenced.
+testGlobalGetRequiredCCVsForSendRejectsGasLimit : Script ()
+testGlobalGetRequiredCCVsForSendRejectsGasLimit = script do
+    s <- setup "gccvs-send-gaslimit"
+    let message = (tokenOnlyAnyMessage s s.user) with
+        extraArgs = CCIP.ClientV2.V3 CCIP.ClientV2.GenericExtraArgsV3 with
+            gasLimit = 100000
+            ccvs = []
+            executor = CCIP.ClientV2.Executor_NoExecutor
+            tokenReceiver = ""
+            tokenArgs = ""
+
+    submitMustFail (actAs s.user <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.GetRequiredCCVsForSend with
+            senderParty = s.user
+            destinationChainSelector = s.destChainSelector
+            message = message
+            routerCid = s.userRouter
+            tokenPoolCid = coerceContractId s.globalContract -- unused: guard aborts first
             context = Splice.Api.Token.MetadataV1.emptyChoiceContext
 
 -- | Execute must reject message-only messages (no token transfer).
 testGlobalExecuteRejectsMessageOnly : Script ()
 testGlobalExecuteRejectsMessageOnly = script do
     s <- setup "execute-message-only"
-    let message = tokenOnlyMessage s s.receiver
+    let message = messageOnlyMessage s s.receiver
     let context = receiverExecuteContext s
     disclosures <- receiverDisclosures s
 
@@ -344,7 +499,10 @@ testGlobalExecuteRejectsMessageOnly = script do
             receiverParty = s.receiver
             routerCid = s.router
             encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
-            tokenTransfer = None
+            tokenTransfer = CCIP.UserV1.Receiver.ReceiverTokenTransferInput with
+                tokenPoolCid = coerceContractId s.globalContract -- unused: guard aborts first
+                tokenReceiverParty = s.receiver
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             ccvInputs = []
             context = context
 
@@ -362,10 +520,10 @@ testGlobalExecuteRejectsPayload = script do
             receiverParty = s.receiver
             routerCid = s.router
             encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
-            tokenTransfer = Some (CCIP.UserV1.Receiver.ReceiverTokenTransferInput with
+            tokenTransfer = CCIP.UserV1.Receiver.ReceiverTokenTransferInput with
                 tokenPoolCid = coerceContractId s.globalContract -- unused: guard aborts first
                 tokenReceiverParty = s.receiver
-                context = Splice.Api.Token.MetadataV1.emptyChoiceContext)
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             ccvInputs = []
             context = context
 
@@ -383,56 +541,84 @@ testGlobalExecuteRejectsMisdirectedReceiverParty = script do
             receiverParty = s.user -- not the message receiver
             routerCid = s.router
             encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
-            tokenTransfer = Some (CCIP.UserV1.Receiver.ReceiverTokenTransferInput with
+            tokenTransfer = CCIP.UserV1.Receiver.ReceiverTokenTransferInput with
                 tokenPoolCid = coerceContractId s.globalContract -- unused: OffRamp rejects first
                 tokenReceiverParty = s.receiver
-                context = Splice.Api.Token.MetadataV1.emptyChoiceContext)
+                context = Splice.Api.Token.MetadataV1.emptyChoiceContext
             ccvInputs = []
             context = context
 
--- | The ICCIPSender interface dispatch must resolve required CCVs for sends.
-testGlobalInterfaceSenderGetRequiredCCVs : Script ()
-testGlobalInterfaceSenderGetRequiredCCVs = script do
+-- | GetRequiredCCVsForExecute must reject message-only messages (no token
+-- transfer); the pool is never dereferenced.
+testGlobalGetRequiredCCVsForExecuteRejectsMessageOnly : Script ()
+testGlobalGetRequiredCCVsForExecuteRejectsMessageOnly = script do
+    s <- setup "gccvs-execute-message-only"
+    let message = messageOnlyMessage s s.receiver
+
+    submitMustFail (actAs s.receiver <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.GetRequiredCCVsForExecute with
+            receiverParty = s.receiver
+            routerCid = s.router -- unused: guard aborts first
+            encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
+            tokenPoolCid = coerceContractId s.globalContract -- unused: guard aborts first
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | GetRequiredCCVsForExecute must reject payload-bearing messages; the pool
+-- is never dereferenced.
+testGlobalGetRequiredCCVsForExecuteRejectsPayload : Script ()
+testGlobalGetRequiredCCVsForExecuteRejectsPayload = script do
+    s <- setup "gccvs-execute-payload"
+    let message = (tokenOnlyMessage s s.receiver) with
+        messageData = "48656c6c6f20576f726c64"
+
+    submitMustFail (actAs s.receiver <> disclose s.disclosedGlobal) do
+        exerciseCmd s.globalContract CCIP.GlobalTokenSenderReceiver.GetRequiredCCVsForExecute with
+            receiverParty = s.receiver
+            routerCid = s.router -- unused: guard aborts first
+            encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
+            tokenPoolCid = coerceContractId s.globalContract -- unused: guard aborts first
+            context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+
+-- | The ICCIPSender interface dispatch must reject message-only messages
+-- (pure token transfers only). The shared interface's optional tokenPoolCid is
+-- unwrapped strictly; a dummy Some is passed so the choice body's guard is
+-- what aborts.
+testGlobalInterfaceSenderGetRequiredCCVsRejectsMessageOnly : Script ()
+testGlobalInterfaceSenderGetRequiredCCVsRejectsMessageOnly = script do
     s <- setup "iface-sender"
     let message = messageOnlyAnyMessage s s.user
     let context = senderSendContext s
     disclosures <- senderDisclosures s
 
-    requiredCCVs <- submit (actAs s.user <> discloseMany disclosures) do
+    submitMustFail (actAs s.user <> discloseMany disclosures) do
         exerciseCmd (toInterfaceContractId @CCIP.UserV1.Sender.ICCIPSender s.globalContract)
             CCIP.UserV1.Sender.ICCIPSender_GetRequiredCCVs with
                 senderParty = s.user
                 destinationChainSelector = s.destChainSelector
                 message = message
                 routerCid = s.userRouter
-                tokenPoolCid = None
+                tokenPoolCid = Some (coerceContractId s.globalContract) -- unused: guard aborts first
                 context = context
 
-    -- No lane-mandated or default CCVs configured for the destination chain.
-    requiredCCVs === []
-
--- | The ICCIPReceiver interface dispatch must resolve required CCVs for
--- execution from the baked-in receiver policy plus the token pool and lane.
-testGlobalInterfaceReceiverGetRequiredCCVs : Script ()
-testGlobalInterfaceReceiverGetRequiredCCVs = script do
+-- | The ICCIPReceiver interface dispatch must reject message-only messages
+-- (pure token transfers only). The shared interface's optional tokenPoolCid is
+-- unwrapped strictly; a dummy Some is passed so the choice body's guard is
+-- what aborts.
+testGlobalInterfaceReceiverGetRequiredCCVsRejectsMessageOnly : Script ()
+testGlobalInterfaceReceiverGetRequiredCCVsRejectsMessageOnly = script do
     s <- setup "iface-receiver"
-    let message = tokenOnlyMessage s s.receiver
+    let message = messageOnlyMessage s s.receiver
     let context = receiverExecuteContext s
     disclosures <- receiverDisclosures s
 
-    requiredCCVs <- submit (actAs s.receiver <> discloseMany disclosures) do
+    submitMustFail (actAs s.receiver <> discloseMany disclosures) do
         exerciseCmd (toInterfaceContractId @CCIP.UserV1.Receiver.ICCIPReceiver s.globalContract)
             CCIP.UserV1.Receiver.ICCIPReceiver_GetRequiredCCVs with
                 receiverParty = s.receiver
                 routerCid = s.router
                 encodedMessage = CCIP.CodecV2.MessageCodecV1.encodeMessageV1 message
-                tokenPoolCid = None
+                tokenPoolCid = Some (coerceContractId s.globalContract) -- unused: guard aborts first
                 context = context
-
-    -- Token-only transfers: the baked-in receiver policy is empty and the pool
-    -- adds nothing here, so the resolved set is the router's resolution of the
-    -- lane configuration (no defaults configured in this setup).
-    requiredCCVs === []
 
 -- | The client interfaces on the global contract must surface the baked-in
 -- state through their views.

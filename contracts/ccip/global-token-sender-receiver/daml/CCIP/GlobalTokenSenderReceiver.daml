@@ -7,7 +7,10 @@
 --
 -- The contract only supports pure token transfers (rejects message-only and
 -- payload-bearing messages in both directions), and implements the
--- ICCIPSender / ICCIPReceiver client interfaces.
+-- ICCIPSender / ICCIPReceiver client interfaces. The token-related choice
+-- inputs are non-optional on the direct choices; via the shared interfaces
+-- (whose argument types must remain optional for CCIPSender / CCIPReceiver)
+-- they are unwrapped strictly and rejected when absent.
 --
 -- The orchestration bodies mirror CCIPSender / CCIPReceiver (which are to be
 -- deprecated), with the orchestrator's owner party replaced by the per-call
@@ -18,7 +21,7 @@ module CCIP.GlobalTokenSenderReceiver where
 import DA.Action (foldlA)
 import DA.Crypto.Text (BytesHex)
 import DA.List (unique)
-import DA.Optional (fromSomeNote, isNone)
+import DA.Optional (fromSomeNote, isNone, isSome)
 
 import qualified Splice.Api.Token.MetadataV1
 
@@ -99,38 +102,39 @@ template GlobalTokenSenderReceiver
         --   Message Sending
         -- ===================
 
-        -- | Query the required CCVs for sending a message.
+        -- | Query the required CCVs for sending a message. Only pure token
+        -- transfers are supported.
         nonconsuming choice GetRequiredCCVsForSend : [Chainlink.InstanceAddress.RawInstanceAddress]
             with
                 senderParty : Party
                 destinationChainSelector : Numeric 0
                 message : CCIP.ClientV2.Canton2AnyMessage
                 routerCid : ContractId CCIP.ClientV2.PerPartyRouter
-                tokenPoolCid : Optional (ContractId CCIP.InterfacesV2.TokenPool.ITokenPool)
+                tokenPoolCid : ContractId CCIP.InterfacesV2.TokenPool.ITokenPool
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller senderParty
             do
+                -- Mirrors the OffRamp's definition of a pure token transfer
+                -- (send direction).
+                assertMsg "sender: payload-bearing messages are rejected" (message.payload == "")
                 extraArgs <- case message.extraArgs of
                     CCIP.ClientV2.V3 v3 -> pure v3
-                poolReportedCCVs <- case (message.tokenTransfer, tokenPoolCid) of
-                    (None, None) -> pure []
-                    (None, Some _) ->
-                        abort "sender: tokenPoolCid provided without token transfer"
-                    (Some _, None) ->
-                        abort "sender: tokenPoolCid required for token transfer"
-                    (Some tt, Some tokenPoolCid) -> do
-                        let sourceAmount = fromSomeNote
-                                "sender: token amount does not fit uint256"
-                                (CCIP.CodecV2.Uint256.numeric0ToUint256Bytes (CCIP.CodecV2.Math.decimalToNumeric0 tt.amount))
-                        exercise tokenPoolCid
-                            CCIP.InterfacesV2.TokenPool.TokenPool_GetRequiredCCVs with
-                                remoteChainSelector = destinationChainSelector
-                                sourceAmount = sourceAmount
-                                finality = CCIP.CodecV2.FinalityConfig.waitForFinalityFlag
-                                extraData = extraArgs.tokenArgs
-                                direction = CCIP.InterfacesV2.TokenPool.Outbound
-                                context = context
-                                caller = senderParty
+                assertMsg "sender: gas limit must be zero for pure token transfers" (extraArgs.gasLimit == 0)
+                tt <- case message.tokenTransfer of
+                    None -> abort "sender: message-only messages are rejected"
+                    Some tt -> pure tt
+                let sourceAmount = fromSomeNote
+                        "sender: token amount does not fit uint256"
+                        (CCIP.CodecV2.Uint256.numeric0ToUint256Bytes (CCIP.CodecV2.Math.decimalToNumeric0 tt.amount))
+                poolReportedCCVs <- exercise tokenPoolCid
+                    CCIP.InterfacesV2.TokenPool.TokenPool_GetRequiredCCVs with
+                        remoteChainSelector = destinationChainSelector
+                        sourceAmount = sourceAmount
+                        finality = CCIP.CodecV2.FinalityConfig.waitForFinalityFlag
+                        extraData = extraArgs.tokenArgs
+                        direction = CCIP.InterfacesV2.TokenPool.Outbound
+                        context = context
+                        caller = senderParty
 
                 exercise routerCid CCIP.ClientV2.PerPartyRouter_GetRequiredCCVsForSend with
                     context = context
@@ -138,7 +142,8 @@ template GlobalTokenSenderReceiver
                     message = message
                     poolReportedCCVs = poolReportedCCVs
 
-        -- | Quote the fees for sending a message.
+        -- | Quote the fees for sending a message. Only pure token transfers
+        -- are supported.
         nonconsuming choice GetFee : CCIP.UserV1.Sender.SenderGetFeeResult
             with
                 senderParty : Party
@@ -146,18 +151,23 @@ template GlobalTokenSenderReceiver
                 message : CCIP.ClientV2.Canton2AnyMessage
                 routerCid : ContractId CCIP.ClientV2.PerPartyRouter
                 ccvSendInputs : [CCIP.UserV1.Sender.SenderCCVSendInput]
-                tokenTransferInput : Optional CCIP.UserV1.Sender.SenderTokenTransferInput
+                tokenTransferInput : CCIP.UserV1.Sender.SenderTokenTransferInput
                 executorInput : Optional CCIP.UserV1.Sender.SenderExecutorInput
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller senderParty
             do
-                -- Payload-bearing messages are rejected (token transfers only).
+                -- Mirrors the OffRamp's definition of a pure token transfer
+                -- (send direction).
                 assertMsg "sender: payload-bearing messages are rejected" (message.payload == "")
+                extraArgs <- case message.extraArgs of
+                    CCIP.ClientV2.V3 v3 -> pure v3
+                assertMsg "sender: gas limit must be zero for pure token transfers" (extraArgs.gasLimit == 0)
+                tt <- case message.tokenTransfer of
+                    None -> abort "sender: message-only messages are rejected"
+                    Some tt -> pure tt
 
                 feeQuoterCid : ContractId CCIP.APIV2.FeeQuoter.IFeeQuoter <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.FeeQuoter.feeQuoterContextKey
                 globalConfigCid : ContractId CCIP.APIV2.GlobalConfig.IGlobalConfig <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.GlobalConfig.globalConfigContextKey
-                extraArgs <- case message.extraArgs of
-                    CCIP.ClientV2.V3 v3 -> pure v3
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.APIV2.GlobalConfig.GlobalConfig_GetDestChainConfig with
                         destChainSelector = destinationChainSelector
@@ -172,9 +182,7 @@ template GlobalTokenSenderReceiver
                     message = message
                     context = context
                     routerCid = routerCid
-                    tokenPoolCid = case tokenTransferInput of
-                        None -> None
-                        Some input -> Some input.tokenPoolCid
+                    tokenPoolCid = tokenTransferInput.tokenPoolCid
 
                 let providedCCVs = map (.ccvAddress) ccvSendInputs
                 assertExactCCVSet requiredCCVs providedCCVs
@@ -188,20 +196,14 @@ template GlobalTokenSenderReceiver
                     pure (fees ++ [q])
                     ) [] ccvSendInputs
 
-                (quotedTokenSendFee, poolFeeBps) <- case (message.tokenTransfer, tokenTransferInput) of
-                    (None, None) -> pure (None, 0.0)
-                    (None, Some _) ->
-                        abort "sender: tokenTransferInput provided without token transfer"
-                    (Some _, None) ->
-                        abort "sender: tokenTransferInput required for token transfer"
-                    (Some tt, Some tokenTransferInput) -> do
-                        q <- exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV2.TokenPool.TokenPool_GetFee with
-                            feeQuoterCid = feeQuoterCid
-                            destChainSelector = destinationChainSelector
-                            tokenInstrumentId = tt.token
-                            context = tokenTransferInput.context
-                            caller = senderParty
-                        pure (Some q, q.tokenFeeBps)
+                (quotedTokenSendFee, poolFeeBps) <- do
+                    q <- exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV2.TokenPool.TokenPool_GetFee with
+                        feeQuoterCid = feeQuoterCid
+                        destChainSelector = destinationChainSelector
+                        tokenInstrumentId = tt.token
+                        context = tokenTransferInput.context
+                        caller = senderParty
+                    pure (Some q, q.tokenFeeBps)
                 executorFeeQuote <- case extraArgs.executor of
                     CCIP.ClientV2.Executor_NoExecutor -> do
                         assertMsg "sender: executorInput not allowed for no-executor mode"
@@ -260,21 +262,26 @@ template GlobalTokenSenderReceiver
                 routerCid : ContractId CCIP.ClientV2.PerPartyRouter
                 feeTokenInput : CCIP.UserV1.Sender.SenderFeeTokenInput
                 ccvSendInputs : [CCIP.UserV1.Sender.SenderCCVSendInput]
-                tokenTransferInput : Optional CCIP.UserV1.Sender.SenderTokenTransferInput
+                tokenTransferInput : CCIP.UserV1.Sender.SenderTokenTransferInput
                 executorInput : Optional CCIP.UserV1.Sender.SenderExecutorInput
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller senderParty
             do
-                -- Payload-bearing messages are rejected (token transfers only).
+                -- Mirrors the OffRamp's definition of a pure token transfer
+                -- (send direction).
                 assertMsg "sender: payload-bearing messages are rejected" (message.payload == "")
+                extraArgs <- case message.extraArgs of
+                    CCIP.ClientV2.V3 v3 -> pure v3
+                assertMsg "sender: gas limit must be zero for pure token transfers" (extraArgs.gasLimit == 0)
+                tt <- case message.tokenTransfer of
+                    None -> abort "sender: message-only messages are rejected"
+                    Some tt -> pure tt
 
                 feeQuoterCid : ContractId CCIP.APIV2.FeeQuoter.IFeeQuoter <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.FeeQuoter.feeQuoterContextKey
                 globalConfigCid : ContractId CCIP.APIV2.GlobalConfig.IGlobalConfig <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.GlobalConfig.globalConfigContextKey
                 rmnRemoteCid : ContractId CCIP.APIV2.RMNRemote.IRMNRemote <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.RMNRemote.rmnRemoteContextKey
                 tokenAdminRegistryCid : ContractId CCIP.APIV2.TokenAdminRegistry.ITokenAdminRegistry <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.TokenAdminRegistry.tokenAdminRegistryContextKey
 
-                extraArgs <- case message.extraArgs of
-                    CCIP.ClientV2.V3 v3 -> pure v3
                 destConfigOpt <- exercise globalConfigCid
                     CCIP.APIV2.GlobalConfig.GlobalConfig_GetDestChainConfig with
                         destChainSelector = destinationChainSelector
@@ -289,22 +296,14 @@ template GlobalTokenSenderReceiver
                         message = message
                         context = context
 
-                smCid <- case message.tokenTransfer of
-                    None -> do
-                        assertMsg "sender: tokenTransferInput provided without token transfer"
-                            (isNone tokenTransferInput)
-                        pure smCid
-                    Some tt -> case tokenTransferInput of
-                        None -> abort "sender: tokenTransferInput required for token transfer"
-                        Some tokenTransferInput -> do
-                            tokenConfigCid <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.TokenAdminRegistry.tokenConfigContextKey
-                            exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV2.TokenPool.TokenPool_VerifyOutboundCCVs with
-                                tokenAdminRegistryCid = tokenAdminRegistryCid
-                                tokenConfigCid = tokenConfigCid
-                                context = tokenTransferInput.context
-                                sendingMessageCid = smCid
-                                amount = tt.amount
-                                caller = senderParty
+                tokenConfigCid <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.TokenAdminRegistry.tokenConfigContextKey
+                smCid <- exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV2.TokenPool.TokenPool_VerifyOutboundCCVs with
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    tokenConfigCid = tokenConfigCid
+                    context = tokenTransferInput.context
+                    sendingMessageCid = smCid
+                    amount = tt.amount
+                    caller = senderParty
 
                 smCid <- foldlA (\cid input -> do
                     exercise input.ccvCid
@@ -314,22 +313,14 @@ template GlobalTokenSenderReceiver
                             caller = senderParty
                     ) smCid ccvSendInputs
 
-                smCid <- case (message.tokenTransfer, tokenTransferInput) of
-                    (None, None) -> pure smCid
-                    (None, Some _) ->
-                        abort "sender: tokenTransferInput provided without token transfer"
-                    (Some _, None) ->
-                        abort "sender: tokenTransferInput required for token transfer"
-                    (Some tt, Some tokenTransferInput) -> do
-                        tokenConfigCid <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.TokenAdminRegistry.tokenConfigContextKey
-                        exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV2.TokenPool.TokenPool_CalculateFee with
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
-                            tokenConfigCid = tokenConfigCid
-                            context = tokenTransferInput.context
-                            sendingMessageCid = smCid
-                            feeQuoterCid = feeQuoterCid
-                            tokenInstrumentId = tt.token
-                            caller = senderParty
+                smCid <- exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV2.TokenPool.TokenPool_CalculateFee with
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    tokenConfigCid = tokenConfigCid
+                    context = tokenTransferInput.context
+                    sendingMessageCid = smCid
+                    feeQuoterCid = feeQuoterCid
+                    tokenInstrumentId = tt.token
+                    caller = senderParty
 
                 smCid <- case extraArgs.executor of
                     CCIP.ClientV2.Executor_NoExecutor -> do
@@ -369,24 +360,16 @@ template GlobalTokenSenderReceiver
                     context
                     sendingMessageCid = smCid
 
-                smCid <- case (message.tokenTransfer, tokenTransferInput) of
-                    (None, None) -> pure smCid
-                    (None, Some _) ->
-                        abort "sender: tokenTransferInput provided without token transfer"
-                    (Some _, None) ->
-                        abort "sender: tokenTransferInput required for token transfer"
-                    (Some tt, Some tokenTransferInput) -> do
-                        tokenConfigCid <- CCIP.UtilsV2.Context.getFromContextU context CCIP.APIV2.TokenAdminRegistry.tokenConfigContextKey
-                        lockResult <- exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV2.TokenPool.TokenPool_LockOrBurn with
-                            tokenAdminRegistryCid = tokenAdminRegistryCid
-                            tokenConfigCid = tokenConfigCid
-                            rmnRemoteCid = rmnRemoteCid
-                            context = tokenTransferInput.context
-                            sendingMessageCid = smCid
-                            senderInputCids = tokenTransferInput.senderInputCids
-                            amount = tt.amount
-                            caller = senderParty
-                        pure (lockResult.sendingMessageCid)
+                lockResult <- exercise tokenTransferInput.tokenPoolCid CCIP.InterfacesV2.TokenPool.TokenPool_LockOrBurn with
+                    tokenAdminRegistryCid = tokenAdminRegistryCid
+                    tokenConfigCid = tokenConfigCid
+                    rmnRemoteCid = rmnRemoteCid
+                    context = tokenTransferInput.context
+                    sendingMessageCid = smCid
+                    senderInputCids = tokenTransferInput.senderInputCids
+                    amount = tt.amount
+                    caller = senderParty
+                smCid <- pure (lockResult.sendingMessageCid)
 
                 smCid <- foldlA (\cid input -> do
                         verifierArgs <- lookupVerifierArgs extraArgs.ccvs input.ccvAddress
@@ -412,36 +395,36 @@ template GlobalTokenSenderReceiver
         -- =====================
 
         -- | Query the final required CCVs for executing an inbound message.
+        -- Only pure token transfers are supported.
         nonconsuming choice GetRequiredCCVsForExecute : [Chainlink.InstanceAddress.RawInstanceAddress]
             with
                 receiverParty : Party
                 routerCid : ContractId CCIP.ClientV2.PerPartyRouter
                 encodedMessage : BytesHex
-                tokenPoolCid : Optional (ContractId CCIP.InterfacesV2.TokenPool.ITokenPool)
+                tokenPoolCid : ContractId CCIP.InterfacesV2.TokenPool.ITokenPool
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller receiverParty
             do
                 let message = fromSomeNote "receiver: failed to decode message"
                         (CCIP.CodecV2.MessageCodecV1.decodeMessageV1 encodedMessage)
 
-                tokenPoolRequiredCCVs <- case (message.tokenTransfer, tokenPoolCid) of
-                    (None, None) -> pure []
-                    (None, Some _) ->
-                        abort "receiver: tokenPoolCid provided without token transfer"
-                    (Some _, None) ->
-                        abort "receiver: tokenPoolCid required for token transfer"
-                    (Some tt, Some poolCid) ->
-                        let tokenExtraData : BytesHex = tt.extraData
-                        in
-                        exercise poolCid
-                            CCIP.InterfacesV2.TokenPool.TokenPool_GetRequiredCCVs with
-                                remoteChainSelector = message.sourceChainSelector
-                                sourceAmount = tt.amount
-                                finality = message.finality.raw
-                                extraData = tokenExtraData
-                                direction = CCIP.InterfacesV2.TokenPool.Inbound
-                                context = context
-                                caller = receiverParty
+                -- Mirrors the OffRamp's definition of a pure token transfer.
+                tt <- case message.tokenTransfer of
+                    None -> abort "receiver: message-only messages are rejected"
+                    Some tt -> pure tt
+                assertMsg "receiver: payload-bearing messages are rejected"
+                    (message.messageData == "" && message.ccipReceiveGasLimit == 0)
+
+                let tokenExtraData : BytesHex = tt.extraData
+                tokenPoolRequiredCCVs <- exercise tokenPoolCid
+                    CCIP.InterfacesV2.TokenPool.TokenPool_GetRequiredCCVs with
+                        remoteChainSelector = message.sourceChainSelector
+                        sourceAmount = tt.amount
+                        finality = message.finality.raw
+                        extraData = tokenExtraData
+                        direction = CCIP.InterfacesV2.TokenPool.Inbound
+                        context = context
+                        caller = receiverParty
 
                 exercise routerCid CCIP.ClientV2.PerPartyRouter_GetRequiredCCVsForExecute with
                     context = context
@@ -464,18 +447,18 @@ template GlobalTokenSenderReceiver
                 encodedMessage : BytesHex
                 -- Includes tokenReceiverParty; also validated against the
                 -- message by the OffRamp.
-                tokenTransfer : Optional CCIP.UserV1.Receiver.ReceiverTokenTransferInput
+                tokenTransfer : CCIP.UserV1.Receiver.ReceiverTokenTransferInput
                 ccvInputs : [CCIP.UserV1.Receiver.ReceiverCCVInput]
                 context : Splice.Api.Token.MetadataV1.ChoiceContext
             controller receiverParty
             do
                 -- Message-only and payload-bearing messages are rejected
                 -- (pure token transfers only).
-                tokenTransfer <- pure (fromSomeNote "receiver: message-only messages are rejected"
-                    tokenTransfer)
                 let message = fromSomeNote "receiver: failed to decode message"
                         (CCIP.CodecV2.MessageCodecV1.decodeMessageV1 encodedMessage)
                 -- Mirrors the OffRamp's definition of a pure token transfer.
+                assertMsg "receiver: message-only messages are rejected"
+                    (isSome message.tokenTransfer)
                 assertMsg "receiver: payload-bearing messages are rejected"
                     (message.messageData == "" && message.ccipReceiveGasLimit == 0)
 
@@ -553,7 +536,7 @@ template GlobalTokenSenderReceiver
                 destinationChainSelector = arg.destinationChainSelector
                 message = arg.message
                 routerCid = arg.routerCid
-                tokenPoolCid = arg.tokenPoolCid
+                tokenPoolCid = fromSomeNote "sender: tokenPoolCid required for token transfer" arg.tokenPoolCid
                 context = arg.context
 
             iccipSender_getFeeImpl self arg = exercise (fromInterfaceContractId @GlobalTokenSenderReceiver self) GetFee with
@@ -562,7 +545,7 @@ template GlobalTokenSenderReceiver
                 message = arg.message
                 routerCid = arg.routerCid
                 ccvSendInputs = arg.ccvSendInputs
-                tokenTransferInput = arg.tokenTransferInput
+                tokenTransferInput = fromSomeNote "sender: tokenTransferInput required for token transfer" arg.tokenTransferInput
                 executorInput = arg.executorInput
                 context = arg.context
 
@@ -573,7 +556,7 @@ template GlobalTokenSenderReceiver
                 routerCid = arg.routerCid
                 feeTokenInput = arg.feeTokenInput
                 ccvSendInputs = arg.ccvSendInputs
-                tokenTransferInput = arg.tokenTransferInput
+                tokenTransferInput = fromSomeNote "sender: tokenTransferInput required for token transfer" arg.tokenTransferInput
                 executorInput = arg.executorInput
                 context = arg.context
 
@@ -587,13 +570,13 @@ template GlobalTokenSenderReceiver
                 receiverParty = arg.receiverParty
                 routerCid = arg.routerCid
                 encodedMessage = arg.encodedMessage
-                tokenPoolCid = arg.tokenPoolCid
+                tokenPoolCid = fromSomeNote "receiver: tokenPoolCid required for token transfer" arg.tokenPoolCid
                 context = arg.context
 
             iccipReceiver_executeImpl self arg = exercise (fromInterfaceContractId @GlobalTokenSenderReceiver self) Execute with
                 receiverParty = arg.receiverParty
                 routerCid = arg.routerCid
                 encodedMessage = arg.encodedMessage
-                tokenTransfer = arg.tokenTransfer
+                tokenTransfer = fromSomeNote "receiver: tokenTransfer required for token transfer" arg.tokenTransfer
                 ccvInputs = arg.ccvInputs
                 context = arg.context

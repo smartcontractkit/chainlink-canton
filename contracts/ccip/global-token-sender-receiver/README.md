@@ -16,9 +16,15 @@ interfaces this contract implements.
   `receiverFinalityConfig`) is set at deployment. It is inert for token-only transfers — the token
   pool is the only counterparty accepting risk in a token transfer and decides CCV and finality
   requirements — but the fields remain because the router's `PrepareExecute` expects them.
-- **Pure token transfers only.** `Send` and `GetFee` abort on non-empty `message.payload`; `Execute`
-  aborts on message-only and payload-bearing messages (mirroring the OffRamp's definition of a pure
-  token transfer).
+- **Pure token transfers only.** A token transfer is strictly required in both directions, and
+  non-pure messages are rejected: `Send`, `GetFee`, and `GetRequiredCCVsForSend` abort on
+  message-only, payload-bearing, and non-zero callback gas limit (`extraArgs.gasLimit`) messages;
+  `Execute` and `GetRequiredCCVsForExecute` abort on message-only and payload-bearing messages
+  (mirroring the OffRamp's definition of a pure token transfer). Accordingly, the token-related
+  choice inputs (`tokenTransferInput` / `tokenPoolCid` / `tokenTransfer`) are non-optional on the
+  direct choices. The shared `ICCIPSender` / `ICCIPReceiver` interfaces keep their optional argument
+  types (they are shared with `CCIPSender` / `CCIPReceiver`); this contract unwraps them strictly,
+  so interface callers must supply the token inputs as well.
 - **No receipts.** `Execute` returns a `ReceiverExecuteResult` (message id, message, execution
   state, the pool's `ReleaseOrMintResult`, choice context); no contract is created.
 - **Self-contained orchestration.** The choice bodies mirror the (to-be-deprecated) `CCIPSender` /

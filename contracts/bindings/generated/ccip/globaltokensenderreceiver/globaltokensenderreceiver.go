@@ -28,7 +28,7 @@ var (
 
 const (
 	PackageName = "ccip-global-token-sender-receiver-v1"
-	PackageID   = "548a378d2a39a45df4ca843672201c2b1a809f7a77f20d7caa668c0e7807dee5"
+	PackageID   = "0b3375fa12027a89ac973c8c657f86d05f6f12036d39922572cacf76df4895f4"
 	SDKVersion  = "3.4.11"
 )
 
@@ -61,7 +61,7 @@ type Execute struct {
 	ReceiverParty  types.PARTY                                `json:"receiverParty"`
 	RouterCid      types.CONTRACT_ID                          `json:"routerCid"`
 	EncodedMessage types.TEXT                                 `json:"encodedMessage"`
-	TokenTransfer  *user.ReceiverTokenTransferInput           `json:"tokenTransfer" hex:"optional"`
+	TokenTransfer  user.ReceiverTokenTransferInput            `json:"tokenTransfer"`
 	CcvInputs      []user.ReceiverCCVInput                    `json:"ccvInputs"`
 	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
@@ -76,17 +76,7 @@ func (t Execute) ToMap() map[string]any {
 
 	m["encodedMessage"] = string(t.EncodedMessage)
 
-	if t.TokenTransfer != nil {
-		m["tokenTransfer"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.TokenTransfer),
-		}
-	} else {
-		m["tokenTransfer"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+	m["tokenTransfer"] = model.NestedToDAMLValue(t.TokenTransfer)
 
 	m["ccvInputs"] = func() []any {
 		res := make([]any, 0, len(t.CcvInputs))
@@ -130,7 +120,7 @@ type GetFee struct {
 	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	CcvSendInputs            []user.SenderCCVSendInput                  `json:"ccvSendInputs"`
-	TokenTransferInput       *user.SenderTokenTransferInput             `json:"tokenTransferInput" hex:"optional"`
+	TokenTransferInput       user.SenderTokenTransferInput              `json:"tokenTransferInput"`
 	ExecutorInput            *user.SenderExecutorInput                  `json:"executorInput" hex:"optional"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
@@ -155,17 +145,7 @@ func (t GetFee) ToMap() map[string]any {
 		return res
 	}()
 
-	if t.TokenTransferInput != nil {
-		m["tokenTransferInput"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.TokenTransferInput),
-		}
-	} else {
-		m["tokenTransferInput"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+	m["tokenTransferInput"] = model.NestedToDAMLValue(t.TokenTransferInput)
 
 	if t.ExecutorInput != nil {
 		m["executorInput"] = map[string]any{
@@ -211,7 +191,7 @@ type GetRequiredCCVsForExecute struct {
 	ReceiverParty  types.PARTY                                `json:"receiverParty"`
 	RouterCid      types.CONTRACT_ID                          `json:"routerCid"`
 	EncodedMessage types.TEXT                                 `json:"encodedMessage"`
-	TokenPoolCid   *types.CONTRACT_ID                         `json:"tokenPoolCid" hex:"optional"`
+	TokenPoolCid   types.CONTRACT_ID                          `json:"tokenPoolCid"`
 	Context        splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
@@ -225,17 +205,7 @@ func (t GetRequiredCCVsForExecute) ToMap() map[string]any {
 
 	m["encodedMessage"] = string(t.EncodedMessage)
 
-	if t.TokenPoolCid != nil {
-		m["tokenPoolCid"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.TokenPoolCid),
-		}
-	} else {
-		m["tokenPoolCid"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+	m["tokenPoolCid"] = model.NestedToDAMLValue(t.TokenPoolCid)
 
 	m["context"] = model.NestedToDAMLValue(t.Context)
 
@@ -270,7 +240,7 @@ type GetRequiredCCVsForSend struct {
 	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
 	Message                  clientapi.Canton2AnyMessage                `json:"message"`
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
-	TokenPoolCid             *types.CONTRACT_ID                         `json:"tokenPoolCid" hex:"optional"`
+	TokenPoolCid             types.CONTRACT_ID                          `json:"tokenPoolCid"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 
@@ -286,17 +256,7 @@ func (t GetRequiredCCVsForSend) ToMap() map[string]any {
 
 	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
 
-	if t.TokenPoolCid != nil {
-		m["tokenPoolCid"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.TokenPoolCid),
-		}
-	} else {
-		m["tokenPoolCid"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+	m["tokenPoolCid"] = model.NestedToDAMLValue(t.TokenPoolCid)
 
 	m["context"] = model.NestedToDAMLValue(t.Context)
 
@@ -694,7 +654,7 @@ type Send struct {
 	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
 	FeeTokenInput            user.SenderFeeTokenInput                   `json:"feeTokenInput"`
 	CcvSendInputs            []user.SenderCCVSendInput                  `json:"ccvSendInputs"`
-	TokenTransferInput       *user.SenderTokenTransferInput             `json:"tokenTransferInput" hex:"optional"`
+	TokenTransferInput       user.SenderTokenTransferInput              `json:"tokenTransferInput"`
 	ExecutorInput            *user.SenderExecutorInput                  `json:"executorInput" hex:"optional"`
 	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
@@ -721,17 +681,7 @@ func (t Send) ToMap() map[string]any {
 		return res
 	}()
 
-	if t.TokenTransferInput != nil {
-		m["tokenTransferInput"] = map[string]any{
-			"_type": "optional",
-			"value": model.NestedToDAMLValue(*t.TokenTransferInput),
-		}
-	} else {
-		m["tokenTransferInput"] = map[string]any{
-			"_type": "optional",
-			"value": nil,
-		}
-	}
+	m["tokenTransferInput"] = model.NestedToDAMLValue(t.TokenTransferInput)
 
 	if t.ExecutorInput != nil {
 		m["executorInput"] = map[string]any{
