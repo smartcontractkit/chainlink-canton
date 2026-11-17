@@ -28,7 +28,7 @@ require (
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.1
 	github.com/smartcontractkit/chainlink-ccv v0.16.1-0.20261030163635-51e69f36a618
 	github.com/smartcontractkit/chainlink-common v0.11.2-0.20260915214759-02f2214d5823
-	github.com/smartcontractkit/chainlink-deployments-framework v0.127.0
+	github.com/smartcontractkit/chainlink-deployments-framework v0.127.1
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/otel v1.47.0
@@ -288,7 +288,7 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.46.0 // indirect
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.47.0 // indirect
-	go.opentelemetry.io/otel/sdk/log v0.22.0 // indirect
+	go.opentelemetry.io/otel/sdk/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect

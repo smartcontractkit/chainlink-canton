@@ -12,11 +12,13 @@ import (
 	committeeverifier "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	core "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	executor "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
-	globaltokensenderreceiver "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/globaltokensenderreceiver"
 	lockreleasetokenpool "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
 	ratelimiter "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ratelimiter"
+	registryburnminttokenpool "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/burnminttokenpool"
+	registryratelimiter "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/ratelimiter"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	link "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link"
+	tokenadmin "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/link/tokenadmin"
 	api "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/mcms/api"
 	splice_api_token_holding_v1 "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
@@ -37,7 +39,7 @@ var (
 
 const (
 	PackageName = "ccip-factory-v2"
-	PackageID   = "ef07d708890bc6206494c25365b1c01642684a266559ae87cfe4ce2c97cbf1ef"
+	PackageID   = "5769f6c2fe46d2b5eb6f450a5b0b9ec67181916b68078dc834a6df150077ca18"
 	SDKVersion  = "3.4.11"
 )
 
@@ -248,6 +250,27 @@ func (t CCIPFactory) DeployLinkTokenWithPackageID(contractID string, packageID s
 	}
 }
 
+// DeployLinkTokenAdmin exercises the DeployLinkTokenAdmin choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployLinkTokenAdmin(contractID string, args DeployLinkTokenAdmin) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FactoryV2", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployLinkTokenAdmin",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployLinkTokenAdminWithPackageID exercises the DeployLinkTokenAdmin choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployLinkTokenAdminWithPackageID(contractID string, packageID string, args DeployLinkTokenAdmin) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FactoryV2", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployLinkTokenAdmin",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // DeployTokenAdminRegistry exercises the DeployTokenAdminRegistry choice on this CCIPFactory contract
 // This method uses the package name in the template ID
 func (t CCIPFactory) DeployTokenAdminRegistry(contractID string, args DeployTokenAdminRegistry) *model.ExerciseCommand {
@@ -328,27 +351,6 @@ func (t CCIPFactory) DeployPerPartyRouterFactoryWithPackageID(contractID string,
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FactoryV2", "CCIPFactory"),
 		ContractID: contractID,
 		Choice:     "DeployPerPartyRouterFactory",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployGlobalTokenSenderReceiver exercises the DeployGlobalTokenSenderReceiver choice on this CCIPFactory contract
-// This method uses the package name in the template ID
-func (t CCIPFactory) DeployGlobalTokenSenderReceiver(contractID string, args DeployGlobalTokenSenderReceiver) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FactoryV2", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployGlobalTokenSenderReceiver",
-		Arguments:  argsToMap(args),
-	}
-}
-
-// DeployGlobalTokenSenderReceiverWithPackageID exercises the DeployGlobalTokenSenderReceiver choice using the provided package ID instead of package name
-func (t CCIPFactory) DeployGlobalTokenSenderReceiverWithPackageID(contractID string, packageID string, args DeployGlobalTokenSenderReceiver) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FactoryV2", "CCIPFactory"),
-		ContractID: contractID,
-		Choice:     "DeployGlobalTokenSenderReceiver",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -458,6 +460,27 @@ func (t CCIPFactory) DeployBurnMintTokenPoolWithPackageID(contractID string, pac
 	}
 }
 
+// DeployRegistryBurnMintTokenPool exercises the DeployRegistryBurnMintTokenPool choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployRegistryBurnMintTokenPool(contractID string, args DeployRegistryBurnMintTokenPool) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FactoryV2", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployRegistryBurnMintTokenPool",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployRegistryBurnMintTokenPoolWithPackageID exercises the DeployRegistryBurnMintTokenPool choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployRegistryBurnMintTokenPoolWithPackageID(contractID string, packageID string, args DeployRegistryBurnMintTokenPool) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FactoryV2", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployRegistryBurnMintTokenPool",
+		Arguments:  argsToMap(args),
+	}
+}
+
 // DeployRateLimiter exercises the DeployRateLimiter choice on this CCIPFactory contract
 // This method uses the package name in the template ID
 func (t CCIPFactory) DeployRateLimiter(contractID string, args DeployRateLimiter) *model.ExerciseCommand {
@@ -475,6 +498,27 @@ func (t CCIPFactory) DeployRateLimiterWithPackageID(contractID string, packageID
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FactoryV2", "CCIPFactory"),
 		ContractID: contractID,
 		Choice:     "DeployRateLimiter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployRegistryRateLimiter exercises the DeployRegistryRateLimiter choice on this CCIPFactory contract
+// This method uses the package name in the template ID
+func (t CCIPFactory) DeployRegistryRateLimiter(contractID string, args DeployRegistryRateLimiter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FactoryV2", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployRegistryRateLimiter",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DeployRegistryRateLimiterWithPackageID exercises the DeployRegistryRateLimiter choice using the provided package ID instead of package name
+func (t CCIPFactory) DeployRegistryRateLimiterWithPackageID(contractID string, packageID string, args DeployRegistryRateLimiter) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FactoryV2", "CCIPFactory"),
+		ContractID: contractID,
+		Choice:     "DeployRegistryRateLimiter",
 		Arguments:  argsToMap(args),
 	}
 }
@@ -1034,102 +1078,6 @@ func (t *DeployGlobalConfigParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
-// DeployGlobalTokenSenderReceiver is a Record type
-type DeployGlobalTokenSenderReceiver struct {
-	Contract globaltokensenderreceiver.GlobalTokenSenderReceiver `json:"contract"`
-}
-
-// ToMap converts DeployGlobalTokenSenderReceiver to a map for DAML arguments
-func (t DeployGlobalTokenSenderReceiver) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["contract"] = model.NestedToDAMLValue(t.Contract)
-
-	return m
-}
-
-func (t DeployGlobalTokenSenderReceiver) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *DeployGlobalTokenSenderReceiver) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes DeployGlobalTokenSenderReceiver to hex string (Canton MCMS format)
-func (t DeployGlobalTokenSenderReceiver) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes DeployGlobalTokenSenderReceiver from hex string (Canton MCMS format)
-func (t *DeployGlobalTokenSenderReceiver) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
-// DeployGlobalTokenSenderReceiverParams is a Record type
-type DeployGlobalTokenSenderReceiverParams struct {
-	InstanceId             types.TEXT                        `json:"instanceId"`
-	RequiredCCVs           []chainlinkapi.RawInstanceAddress `json:"requiredCCVs"`
-	OptionalCCVs           []chainlinkapi.RawInstanceAddress `json:"optionalCCVs"`
-	OptionalThreshold      types.INT64                       `json:"optionalThreshold"`
-	ReceiverFinalityConfig ccipcodec.FinalityConfig          `json:"receiverFinalityConfig"`
-}
-
-// ToMap converts DeployGlobalTokenSenderReceiverParams to a map for DAML arguments
-func (t DeployGlobalTokenSenderReceiverParams) ToMap() map[string]any {
-	m := make(map[string]any)
-
-	m["instanceId"] = string(t.InstanceId)
-
-	m["requiredCCVs"] = func() []any {
-		res := make([]any, 0, len(t.RequiredCCVs))
-		for _, e := range t.RequiredCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
-		}
-		return res
-	}()
-
-	m["optionalCCVs"] = func() []any {
-		res := make([]any, 0, len(t.OptionalCCVs))
-		for _, e := range t.OptionalCCVs {
-			res = append(res, model.NestedToDAMLValue(e))
-		}
-		return res
-	}()
-
-	m["optionalThreshold"] = int64(t.OptionalThreshold)
-
-	m["receiverFinalityConfig"] = model.NestedToDAMLValue(t.ReceiverFinalityConfig)
-
-	return m
-}
-
-func (t DeployGlobalTokenSenderReceiverParams) MarshalJSON() ([]byte, error) {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshal(t)
-}
-
-func (t *DeployGlobalTokenSenderReceiverParams) UnmarshalJSON(data []byte) error {
-	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshal(data, t)
-}
-
-// MarshalHex encodes DeployGlobalTokenSenderReceiverParams to hex string (Canton MCMS format)
-func (t DeployGlobalTokenSenderReceiverParams) MarshalHex() (string, error) {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Marshal(t)
-}
-
-// UnmarshalHex decodes DeployGlobalTokenSenderReceiverParams from hex string (Canton MCMS format)
-func (t *DeployGlobalTokenSenderReceiverParams) UnmarshalHex(data string) error {
-	hexCodec := codec.NewHexCodec()
-	return hexCodec.Unmarshal(data, t)
-}
-
 // DeployLinkToken is a Record type
 type DeployLinkToken struct {
 	Contract link.LinkRegistry `json:"contract"`
@@ -1162,6 +1110,90 @@ func (t DeployLinkToken) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes DeployLinkToken from hex string (Canton MCMS format)
 func (t *DeployLinkToken) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployLinkTokenAdmin is a Record type
+type DeployLinkTokenAdmin struct {
+	Contract tokenadmin.LinkTokenAdmin `json:"contract"`
+}
+
+// ToMap converts DeployLinkTokenAdmin to a map for DAML arguments
+func (t DeployLinkTokenAdmin) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contract"] = model.NestedToDAMLValue(t.Contract)
+
+	return m
+}
+
+func (t DeployLinkTokenAdmin) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployLinkTokenAdmin) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployLinkTokenAdmin to hex string (Canton MCMS format)
+func (t DeployLinkTokenAdmin) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployLinkTokenAdmin from hex string (Canton MCMS format)
+func (t *DeployLinkTokenAdmin) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployLinkTokenAdminParams is a Record type
+type DeployLinkTokenAdminParams struct {
+	InstanceId   types.TEXT                               `json:"instanceId"`
+	InstrumentId splice_api_token_holding_v1.InstrumentId `json:"instrumentId"`
+	Observers    []types.PARTY                            `json:"observers"`
+}
+
+// ToMap converts DeployLinkTokenAdminParams to a map for DAML arguments
+func (t DeployLinkTokenAdminParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instanceId"] = string(t.InstanceId)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t DeployLinkTokenAdminParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployLinkTokenAdminParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployLinkTokenAdminParams to hex string (Canton MCMS format)
+func (t DeployLinkTokenAdminParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployLinkTokenAdminParams from hex string (Canton MCMS format)
+func (t *DeployLinkTokenAdminParams) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -1767,6 +1799,223 @@ func (t *DeployRateLimiterParams) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// DeployRegistryBurnMintTokenPool is a Record type
+type DeployRegistryBurnMintTokenPool struct {
+	Contract registryburnminttokenpool.BurnMintTokenPool `json:"contract"`
+}
+
+// ToMap converts DeployRegistryBurnMintTokenPool to a map for DAML arguments
+func (t DeployRegistryBurnMintTokenPool) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contract"] = model.NestedToDAMLValue(t.Contract)
+
+	return m
+}
+
+func (t DeployRegistryBurnMintTokenPool) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployRegistryBurnMintTokenPool) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployRegistryBurnMintTokenPool to hex string (Canton MCMS format)
+func (t DeployRegistryBurnMintTokenPool) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployRegistryBurnMintTokenPool from hex string (Canton MCMS format)
+func (t *DeployRegistryBurnMintTokenPool) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployRegistryBurnMintTokenPoolParams is a Record type
+type DeployRegistryBurnMintTokenPoolParams struct {
+	InstanceId         types.TEXT                                 `json:"instanceId"`
+	InstrumentId       splice_api_token_holding_v1.InstrumentId   `json:"instrumentId"`
+	Decimals           types.INT64                                `json:"decimals"`
+	RateLimitAdmin     *types.PARTY                               `json:"rateLimitAdmin" hex:"optional"`
+	Observers          []types.PARTY                              `json:"observers"`
+	TokenAdminRegistry chainlinkapi.RawInstanceAddress            `json:"tokenAdminRegistry"`
+	FeeQuoter          chainlinkapi.RawInstanceAddress            `json:"feeQuoter"`
+	RmnRemote          chainlinkapi.RawInstanceAddress            `json:"rmnRemote"`
+	PoolReceiveContext splice_api_token_metadata_v1.ChoiceContext `json:"poolReceiveContext"`
+	TransferTimeout    registryburnminttokenpool.TransferTimeout  `json:"transferTimeout"`
+}
+
+// ToMap converts DeployRegistryBurnMintTokenPoolParams to a map for DAML arguments
+func (t DeployRegistryBurnMintTokenPoolParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instanceId"] = string(t.InstanceId)
+
+	m["instrumentId"] = model.NestedToDAMLValue(t.InstrumentId)
+
+	m["decimals"] = int64(t.Decimals)
+
+	if t.RateLimitAdmin != nil {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": (*t.RateLimitAdmin).ToMap(),
+		}
+	} else {
+		m["rateLimitAdmin"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	m["tokenAdminRegistry"] = model.NestedToDAMLValue(t.TokenAdminRegistry)
+
+	m["feeQuoter"] = model.NestedToDAMLValue(t.FeeQuoter)
+
+	m["rmnRemote"] = model.NestedToDAMLValue(t.RmnRemote)
+
+	m["poolReceiveContext"] = model.NestedToDAMLValue(t.PoolReceiveContext)
+
+	m["transferTimeout"] = model.NestedToDAMLValue(t.TransferTimeout)
+
+	return m
+}
+
+func (t DeployRegistryBurnMintTokenPoolParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployRegistryBurnMintTokenPoolParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployRegistryBurnMintTokenPoolParams to hex string (Canton MCMS format)
+func (t DeployRegistryBurnMintTokenPoolParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployRegistryBurnMintTokenPoolParams from hex string (Canton MCMS format)
+func (t *DeployRegistryBurnMintTokenPoolParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployRegistryRateLimiter is a Record type
+type DeployRegistryRateLimiter struct {
+	Contract registryratelimiter.RateLimiter `json:"contract"`
+}
+
+// ToMap converts DeployRegistryRateLimiter to a map for DAML arguments
+func (t DeployRegistryRateLimiter) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["contract"] = model.NestedToDAMLValue(t.Contract)
+
+	return m
+}
+
+func (t DeployRegistryRateLimiter) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployRegistryRateLimiter) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployRegistryRateLimiter to hex string (Canton MCMS format)
+func (t DeployRegistryRateLimiter) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployRegistryRateLimiter from hex string (Canton MCMS format)
+func (t *DeployRegistryRateLimiter) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// DeployRegistryRateLimiterParams is a Record type
+type DeployRegistryRateLimiterParams struct {
+	InstanceId          types.TEXT                             `json:"instanceId"`
+	PoolInstanceId      types.TEXT                             `json:"poolInstanceId"`
+	RemoteChainSelector types.NUMERIC                          `json:"remoteChainSelector"`
+	Direction           registryratelimiter.RateLimitDirection `json:"direction"`
+	Mode                registryratelimiter.RateLimitMode      `json:"mode"`
+	IsEnabled           types.BOOL                             `json:"isEnabled"`
+	Capacity            types.NUMERIC                          `json:"capacity"`
+	Rate                types.NUMERIC                          `json:"rate"`
+	Observers           []types.PARTY                          `json:"observers"`
+}
+
+// ToMap converts DeployRegistryRateLimiterParams to a map for DAML arguments
+func (t DeployRegistryRateLimiterParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["instanceId"] = string(t.InstanceId)
+
+	m["poolInstanceId"] = string(t.PoolInstanceId)
+
+	m["remoteChainSelector"] = t.RemoteChainSelector
+
+	m["direction"] = model.NestedToDAMLValue(t.Direction)
+
+	m["mode"] = model.NestedToDAMLValue(t.Mode)
+
+	m["isEnabled"] = bool(t.IsEnabled)
+
+	m["capacity"] = t.Capacity
+
+	m["rate"] = t.Rate
+
+	m["observers"] = func() []any {
+		res := make([]any, 0, len(t.Observers))
+		for _, e := range t.Observers {
+			res = append(res, e.ToMap())
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t DeployRegistryRateLimiterParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DeployRegistryRateLimiterParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DeployRegistryRateLimiterParams to hex string (Canton MCMS format)
+func (t DeployRegistryRateLimiterParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DeployRegistryRateLimiterParams from hex string (Canton MCMS format)
+func (t *DeployRegistryRateLimiterParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // DeployResult is a Record type
 type DeployResult struct {
 	FactoryCid  types.CONTRACT_ID `json:"factoryCid"`
@@ -2037,9 +2286,9 @@ type MCMSEncoder interface {
 	DeployFeeQuoterParams(args DeployFeeQuoterParams) (*bind.EncodedChoice, error)
 	DeployGlobalConfig(args DeployGlobalConfig) (*bind.EncodedChoice, error)
 	DeployGlobalConfigParams(args DeployGlobalConfigParams) (*bind.EncodedChoice, error)
-	DeployGlobalTokenSenderReceiver(args DeployGlobalTokenSenderReceiver) (*bind.EncodedChoice, error)
-	DeployGlobalTokenSenderReceiverParams(args DeployGlobalTokenSenderReceiverParams) (*bind.EncodedChoice, error)
 	DeployLinkToken(args DeployLinkToken) (*bind.EncodedChoice, error)
+	DeployLinkTokenAdmin(args DeployLinkTokenAdmin) (*bind.EncodedChoice, error)
+	DeployLinkTokenAdminParams(args DeployLinkTokenAdminParams) (*bind.EncodedChoice, error)
 	DeployLinkTokenParams(args DeployLinkTokenParams) (*bind.EncodedChoice, error)
 	DeployLockReleaseTokenPool(args DeployLockReleaseTokenPool) (*bind.EncodedChoice, error)
 	DeployLockReleaseTokenPoolParams(args DeployLockReleaseTokenPoolParams) (*bind.EncodedChoice, error)
@@ -2053,6 +2302,10 @@ type MCMSEncoder interface {
 	DeployRMNRemoteParams(args DeployRMNRemoteParams) (*bind.EncodedChoice, error)
 	DeployRateLimiter(args DeployRateLimiter) (*bind.EncodedChoice, error)
 	DeployRateLimiterParams(args DeployRateLimiterParams) (*bind.EncodedChoice, error)
+	DeployRegistryBurnMintTokenPool(args DeployRegistryBurnMintTokenPool) (*bind.EncodedChoice, error)
+	DeployRegistryBurnMintTokenPoolParams(args DeployRegistryBurnMintTokenPoolParams) (*bind.EncodedChoice, error)
+	DeployRegistryRateLimiter(args DeployRegistryRateLimiter) (*bind.EncodedChoice, error)
+	DeployRegistryRateLimiterParams(args DeployRegistryRateLimiterParams) (*bind.EncodedChoice, error)
 	DeployTokenAdminRegistry(args DeployTokenAdminRegistry) (*bind.EncodedChoice, error)
 	DeployTokenAdminRegistryParams(args DeployTokenAdminRegistryParams) (*bind.EncodedChoice, error)
 	GetFactoryState(args GetFactoryState) (*bind.EncodedChoice, error)
@@ -2137,19 +2390,19 @@ func (e *encoder) DeployGlobalConfigParams(args DeployGlobalConfigParams) (*bind
 	return e.EncodeChoiceArgs("DeployGlobalConfig", args)
 }
 
-// DeployGlobalTokenSenderReceiver encodes parameters for the DeployGlobalTokenSenderReceiver choice.
-func (e *encoder) DeployGlobalTokenSenderReceiver(args DeployGlobalTokenSenderReceiver) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployGlobalTokenSenderReceiver", args)
-}
-
-// DeployGlobalTokenSenderReceiverParams encodes parameters for the DeployGlobalTokenSenderReceiver choice.
-func (e *encoder) DeployGlobalTokenSenderReceiverParams(args DeployGlobalTokenSenderReceiverParams) (*bind.EncodedChoice, error) {
-	return e.EncodeChoiceArgs("DeployGlobalTokenSenderReceiver", args)
-}
-
 // DeployLinkToken encodes parameters for the DeployLinkToken choice.
 func (e *encoder) DeployLinkToken(args DeployLinkToken) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("DeployLinkToken", args)
+}
+
+// DeployLinkTokenAdmin encodes parameters for the DeployLinkTokenAdmin choice.
+func (e *encoder) DeployLinkTokenAdmin(args DeployLinkTokenAdmin) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployLinkTokenAdmin", args)
+}
+
+// DeployLinkTokenAdminParams encodes parameters for the DeployLinkTokenAdmin choice.
+func (e *encoder) DeployLinkTokenAdminParams(args DeployLinkTokenAdminParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployLinkTokenAdmin", args)
 }
 
 // DeployLinkTokenParams encodes parameters for the DeployLinkToken choice.
@@ -2215,6 +2468,26 @@ func (e *encoder) DeployRateLimiter(args DeployRateLimiter) (*bind.EncodedChoice
 // DeployRateLimiterParams encodes parameters for the DeployRateLimiter choice.
 func (e *encoder) DeployRateLimiterParams(args DeployRateLimiterParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("DeployRateLimiter", args)
+}
+
+// DeployRegistryBurnMintTokenPool encodes parameters for the DeployRegistryBurnMintTokenPool choice.
+func (e *encoder) DeployRegistryBurnMintTokenPool(args DeployRegistryBurnMintTokenPool) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployRegistryBurnMintTokenPool", args)
+}
+
+// DeployRegistryBurnMintTokenPoolParams encodes parameters for the DeployRegistryBurnMintTokenPool choice.
+func (e *encoder) DeployRegistryBurnMintTokenPoolParams(args DeployRegistryBurnMintTokenPoolParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployRegistryBurnMintTokenPool", args)
+}
+
+// DeployRegistryRateLimiter encodes parameters for the DeployRegistryRateLimiter choice.
+func (e *encoder) DeployRegistryRateLimiter(args DeployRegistryRateLimiter) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployRegistryRateLimiter", args)
+}
+
+// DeployRegistryRateLimiterParams encodes parameters for the DeployRegistryRateLimiter choice.
+func (e *encoder) DeployRegistryRateLimiterParams(args DeployRegistryRateLimiterParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DeployRegistryRateLimiter", args)
 }
 
 // DeployTokenAdminRegistry encodes parameters for the DeployTokenAdminRegistry choice.
