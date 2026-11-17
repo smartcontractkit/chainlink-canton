@@ -36,7 +36,9 @@ func RegistrarScopedURL(host string, admin types.PARTY) string {
 	return host
 }
 
-func NewTransferFactory(ctx context.Context, poolOwner types.PARTY, acs store.ActiveContractStoreInterface, cfg config.Factory) (TransferDisclosureFactory, error) {
+func NewTransferFactory(ctx context.Context, poolOwner types.PARTY, acs store.ActiveContractStoreInterface, cfg config.Factory, opts ...Option) (TransferDisclosureFactory, error) {
+	o := applyOptions(opts)
+
 	switch cfg.Type {
 	case config.FactoryTypeDisabled:
 		return nil, nil //nolint:nilnil
@@ -98,6 +100,7 @@ func NewTransferFactory(ctx context.Context, poolOwner types.PARTY, acs store.Ac
 			poolOwner:                 poolOwner,
 			transferInstructionClient: transferInstructionClient,
 			bridgeHoldingsURL:         bridgeURL,
+			metrics:                   o.metrics,
 		}, nil
 	case config.FactoryTypeURLRequests:
 		return nil, fmt.Errorf("invalid factory type %q: URLRequests is not supported for TransferFactory", cfg.Type)
@@ -155,6 +158,7 @@ type URLTransferFactory struct {
 	poolOwner                 types.PARTY
 	transferInstructionClient transferInstructionV1.ClientWithResponsesInterface
 	bridgeHoldingsURL         string
+	metrics                   Metrics
 }
 
 func (f URLTransferFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, poolReceiveMeta map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
@@ -228,6 +232,10 @@ func (f URLTransferFactory) getTransferFactory(
 	receiver types.PARTY,
 	meta map[string]types.TEXT,
 ) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+	started := time.Now()
+	success := false
+	defer func() { recordDARequest(ctx, f.metrics, OperationTransferFactory, started, success) }()
+
 	// The receiver label in the transfer meta selects the context mode: a named
 	// label (e.g. cip-112/receiver.id) yields the two-step context, "" the
 	// direct/preapproved one.
@@ -288,6 +296,8 @@ func (f URLTransferFactory) getTransferFactory(
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
 
+	success = true
+
 	return types.CONTRACT_ID(resp.JSON200.FactoryId), choiceContext, disclosedContracts, nil
 }
 
@@ -340,6 +350,10 @@ func (f URLTransferFactory) GetBridgeHoldings(
 		return nil, fmt.Errorf("bridge holdings not configured (set factory.bridge_holdings_url to enable)")
 	}
 
+	started := time.Now()
+	success := false
+	defer func() { recordDARequest(ctx, f.metrics, OperationBridgeHoldings, started, success) }()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, f.bridgeHoldingsURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build bridge holdings request: %w", err)
@@ -373,6 +387,8 @@ func (f URLTransferFactory) GetBridgeHoldings(
 			SynchronizerId:   h.SynchronizerId,
 		}
 	}
+
+	success = true
 
 	return out, nil
 }

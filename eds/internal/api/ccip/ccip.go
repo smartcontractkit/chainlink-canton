@@ -70,6 +70,7 @@ func NewServer(
 	logger zerolog.Logger,
 	activeContractStore store.ActiveContractStoreInterface,
 	cfg config.CCIPAPIConfig,
+	factoryOpts ...factory.Option,
 ) (*Server, error) {
 	s := &Server{
 		logger:                    logger.With().Str("component", "CCIPAPI").Logger(),
@@ -131,7 +132,7 @@ func NewServer(
 		if feeToken.Factory == nil {
 			continue
 		}
-		disclosureFactory, err := factory.NewTransferFactory(ctx, s.ccipOwner, activeContractStore, *feeToken.Factory)
+		disclosureFactory, err := factory.NewTransferFactory(ctx, s.ccipOwner, activeContractStore, *feeToken.Factory, factoryOpts...)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create transfer factory for fee token %s@%s: %w", feeToken.TokenId, feeToken.Admin, err)
 		}
