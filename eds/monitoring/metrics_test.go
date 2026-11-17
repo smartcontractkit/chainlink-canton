@@ -57,7 +57,6 @@ func attrs(kv ...string) attribute.Set {
 	return attribute.NewSet(set...)
 }
 
-//nolint:paralleltest // swaps the global beholder client, so it cannot run in parallel
 func TestRecordDARequestExportedMetrics(t *testing.T) {
 	got := collectDAMetrics(t, func(l *EDSMetricLabeler) {
 		ctx := context.Background()
