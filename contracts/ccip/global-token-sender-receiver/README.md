@@ -5,8 +5,38 @@ DA Registry token transfers in both directions. It removes the need to deploy pe
 contracts: every user keeps their own `PerPartyRouter` (one-time `CreateRouter`, no code deployment)
 and drives this contract with `caller` = their own party.
 
+The contract can only be used for **pure token transfers** — no arbitrary messages, no payload, no
+receiver callbacks. See [Pure token transfers only](#pure-token-transfers-only).
+
 See the [client interfaces](../client/README.md) package for the `ICCIPSender` / `ICCIPReceiver`
 interfaces this contract implements.
+
+## Pure token transfers only
+
+On Canton, a message receiver is a **party**, not a contract: a message addressed to a party has to
+be executed by that party against a contract that reacts to the message content. Since this contract
+is shared between all users, it is deliberately a **blank receiver** — it contains no application
+logic and only ever moves tokens. Messages that carry anything beyond a token transfer have no logic
+to react to them and are therefore rejected.
+
+A **pure token transfer** is a message that consists solely of a token transfer, mirroring the
+OnRamp / OffRamp definition of a token-only transfer:
+
+- **Outgoing** (`GetRequiredCCVsForSend`, `GetFee`, `Send`): `message.tokenTransfer` present,
+  `message.payload` empty, and `extraArgs.gasLimit == 0` — the field that becomes
+  `ccipReceiveGasLimit` on the wire.
+- **Incoming** (`GetRequiredCCVsForExecute`, `Execute`): decoded `message.tokenTransfer` present,
+  `message.messageData` empty, and `message.ccipReceiveGasLimit == 0`.
+
+Implications:
+
+- **No arbitrary messages and no programmable receivers.** Message-only messages (no token
+  transfer), payload-bearing messages, and messages with a non-zero callback gas limit are rejected
+  by the choices above. Users that need custom receiver logic must deploy their own orchestrator 
+  (e.g. the per-user `CCIPSender` / `CCIPReceiver`).
+- **The baked-in receiver policy is inert.** The token pool is the only counterparty accepting risk
+  in a pure token transfer and decides CCV and finality requirements (see
+  [Design](#design) for the fields involved).
 
 ## Design
 
@@ -16,17 +46,6 @@ interfaces this contract implements.
   `receiverFinalityConfig`) is set at deployment. It is inert for token-only transfers — the token
   pool is the only counterparty accepting risk in a token transfer and decides CCV and finality
   requirements — but the fields remain because the router's `PrepareExecute` expects them.
-- **Pure token transfers only.** A token transfer is strictly required in both directions, and
-  non-pure messages are rejected: `Send`, `GetFee`, and `GetRequiredCCVsForSend` abort on
-  message-only, payload-bearing, and non-zero callback gas limit (`extraArgs.gasLimit`) messages;
-  `Execute` and `GetRequiredCCVsForExecute` abort on message-only and payload-bearing messages
-  (mirroring the OffRamp's definition of a pure token transfer). Accordingly, the token-related
-  choice inputs (`tokenTransferInput` / `tokenPoolCid` / `tokenTransfer`) are non-optional on the
-  direct choices. The shared `ICCIPSender` / `ICCIPReceiver` interfaces keep their optional argument
-  types (they are shared with `CCIPSender` / `CCIPReceiver`); this contract unwraps them strictly,
-  so interface callers must supply the token inputs as well.
-- **No receipts.** `Execute` returns a `ReceiverExecuteResult` (message id, message, execution
-  state, the pool's `ReleaseOrMintResult`, choice context); no contract is created.
 - **Self-contained orchestration.** The choice bodies mirror the (to-be-deprecated) `CCIPSender` /
   `CCIPReceiver` orchestrators with `owner := caller` / `receiverParty` bindings. This package
   intentionally does **not** depend on the sender/receiver packages.
