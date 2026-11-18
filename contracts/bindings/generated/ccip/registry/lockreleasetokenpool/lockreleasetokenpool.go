@@ -29,7 +29,7 @@ var (
 
 const (
 	PackageName = "ccip-registry-lock-release-token-pool-v2"
-	PackageID   = "b6a4fca67ebde49cc29f116b17e09e15885204bef7ff383d473926fb754d9216"
+	PackageID   = "54088f90262bb6b8f870e39700d79cca9cbe2891b3a2c1da7bc4cf639cb4512e"
 	SDKVersion  = "3.4.11"
 )
 
@@ -2553,6 +2553,48 @@ func (t *SetPoolReleaseMetadata) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// SetPoolReleaseMetadataParams is a Record type
+type SetPoolReleaseMetadataParams struct {
+	MetadataEntries []MetadataEntry `json:"metadataEntries"`
+}
+
+// ToMap converts SetPoolReleaseMetadataParams to a map for DAML arguments
+func (t SetPoolReleaseMetadataParams) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["metadataEntries"] = func() []any {
+		res := make([]any, 0, len(t.MetadataEntries))
+		for _, e := range t.MetadataEntries {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	return m
+}
+
+func (t SetPoolReleaseMetadataParams) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *SetPoolReleaseMetadataParams) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes SetPoolReleaseMetadataParams to hex string (Canton MCMS format)
+func (t SetPoolReleaseMetadataParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes SetPoolReleaseMetadataParams from hex string (Canton MCMS format)
+func (t *SetPoolReleaseMetadataParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // SetRateLimitConfig is a Record type
 type SetRateLimitConfig struct {
 	Caller         types.PARTY       `json:"caller"`
@@ -3152,6 +3194,7 @@ type MCMSEncoder interface {
 	SetPoolReceiveMetadata(args SetPoolReceiveMetadata) (*bind.EncodedChoice, error)
 	SetPoolReceiveMetadataParams(args SetPoolReceiveMetadataParams) (*bind.EncodedChoice, error)
 	SetPoolReleaseMetadata(args SetPoolReleaseMetadata) (*bind.EncodedChoice, error)
+	SetPoolReleaseMetadataParams(args SetPoolReleaseMetadataParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfig(args SetRateLimitConfig) (*bind.EncodedChoice, error)
 	SetRateLimitConfigMCMSParams(args SetRateLimitConfigMCMSParams) (*bind.EncodedChoice, error)
 	SetRateLimitConfigParams(args SetRateLimitConfigParams) (*bind.EncodedChoice, error)
@@ -3334,6 +3377,11 @@ func (e *encoder) SetPoolReceiveMetadataParams(args SetPoolReceiveMetadataParams
 
 // SetPoolReleaseMetadata encodes parameters for the SetPoolReleaseMetadata choice.
 func (e *encoder) SetPoolReleaseMetadata(args SetPoolReleaseMetadata) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("SetPoolReleaseMetadata", args)
+}
+
+// SetPoolReleaseMetadataParams encodes parameters for the SetPoolReleaseMetadata choice.
+func (e *encoder) SetPoolReleaseMetadataParams(args SetPoolReleaseMetadataParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("SetPoolReleaseMetadata", args)
 }
 

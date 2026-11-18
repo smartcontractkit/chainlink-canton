@@ -53,6 +53,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2CodecGen (
     decodeSetRateLimitConfigParamsAt,
     decodeSetTransferTimeoutParamsAt,
     decodeSetPoolReceiveMetadataParamsAt,
+    decodeSetPoolReleaseMetadataParamsAt,
     decodeAddPoolReceiveContextNonContractValueParamsAt,
     decodeAddPoolReceiveContextContractValueParamsAt,
     decodeRemovePoolReceiveContextValueParamsAt,
@@ -73,6 +74,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2Types (
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
     SetPoolReceiveMetadataParams(..),
+    SetPoolReleaseMetadataParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
     RemovePoolReceiveContextValueParams(..),
@@ -1570,6 +1572,15 @@ template LockReleaseTokenPool
                         Some (SetPoolReceiveMetadataParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetPoolReceiveMetadata" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid SetPoolReceiveMetadata with
+                                metadata = Splice.Api.Token.MetadataV1.Metadata with
+                                    values = TextMap.fromList (map (\e -> (e.key, e.value)) metadataEntries)
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetPoolReleaseMetadata" -> do
+                    case decodeSetPoolReleaseMetadataParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: SetPoolReleaseMetadata"
+                        Some (SetPoolReleaseMetadataParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetPoolReleaseMetadata" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetPoolReleaseMetadata with
                                 metadata = Splice.Api.Token.MetadataV1.Metadata with
                                     values = TextMap.fromList (map (\e -> (e.key, e.value)) metadataEntries)
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)
