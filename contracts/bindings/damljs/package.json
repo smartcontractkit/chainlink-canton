@@ -28,6 +28,6 @@
     "@mojotech/json-type-validation": "^3.1.0"
   },
   "peerDependencies": {
-    "@daml/types": "^3.7.1"
+    "@daml/types": "^3.7.3"
   }
 }
