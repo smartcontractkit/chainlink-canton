@@ -534,6 +534,15 @@ template LockReleaseTokenPool
                 lanes : [LaneDeploySpec]
             controller poolOwner, admin
             do
+                -- Bind the registry argument to the configured address, as the runtime
+                -- choices do: a pool registered on any other registry is unusable.
+                tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_PublicFetch with
+                        expectedAddress = deps.tokenAdminRegistry
+                        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                        caller = admin
+                Chainlink.InstanceAddress.assertEqual "Initialize: tokenAdminRegistry mismatch"
+                    tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
+
                 acceptedTokenConfigCid <- case existingTokenConfigCid of
                     -- Already registered with this admin accepted: validate + reuse.
                     -- ProposeAdministrator requires proposal authority (issuer or
