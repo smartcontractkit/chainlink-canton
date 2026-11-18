@@ -16,7 +16,14 @@
       "release-type": "go",
       "package-name": "contracts",
       "draft": true,
-      "force-tag-creation": true
+      "force-tag-creation": true,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "contracts/bindings/damljs/package.json",
+          "jsonpath": "$.version"
+        }
+      ]
     },
     "eds": {
       "release-type": "go",
