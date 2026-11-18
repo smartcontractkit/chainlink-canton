@@ -137,6 +137,16 @@ var DeployPerPartyRouterFactory = contract.NewExercise(contract.ExerciseParams[f
 	EncodeMethod: encodeDeployPerPartyRouterFactory,
 })
 
+var DeployGlobalTokenSenderReceiver = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployGlobalTokenSenderReceiver]{
+	Name:         "canton/ccip/factory/deploy_global_token_sender_receiver",
+	Version:      Version,
+	Description:  "Deploys a GlobalTokenSenderReceiver through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployGlobalTokenSenderReceiver,
+	EncodeMethod: encodeDeployGlobalTokenSenderReceiver,
+})
+
 var SetOwnerToMCMS = contract.NewExercise(contract.ExerciseParams[factorybindings.SetOwnerToMCMS]{
 	Name:         "canton/ccip/factory/set_owner_to_mcms",
 	Version:      Version,
@@ -185,6 +195,26 @@ var DeployRateLimiter = contract.NewExercise(contract.ExerciseParams[factorybind
 	Template:     factorybindings.CCIPFactory{},
 	Method:       factorybindings.CCIPFactory{}.DeployRateLimiter,
 	EncodeMethod: encodeDeployRateLimiter,
+})
+
+var DeployRegistryBurnMintTokenPool = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployRegistryBurnMintTokenPool]{
+	Name:         "canton/ccip/factory/deploy_registry_burn_mint_token_pool",
+	Version:      Version,
+	Description:  "Deploys a registry BurnMintTokenPool through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployRegistryBurnMintTokenPool,
+	EncodeMethod: encodeDeployRegistryBurnMintTokenPool,
+})
+
+var DeployRegistryRateLimiter = contract.NewExercise(contract.ExerciseParams[factorybindings.DeployRegistryRateLimiter]{
+	Name:         "canton/ccip/factory/deploy_registry_rate_limiter",
+	Version:      Version,
+	Description:  "Deploys a registry token pool rate limiter through the CCIPFactory",
+	ContractType: ContractType,
+	Template:     factorybindings.CCIPFactory{},
+	Method:       factorybindings.CCIPFactory{}.DeployRegistryRateLimiter,
+	EncodeMethod: encodeDeployRegistryRateLimiter,
 })
 
 func encodeDeployRMNRemote(args factorybindings.DeployRMNRemote) (*bind.EncodedChoice, error) {
@@ -279,6 +309,16 @@ func encodeDeployPerPartyRouterFactory(args factorybindings.DeployPerPartyRouter
 	})
 }
 
+func encodeDeployGlobalTokenSenderReceiver(args factorybindings.DeployGlobalTokenSenderReceiver) (*bind.EncodedChoice, error) {
+	return factoryEncoder.DeployGlobalTokenSenderReceiverParams(factorybindings.DeployGlobalTokenSenderReceiverParams{
+		InstanceId:             args.Contract.InstanceId,
+		RequiredCCVs:           args.Contract.RequiredCCVs,
+		OptionalCCVs:           args.Contract.OptionalCCVs,
+		OptionalThreshold:      args.Contract.OptionalThreshold,
+		ReceiverFinalityConfig: args.Contract.ReceiverFinalityConfig,
+	})
+}
+
 func encodeDeployLockReleaseTokenPool(args factorybindings.DeployLockReleaseTokenPool) (*bind.EncodedChoice, error) {
 	c := args.Contract
 	return factoryEncoder.DeployLockReleaseTokenPoolParams(factorybindings.DeployLockReleaseTokenPoolParams{
@@ -325,6 +365,37 @@ func encodeDeployRateLimiter(args factorybindings.DeployRateLimiter) (*bind.Enco
 		IsEnabled:           c.IsEnabled,
 		Capacity:            c.Capacity,
 		Rate:                c.Rate,
+	})
+}
+
+func encodeDeployRegistryBurnMintTokenPool(args factorybindings.DeployRegistryBurnMintTokenPool) (*bind.EncodedChoice, error) {
+	c := args.Contract
+	return factoryEncoder.DeployRegistryBurnMintTokenPoolParams(factorybindings.DeployRegistryBurnMintTokenPoolParams{
+		InstanceId:         c.InstanceId,
+		InstrumentId:       c.InstrumentId,
+		Decimals:           c.Decimals,
+		RateLimitAdmin:     c.RateLimitAdmin,
+		Observers:          c.Observers,
+		TokenAdminRegistry: c.Deps.TokenAdminRegistry,
+		FeeQuoter:          c.Deps.FeeQuoter,
+		RmnRemote:          c.Deps.RmnRemote,
+		PoolReceiveContext: c.PoolReceiveContext,
+		TransferTimeout:    c.TransferTimeout,
+	})
+}
+
+func encodeDeployRegistryRateLimiter(args factorybindings.DeployRegistryRateLimiter) (*bind.EncodedChoice, error) {
+	c := args.Contract
+	return factoryEncoder.DeployRegistryRateLimiterParams(factorybindings.DeployRegistryRateLimiterParams{
+		InstanceId:          c.InstanceId,
+		PoolInstanceId:      c.PoolInstanceId,
+		RemoteChainSelector: c.RemoteChainSelector,
+		Direction:           c.Direction,
+		Mode:                c.Mode,
+		IsEnabled:           c.IsEnabled,
+		Capacity:            c.Capacity,
+		Rate:                c.Rate,
+		Observers:           c.Observers,
 	})
 }
 

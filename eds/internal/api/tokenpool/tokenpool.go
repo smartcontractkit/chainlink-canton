@@ -46,6 +46,8 @@ type Server struct {
 	logger                 zerolog.Logger
 	activeContractStore    store.ActiveContractStoreInterface
 	instrumentHoldingStore store.InstrumentHoldingStoreInterface
+	// factoryOpts are applied to every disclosure factory this server creates.
+	factoryOpts []factory.Option
 
 	mux             sync.RWMutex
 	contractConfigs map[contracts.InstanceAddress]ContractConfig
@@ -59,11 +61,13 @@ func NewServer(
 	activeContractStore store.ActiveContractStoreInterface,
 	instrumentHoldingStore store.InstrumentHoldingStoreInterface,
 	cfg config.TokenPoolAPIConfig,
+	factoryOpts ...factory.Option,
 ) (*Server, error) {
 	s := &Server{
 		logger:                 logger.With().Str("component", "TokenPoolAPI").Logger(),
 		activeContractStore:    activeContractStore,
 		instrumentHoldingStore: instrumentHoldingStore,
+		factoryOpts:            factoryOpts,
 		contractConfigs:        make(map[contracts.InstanceAddress]ContractConfig),
 	}
 	for _, tokenPool := range cfg.TokenPools {
@@ -90,7 +94,7 @@ func NewServer(
 			// ContractIds, Context, and disclosures from the instrument's TransferFactory.
 			// If not enabled, users will have to get these information from the TransferFactory API themselves.
 			if tokenPool.Factory != nil {
-				disclosureFactory, err := factory.NewTransferFactory(ctx, types.PARTY(tokenPool.PoolOwner), activeContractStore, *tokenPool.Factory)
+				disclosureFactory, err := factory.NewTransferFactory(ctx, types.PARTY(tokenPool.PoolOwner), activeContractStore, *tokenPool.Factory, s.factoryOpts...)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get transfer factory for token pool with address %s: %w", tokenPool.InstanceAddress, err)
 				}
@@ -102,7 +106,7 @@ func NewServer(
 				PartyID:    tokenPool.PartyID,
 			})
 			if tokenPool.Factory != nil {
-				disclosureFactory, err := factory.NewBurnMintFactory(ctx, types.PARTY(tokenPool.PoolOwner), activeContractStore, *tokenPool.Factory)
+				disclosureFactory, err := factory.NewBurnMintFactory(ctx, types.PARTY(tokenPool.PoolOwner), activeContractStore, *tokenPool.Factory, s.factoryOpts...)
 				if err != nil {
 					return nil, fmt.Errorf("failed to get burn mint factory for token pool with address %s: %w", tokenPool.InstanceAddress, err)
 				}
@@ -836,9 +840,9 @@ func (s *Server) RegisterDiscoveredPool(ctx context.Context, poolConfig config.T
 		var err error
 		switch poolConfig.Type {
 		case config.TokenPoolTypeBurnMint:
-			disclosureFactory, err = factory.NewBurnMintFactory(ctx, types.PARTY(poolConfig.PoolOwner), s.activeContractStore, *poolConfig.Factory)
+			disclosureFactory, err = factory.NewBurnMintFactory(ctx, types.PARTY(poolConfig.PoolOwner), s.activeContractStore, *poolConfig.Factory, s.factoryOpts...)
 		case config.TokenPoolTypeLockRelease:
-			disclosureFactory, err = factory.NewTransferFactory(ctx, types.PARTY(poolConfig.PoolOwner), s.activeContractStore, *poolConfig.Factory)
+			disclosureFactory, err = factory.NewTransferFactory(ctx, types.PARTY(poolConfig.PoolOwner), s.activeContractStore, *poolConfig.Factory, s.factoryOpts...)
 		}
 		if err != nil {
 			return fmt.Errorf("failed to get %s factory for token pool with address %s: %w", poolConfig.Type, poolConfig.InstanceAddress, err)

@@ -158,6 +158,15 @@ func main() {
 				"RateLimitMode_DefaultFinality": 0x00,
 				"RateLimitMode_CustomFinality":  0x01,
 			},
+			// Tags match decodeRegistryRateLimitDirectionAt and decodeRegistryRateLimitModeAt in FactoryV2.daml.
+			"CCIP.Registry.RateLimiterV2.RateLimitDirection": {
+				"RateLimitDirection_Outbound": 0x00,
+				"RateLimitDirection_Inbound":  0x01,
+			},
+			"CCIP.Registry.RateLimiterV2.RateLimitMode": {
+				"RateLimitMode_DefaultFinality": 0x00,
+				"RateLimitMode_CustomFinality":  0x01,
+			},
 		},
 		// Dispatcher operationData payloads decoded by MCMS.Main.ExecuteOp.
 		ChoiceParamEncoderNames: map[string]bool{
