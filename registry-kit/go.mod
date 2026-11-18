@@ -211,7 +211,7 @@ require (
 	github.com/smartcontractkit/chainlink-canton/authentication v1.2.0 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20261028235024-46426ab19422 // indirect
-	github.com/smartcontractkit/chainlink-common v0.11.2-0.20261117180805-a2fb88ff3710 // indirect
+	github.com/smartcontractkit/chainlink-common v0.11.2-ccip2.58.1 // indirect
 	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.11-0.20261106154152-9426766b30a9 // indirect
 	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20261103151748-aa8c64acc53c // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0 // indirect
