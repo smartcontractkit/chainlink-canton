@@ -174,7 +174,7 @@ build-run-e2e-tests: start-devenv run-e2e-tests
 
 .PHONY: mocks
 mocks:
-	go run github.com/vektra/mockery/v3@v3.8.1
+	go run github.com/vektra/mockery/v3@v3.9.0
 
 .PHONY: git-generated-merge-config
 git-generated-merge-config:

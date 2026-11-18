@@ -6,8 +6,6 @@ replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../../contr
 
 replace github.com/smartcontractkit/chainlink-canton/party-ceremony => ../
 
-replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
-
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.3
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
