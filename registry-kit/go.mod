@@ -1,6 +1,6 @@
 module github.com/smartcontractkit/chainlink-canton/registry-kit
 
-go 1.27.1
+go 1.27.3
 
 replace github.com/smartcontractkit/chainlink-canton => ../
 
@@ -8,15 +8,12 @@ replace github.com/smartcontractkit/chainlink-canton/contracts/v2 => ../contract
 
 replace github.com/smartcontractkit/chainlink-canton/eds => ../eds
 
-// Coming from chainlink-deployments-framework
-replace github.com/fbsobreira/gotron-sdk => github.com/smartcontractkit/chainlink-tron/relayer/gotron-sdk v0.0.5-0.20251014120029-d73d15cc23f7
-
 require (
 	github.com/digital-asset/dazl-client/v8 v8.9.0
 	github.com/google/uuid v1.6.0
 	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.1
-	github.com/smartcontractkit/chainlink-deployments-framework v0.127.1
+	github.com/smartcontractkit/chainlink-deployments-framework v0.129.1
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 )
 
@@ -214,9 +211,9 @@ require (
 	github.com/smartcontractkit/chainlink-canton/authentication v1.2.0 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana v0.0.0-20260129103204-4c8453dd8139 // indirect
 	github.com/smartcontractkit/chainlink-ccip/chains/solana/gobindings v0.0.0-20261028235024-46426ab19422 // indirect
-	github.com/smartcontractkit/chainlink-common v0.11.2-ccip2.58.1 // indirect
-	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.11-0.20260915184316-2730f1867c92 // indirect
-	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20260916140808-f5d22b3cb3ee // indirect
+	github.com/smartcontractkit/chainlink-common v0.11.2-0.20261117180805-a2fb88ff3710 // indirect
+	github.com/smartcontractkit/chainlink-common/pkg/chipingress v0.0.11-0.20261106154152-9426766b30a9 // indirect
+	github.com/smartcontractkit/chainlink-protos/cre/go v0.0.0-20261103151748-aa8c64acc53c // indirect
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0 // indirect
 	github.com/smartcontractkit/chainlink-protos/linking-service/go v0.0.0-20260512230622-65f10f4cd305 // indirect
 	github.com/smartcontractkit/chainlink-protos/metering/go v0.0.0-20260710151514-27b5a126dabe // indirect
