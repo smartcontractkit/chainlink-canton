@@ -63,9 +63,15 @@ func main() {
 		if err != nil {
 			log.Fatal().Err(err).Str("package", string(p)).Msg("Failed to get main package ID from DAR")
 		}
+		// Nested dirs (ccip/registry/burnminttokenpool) share a leaf with ccip/burnminttokenpool,
+		// and the factory imports both.
+		alias := s[len(s)-1]
+		if len(s) > 2 {
+			alias = strings.Join(s[1:], "")
+		}
 		externalPackage := model.ExternalPackage{
 			Import: fmt.Sprintf("%s/%s", *basePath, strings.Join(s, "/")),
-			Alias:  s[len(s)-1],
+			Alias:  alias,
 		}
 		log.Debug().Str("packageId", packageId).Str("alias", externalPackage.Alias).Str("import", externalPackage.Import).Msg("Collected external package information")
 		externalPackages.Packages[packageId] = externalPackage
@@ -126,6 +132,12 @@ func main() {
 				"Indefinite":    0x00,
 				"RelativeHours": 0x01,
 			},
+			// Tags must match decodeTransferTimeoutAt in
+			// contracts/ccip/registry-pools/burn-mint-token-pool/daml/CCIP/Registry/BurnMintTokenPoolV2CodecGen.daml.
+			"CCIP.Registry.BurnMintTokenPoolV2Types.TransferTimeout": {
+				"Indefinite":    0x00,
+				"RelativeHours": 0x01,
+			},
 			// Tags must match encode/decode in contracts/ccip/codec/daml/CCIP/CodecV2/FinalityConfig.daml.
 			"CCIP.CodecV2.FinalityConfig.FinalityConfig": {
 				"WaitForFinality": 0x00,
@@ -143,6 +155,15 @@ func main() {
 			},
 			// Tags match decodeRateLimitModeAt in contracts/ccip/factory/daml/CCIP/FactoryV2.daml.
 			"CCIP.RateLimiterV2.RateLimitMode": {
+				"RateLimitMode_DefaultFinality": 0x00,
+				"RateLimitMode_CustomFinality":  0x01,
+			},
+			// Tags match decodeRegistryRateLimitDirectionAt and decodeRegistryRateLimitModeAt in FactoryV2.daml.
+			"CCIP.Registry.RateLimiterV2.RateLimitDirection": {
+				"RateLimitDirection_Outbound": 0x00,
+				"RateLimitDirection_Inbound":  0x01,
+			},
+			"CCIP.Registry.RateLimiterV2.RateLimitMode": {
 				"RateLimitMode_DefaultFinality": 0x00,
 				"RateLimitMode_CustomFinality":  0x01,
 			},

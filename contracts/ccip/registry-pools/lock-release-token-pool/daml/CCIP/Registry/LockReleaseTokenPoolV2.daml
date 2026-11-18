@@ -53,6 +53,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2CodecGen (
     decodeSetRateLimitConfigParamsAt,
     decodeSetTransferTimeoutParamsAt,
     decodeSetPoolReceiveMetadataParamsAt,
+    decodeSetPoolReleaseMetadataParamsAt,
     decodeAddPoolReceiveContextNonContractValueParamsAt,
     decodeAddPoolReceiveContextContractValueParamsAt,
     decodeRemovePoolReceiveContextValueParamsAt,
@@ -73,6 +74,7 @@ import CCIP.Registry.LockReleaseTokenPoolV2Types (
     SetRateLimitConfigParams(..),
     SetTransferTimeoutParams(..),
     SetPoolReceiveMetadataParams(..),
+    SetPoolReleaseMetadataParams(..),
     AddPoolReceiveContextNonContractValueParams(..),
     AddPoolReceiveContextContractValueParams(..),
     RemovePoolReceiveContextValueParams(..),
@@ -323,6 +325,10 @@ template LockReleaseTokenPool
         -- Timeout for pending TransferInstructions created by this pool.
         transferTimeout : TransferTimeout
         deps : LockReleaseTokenPoolDeps
+        -- Metadata passed on the pool's own release transfers (ReleaseFromTicket), e.g. the sender
+        -- account id that keeps the pool's change labelled for DA's holdings disclosure API.
+        -- Optional and last, so adding it is a valid package upgrade (None = empty metadata).
+        poolReleaseMetadata : Optional Splice.Api.Token.MetadataV1.Metadata
     where
         signatory poolOwner
         observer optional [] pure rateLimitAdmin <> observers
@@ -534,6 +540,15 @@ template LockReleaseTokenPool
                 lanes : [LaneDeploySpec]
             controller poolOwner, admin
             do
+                -- Bind the registry argument to the configured address, as the runtime
+                -- choices do: a pool registered on any other registry is unusable.
+                tokenAdminRegistryView <- exercise tokenAdminRegistryCid CCIP.APIV2.TokenAdminRegistry.TokenAdminRegistry_PublicFetch with
+                        expectedAddress = deps.tokenAdminRegistry
+                        context = Splice.Api.Token.MetadataV1.emptyChoiceContext
+                        caller = admin
+                Chainlink.InstanceAddress.assertEqual "Initialize: tokenAdminRegistry mismatch"
+                    tokenAdminRegistryView.instanceId tokenAdminRegistryView.ccipOwner deps.tokenAdminRegistry
+
                 acceptedTokenConfigCid <- case existingTokenConfigCid of
                     -- Already registered with this admin accepted: validate + reuse.
                     -- ProposeAdministrator requires proposal authority (issuer or
@@ -748,6 +763,13 @@ template LockReleaseTokenPool
                 metadata : Splice.Api.Token.MetadataV1.Metadata
             controller poolOwner
             do create this with poolReceiveMetadata = metadata
+
+        -- Set the metadata passed on release transfers — see poolReleaseMetadata.
+        choice SetPoolReleaseMetadata : ContractId LockReleaseTokenPool
+            with
+                metadata : Splice.Api.Token.MetadataV1.Metadata
+            controller poolOwner
+            do create this with poolReleaseMetadata = Some metadata
 
         -- Set the transfer timeout for pending TransferInstructions.
         -- Use Indefinite for tokens without expiry, RelativeHours for tokens with expiry constraints.
@@ -1034,7 +1056,9 @@ template LockReleaseTokenPool
                         requestedAt = now
                         executeBefore
                         inputHoldingCids = tokenPoolHoldings
-                        meta = Splice.Api.Token.MetadataV1.emptyMetadata
+                        -- Pool-configured (see poolReleaseMetadata), e.g. the sender label that
+                        -- keeps the pool's change visible to the DA bridge.
+                        meta = fromOptional Splice.Api.Token.MetadataV1.emptyMetadata poolReleaseMetadata
 
                 transferResult <- exercise transferFactory
                     Splice.Api.Token.TransferInstructionV1.TransferFactory_Transfer with
@@ -1548,6 +1572,15 @@ template LockReleaseTokenPool
                         Some (SetPoolReceiveMetadataParams{..}, finalOffset) -> do
                             assertMsg "E_TRAILING_BYTES: SetPoolReceiveMetadata" (finalOffset == byteCount operationData)
                             newCid <- exercise selfCid SetPoolReceiveMetadata with
+                                metadata = Splice.Api.Token.MetadataV1.Metadata with
+                                    values = TextMap.fromList (map (\e -> (e.key, e.value)) metadataEntries)
+                            pure (Map.insert instAddr (coerceContractId newCid) contractIds)
+                "SetPoolReleaseMetadata" -> do
+                    case decodeSetPoolReleaseMetadataParamsAt operationData 0 of
+                        None -> abort "E_INVALID_PARAMS: SetPoolReleaseMetadata"
+                        Some (SetPoolReleaseMetadataParams{..}, finalOffset) -> do
+                            assertMsg "E_TRAILING_BYTES: SetPoolReleaseMetadata" (finalOffset == byteCount operationData)
+                            newCid <- exercise selfCid SetPoolReleaseMetadata with
                                 metadata = Splice.Api.Token.MetadataV1.Metadata with
                                     values = TextMap.fromList (map (\e -> (e.key, e.value)) metadataEntries)
                             pure (Map.insert instAddr (coerceContractId newCid) contractIds)

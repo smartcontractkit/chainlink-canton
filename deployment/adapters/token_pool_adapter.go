@@ -19,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/burnminttokenpool"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/lockreleasetokenpool"
+	registrybnm "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/registry/burnminttokenpool"
 	cantonsequences "github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	opcontract "github.com/smartcontractkit/chainlink-canton/deployment/utils/operations/contract"
 )
@@ -146,6 +147,24 @@ func (c CantonTokenAdapter) deriveTokenPoolDecimalsFromLedger(
 		parsedPool, err := bindings.UnmarshalCreatedEvent[burnminttokenpool.BurnMintTokenPool](activePool.GetCreatedEvent())
 		if err != nil {
 			return 0, fmt.Errorf("parse active burn/mint pool %s: %w", poolAddressHex, err)
+		}
+
+		//nolint:gosec // Decimals should never exceed uint8
+		return uint8(parsedPool.Decimals), nil
+	case datastore.ContractType("RegistryBurnMintTokenPool"):
+		activePool, err := opcontract.FindActiveContractByInstanceAddress(
+			ctx,
+			participant.LedgerServices.State,
+			queryParties,
+			registrybnm.BurnMintTokenPool{}.GetTemplateID(),
+			poolAddress,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("find active registry burn/mint pool %s: %w", poolAddressHex, err)
+		}
+		parsedPool, err := bindings.UnmarshalCreatedEvent[registrybnm.BurnMintTokenPool](activePool.GetCreatedEvent())
+		if err != nil {
+			return 0, fmt.Errorf("parse active registry burn/mint pool %s: %w", poolAddressHex, err)
 		}
 
 		//nolint:gosec // Decimals should never exceed uint8
