@@ -38,7 +38,7 @@ jobs:
       AWS_ROLE_PUBLISH_ARN: ${{ secrets.CANTON_IAM_ROLE_SDLC_EDS }}
 
   publish-npm-bindings:
-    name: Publish @chainlink/chainlink-canton-contracts to npm
+    name: Publish @chainlink/canton-contracts to npm
     # Publishes the generated TypeScript bindings for contracts/ release tags.
     # Publishing is opt-in until the npm side is fully rolled out: enable by
     # setting the NPM_PUBLISH_ENABLED repository variable to 'true' and

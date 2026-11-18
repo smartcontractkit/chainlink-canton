@@ -6,20 +6,20 @@
 import * as jtv from '@mojotech/json-type-validation';
 import * as damlTypes from '@daml/types';
 
-import * as pkg0ad9d7694de68cd774fe399999722cf5fd8c514066125261e21b42431cfc962e from '@chainlink/chainlink-canton-contracts/ccip-committee-verifier-v2-2.0.0';
-import * as pkg4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f from '@chainlink/chainlink-canton-contracts/splice-api-token-metadata-v1-1.0.0';
-import * as pkg62e9c12c62db5de2138722340d7ff597f9a07678aeba1e1fbf9ad121a9e89d40 from '@chainlink/chainlink-canton-contracts/ccip-rate-limiter-v2-2.0.0';
-import * as pkg674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240 from '@chainlink/chainlink-canton-contracts/mcms-api-1.0.0';
-import * as pkg6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb from '@chainlink/chainlink-canton-contracts/ccip-codec-v2-2.0.0';
-import * as pkg718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b from '@chainlink/chainlink-canton-contracts/splice-api-token-holding-v1-1.0.0';
-import * as pkg7a9aef5d7e6c613c2c57365e732554f049e66f96a6f1d29ca190f5d767580a5a from '@chainlink/chainlink-canton-contracts/ccip-lock-release-token-pool-v2-2.1.0';
-import * as pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 from '@chainlink/chainlink-canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0';
-import * as pkgb43a9896a3d6753fa23d25f42b6021a20984d807ca73f0dc08be71b582451e1c from '@chainlink/chainlink-canton-contracts/ccip-runtime-v2-2.1.0';
-import * as pkgb9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8 from '@chainlink/chainlink-canton-contracts/chainlink-api-2.0.0';
-import * as pkgd76abab3fd465d7ae412818f9caab6b8a0de61128bd7db0464d65987e456a323 from '@chainlink/chainlink-canton-contracts/ccip-core-v2-2.1.0';
-import * as pkgf0fa05643b29b791f7928bcfb91f7bbf6c33622e91859fc3ef69c85482b4a688 from '@chainlink/chainlink-canton-contracts/ccip-executor-v2-2.0.0';
-import * as pkgf83b5db150d68564a63d9a5760a8a49323424f58ebbea0e089fe79643a8f29c2 from '@chainlink/chainlink-canton-contracts/link-2.0.0';
-import * as pkgfad3d7f03cafedfa5060726d0981d9edd1aa91ebd2e120a2fe3b8b7e9fbf49c3 from '@chainlink/chainlink-canton-contracts/ccip-burn-mint-token-pool-v2-2.1.0';
+import * as pkg0ad9d7694de68cd774fe399999722cf5fd8c514066125261e21b42431cfc962e from '@chainlink/canton-contracts/ccip-committee-verifier-v2-2.0.0';
+import * as pkg4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f from '@chainlink/canton-contracts/splice-api-token-metadata-v1-1.0.0';
+import * as pkg62e9c12c62db5de2138722340d7ff597f9a07678aeba1e1fbf9ad121a9e89d40 from '@chainlink/canton-contracts/ccip-rate-limiter-v2-2.0.0';
+import * as pkg674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240 from '@chainlink/canton-contracts/mcms-api-1.0.0';
+import * as pkg6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb from '@chainlink/canton-contracts/ccip-codec-v2-2.0.0';
+import * as pkg718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b from '@chainlink/canton-contracts/splice-api-token-holding-v1-1.0.0';
+import * as pkg7a9aef5d7e6c613c2c57365e732554f049e66f96a6f1d29ca190f5d767580a5a from '@chainlink/canton-contracts/ccip-lock-release-token-pool-v2-2.1.0';
+import * as pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 from '@chainlink/canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0';
+import * as pkgb43a9896a3d6753fa23d25f42b6021a20984d807ca73f0dc08be71b582451e1c from '@chainlink/canton-contracts/ccip-runtime-v2-2.1.0';
+import * as pkgb9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8 from '@chainlink/canton-contracts/chainlink-api-2.0.0';
+import * as pkgd76abab3fd465d7ae412818f9caab6b8a0de61128bd7db0464d65987e456a323 from '@chainlink/canton-contracts/ccip-core-v2-2.1.0';
+import * as pkgf0fa05643b29b791f7928bcfb91f7bbf6c33622e91859fc3ef69c85482b4a688 from '@chainlink/canton-contracts/ccip-executor-v2-2.0.0';
+import * as pkgf83b5db150d68564a63d9a5760a8a49323424f58ebbea0e089fe79643a8f29c2 from '@chainlink/canton-contracts/link-2.0.0';
+import * as pkgfad3d7f03cafedfa5060726d0981d9edd1aa91ebd2e120a2fe3b8b7e9fbf49c3 from '@chainlink/canton-contracts/ccip-burn-mint-token-pool-v2-2.1.0';
 
 export declare type CCIPFactory = {
   instanceId: string,

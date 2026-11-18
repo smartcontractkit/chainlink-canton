@@ -11,9 +11,9 @@ var jtv = require('@mojotech/json-type-validation');
 /* eslint-disable-next-line no-unused-vars */
 var damlTypes = require('@daml/types');
 
-var pkg674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240 = require('@chainlink/chainlink-canton-contracts/mcms-api-1.0.0');
-var pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 = require('@chainlink/chainlink-canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0');
-var pkgb70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946 = require('@chainlink/chainlink-canton-contracts/daml-stdlib-DA-Time-Types-1.0.0');
+var pkg674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240 = require('@chainlink/canton-contracts/mcms-api-1.0.0');
+var pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 = require('@chainlink/canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0');
+var pkgb70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946 = require('@chainlink/canton-contracts/daml-stdlib-DA-Time-Types-1.0.0');
 
 exports.CanExecuteOp = {
   decoder: damlTypes.lazyMemo(function () {

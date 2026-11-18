@@ -11,13 +11,13 @@ var jtv = require('@mojotech/json-type-validation');
 /* eslint-disable-next-line no-unused-vars */
 var damlTypes = require('@daml/types');
 
-var pkg506234a38fffe1945e3b5ff3a5e444a237fa9592b249b0f7444c194207df2c2d = require('@chainlink/chainlink-canton-contracts/ccip-tickets-v2-2.0.0');
-var pkg674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240 = require('@chainlink/chainlink-canton-contracts/mcms-api-1.0.0');
-var pkg6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb = require('@chainlink/chainlink-canton-contracts/ccip-codec-v2-2.0.0');
-var pkg7f6d5a64b55cc88008c9664d166ffa8eee2998e17425106ea1b036baeed85924 = require('@chainlink/chainlink-canton-contracts/ccip-core-v2-2.0.0');
-var pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 = require('@chainlink/chainlink-canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0');
-var pkgb9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8 = require('@chainlink/chainlink-canton-contracts/chainlink-api-2.0.0');
-var pkgbfe1045f369796e1f8320e3c3d3b43142009ce1e8a6773b57b12f49c357c2f3f = require('@chainlink/chainlink-canton-contracts/ccip-events-v2-2.0.0');
+var pkg506234a38fffe1945e3b5ff3a5e444a237fa9592b249b0f7444c194207df2c2d = require('@chainlink/canton-contracts/ccip-tickets-v2-2.0.0');
+var pkg674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240 = require('@chainlink/canton-contracts/mcms-api-1.0.0');
+var pkg6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb = require('@chainlink/canton-contracts/ccip-codec-v2-2.0.0');
+var pkg7f6d5a64b55cc88008c9664d166ffa8eee2998e17425106ea1b036baeed85924 = require('@chainlink/canton-contracts/ccip-core-v2-2.0.0');
+var pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 = require('@chainlink/canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0');
+var pkgb9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8 = require('@chainlink/canton-contracts/chainlink-api-2.0.0');
+var pkgbfe1045f369796e1f8320e3c3d3b43142009ce1e8a6773b57b12f49c357c2f3f = require('@chainlink/canton-contracts/ccip-events-v2-2.0.0');
 
 var CCIP_RuntimeV2_OffRampTypes = require('../../../CCIP/RuntimeV2/OffRampTypes/module');
 

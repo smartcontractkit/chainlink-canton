@@ -11,12 +11,12 @@ var jtv = require('@mojotech/json-type-validation');
 /* eslint-disable-next-line no-unused-vars */
 var damlTypes = require('@daml/types');
 
-var pkg4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f = require('@chainlink/chainlink-canton-contracts/splice-api-token-metadata-v1-1.0.0');
-var pkg55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281 = require('@chainlink/chainlink-canton-contracts/splice-api-token-transfer-instruction-v1-1.0.0');
-var pkg718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b = require('@chainlink/chainlink-canton-contracts/splice-api-token-holding-v1-1.0.0');
-var pkg7fffaf108129d37413d8edfbd91ffe373051b2cb0621c26e245093c6138daf58 = require('@chainlink/chainlink-canton-contracts/ccip-api-v2-2.0.0');
-var pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 = require('@chainlink/chainlink-canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0');
-var pkgb9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8 = require('@chainlink/chainlink-canton-contracts/chainlink-api-2.0.0');
+var pkg4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f = require('@chainlink/canton-contracts/splice-api-token-metadata-v1-1.0.0');
+var pkg55ba4deb0ad4662c4168b39859738a0e91388d252286480c7331b3f71a517281 = require('@chainlink/canton-contracts/splice-api-token-transfer-instruction-v1-1.0.0');
+var pkg718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b = require('@chainlink/canton-contracts/splice-api-token-holding-v1-1.0.0');
+var pkg7fffaf108129d37413d8edfbd91ffe373051b2cb0621c26e245093c6138daf58 = require('@chainlink/canton-contracts/ccip-api-v2-2.0.0');
+var pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 = require('@chainlink/canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0');
+var pkgb9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8 = require('@chainlink/canton-contracts/chainlink-api-2.0.0');
 
 exports.ITokenPool = damlTypes.assembleInterface(
   '#ccip-extension-api-v2:CCIP.InterfacesV2.TokenPool:ITokenPool',

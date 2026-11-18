@@ -11,7 +11,7 @@ var jtv = require('@mojotech/json-type-validation');
 /* eslint-disable-next-line no-unused-vars */
 var damlTypes = require('@daml/types');
 
-var pkgbde4bd30749e99603e5afa354706608601029e225d4983324d617825b634253a = require('@chainlink/chainlink-canton-contracts/daml-stdlib-DA-NonEmpty-Types-1.0.0');
+var pkgbde4bd30749e99603e5afa354706608601029e225d4983324d617825b634253a = require('@chainlink/canton-contracts/daml-stdlib-DA-NonEmpty-Types-1.0.0');
 
 exports.Validation = function (errs, a) {
   return ({

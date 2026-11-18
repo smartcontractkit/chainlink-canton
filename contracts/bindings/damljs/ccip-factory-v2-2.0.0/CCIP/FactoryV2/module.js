@@ -11,20 +11,20 @@ var jtv = require('@mojotech/json-type-validation');
 /* eslint-disable-next-line no-unused-vars */
 var damlTypes = require('@daml/types');
 
-var pkg0ad9d7694de68cd774fe399999722cf5fd8c514066125261e21b42431cfc962e = require('@chainlink/chainlink-canton-contracts/ccip-committee-verifier-v2-2.0.0');
-var pkg2235ebbb5f722d88a0e21aba9ced9abd0b637762768b8d38e17a4777fb8a3238 = require('@chainlink/chainlink-canton-contracts/ccip-runtime-v2-2.0.0');
-var pkg4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f = require('@chainlink/chainlink-canton-contracts/splice-api-token-metadata-v1-1.0.0');
-var pkg62e9c12c62db5de2138722340d7ff597f9a07678aeba1e1fbf9ad121a9e89d40 = require('@chainlink/chainlink-canton-contracts/ccip-rate-limiter-v2-2.0.0');
-var pkg674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240 = require('@chainlink/chainlink-canton-contracts/mcms-api-1.0.0');
-var pkg6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb = require('@chainlink/chainlink-canton-contracts/ccip-codec-v2-2.0.0');
-var pkg718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b = require('@chainlink/chainlink-canton-contracts/splice-api-token-holding-v1-1.0.0');
-var pkg7f6d5a64b55cc88008c9664d166ffa8eee2998e17425106ea1b036baeed85924 = require('@chainlink/chainlink-canton-contracts/ccip-core-v2-2.0.0');
-var pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 = require('@chainlink/chainlink-canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0');
-var pkgb44e4259b6a243cdff7303f4ce28ce631d2e852dcf2837eba240d3c584cd9399 = require('@chainlink/chainlink-canton-contracts/ccip-burn-mint-token-pool-v2-2.0.0');
-var pkgb9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8 = require('@chainlink/chainlink-canton-contracts/chainlink-api-2.0.0');
-var pkgf0a7abce686b27e23ce7017b3b2159f7d7ecda430d101161fc5f10c67d5ac6d6 = require('@chainlink/chainlink-canton-contracts/ccip-lock-release-token-pool-v2-2.0.0');
-var pkgf0fa05643b29b791f7928bcfb91f7bbf6c33622e91859fc3ef69c85482b4a688 = require('@chainlink/chainlink-canton-contracts/ccip-executor-v2-2.0.0');
-var pkgf83b5db150d68564a63d9a5760a8a49323424f58ebbea0e089fe79643a8f29c2 = require('@chainlink/chainlink-canton-contracts/link-2.0.0');
+var pkg0ad9d7694de68cd774fe399999722cf5fd8c514066125261e21b42431cfc962e = require('@chainlink/canton-contracts/ccip-committee-verifier-v2-2.0.0');
+var pkg2235ebbb5f722d88a0e21aba9ced9abd0b637762768b8d38e17a4777fb8a3238 = require('@chainlink/canton-contracts/ccip-runtime-v2-2.0.0');
+var pkg4ded6b668cb3b64f7a88a30874cd41c75829f5e064b3fbbadf41ec7e8363354f = require('@chainlink/canton-contracts/splice-api-token-metadata-v1-1.0.0');
+var pkg62e9c12c62db5de2138722340d7ff597f9a07678aeba1e1fbf9ad121a9e89d40 = require('@chainlink/canton-contracts/ccip-rate-limiter-v2-2.0.0');
+var pkg674d8f60de56afd32698ae19516260217c73dd9ed082680fa840ede4b7665240 = require('@chainlink/canton-contracts/mcms-api-1.0.0');
+var pkg6feabd6c3535eaaa23c820efbdaed64e15d733bdbfc292b88225888162774cfb = require('@chainlink/canton-contracts/ccip-codec-v2-2.0.0');
+var pkg718a0f77e505a8de22f188bd4c87fe74101274e9d4cb1bfac7d09aec7158d35b = require('@chainlink/canton-contracts/splice-api-token-holding-v1-1.0.0');
+var pkg7f6d5a64b55cc88008c9664d166ffa8eee2998e17425106ea1b036baeed85924 = require('@chainlink/canton-contracts/ccip-core-v2-2.0.0');
+var pkg9e70a8b3510d617f8a136213f33d6a903a10ca0eeec76bb06ba55d1ed9680f69 = require('@chainlink/canton-contracts/ghc-stdlib-DA-Internal-Template-1.0.0');
+var pkgb44e4259b6a243cdff7303f4ce28ce631d2e852dcf2837eba240d3c584cd9399 = require('@chainlink/canton-contracts/ccip-burn-mint-token-pool-v2-2.0.0');
+var pkgb9f630bb75179b06f350030282a2276259016da59ba60677b3a8280d854dc2d8 = require('@chainlink/canton-contracts/chainlink-api-2.0.0');
+var pkgf0a7abce686b27e23ce7017b3b2159f7d7ecda430d101161fc5f10c67d5ac6d6 = require('@chainlink/canton-contracts/ccip-lock-release-token-pool-v2-2.0.0');
+var pkgf0fa05643b29b791f7928bcfb91f7bbf6c33622e91859fc3ef69c85482b4a688 = require('@chainlink/canton-contracts/ccip-executor-v2-2.0.0');
+var pkgf83b5db150d68564a63d9a5760a8a49323424f58ebbea0e089fe79643a8f29c2 = require('@chainlink/canton-contracts/link-2.0.0');
 
 exports.CCIPFactory = damlTypes.assembleTemplate(
   {

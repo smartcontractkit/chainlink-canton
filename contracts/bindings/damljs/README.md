@@ -1,4 +1,4 @@
-# @chainlink/chainlink-canton-contracts
+# @chainlink/canton-contracts
 
 Official TypeScript bindings for the [Chainlink Canton contracts](https://github.com/smartcontractkit/chainlink-canton), generated with `dpm codegen-js` from the released DARs in [`contracts/dars/released`](../../dars/released).
 
@@ -10,14 +10,14 @@ Publishing runs on every `contracts/vX.Y.Z` tag in the [`release-publish` workfl
 
 Activation checklist:
 
-1. Configure npm trusted publishing for `@chainlink/chainlink-canton-contracts` (workflow `release-publish.yaml`, job `publish-npm-bindings`, environment `publish`).
+1. Configure npm trusted publishing for `@chainlink/canton-contracts` (workflow `release-publish.yaml`, job `publish-npm-bindings`, environment `publish`).
 2. Ensure the `publish` GitHub environment exists in this repository.
 3. Set the `NPM_PUBLISH_ENABLED` repository variable to `true`.
 
 ## Installation
 
 ```bash
-npm install @chainlink/chainlink-canton-contracts
+npm install @chainlink/canton-contracts
 ```
 
 ## Usage
@@ -25,19 +25,19 @@ npm install @chainlink/chainlink-canton-contracts
 The package contains one directory per Daml package, named `<package>-<package version>`. Import the bindings for a Daml package as a deep import:
 
 ```ts
-import { CCIP } from '@chainlink/chainlink-canton-contracts/ccip-api-v2-2.0.0';
+import { CCIP } from '@chainlink/canton-contracts/ccip-api-v2-2.0.0';
 ```
 
 or in CommonJS:
 
 ```js
-const { CCIP } = require('@chainlink/chainlink-canton-contracts/ccip-api-v2-2.0.0');
+const { CCIP } = require('@chainlink/canton-contracts/ccip-api-v2-2.0.0');
 ```
 
 A convenience barrel re-exporting every package is available at the package root:
 
 ```js
-const bindings = require('@chainlink/chainlink-canton-contracts');
+const bindings = require('@chainlink/canton-contracts');
 bindings['ccip-api-v2-2.0.0'].packageId;
 ```
 

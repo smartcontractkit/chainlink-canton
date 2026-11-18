@@ -12,7 +12,7 @@ generate-bindings:
 	cd ./contracts && go run ./cmd/bindings
 
 .PHONY: generate-bindings-js
-generate-bindings-js: ## Regenerate the @chainlink/chainlink-canton-contracts TypeScript bindings package (requires dpm).
+generate-bindings-js: ## Regenerate the @chainlink/canton-contracts TypeScript bindings package (requires dpm).
 	cd ./contracts && go run ./cmd/genbindingsjs
 
 .PHONY: inspect-dars

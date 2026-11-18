@@ -1,15 +1,15 @@
 // Command genbindingsjs generates the TypeScript bindings npm package
-// @chainlink/chainlink-canton-contracts from the released DARs.
+// @chainlink/canton-contracts from the released DARs.
 //
 // It runs `dpm codegen-js` over contracts/dars/released/*.dar with the npm
 // scope set to the package name, so the generated cross-package imports
-// (require('@chainlink/chainlink-canton-contracts/<package>')) resolve as
+// (require('@chainlink/canton-contracts/<package>')) resolve as
 // deep imports of the single published package. The codegen output is then
 // post-processed into the output directory (by default bindings/damljs):
 //
 //   - each generated package's lib/ contents are copied to <out>/<package>/
 //     (flattened one level); the per-package package.json/tsconfig.json stubs
-//     are dropped in favour of a single root package.json
+//     are dropped in favor of a single root package.json
 //   - the root package.json is (re)written: the version comes from the
 //     release-please manifest (contracts component) so the package stays in
 //     lockstep with contracts/vX.X.X releases, and the dependency/peer
@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	npmScope    = "chainlink/chainlink-canton-contracts"
+	npmScope    = "chainlink/canton-contracts"
 	packageName = "@" + npmScope
 
 	// releaseComponent is the release-please component whose version the
