@@ -1,7 +1,8 @@
 sdk-version: 3.4.11
 name: ccip-registry-lock-release-token-pool-v2
 source: daml
-version: 2.0.0
+version: 2.0.1
+# 2.0.1 upgrades 2.0.0: adds the optional poolReleaseMetadata field + SetPoolReleaseMetadata.
 # Fresh lineage: 2.0.0 decouples Initialize from ccip-core (choice-signature
 # change via the APIV2 TokenAdminRegistry interface), so it cannot upgrade the
 # released 1.0.0 artifacts — they are superseded, not upgraded.
