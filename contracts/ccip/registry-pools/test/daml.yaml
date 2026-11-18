@@ -20,7 +20,7 @@ data-dependencies:
   - ../../core/.daml/dist/ccip-core-v2-2.1.1.dar
 
   - ../rate-limiter/.daml/dist/ccip-registry-rate-limiter-v2-2.0.0.dar
-  - ../lock-release-token-pool/.daml/dist/ccip-registry-lock-release-token-pool-v2-2.0.0.dar
+  - ../lock-release-token-pool/.daml/dist/ccip-registry-lock-release-token-pool-v2-2.0.1.dar
   - ../burn-mint-token-pool/.daml/dist/ccip-registry-burn-mint-token-pool-v2-2.0.0.dar
 dependencies:
   - daml-prim
