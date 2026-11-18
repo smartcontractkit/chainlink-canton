@@ -14,11 +14,13 @@ packages:
   - mcms/test/globalconfig-v1-upgraded
 
   - ccip/api
+  - ccip/user
   - ccip/client-api
   - ccip/codec
   - ccip/core
   - ccip/extension-api
   - ccip/events
+  - ccip/global-token-sender-receiver
   - ccip/runtime
   - ccip/sender
   - ccip/receiver

@@ -25,6 +25,11 @@ type EDSMetrics struct {
 	storeUpdatesCounter     metric.Int64Counter
 	storeReconnectsCounter  metric.Int64Counter
 	storeLedgerEndGauge     metric.Int64Gauge
+
+	// DA dependency metrics
+	daRequestsCounter  metric.Int64Counter
+	daUpGauge          metric.Int64Gauge
+	daRequestDurations metric.Float64Histogram
 }
 
 func InitMetrics() (*EDSMetrics, error) {
@@ -80,6 +85,31 @@ func InitMetrics() (*EDSMetrics, error) {
 		return nil, fmt.Errorf("failed to create eds_store_ledger_end: %w", err)
 	}
 
+	m.daRequestsCounter, err = beholder.GetMeter().Int64Counter(
+		"eds_da_requests_total",
+		metric.WithDescription("Total number of outgoing requests to DA endpoints, by operation and result (success/failure)"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create eds_da_requests_total: %w", err)
+	}
+
+	m.daUpGauge, err = beholder.GetMeter().Int64Gauge(
+		"eds_da_up",
+		metric.WithDescription("Result of the latest request to a DA endpoint: 1 if it succeeded, 0 if it failed. Only updated when EDS makes a request, so it carries no information while there is no traffic."),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create eds_da_up: %w", err)
+	}
+
+	m.daRequestDurations, err = beholder.GetMeter().Float64Histogram(
+		"eds_da_request_duration_seconds",
+		metric.WithDescription("Duration of outgoing requests to DA endpoints"),
+		metric.WithUnit("seconds"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create eds_da_request_duration_seconds: %w", err)
+	}
+
 	return m, nil
 }
 
@@ -89,6 +119,12 @@ func MetricViews() []sdkmetric.View {
 			sdkmetric.Instrument{Name: "eds_request_duration_seconds"},
 			sdkmetric.Stream{Aggregation: sdkmetric.AggregationExplicitBucketHistogram{
 				Boundaries: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+			}},
+		),
+		sdkmetric.NewView(
+			sdkmetric.Instrument{Name: "eds_da_request_duration_seconds"},
+			sdkmetric.Stream{Aggregation: sdkmetric.AggregationExplicitBucketHistogram{
+				Boundaries: []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 20},
 			}},
 		),
 	}
@@ -149,4 +185,19 @@ func (l *EDSMetricLabeler) IncrementStoreReconnectCounter(ctx context.Context) {
 func (l *EDSMetricLabeler) RecordStoreLedgerEndGauge(ctx context.Context, ledgerEnd int64) {
 	otelLabels := beholder.OtelAttributes(l.Labels).AsStringAttributes()
 	l.m.storeLedgerEndGauge.Record(ctx, ledgerEnd, metric.WithAttributes(otelLabels...))
+}
+
+func (l *EDSMetricLabeler) RecordDARequest(ctx context.Context, operation string, success bool, duration time.Duration) {
+	otelLabels := beholder.OtelAttributes(l.Labels).AsStringAttributes()
+	result := "failure"
+	up := int64(0)
+	if success {
+		result = "success"
+		up = 1
+	}
+	operationAttr := attribute.String("operation", operation)
+
+	l.m.daRequestsCounter.Add(ctx, 1, metric.WithAttributes(operationAttr, attribute.String("result", result)), metric.WithAttributes(otelLabels...))
+	l.m.daUpGauge.Record(ctx, up, metric.WithAttributes(operationAttr), metric.WithAttributes(otelLabels...))
+	l.m.daRequestDurations.Record(ctx, duration.Seconds(), metric.WithAttributes(operationAttr), metric.WithAttributes(otelLabels...))
 }
