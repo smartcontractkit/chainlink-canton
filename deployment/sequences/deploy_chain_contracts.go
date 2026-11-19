@@ -13,15 +13,18 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/committeeverifier"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/globaltokensenderreceiver"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_token_sender_receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -286,6 +289,25 @@ var DeployChainContracts = operations.NewSequence(
 			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy PerPartyRouterFactory: %w", err)
 		}
 		addresses = append(addresses, deployPerPartyRouterFactoryReport.Output)
+
+		// Deploy GlobalTokenSenderReceiver: one Chainlink-operated orchestrator
+		// for all DA Registry token transfers. Receiver-side policy is baked in;
+		// for token-only transfers the token pool decides CCV and finality
+		// requirements, so the defaults below are inert.
+		deployGlobalTokenSenderReceiverReport, err := operations.ExecuteOperation(b, global_token_sender_receiver.Deploy, deps, contract.DeployInput[globaltokensenderreceiver.GlobalTokenSenderReceiver]{
+			Template: globaltokensenderreceiver.GlobalTokenSenderReceiver{
+				CcipOwner:              types.PARTY(input.CCIPOwnerParty),
+				RequiredCCVs:           nil,
+				OptionalCCVs:           nil,
+				OptionalThreshold:      0,
+				ReceiverFinalityConfig: ccipcodec.FinalityConfig{WaitForFinality: &types.UNIT{}},
+			},
+			OwnerParty: types.PARTY(input.CCIPOwnerParty),
+		})
+		if err != nil {
+			return sequences.OnChainOutput{}, fmt.Errorf("failed to deploy GlobalTokenSenderReceiver: %w", err)
+		}
+		addresses = append(addresses, deployGlobalTokenSenderReceiverReport.Output)
 
 		// Deploy Committee Verifiers
 		for i, committeeVerifier := range input.CommitteeVerifiers {

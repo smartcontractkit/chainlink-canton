@@ -144,6 +144,12 @@ data SetPoolReceiveMetadataParams = SetPoolReceiveMetadataParams
         metadataEntries : [MetadataEntry]
     deriving (Eq, Show)
 
+-- | Params for SetPoolReleaseMetadata choice (metadata passed on release transfers).
+data SetPoolReleaseMetadataParams = SetPoolReleaseMetadataParams
+    with
+        metadataEntries : [MetadataEntry]
+    deriving (Eq, Show)
+
 -- | MCMS params: set one ChoiceContext entry from a serialized AnyValue payload.
 -- | valuePayload must be exactly encodeAnyValue output (see CCIP.ContextCodec); AV_ContractId is not round-trippable in bytes—use AddPoolReceiveContextContractValueParams instead.
 data AddPoolReceiveContextNonContractValueParams = AddPoolReceiveContextNonContractValueParams

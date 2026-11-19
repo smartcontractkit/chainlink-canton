@@ -14,6 +14,7 @@ import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiver_Entrypoint(..))
 import qualified Chainlink.InstanceAddress
 
 import qualified Link.Token
+import qualified Link.TokenAdmin
 
 import qualified CCIP.BurnMintTokenPoolV2
 import qualified CCIP.CodecV2.FinalityConfig
@@ -21,21 +22,28 @@ import qualified CCIP.CommitteeVerifierV2
 import qualified CCIP.FactoryV2
 import qualified CCIP.LockReleaseTokenPoolV2
 import qualified CCIP.RateLimiterV2
+import qualified CCIP.Registry.BurnMintTokenPoolV2
+import qualified CCIP.Registry.BurnMintTokenPoolV2Types
+import qualified CCIP.Registry.RateLimiterV2
 
 import CCIP.FactoryTest.FactoryCodecTest
   ( encodeDeployGlobalConfigParams
   , encodeDeployFeeQuoterParams
   , encodeDeployLinkTokenParams
+  , encodeDeployLinkTokenAdminParams
   , encodeDeployTokenAdminRegistryParams
   , encodeDeployOnRampParams
   , encodeDeployOffRampParams
   , encodeDeployPerPartyRouterFactoryParams
+  , encodeDeployGlobalTokenSenderReceiverParams
   , encodeDeployRMNRemoteParams
   , encodeDeployCommitteeVerifierParams
   , encodeDeployExecutorParams
   , encodeDeployLockReleaseTokenPoolParams
   , encodeDeployBurnMintTokenPoolParams
+  , encodeDeployRegistryBurnMintTokenPoolParams
   , encodeDeployRateLimiterParams
+  , encodeDeployRegistryRateLimiterParams
   )
 
 finalityConfig n =
@@ -388,6 +396,53 @@ testDeployLinkToken_MCMS = script do
 
   pure ()
 
+-- | LinkTokenAdmin has ccipOwner as sole signatory, so the factory owner becomes ccipOwner.
+testDeployLinkTokenAdmin_MCMS : Script ()
+testDeployLinkTokenAdmin_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+  operator <- allocateParty "operator"
+
+  let factoryInstanceId = "factory-link-token-admin"
+      adminInstanceId = "link-token-admin-1"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "LINK"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = Chainlink.InstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = CCIP.FactoryV2.DeployLinkTokenAdminParams with
+        instanceId = adminInstanceId
+        instrumentId
+        observers = [operator]
+      encoded = encodeDeployLinkTokenAdminParams params
+
+  updatedContractIds <- submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployLinkTokenAdmin"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  let adminAddr = Chainlink.InstanceAddress.makeText adminInstanceId mcmsParty
+  assertMsg "deployed LinkTokenAdmin missing from returned contract ids" (Map.member adminAddr updatedContractIds)
+
+  admins <- query @Link.TokenAdmin.LinkTokenAdmin operator
+  case filter (\(_, admin) -> admin.instanceId == adminInstanceId) admins of
+    [(_, admin)] -> do
+      admin.ccipOwner === mcmsParty
+      admin.instrumentId === instrumentId
+      admin.paused === False
+      admin.observers === [operator]
+    _ -> abort "Expected exactly one deployed LinkTokenAdmin"
+
+  pure ()
+
 -- | LinkRegistry's instrument admin must match the factory owner / registry admin.
 testDeployLinkToken_AdminMismatch_Rejected : Script ()
 testDeployLinkToken_AdminMismatch_Rejected = script do
@@ -549,6 +604,40 @@ testDeployPerPartyRouterFactory_MCMS = script do
   submit mcmsParty do
     exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
       functionName = "DeployPerPartyRouterFactory"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
+-- | Test DeployGlobalTokenSenderReceiver via MCMS entrypoint
+testDeployGlobalTokenSenderReceiver_MCMS : Script ()
+testDeployGlobalTokenSenderReceiver_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+
+  let factoryInstanceId = "factory-global-sr"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = Chainlink.InstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = CCIP.FactoryV2.DeployGlobalTokenSenderReceiverParams with
+        instanceId = "global-sr-1"
+        requiredCCVs = []
+        optionalCCVs = []
+        optionalThreshold = 0
+        receiverFinalityConfig = CCIP.CodecV2.FinalityConfig.WaitForFinality
+      encoded = encodeDeployGlobalTokenSenderReceiverParams params
+
+  submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployGlobalTokenSenderReceiver"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
 
@@ -720,6 +809,129 @@ testDeployBurnMintTokenPool_MCMS = script do
 
   pure ()
 
+-- | The registry pool's poolOwner and ccipOwner are both the factory owner.
+testDeployRegistryBurnMintTokenPool_MCMS : Script ()
+testDeployRegistryBurnMintTokenPool_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+  rateLimitAdmin <- allocateParty "rate_limit_admin"
+  edsObserver <- allocateParty "eds_observer"
+
+  let factoryInstanceId = "factory-registry-bmtp"
+      poolInstanceId = "registry-bmtp-1"
+      instrumentId = Splice.Api.Token.HoldingV1.InstrumentId mcmsParty "LINK"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = Chainlink.InstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = CCIP.FactoryV2.DeployRegistryBurnMintTokenPoolParams with
+        instanceId = poolInstanceId
+        instrumentId
+        decimals = 10
+        rateLimitAdmin = Some rateLimitAdmin
+        observers = [edsObserver]
+        tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-1" mcmsParty
+        feeQuoter = Chainlink.InstanceAddress.make "fq-1" mcmsParty
+        rmnRemote = Chainlink.InstanceAddress.make "rmn-1" mcmsParty
+        poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.Registry.BurnMintTokenPoolV2Types.RelativeHours 24
+      encoded = encodeDeployRegistryBurnMintTokenPoolParams params
+
+  updatedContractIds <- submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployRegistryBurnMintTokenPool"
+      operationData = encoded
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  let poolAddr = Chainlink.InstanceAddress.makeText poolInstanceId mcmsParty
+  assertMsg "deployed registry pool missing from returned contract ids" (Map.member poolAddr updatedContractIds)
+
+  pools <- query @CCIP.Registry.BurnMintTokenPoolV2.BurnMintTokenPool edsObserver
+  case filter (\(_, pool) -> pool.instanceId == poolInstanceId) pools of
+    [(_, pool)] -> do
+      pool.poolOwner === mcmsParty
+      pool.ccipOwner === mcmsParty
+      pool.instrumentId === instrumentId
+      pool.decimals === 10
+      pool.rateLimitAdmin === Some rateLimitAdmin
+      pool.observers === [edsObserver]
+      pool.transferTimeout === CCIP.Registry.BurnMintTokenPoolV2Types.RelativeHours 24
+      pool.poolReceiveContext === params.poolReceiveContext
+      pool.deps === CCIP.Registry.BurnMintTokenPoolV2.BurnMintTokenPoolDeps with
+        tokenAdminRegistry = params.tokenAdminRegistry
+        rmnRemote = params.rmnRemote
+        feeQuoter = params.feeQuoter
+    _ -> abort "Expected exactly one deployed registry BurnMintTokenPool"
+
+  pure ()
+
+-- | Direct exercisers cannot deploy a LinkTokenAdmin owned by another party.
+testDeployLinkTokenAdmin_RejectsForeignOwner : Script ()
+testDeployLinkTokenAdmin_RejectsForeignOwner = script do
+  mcmsParty <- allocateParty "mcms_party"
+  other <- allocateParty "other"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = "factory-lta-owner"
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  submitMustFail mcmsParty do
+    exerciseCmd factoryCid CCIP.FactoryV2.DeployLinkTokenAdmin with
+      contract = Link.TokenAdmin.LinkTokenAdmin with
+        ccipOwner = other
+        instanceId = "lta-foreign"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId other "LINK"
+        paused = False
+        observers = []
+
+  pure ()
+
+-- | Direct exercisers cannot deploy a registry pool owned by another party.
+testDeployRegistryBurnMintTokenPool_RejectsForeignOwner : Script ()
+testDeployRegistryBurnMintTokenPool_RejectsForeignOwner = script do
+  mcmsParty <- allocateParty "mcms_party"
+  other <- allocateParty "other"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = "factory-registry-owner"
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let params = CCIP.FactoryV2.DeployRegistryBurnMintTokenPoolParams with
+        instanceId = "registry-bmtp-foreign"
+        instrumentId = Splice.Api.Token.HoldingV1.InstrumentId other "LINK"
+        decimals = 10
+        rateLimitAdmin = None
+        observers = [mcmsParty]
+        tokenAdminRegistry = Chainlink.InstanceAddress.make "tar-1" mcmsParty
+        feeQuoter = Chainlink.InstanceAddress.make "fq-1" mcmsParty
+        rmnRemote = Chainlink.InstanceAddress.make "rmn-1" mcmsParty
+        poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+        transferTimeout = CCIP.Registry.BurnMintTokenPoolV2Types.RelativeHours 24
+
+  submitMustFail mcmsParty do
+    exerciseCmd factoryCid CCIP.FactoryV2.DeployRegistryBurnMintTokenPool with
+      contract = (CCIP.FactoryV2.mkRegistryBurnMintTokenPoolContract mcmsParty params) with
+        poolOwner = other
+
+  pure ()
+
 -- | Test DeployExecutor via MCMS entrypoint
 testDeployExecutor_MCMS : Script ()
 testDeployExecutor_MCMS = script do
@@ -791,6 +1003,95 @@ testDeployRateLimiter_MCMS = script do
       functionName = "DeployRateLimiter"
       operationData = encoded
       contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  pure ()
+
+testDeployRegistryRateLimiter_MCMS : Script ()
+testDeployRegistryRateLimiter_MCMS = script do
+  mcmsParty <- allocateParty "mcms_party"
+  edsObserver <- allocateParty "eds_observer"
+
+  let factoryInstanceId = "factory-registry-rl"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = factoryInstanceId
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  let instAddr = Chainlink.InstanceAddress.makeText factoryInstanceId mcmsParty
+  let targetAsMcmsReceiver = toInterfaceContractId @MCMSReceiver factoryCid
+  let params = CCIP.FactoryV2.DeployRegistryRateLimiterParams with
+        instanceId = "registry-rl-1"
+        poolInstanceId = "registry-bmtp-1"
+        remoteChainSelector = 137.0
+        direction = CCIP.Registry.RateLimiterV2.RateLimitDirection_Inbound
+        mode = CCIP.Registry.RateLimiterV2.RateLimitMode_CustomFinality
+        isEnabled = True
+        capacity = 1000000.0
+        rate = 100.0
+        observers = [edsObserver]
+
+  updatedContractIds <- submit mcmsParty do
+    exerciseCmd targetAsMcmsReceiver MCMSReceiver_Entrypoint with
+      functionName = "DeployRegistryRateLimiter"
+      operationData = encodeDeployRegistryRateLimiterParams params
+      contractIds = Map.fromList [(instAddr, toAnyContractId factoryCid)]
+
+  let limiterAddr = Chainlink.InstanceAddress.makeText params.instanceId mcmsParty
+  assertMsg "deployed registry rate limiter missing from returned contract ids" (Map.member limiterAddr updatedContractIds)
+
+  limiters <- query @CCIP.Registry.RateLimiterV2.RateLimiter edsObserver
+  case filter (\(_, rl) -> rl.instanceId == params.instanceId) limiters of
+    [(_, rl)] -> do
+      rl.poolOwner === mcmsParty
+      rl.poolInstanceId === params.poolInstanceId
+      rl.remoteChainSelector === params.remoteChainSelector
+      rl.direction === params.direction
+      rl.mode === params.mode
+      rl.isEnabled === True
+      rl.capacity === params.capacity
+      rl.rate === params.rate
+      rl.tokens === params.capacity
+      rl.observers === [edsObserver]
+    _ -> abort "Expected exactly one deployed registry RateLimiter"
+
+  pure ()
+
+-- | Direct exercisers cannot deploy a registry rate limiter owned by another party.
+testDeployRegistryRateLimiter_RejectsForeignOwner : Script ()
+testDeployRegistryRateLimiter_RejectsForeignOwner = script do
+  mcmsParty <- allocateParty "mcms_party"
+  other <- allocateParty "other"
+
+  factoryCid <- submit mcmsParty do
+    createCmd CCIP.FactoryV2.CCIPFactory with
+      instanceId = "factory-registry-rl-owner"
+      owner = mcmsParty
+      mcmsParty
+      usedInstanceIds = Map.empty
+      deployedContracts = Map.empty
+      perPartyRouterFactoryDeployed = False
+
+  now <- getTime
+  submitMustFail mcmsParty do
+    exerciseCmd factoryCid CCIP.FactoryV2.DeployRegistryRateLimiter with
+      contract = CCIP.Registry.RateLimiterV2.RateLimiter with
+        instanceId = "registry-rl-foreign"
+        poolInstanceId = "registry-bmtp-1"
+        poolOwner = other
+        remoteChainSelector = 137.0
+        direction = CCIP.Registry.RateLimiterV2.RateLimitDirection_Outbound
+        mode = CCIP.Registry.RateLimiterV2.RateLimitMode_DefaultFinality
+        isEnabled = False
+        capacity = 0.0
+        rate = 0.0
+        tokens = 0.0
+        lastUpdated = now
+        observers = [mcmsParty]
 
   pure ()
 

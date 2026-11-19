@@ -52,6 +52,9 @@ chain_selector = "8706591216959472610"
   [ccip_api.fee_quoter]
     instance_address = "0x80b5666a8c377bfd0a4794a7c0a56a49f48fc406c8889e48a3b458c99c2ed883"
     party_id = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
+  [ccip_api.global_token_sender_receiver]
+    instance_address = "0x3f5d1a269dd84ee9a1a0575de5b3c4f7e6d2a1904ddcba8e9fd54f4b6b0a7c2e"
+    party_id = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"
   [ccip_api.fee_tokens."CC"]
     token_id = "Amulet"
     admin = "participant1-localparty-1::1220028a5709a1b1a0e7a393a701ef0a5746e6a5c25b7b29d27ffcf8f1043b6bbbe2"

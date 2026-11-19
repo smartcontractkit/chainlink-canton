@@ -8,6 +8,7 @@ import (
 	tokenadapters "github.com/smartcontractkit/chainlink-ccip/deployment/tokens"
 	cldfcanton "github.com/smartcontractkit/chainlink-deployments-framework/chain/canton"
 	"github.com/smartcontractkit/chainlink-deployments-framework/datastore"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 func TestResolveTokenPoolParties_devenvFallback(t *testing.T) {
@@ -63,4 +64,15 @@ func TestResolveTokenPoolParties_ignoresPoolOwnerLabel(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "ccip-party", ccip)
 	require.Equal(t, "ccip-party", pool)
+}
+
+func TestObserversFromTokenRefLabels_defaultsToFallback(t *testing.T) {
+	t.Parallel()
+
+	ref := &datastore.AddressRef{Labels: datastore.NewLabelSet("ccip-owner:ccip-party", "instrument-id:LINK")}
+	require.Equal(t, []types.PARTY{"ccip-party"}, observersFromTokenRefLabels(ref, "ccip-party"))
+	require.Equal(t, []types.PARTY{"ccip-party"}, observersFromTokenRefLabels(nil, "ccip-party"))
+
+	blank := &datastore.AddressRef{Labels: datastore.NewLabelSet("observer:", "observer:  ")}
+	require.Equal(t, []types.PARTY{"ccip-party"}, observersFromTokenRefLabels(blank, "ccip-party"))
 }

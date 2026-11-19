@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	clientapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/clientapi"
+	user "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/user"
 	chainlinkapi "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/chainlink/chainlinkapi"
 	splice_api_token_metadata_v1 "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_metadata_v1"
 	"github.com/smartcontractkit/go-daml/pkg/bind"
@@ -26,7 +27,7 @@ var (
 
 const (
 	PackageName = "ccip-sender-v2"
-	PackageID   = "7ffa2b979e063523780a09ae70c71166410b177abb98094e448c658869335af3"
+	PackageID   = "04be04f30f8208bea4a261ff9529306740375806ac8e39f1921e1c14e16a8c03"
 	SDKVersion  = "3.4.11"
 )
 
@@ -147,45 +148,24 @@ func (t CCIPSender) SendWithPackageID(contractID string, packageID string, args 
 	}
 }
 
-// GetFee exercises the GetFee choice on this CCIPSender contract
+// GetFee2 exercises the GetFee2 choice on this CCIPSender contract
 // This method uses the package name in the template ID
-func (t CCIPSender) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
+func (t CCIPSender) GetFee2(contractID string, args GetFee2) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
-		Choice:     "GetFee",
+		Choice:     "GetFee2",
 		Arguments:  argsToMap(args),
 	}
 }
 
-// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
-func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
+// GetFee2WithPackageID exercises the GetFee2 choice using the provided package ID instead of package name
+func (t CCIPSender) GetFee2WithPackageID(contractID string, packageID string, args GetFee2) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
 		ContractID: contractID,
-		Choice:     "GetFee",
+		Choice:     "GetFee2",
 		Arguments:  argsToMap(args),
-	}
-}
-
-// Archive exercises the Archive choice on this CCIPSender contract
-// This method uses the package name in the template ID
-func (t CCIPSender) Archive(contractID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
-	}
-}
-
-// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
-func (t CCIPSender) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
-	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
-		ContractID: contractID,
-		Choice:     "Archive",
-		Arguments:  map[string]any{},
 	}
 }
 
@@ -209,6 +189,115 @@ func (t CCIPSender) GetRequiredCCVsWithPackageID(contractID string, packageID st
 		Arguments:  argsToMap(args),
 	}
 }
+
+// Archive exercises the Archive choice on this CCIPSender contract via the IICCIPSender interface
+// This method uses the package name in the template ID
+func (t CCIPSender) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t CCIPSender) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// GetFee exercises the GetFee choice on this CCIPSender contract
+// This method uses the package name in the template ID
+func (t CCIPSender) GetFee(contractID string, args GetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "CCIPSender"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// GetFeeWithPackageID exercises the GetFee choice using the provided package ID instead of package name
+func (t CCIPSender) GetFeeWithPackageID(contractID string, packageID string, args GetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "CCIPSender"),
+		ContractID: contractID,
+		Choice:     "GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderGetRequiredCCVs exercises the ICCIPSender_GetRequiredCCVs choice on this CCIPSender contract via the IICCIPSender interface
+// This method uses the package name in the template ID
+func (t CCIPSender) ICCIPSenderGetRequiredCCVs(contractID string, args user.ICCIPSenderGetRequiredCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderGetRequiredCCVsWithPackageID exercises the ICCIPSender_GetRequiredCCVs choice using the provided package ID instead of package name
+func (t CCIPSender) ICCIPSenderGetRequiredCCVsWithPackageID(contractID string, packageID string, args user.ICCIPSenderGetRequiredCCVs) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_GetRequiredCCVs",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderGetFee exercises the ICCIPSender_GetFee choice on this CCIPSender contract via the IICCIPSender interface
+// This method uses the package name in the template ID
+func (t CCIPSender) ICCIPSenderGetFee(contractID string, args user.ICCIPSenderGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderGetFeeWithPackageID exercises the ICCIPSender_GetFee choice using the provided package ID instead of package name
+func (t CCIPSender) ICCIPSenderGetFeeWithPackageID(contractID string, packageID string, args user.ICCIPSenderGetFee) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_GetFee",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderSend exercises the ICCIPSender_Send choice on this CCIPSender contract via the IICCIPSender interface
+// This method uses the package name in the template ID
+func (t CCIPSender) ICCIPSenderSend(contractID string, args user.ICCIPSenderSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_Send",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// ICCIPSenderSendWithPackageID exercises the ICCIPSender_Send choice using the provided package ID instead of package name
+func (t CCIPSender) ICCIPSenderSendWithPackageID(contractID string, packageID string, args user.ICCIPSenderSend) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.CCIPSender", "ICCIPSender"),
+		ContractID: contractID,
+		Choice:     "ICCIPSender_Send",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for CCIPSender
+
+var _ user.IICCIPSender = (*CCIPSender)(nil)
 
 // CCVSendInput is a Record type
 type CCVSendInput struct {
@@ -418,6 +507,86 @@ func (t GetFee) MarshalHex() (string, error) {
 
 // UnmarshalHex decodes GetFee from hex string (Canton MCMS format)
 func (t *GetFee) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// GetFee2 is a Record type
+type GetFee2 struct {
+	DestinationChainSelector types.NUMERIC                              `json:"destinationChainSelector"`
+	Message                  clientapi.Canton2AnyMessage                `json:"message"`
+	RouterCid                types.CONTRACT_ID                          `json:"routerCid"`
+	CcvSendInputs            []CCVSendInput                             `json:"ccvSendInputs"`
+	TokenTransferInput       *TokenTransferInput                        `json:"tokenTransferInput" hex:"optional"`
+	ExecutorInput            *ExecutorInput                             `json:"executorInput" hex:"optional"`
+	Context                  splice_api_token_metadata_v1.ChoiceContext `json:"context"`
+}
+
+// ToMap converts GetFee2 to a map for DAML arguments
+func (t GetFee2) ToMap() map[string]any {
+	m := make(map[string]any)
+
+	m["destinationChainSelector"] = t.DestinationChainSelector
+
+	m["message"] = model.NestedToDAMLValue(t.Message)
+
+	m["routerCid"] = model.NestedToDAMLValue(t.RouterCid)
+
+	m["ccvSendInputs"] = func() []any {
+		res := make([]any, 0, len(t.CcvSendInputs))
+		for _, e := range t.CcvSendInputs {
+			res = append(res, model.NestedToDAMLValue(e))
+		}
+		return res
+	}()
+
+	if t.TokenTransferInput != nil {
+		m["tokenTransferInput"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.TokenTransferInput),
+		}
+	} else {
+		m["tokenTransferInput"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	if t.ExecutorInput != nil {
+		m["executorInput"] = map[string]any{
+			"_type": "optional",
+			"value": model.NestedToDAMLValue(*t.ExecutorInput),
+		}
+	} else {
+		m["executorInput"] = map[string]any{
+			"_type": "optional",
+			"value": nil,
+		}
+	}
+
+	m["context"] = model.NestedToDAMLValue(t.Context)
+
+	return m
+}
+
+func (t GetFee2) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *GetFee2) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes GetFee2 to hex string (Canton MCMS format)
+func (t GetFee2) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes GetFee2 from hex string (Canton MCMS format)
+func (t *GetFee2) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
@@ -654,6 +823,7 @@ func (t *TokenTransferInput) UnmarshalHex(data string) error {
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	GetFee(args GetFee) (*bind.EncodedChoice, error)
+	GetFee2(args GetFee2) (*bind.EncodedChoice, error)
 	GetRequiredCCVs(args GetRequiredCCVs) (*bind.EncodedChoice, error)
 	Send(args Send) (*bind.EncodedChoice, error)
 }
@@ -688,6 +858,11 @@ func (c *Contract) Encoder() MCMSEncoder {
 // GetFee encodes parameters for the GetFee choice.
 func (e *encoder) GetFee(args GetFee) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("GetFee", args)
+}
+
+// GetFee2 encodes parameters for the GetFee2 choice.
+func (e *encoder) GetFee2(args GetFee2) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("GetFee2", args)
 }
 
 // GetRequiredCCVs encodes parameters for the GetRequiredCCVs choice.
