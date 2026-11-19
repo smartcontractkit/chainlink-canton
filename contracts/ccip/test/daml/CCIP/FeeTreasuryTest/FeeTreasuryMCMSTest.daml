@@ -23,6 +23,7 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.FeeTreasury (
     MCMSFeeTreasury(..),
     FeeWithdrawalAuthorization(..),
+    FeeTransferRecovery(..),
     CleanupExpiredAuthorization(..),
     ExecuteFeeWithdrawal(..),
     WithdrawAuthorization(..),
@@ -95,6 +96,68 @@ testFeeTreasuryMCMSEntrypoint_AuthorizeFeeWithdrawal = script do
     auth.recipient       === recipient
     auth.instrumentId    === instrumentId
     auth.maxAmount       === 500.0
+
+testFeeTreasuryMCMSEntrypoint_RejectsZeroValiditySecs : Script ()
+testFeeTreasuryMCMSEntrypoint_RejectsZeroValiditySecs = script do
+    feeOwner  <- allocateParty "fee_owner"
+    recipient <- allocateParty "recipient"
+
+    let instanceId   = "fee-treasury-zero-validity-test"
+        instrumentId = InstrumentId feeOwner "FeeToken"
+        instAddr     = RawInstanceAddress.makeText instanceId feeOwner
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId
+            feeOwner
+            mcmsController = feeOwner
+
+    let params = AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-zero-validity-test"
+            recipient
+            instrumentId
+            maxAmount    = 500.0
+            validitySecs = 0
+
+    submitMustFail feeOwner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver treasuryCid) MCMSReceiver_Entrypoint with
+            functionName  = "AuthorizeFeeWithdrawal"
+            operationData = encodeAuthorizeFeeWithdrawalParams params
+            contractIds   = Map.fromList [(instAddr, coerceContractId treasuryCid)]
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 0
+
+testFeeTreasuryMCMSEntrypoint_RejectsZeroMaxAmount : Script ()
+testFeeTreasuryMCMSEntrypoint_RejectsZeroMaxAmount = script do
+    feeOwner  <- allocateParty "fee_owner"
+    recipient <- allocateParty "recipient"
+
+    let instanceId   = "fee-treasury-zero-cap-test"
+        instrumentId = InstrumentId feeOwner "FeeToken"
+        instAddr     = RawInstanceAddress.makeText instanceId feeOwner
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId
+            feeOwner
+            mcmsController = feeOwner
+
+    let params = AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-zero-cap-test"
+            recipient
+            instrumentId
+            maxAmount    = 0.0
+            validitySecs = 3600
+
+    submitMustFail feeOwner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver treasuryCid) MCMSReceiver_Entrypoint with
+            functionName  = "AuthorizeFeeWithdrawal"
+            operationData = encodeAuthorizeFeeWithdrawalParams params
+            contractIds   = Map.fromList [(instAddr, coerceContractId treasuryCid)]
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 0
 
 -- ========================================================
 -- |   ExecuteFeeWithdrawal: Completed (with preapproval)  |
@@ -207,6 +270,66 @@ testFeeTreasury_ExecuteFeeWithdrawal_Pending = script do
     case result.output of
         TransferInstructionResult_Pending _ -> pure ()
         _ -> abort "Expected TransferInstructionResult_Pending"
+
+-- ========================================================
+-- |   ExecuteFeeWithdrawal: partial keeps the remainder   |
+-- ========================================================
+
+testFeeTreasury_ExecuteFeeWithdrawal_PartialLeavesRemainder : Script ()
+testFeeTreasury_ExecuteFeeWithdrawal_PartialLeavesRemainder = script do
+    feeOwner  <- allocateParty "fee_owner"
+    recipient <- allocateParty "recipient"
+
+    let instrumentId = InstrumentId feeOwner "FeeToken"
+
+    firstHoldingCid <- submit (actAs feeOwner) do
+        createCmd TestToken.TestHolding with
+            owner = feeOwner; admin = feeOwner; instrumentId; amount = 200.0
+
+    -- Large enough for the 150.0 attempt, so only the cap can reject it.
+    secondHoldingCid <- submit (actAs feeOwner) do
+        createCmd TestToken.TestHolding with
+            owner = feeOwner; admin = feeOwner; instrumentId; amount = 200.0
+
+    factoryCid <- submit feeOwner do
+        createCmd TestToken.TestTransferFactory with admin = feeOwner
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId = "fee-treasury-partial-test"
+            feeOwner; mcmsController = feeOwner
+
+    authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-partial-test" treasuryCid
+        AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-partial-test"
+            recipient; instrumentId; maxAmount = 300.0; validitySecs = 3600
+
+    Some original <- queryContractId feeOwner authCid
+
+    now <- getTime
+    let execute cid holdingCid amount = exerciseCmd cid ExecuteFeeWithdrawal with
+            submitter          = feeOwner
+            transferFactoryCid = toInterfaceContractId @TransferFactory factoryCid
+            inputHoldingCids   = [toInterfaceContractId holdingCid]
+            amount
+            extraArgs          = ExtraArgs emptyChoiceContext emptyMetadata
+            requestedAt        = now
+
+    _ <- submit feeOwner do execute authCid firstHoldingCid 200.0
+
+    remaining <- query @FeeWithdrawalAuthorization feeOwner
+    length remaining === 1
+    let (remainderCid, remainder) = head remaining
+    remainder.maxAmount  === 100.0
+    remainder.instanceId === original.instanceId
+    remainder.expiresAt  === original.expiresAt
+
+    submitMustFail feeOwner do execute remainderCid secondHoldingCid 150.0
+
+    _ <- submit feeOwner do execute remainderCid secondHoldingCid 100.0
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 0
 
 -- ========================================================
 -- |   Negative: amount exceeds cap                        |
@@ -610,3 +733,86 @@ testFeeTreasuryMCMSEntrypoint_AuthorizeThenWithdrawSameBatch = script do
 
     auths <- query @FeeWithdrawalAuthorization feeOwner
     length auths === 0
+
+-- ========================================================
+-- |   Pending transfer recovered through MCMS             |
+-- ========================================================
+
+testFeeTreasury_PendingTransferRecoveredViaMCMS : Script ()
+testFeeTreasury_PendingTransferRecoveredViaMCMS = script do
+    feeOwner   <- allocateParty "fee_owner"
+    recipient  <- allocateParty "recipient"
+    tokenAdmin <- allocateParty "token_admin"
+
+    -- A separate token admin holds the locked funds, so feeOwner's own balance
+    -- shows when they are locked and when they come back.
+    let instrumentId = InstrumentId tokenAdmin "FeeToken"
+        ownBalance = do
+            holdings <- query @TestToken.TestHolding feeOwner
+            pure (sum [h.amount | (_, h) <- holdings, h.owner == feeOwner])
+
+    holdingCid <- submit (actAs feeOwner <> actAs tokenAdmin) do
+        createCmd TestToken.TestHolding with
+            owner = feeOwner; admin = tokenAdmin; instrumentId; amount = 100.0
+
+    factoryCid <- submit tokenAdmin do
+        createCmd TestToken.TestTransferFactory with admin = tokenAdmin
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId = "fee-treasury-recovery-test"
+            feeOwner; mcmsController = feeOwner
+
+    authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-recovery-test" treasuryCid
+        AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-recovery-test"
+            recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
+
+    now <- getTime
+    disclosedFactory <- fromSome <$> queryDisclosure tokenAdmin factoryCid
+    disclosedHolding <- fromSome <$> queryDisclosure feeOwner holdingCid
+
+    -- The recipient executes; no preapproval, so the transfer goes pending.
+    result <- submit (actAs recipient <> disclose disclosedFactory <> disclose disclosedHolding) do
+        exerciseCmd authCid ExecuteFeeWithdrawal with
+            submitter          = recipient
+            transferFactoryCid = toInterfaceContractId @TransferFactory factoryCid
+            inputHoldingCids   = [toInterfaceContractId holdingCid]
+            amount             = 100.0
+            extraArgs          = ExtraArgs emptyChoiceContext emptyMetadata
+            requestedAt        = now
+    case result.output of
+        TransferInstructionResult_Pending _ -> pure ()
+        _ -> abort "Expected TransferInstructionResult_Pending"
+
+    balanceLocked <- ownBalance
+    balanceLocked === 0.0
+
+    recoveries <- query @FeeTransferRecovery feeOwner
+    length recoveries === 1
+    let (recoveryCid, recovery) = head recoveries
+        recoveryId   = "fee-withdrawal-recovery-test-recovery-100.0"
+        recoveryAddr = RawInstanceAddress.makeText recoveryId feeOwner
+        withdrawViaMCMS = exerciseCmd (toInterfaceContractId @MCMSReceiver recoveryCid) MCMSReceiver_Entrypoint with
+            functionName  = "Withdraw"
+            operationData = ""
+            contractIds   = Map.fromList [(recoveryAddr, coerceContractId recoveryCid)]
+    recovery.instanceId === recoveryId
+
+    -- The token admin holds the locked funds; the registry discloses them, as with Amulet.
+    lockedHoldings <- query @TestToken.TestHolding tokenAdmin
+    let [(lockedCid, _)] = filter (\(_, h) -> h.owner == tokenAdmin) lockedHoldings
+    disclosedLocked <- fromSome <$> queryDisclosure tokenAdmin lockedCid
+
+    -- Until executeBefore the recipient keeps control of the outcome.
+    submitMustFail (actAs feeOwner <> disclose disclosedLocked) withdrawViaMCMS
+
+    passTime (seconds 3601)
+
+    updatedMap <- submit (actAs feeOwner <> disclose disclosedLocked) withdrawViaMCMS
+    Map.lookup recoveryAddr updatedMap === None
+
+    remaining <- query @FeeTransferRecovery feeOwner
+    length remaining === 0
+    balanceBack <- ownBalance
+    balanceBack === 100.0

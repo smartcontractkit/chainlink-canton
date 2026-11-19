@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-fee-treasury"
-	PackageID   = "4960a19fafbcd288150e4b72c01f6769f1151a3d9e32cc5c4c27c83071aca1cd"
+	PackageID   = "1f19a8029957a63364bdccc8ddfaaef3cd3f986d02ffb6ad15ad1a093355cb57"
 	SDKVersion  = "3.4.11"
 )
 
@@ -174,6 +174,38 @@ func (t *CleanupExpiredAuthorization) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// DiscardRecovery is a Record type
+type DiscardRecovery struct {
+}
+
+// ToMap converts DiscardRecovery to a map for DAML arguments
+func (t DiscardRecovery) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t DiscardRecovery) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *DiscardRecovery) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes DiscardRecovery to hex string (Canton MCMS format)
+func (t DiscardRecovery) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes DiscardRecovery from hex string (Canton MCMS format)
+func (t *DiscardRecovery) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // ExecuteFeeWithdrawal is a Record type
 type ExecuteFeeWithdrawal struct {
 	Submitter          types.PARTY                            `json:"submitter"`
@@ -230,6 +262,187 @@ func (t *ExecuteFeeWithdrawal) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
+
+// FeeTransferRecovery is a Template type
+type FeeTransferRecovery struct {
+	InstanceId             types.TEXT        `json:"instanceId"`
+	FeeOwner               types.PARTY       `json:"feeOwner"`
+	McmsController         types.PARTY       `json:"mcmsController"`
+	TransferInstructionCid types.CONTRACT_ID `json:"transferInstructionCid"`
+	ExecuteBefore          types.TIMESTAMP   `json:"executeBefore"`
+}
+
+// GetTemplateID returns the template ID for this template using the package name
+func (t FeeTransferRecovery) GetTemplateID() string {
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeTreasury", "FeeTransferRecovery")
+}
+
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t FeeTransferRecovery) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "CCIP.FeeTreasury", "FeeTransferRecovery")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t FeeTransferRecovery) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["feeOwner"] = t.FeeOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["mcmsController"] = t.McmsController.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["transferInstructionCid"] = model.NestedToDAMLValue(t.TransferInstructionCid)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["executeBefore"] = t.ExecuteBefore
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
+}
+
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t FeeTransferRecovery) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["instanceId"] = string(t.InstanceId)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["feeOwner"] = t.FeeOwner.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["mcmsController"] = t.McmsController.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["transferInstructionCid"] = model.NestedToDAMLValue(t.TransferInstructionCid)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["executeBefore"] = t.ExecuteBefore
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
+func (t FeeTransferRecovery) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *FeeTransferRecovery) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes FeeTransferRecovery to hex string (Canton MCMS format)
+func (t FeeTransferRecovery) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes FeeTransferRecovery from hex string (Canton MCMS format)
+func (t *FeeTransferRecovery) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
+// Choice methods for FeeTransferRecovery
+
+// WithdrawInstruction exercises the WithdrawInstruction choice on this FeeTransferRecovery contract
+// This method uses the package name in the template ID
+func (t FeeTransferRecovery) WithdrawInstruction(contractID string, args WithdrawInstruction) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeTreasury", "FeeTransferRecovery"),
+		ContractID: contractID,
+		Choice:     "WithdrawInstruction",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// WithdrawInstructionWithPackageID exercises the WithdrawInstruction choice using the provided package ID instead of package name
+func (t FeeTransferRecovery) WithdrawInstructionWithPackageID(contractID string, packageID string, args WithdrawInstruction) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeTreasury", "FeeTransferRecovery"),
+		ContractID: contractID,
+		Choice:     "WithdrawInstruction",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Archive exercises the Archive choice on this FeeTransferRecovery contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t FeeTransferRecovery) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeTreasury", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t FeeTransferRecovery) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeTreasury", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
+	}
+}
+
+// DiscardRecovery exercises the DiscardRecovery choice on this FeeTransferRecovery contract
+// This method uses the package name in the template ID
+func (t FeeTransferRecovery) DiscardRecovery(contractID string, args DiscardRecovery) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeTreasury", "FeeTransferRecovery"),
+		ContractID: contractID,
+		Choice:     "DiscardRecovery",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// DiscardRecoveryWithPackageID exercises the DiscardRecovery choice using the provided package ID instead of package name
+func (t FeeTransferRecovery) DiscardRecoveryWithPackageID(contractID string, packageID string, args DiscardRecovery) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeTreasury", "FeeTransferRecovery"),
+		ContractID: contractID,
+		Choice:     "DiscardRecovery",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypoint exercises the MCMSReceiver_Entrypoint choice on this FeeTransferRecovery contract via the IMCMSReceiver interface
+// This method uses the package name in the template ID
+func (t FeeTransferRecovery) MCMSReceiverEntrypoint(contractID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "CCIP.FeeTreasury", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// MCMSReceiverEntrypointWithPackageID exercises the MCMSReceiver_Entrypoint choice using the provided package ID instead of package name
+func (t FeeTransferRecovery) MCMSReceiverEntrypointWithPackageID(contractID string, packageID string, args api.MCMSReceiverEntrypoint) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "CCIP.FeeTreasury", "MCMSReceiver"),
+		ContractID: contractID,
+		Choice:     "MCMSReceiver_Entrypoint",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Verify interface implementations for FeeTransferRecovery
+
+var _ api.IMCMSReceiver = (*FeeTransferRecovery)(nil)
 
 // FeeWithdrawalAuthorization is a Template type
 type FeeWithdrawalAuthorization struct {
@@ -627,14 +840,48 @@ func (t *WithdrawAuthorization) UnmarshalHex(data string) error {
 	return hexCodec.Unmarshal(data, t)
 }
 
+// WithdrawInstruction is a Record type
+type WithdrawInstruction struct {
+}
+
+// ToMap converts WithdrawInstruction to a map for DAML arguments
+func (t WithdrawInstruction) ToMap() map[string]any {
+	m := make(map[string]any)
+	return m
+}
+
+func (t WithdrawInstruction) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshal(t)
+}
+
+func (t *WithdrawInstruction) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshal(data, t)
+}
+
+// MarshalHex encodes WithdrawInstruction to hex string (Canton MCMS format)
+func (t WithdrawInstruction) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes WithdrawInstruction from hex string (Canton MCMS format)
+func (t *WithdrawInstruction) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 	AuthorizeFeeWithdrawal(args AuthorizeFeeWithdrawal) (*bind.EncodedChoice, error)
 	AuthorizeFeeWithdrawalParams(args AuthorizeFeeWithdrawalParams) (*bind.EncodedChoice, error)
 	CleanupExpiredAuthorization(args CleanupExpiredAuthorization) (*bind.EncodedChoice, error)
+	DiscardRecovery(args DiscardRecovery) (*bind.EncodedChoice, error)
 	ExecuteFeeWithdrawal(args ExecuteFeeWithdrawal) (*bind.EncodedChoice, error)
 	WithdrawAuthorization(args WithdrawAuthorization) (*bind.EncodedChoice, error)
+	WithdrawInstruction(args WithdrawInstruction) (*bind.EncodedChoice, error)
 }
 
 // encoder provides typed encoding methods for choice parameters (unexported).
@@ -679,6 +926,11 @@ func (e *encoder) CleanupExpiredAuthorization(args CleanupExpiredAuthorization) 
 	return e.EncodeChoiceArgs("CleanupExpiredAuthorization", args)
 }
 
+// DiscardRecovery encodes parameters for the DiscardRecovery choice.
+func (e *encoder) DiscardRecovery(args DiscardRecovery) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("DiscardRecovery", args)
+}
+
 // ExecuteFeeWithdrawal encodes parameters for the ExecuteFeeWithdrawal choice.
 func (e *encoder) ExecuteFeeWithdrawal(args ExecuteFeeWithdrawal) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("ExecuteFeeWithdrawal", args)
@@ -687,6 +939,11 @@ func (e *encoder) ExecuteFeeWithdrawal(args ExecuteFeeWithdrawal) (*bind.Encoded
 // WithdrawAuthorization encodes parameters for the WithdrawAuthorization choice.
 func (e *encoder) WithdrawAuthorization(args WithdrawAuthorization) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("WithdrawAuthorization", args)
+}
+
+// WithdrawInstruction encodes parameters for the WithdrawInstruction choice.
+func (e *encoder) WithdrawInstruction(args WithdrawInstruction) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("WithdrawInstruction", args)
 }
 
 // Verify MCMSEncoder interface implementation

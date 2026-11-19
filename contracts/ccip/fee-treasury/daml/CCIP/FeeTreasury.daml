@@ -7,16 +7,19 @@
 --      mining-round context). Not subject to MCMS validateTargetCidsSize cap.
 module CCIP.FeeTreasury where
 
+import DA.Action (when)
 import DA.Crypto.Text (byteCount)
 import DA.Map qualified as Map
 import DA.Time (addRelTime, seconds)
 
 import Splice.Api.Token.HoldingV1 (Holding, InstrumentId(..))
-import Splice.Api.Token.MetadataV1 (ExtraArgs, emptyMetadata)
+import Splice.Api.Token.MetadataV1 (ExtraArgs(..), emptyChoiceContext, emptyMetadata)
 import Splice.Api.Token.TransferInstructionV1 (
     Transfer(..),
     TransferFactory,
     TransferFactory_Transfer(..),
+    TransferInstruction,
+    TransferInstruction_Withdraw(..),
     TransferInstructionResult,
     TransferInstructionResult_Output(..),
     )
@@ -40,15 +43,17 @@ template MCMSFeeTreasury
 
         ensure assertValidInstanceId instanceId
 
-        -- Nonconsuming: authorizing does not mutate the treasury. The single-use
-        -- capability is the created FeeWithdrawalAuthorization contract itself (its
-        -- ContractId), consumed by ExecuteFeeWithdrawal, WithdrawAuthorization, or
-        -- CleanupExpiredAuthorization.
+        -- Nonconsuming: authorizing does not mutate the treasury. The capability is the
+        -- created FeeWithdrawalAuthorization contract itself, consumed by
+        -- ExecuteFeeWithdrawal, WithdrawAuthorization, or CleanupExpiredAuthorization.
+        -- A partial ExecuteFeeWithdrawal recreates it with the unused cap.
         nonconsuming choice AuthorizeFeeWithdrawal : ContractId FeeWithdrawalAuthorization
             with
                 params : AuthorizeFeeWithdrawalParams
             controller feeOwner
             do
+                assertMsg "feetreasury: maxAmount must be positive" (params.maxAmount > 0.0)
+                assertMsg "feetreasury: validitySecs must be positive" (params.validitySecs > 0)
                 now <- getTime
                 let expiresAt = now `addRelTime` seconds params.validitySecs
                 create FeeWithdrawalAuthorization with
@@ -85,10 +90,13 @@ template MCMSFeeTreasury
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 
--- | Single-use MCMS-approved authorization to withdraw fees from feeOwner.
+-- | MCMS-approved authorization to withdraw up to maxAmount of fees from feeOwner.
 -- Anyone can submit ExecuteFeeWithdrawal — security comes from the locked policy
 -- (recipient, instrument, amount cap, expiry), not from restricting who calls it.
--- instanceId makes this authorization independently addressable by MCMS for cancellation.
+-- A partial withdrawal recreates the contract with the unused cap, so a small amount
+-- cannot burn the approval and total spend stays within the approved maxAmount.
+-- instanceId makes this authorization independently addressable by MCMS for cancellation,
+-- and it carries over to the recreated contract.
 template FeeWithdrawalAuthorization
     with
         instanceId     : Text
@@ -103,6 +111,7 @@ template FeeWithdrawalAuthorization
         observer recipient, mcmsController
 
         ensure assertValidInstanceId instanceId
+            && maxAmount > 0.0
 
         -- | Execute the MCMS-approved withdrawal with live CIDs and disclosed context.
         choice ExecuteFeeWithdrawal : TransferInstructionResult
@@ -138,7 +147,25 @@ template FeeWithdrawalAuthorization
                 case result.output of
                     TransferInstructionResult_Failed ->
                         abort "feetreasury: token transfer failed"
-                    _ -> pure result
+                    _ -> do
+                        -- A pending instruction locks feeOwner holdings and its Withdraw is
+                        -- sender-controlled, so MCMS needs its own way to reach it. The id
+                        -- separates it from the authorization and earlier recoveries.
+                        case result.output of
+                            TransferInstructionResult_Pending transferInstructionCid -> do
+                                _ <- create FeeTransferRecovery with
+                                    instanceId = instanceId <> "-recovery-" <> show maxAmount
+                                    feeOwner
+                                    mcmsController
+                                    transferInstructionCid
+                                    executeBefore = expiresAt
+                                pure ()
+                            _ -> pure ()
+                        let remainingAmount = maxAmount - amount
+                        when (remainingAmount > 0.0) do
+                            _ <- create this with maxAmount = remainingAmount
+                            pure ()
+                        pure result
 
         -- | Cancel an unused authorization (e.g. after expiry or policy change).
         choice WithdrawAuthorization : ()
@@ -169,5 +196,62 @@ template FeeWithdrawalAuthorization
                     "WithdrawAuthorization" -> do
                         assertMsg "E_TRAILING_BYTES: WithdrawAuthorization" (byteCount operationData == 0)
                         _ <- exercise selfCid WithdrawAuthorization
+                        pure (Map.delete instAddr contractIds)
+                    _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
+
+
+-- | Withdraw path for a pending fee transfer whose recipient never acted. The
+-- | instruction's Withdraw is sender-controlled and the sender is feeOwner,
+-- | which acts through MCMS.
+template FeeTransferRecovery
+    with
+        instanceId             : Text
+        feeOwner               : Party
+        mcmsController         : Party
+        transferInstructionCid : ContractId TransferInstruction
+        executeBefore          : Time
+    where
+        signatory feeOwner
+        observer mcmsController
+
+        ensure assertValidInstanceId instanceId
+
+        -- | Only once executeBefore has passed: until then the recipient keeps sole
+        -- | control of the outcome, matching the instruction's own accept deadline.
+        choice WithdrawInstruction : TransferInstructionResult
+            controller feeOwner
+            do
+                now <- getTime
+                assertMsg "feetreasury: executeBefore has not passed" (now >= executeBefore)
+                exercise transferInstructionCid TransferInstruction_Withdraw with
+                    extraArgs = ExtraArgs with
+                        context = emptyChoiceContext
+                        meta = emptyMetadata
+
+        -- | Cleanup once the instruction is archived. The ledger cannot prove from
+        -- | here that it is gone, so this stays a governance judgment.
+        choice DiscardRecovery : ()
+            controller feeOwner
+            do pure ()
+
+        interface instance MCMSReceiver for FeeTransferRecovery where
+            view = MCMSReceiverView with
+                mcmsController
+                instanceId
+
+            mcmsEntrypoint functionName operationData contractIds = do
+                let instAddr = RawInstanceAddress.makeText instanceId feeOwner
+                selfCid <- case Map.lookup instAddr contractIds of
+                    None -> abort $ "E_SELF_CID_NOT_IN_MAP: " <> instAddr
+                    Some cid -> pure (coerceContractId cid : ContractId FeeTransferRecovery)
+
+                case functionName of
+                    "Withdraw" -> do
+                        assertMsg "E_TRAILING_BYTES: Withdraw" (byteCount operationData == 0)
+                        _ <- exercise selfCid WithdrawInstruction
+                        pure (Map.delete instAddr contractIds)
+                    "Discard" -> do
+                        assertMsg "E_TRAILING_BYTES: Discard" (byteCount operationData == 0)
+                        exercise selfCid DiscardRecovery
                         pure (Map.delete instAddr contractIds)
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
