@@ -23,6 +23,7 @@ import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import CCIP.FeeTreasury (
     MCMSFeeTreasury(..),
     FeeWithdrawalAuthorization(..),
+    FeeTransferRecovery(..),
     CleanupExpiredAuthorization(..),
     ExecuteFeeWithdrawal(..),
     WithdrawAuthorization(..),
@@ -670,3 +671,86 @@ testFeeTreasuryMCMSEntrypoint_AuthorizeThenWithdrawSameBatch = script do
 
     auths <- query @FeeWithdrawalAuthorization feeOwner
     length auths === 0
+
+-- ========================================================
+-- |   Pending transfer recovered through MCMS             |
+-- ========================================================
+
+testFeeTreasury_PendingTransferRecoveredViaMCMS : Script ()
+testFeeTreasury_PendingTransferRecoveredViaMCMS = script do
+    feeOwner   <- allocateParty "fee_owner"
+    recipient  <- allocateParty "recipient"
+    tokenAdmin <- allocateParty "token_admin"
+
+    -- A separate token admin holds the locked funds, so feeOwner's own balance
+    -- shows when they are locked and when they come back.
+    let instrumentId = InstrumentId tokenAdmin "FeeToken"
+        ownBalance = do
+            holdings <- query @TestToken.TestHolding feeOwner
+            pure (sum [h.amount | (_, h) <- holdings, h.owner == feeOwner])
+
+    holdingCid <- submit (actAs feeOwner <> actAs tokenAdmin) do
+        createCmd TestToken.TestHolding with
+            owner = feeOwner; admin = tokenAdmin; instrumentId; amount = 100.0
+
+    factoryCid <- submit tokenAdmin do
+        createCmd TestToken.TestTransferFactory with admin = tokenAdmin
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId = "fee-treasury-recovery-test"
+            feeOwner; mcmsController = feeOwner
+
+    authCid <- authorizeViaEntrypoint feeOwner "fee-treasury-recovery-test" treasuryCid
+        AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-recovery-test"
+            recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
+
+    now <- getTime
+    disclosedFactory <- fromSome <$> queryDisclosure tokenAdmin factoryCid
+    disclosedHolding <- fromSome <$> queryDisclosure feeOwner holdingCid
+
+    -- The recipient executes; no preapproval, so the transfer goes pending.
+    result <- submit (actAs recipient <> disclose disclosedFactory <> disclose disclosedHolding) do
+        exerciseCmd authCid ExecuteFeeWithdrawal with
+            submitter          = recipient
+            transferFactoryCid = toInterfaceContractId @TransferFactory factoryCid
+            inputHoldingCids   = [toInterfaceContractId holdingCid]
+            amount             = 100.0
+            extraArgs          = ExtraArgs emptyChoiceContext emptyMetadata
+            requestedAt        = now
+    case result.output of
+        TransferInstructionResult_Pending _ -> pure ()
+        _ -> abort "Expected TransferInstructionResult_Pending"
+
+    balanceLocked <- ownBalance
+    balanceLocked === 0.0
+
+    recoveries <- query @FeeTransferRecovery feeOwner
+    length recoveries === 1
+    let (recoveryCid, recovery) = head recoveries
+        recoveryId   = "fee-withdrawal-recovery-test-recovery-100.0"
+        recoveryAddr = RawInstanceAddress.makeText recoveryId feeOwner
+        withdrawViaMCMS = exerciseCmd (toInterfaceContractId @MCMSReceiver recoveryCid) MCMSReceiver_Entrypoint with
+            functionName  = "Withdraw"
+            operationData = ""
+            contractIds   = Map.fromList [(recoveryAddr, coerceContractId recoveryCid)]
+    recovery.instanceId === recoveryId
+
+    -- The token admin holds the locked funds; the registry discloses them, as with Amulet.
+    lockedHoldings <- query @TestToken.TestHolding tokenAdmin
+    let [(lockedCid, _)] = filter (\(_, h) -> h.owner == tokenAdmin) lockedHoldings
+    disclosedLocked <- fromSome <$> queryDisclosure tokenAdmin lockedCid
+
+    -- Until executeBefore the recipient keeps control of the outcome.
+    submitMustFail (actAs feeOwner <> disclose disclosedLocked) withdrawViaMCMS
+
+    passTime (seconds 3601)
+
+    updatedMap <- submit (actAs feeOwner <> disclose disclosedLocked) withdrawViaMCMS
+    Map.lookup recoveryAddr updatedMap === None
+
+    remaining <- query @FeeTransferRecovery feeOwner
+    length remaining === 0
+    balanceBack <- ownBalance
+    balanceBack === 100.0
