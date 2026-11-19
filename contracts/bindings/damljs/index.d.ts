@@ -28,8 +28,11 @@ declare const packages: {
     readonly 'ccip-receiver-v2-2.0.0': typeof import('./ccip-receiver-v2-2.0.0');
     readonly 'ccip-receiver-v2-2.1.0': typeof import('./ccip-receiver-v2-2.1.0');
     readonly 'ccip-registry-burn-mint-token-pool-1.0.0': typeof import('./ccip-registry-burn-mint-token-pool-1.0.0');
+    readonly 'ccip-registry-burn-mint-token-pool-v2-2.0.0': typeof import('./ccip-registry-burn-mint-token-pool-v2-2.0.0');
     readonly 'ccip-registry-lock-release-token-pool-1.0.0': typeof import('./ccip-registry-lock-release-token-pool-1.0.0');
+    readonly 'ccip-registry-lock-release-token-pool-v2-2.0.0': typeof import('./ccip-registry-lock-release-token-pool-v2-2.0.0');
     readonly 'ccip-registry-rate-limiter-1.0.0': typeof import('./ccip-registry-rate-limiter-1.0.0');
+    readonly 'ccip-registry-rate-limiter-v2-2.0.0': typeof import('./ccip-registry-rate-limiter-v2-2.0.0');
     readonly 'ccip-runtime-v2-2.0.0': typeof import('./ccip-runtime-v2-2.0.0');
     readonly 'ccip-runtime-v2-2.1.0': typeof import('./ccip-runtime-v2-2.1.0');
     readonly 'ccip-runtime-v2-2.1.1': typeof import('./ccip-runtime-v2-2.1.1');

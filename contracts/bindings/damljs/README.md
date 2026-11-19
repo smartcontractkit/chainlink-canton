@@ -6,13 +6,15 @@ The package is published to npm automatically on `contracts/vX.Y.Z` releases (se
 
 ## Publishing
 
-Publishing runs on every `contracts/vX.Y.Z` tag in the [`release-publish` workflow](../../../.github/workflows/release-publish.yaml), gated by the `NPM_PUBLISH_ENABLED` repository variable. It uses npm trusted publishing (OIDC) via the `publish` GitHub environment — no long-lived npm token is stored.
+Publishing runs on every `contracts/vX.Y.Z` tag in the [`release-publish` workflow](../../../.github/workflows/release-publish.yaml). It uses npm trusted publishing (OIDC) via the `publish` GitHub environment — no long-lived npm token is stored.
 
-Activation checklist:
+The package can also be published manually by dispatching the workflow from the default branch — e.g. for an initial publish whose release tag predates this workflow:
 
-1. Configure npm trusted publishing for `@chainlink/canton-contracts` (workflow `release-publish.yaml`, job `publish-npm-bindings`, environment `publish`).
-2. Ensure the `publish` GitHub environment exists in this repository.
-3. Set the `NPM_PUBLISH_ENABLED` repository variable to `true`.
+```bash
+gh workflow run release-publish.yaml
+```
+
+Manual dispatch publishes the committed version of the selected ref; on a `contracts/vX.Y.Z` ref the version is re-stamped from the tag as a safeguard.
 
 ## Installation
 
