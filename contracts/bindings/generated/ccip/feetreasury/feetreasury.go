@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-fee-treasury"
-	PackageID   = "e346a468f1800c80a13cc0dbff31634fb748db2151b6e098ace177d446b1cde8"
+	PackageID   = "1f19a8029957a63364bdccc8ddfaaef3cd3f986d02ffb6ad15ad1a093355cb57"
 	SDKVersion  = "3.4.11"
 )
 

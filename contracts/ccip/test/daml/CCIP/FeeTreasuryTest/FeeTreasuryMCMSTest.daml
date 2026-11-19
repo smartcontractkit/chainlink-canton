@@ -97,6 +97,68 @@ testFeeTreasuryMCMSEntrypoint_AuthorizeFeeWithdrawal = script do
     auth.instrumentId    === instrumentId
     auth.maxAmount       === 500.0
 
+testFeeTreasuryMCMSEntrypoint_RejectsZeroValiditySecs : Script ()
+testFeeTreasuryMCMSEntrypoint_RejectsZeroValiditySecs = script do
+    feeOwner  <- allocateParty "fee_owner"
+    recipient <- allocateParty "recipient"
+
+    let instanceId   = "fee-treasury-zero-validity-test"
+        instrumentId = InstrumentId feeOwner "FeeToken"
+        instAddr     = RawInstanceAddress.makeText instanceId feeOwner
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId
+            feeOwner
+            mcmsController = feeOwner
+
+    let params = AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-zero-validity-test"
+            recipient
+            instrumentId
+            maxAmount    = 500.0
+            validitySecs = 0
+
+    submitMustFail feeOwner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver treasuryCid) MCMSReceiver_Entrypoint with
+            functionName  = "AuthorizeFeeWithdrawal"
+            operationData = encodeAuthorizeFeeWithdrawalParams params
+            contractIds   = Map.fromList [(instAddr, coerceContractId treasuryCid)]
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 0
+
+testFeeTreasuryMCMSEntrypoint_RejectsZeroMaxAmount : Script ()
+testFeeTreasuryMCMSEntrypoint_RejectsZeroMaxAmount = script do
+    feeOwner  <- allocateParty "fee_owner"
+    recipient <- allocateParty "recipient"
+
+    let instanceId   = "fee-treasury-zero-cap-test"
+        instrumentId = InstrumentId feeOwner "FeeToken"
+        instAddr     = RawInstanceAddress.makeText instanceId feeOwner
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId
+            feeOwner
+            mcmsController = feeOwner
+
+    let params = AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-zero-cap-test"
+            recipient
+            instrumentId
+            maxAmount    = 0.0
+            validitySecs = 3600
+
+    submitMustFail feeOwner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver treasuryCid) MCMSReceiver_Entrypoint with
+            functionName  = "AuthorizeFeeWithdrawal"
+            operationData = encodeAuthorizeFeeWithdrawalParams params
+            contractIds   = Map.fromList [(instAddr, coerceContractId treasuryCid)]
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 0
+
 -- ========================================================
 -- |   ExecuteFeeWithdrawal: Completed (with preapproval)  |
 -- ========================================================

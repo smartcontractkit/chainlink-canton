@@ -52,6 +52,8 @@ template MCMSFeeTreasury
                 params : AuthorizeFeeWithdrawalParams
             controller feeOwner
             do
+                assertMsg "feetreasury: maxAmount must be positive" (params.maxAmount > 0.0)
+                assertMsg "feetreasury: validitySecs must be positive" (params.validitySecs > 0)
                 now <- getTime
                 let expiresAt = now `addRelTime` seconds params.validitySecs
                 create FeeWithdrawalAuthorization with
@@ -109,6 +111,7 @@ template FeeWithdrawalAuthorization
         observer recipient, mcmsController
 
         ensure assertValidInstanceId instanceId
+            && maxAmount > 0.0
 
         -- | Execute the MCMS-approved withdrawal with live CIDs and disclosed context.
         choice ExecuteFeeWithdrawal : TransferInstructionResult
