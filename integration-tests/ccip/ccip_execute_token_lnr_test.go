@@ -55,6 +55,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_token_sender_receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/lock_release_token_pool"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
@@ -156,9 +157,11 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	require.NoError(t, err)
 	executorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV1, contracts.DevVersion)
+	require.NoError(t, err)
 
 	// Upload DARs to all participants
-	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, tokenPoolDar, ccipReceiverDar, executorDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, tokenPoolDar, ccipReceiverDar, executorDar, globalSenderReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant, tokenPoolOwnerParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -207,7 +210,6 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
-	versionTag := "e9a05a20"
 	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
 
 	reporter := cld_ops.NewMemoryReporter()
@@ -238,7 +240,7 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
-							VersionTag:                   types.TEXT(versionTag),
+							VersionTag:                   committeeverifier.VersionTagV200,
 							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
@@ -307,6 +309,9 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 	_, rmnRemoteAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), rmn_remote.ContractType, rmn_remote.Version, "")
 	require.NoError(t, err, "failed to get RMNRemote address")
 	_, perPartyRouterFactoryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), per_party_router_factory.ContractType, per_party_router_factory.Version, "")
+	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+	_, globalTokenSenderReceiverAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_token_sender_receiver.ContractType, global_token_sender_receiver.Version, "")
+	require.NoError(t, err, "failed to get GlobalTokenSenderReceiver address")
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
 
 	// Deploy and configure lane (CCIP 2.0 lanes sequence, same as ccip_execute_test)
@@ -522,6 +527,10 @@ func runLnRTokenPoolReceiveFlowTest(t *testing.T, tc lnrTokenPoolReceiveFlowTest
 				FeeQuoter: config.ContractIdentifier{
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
+				},
+				GlobalTokenSenderReceiver: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: globalTokenSenderReceiverAddress.InstanceAddress(),
 				},
 				CcipOwner: partyCCIP,
 			},

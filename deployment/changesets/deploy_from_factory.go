@@ -16,6 +16,7 @@ import (
 
 	factorybindings "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/factory"
 	factoryops "github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/factory"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_token_sender_receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/linkregistry"
 	"github.com/smartcontractkit/chainlink-canton/deployment/sequences"
 	dsutils "github.com/smartcontractkit/chainlink-canton/deployment/utils/datastore"
@@ -288,6 +289,72 @@ func (d DeployLinkTokenFromFactory) Apply(e cldf.Environment, config CantonCSDep
 	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployLinkTokenFromFactory, chain, params)
 	if err != nil {
 		return cldf.ChangesetOutput{}, fmt.Errorf("deploy link token from factory: %w", err)
+	}
+
+	for _, addrRef := range out.Output.Addresses {
+		if err := ds.AddressRefStore.Add(addrRef); err != nil {
+			return cldf.ChangesetOutput{}, fmt.Errorf("store address ref %v: %w", addrRef, err)
+		}
+	}
+
+	return buildFactoryDeployChangesetOutput(
+		e, chain, config.ChainSelector, config.Participant, params.ProposalDriven,
+		cantonmcms.QualifierCCIPOwner, config.Config.MinDelay, config.Config.Description, ds, out.Output.BatchOps,
+	)
+}
+
+// --- DeployGlobalTokenSenderReceiverFromFactory ---
+
+type DeployGlobalTokenSenderReceiverFromFactoryConfig struct {
+	OwnerParty     string        `json:"ownerParty" yaml:"ownerParty"`
+	CCIPOwnerParty string        `json:"ccipOwnerParty" yaml:"ccipOwnerParty"`
+	MinDelay       time.Duration `json:"minDelay,omitempty" yaml:"minDelay,omitempty"`
+	Description    string        `json:"description,omitempty" yaml:"description,omitempty"`
+	Params         sequences.DeployGlobalTokenSenderReceiverFromFactoryParams
+}
+
+type DeployGlobalTokenSenderReceiverFromFactory struct{}
+
+var _ cldf.ChangeSetV2[CantonCSDeps[DeployGlobalTokenSenderReceiverFromFactoryConfig]] = DeployGlobalTokenSenderReceiverFromFactory{}
+
+func (d DeployGlobalTokenSenderReceiverFromFactory) VerifyPreconditions(e cldf.Environment, config CantonCSDeps[DeployGlobalTokenSenderReceiverFromFactoryConfig]) error {
+	if err := requireFactoryDeployOwnerParties(config.Config.OwnerParty, config.Config.CCIPOwnerParty); err != nil {
+		return err
+	}
+	_, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
+	if err != nil {
+		return fmt.Errorf("core CCIPFactory must be deployed first: %w", err)
+	}
+	if _, err := e.DataStore.Addresses().Get(datastore.NewAddressRefKey(
+		config.ChainSelector,
+		datastore.ContractType(global_token_sender_receiver.ContractType),
+		global_token_sender_receiver.Version,
+		"",
+	)); err == nil {
+		return fmt.Errorf("GlobalTokenSenderReceiver is already deployed for chain %d", config.ChainSelector)
+	}
+
+	return nil
+}
+
+func (d DeployGlobalTokenSenderReceiverFromFactory) Apply(e cldf.Environment, config CantonCSDeps[DeployGlobalTokenSenderReceiverFromFactoryConfig]) (cldf.ChangesetOutput, error) {
+	ds := datastore.NewMemoryDataStore()
+	chain := e.BlockChains.CantonChains()[config.ChainSelector]
+	participant := chain.Participants[config.Participant]
+
+	factoryRef, err := dsutils.FactoryAddressRef(e.DataStore, config.ChainSelector, dsutils.QualifierCCIP)
+	if err != nil {
+		return cldf.ChangesetOutput{}, err
+	}
+
+	params := config.Config.Params
+	params.CCIPOwnerParty = config.Config.CCIPOwnerParty
+	params.FactoryAddressRef = factoryRef
+	params.ProposalDriven = len(participant.ReadAsPartyIDs) > 0
+
+	out, err := operations.ExecuteSequence(e.OperationsBundle, sequences.DeployGlobalTokenSenderReceiverFromFactory, chain, params)
+	if err != nil {
+		return cldf.ChangesetOutput{}, fmt.Errorf("deploy GlobalTokenSenderReceiver from factory: %w", err)
 	}
 
 	for _, addrRef := range out.Output.Addresses {

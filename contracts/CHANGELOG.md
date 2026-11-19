@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.3.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.2.0...contracts/v2.3.0) (2026-11-18)
+
+
+### Features
+
+* Add Global Token Sender Receiver contract ([#1235](https://github.com/smartcontractkit/chainlink-canton/issues/1235)) ([a66a3e2](https://github.com/smartcontractkit/chainlink-canton/commit/a66a3e29320943ded68a15d3564e9659efcabfb7))
+* **contracts:** Accept pending lock transfers in LRTP ([#1199](https://github.com/smartcontractkit/chainlink-canton/issues/1199)) ([fa58b01](https://github.com/smartcontractkit/chainlink-canton/commit/fa58b016268b20fcbe7b9e459d58cbb70e059add))
+* **contracts:** Decouple registry pools from ccip-core via APIV2 interfaces; fresh -v2 lineage ([#1222](https://github.com/smartcontractkit/chainlink-canton/issues/1222)) ([f4a0aa9](https://github.com/smartcontractkit/chainlink-canton/commit/f4a0aa9408be5ae437675f8cda8a39a5d3c87f01))
+* **contracts:** Deploy LinkTokenAdmin and registry burn-mint pool from FactoryV2 ([#1225](https://github.com/smartcontractkit/chainlink-canton/issues/1225)) ([16fbaf9](https://github.com/smartcontractkit/chainlink-canton/commit/16fbaf997442d5b40900024c92bd73b846a9092d))
+* **contracts:** Deploy registry rate limiters from FactoryV2 ([#1236](https://github.com/smartcontractkit/chainlink-canton/issues/1236)) ([f101324](https://github.com/smartcontractkit/chainlink-canton/commit/f101324ded92a0a6e5ae244573253fba7e18a043))
+* **contracts:** MCMS-governed LinkTokenAdmin for registry-issued LINK ([#1113](https://github.com/smartcontractkit/chainlink-canton/issues/1113)) ([ad4f03c](https://github.com/smartcontractkit/chainlink-canton/commit/ad4f03c7090ea4f5b2ea9a0189b36cbc39b67a81))
+* **deployment:** Deploy and govern LinkTokenAdmin through MCMS ([#1227](https://github.com/smartcontractkit/chainlink-canton/issues/1227)) ([aaed779](https://github.com/smartcontractkit/chainlink-canton/commit/aaed7798db8f230f5450c8c5f3b7f2f308b38bf0))
+
+
+### Bug Fixes
+
+* Bind registry to configued address  ([#1259](https://github.com/smartcontractkit/chainlink-canton/issues/1259)) ([9b6b638](https://github.com/smartcontractkit/chainlink-canton/commit/9b6b638b6b6507ae754644fa954c85779e2c99bc))
+* **contracts:** Carry accept-step sender change into LockOrBurn result ([#1218](https://github.com/smartcontractkit/chainlink-canton/issues/1218)) ([03e0f46](https://github.com/smartcontractkit/chainlink-canton/commit/03e0f46f45d9d362e0561c75b4b9e3b4b822ff08))
+* **contracts:** Reuse accepted TAR admin in Initialize; validate timeouts and rate limits ([#1221](https://github.com/smartcontractkit/chainlink-canton/issues/1221)) ([90c3b76](https://github.com/smartcontractkit/chainlink-canton/commit/90c3b76ff5d9899b73e6b8dedd2d683adc4ab60a))
+
 ## [2.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.1.1...contracts/v2.2.0) (2026-10-26)
 
 
