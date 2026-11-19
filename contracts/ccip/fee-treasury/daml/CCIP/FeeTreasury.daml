@@ -77,10 +77,11 @@ template MCMSFeeTreasury
                             None -> abort "E_INVALID_PARAMS: AuthorizeFeeWithdrawal"
                             Some (params, finalOffset) -> do
                                 assertMsg "E_TRAILING_BYTES: AuthorizeFeeWithdrawal" (finalOffset == byteCount operationData)
-                                _ <- exercise selfCid AuthorizeFeeWithdrawal with params
-                                -- AuthorizeFeeWithdrawal is nonconsuming: the treasury CID is
-                                -- unchanged, so the contractIds map is returned as-is.
-                                pure contractIds
+                                authorizationCid <- exercise selfCid AuthorizeFeeWithdrawal with params
+                                -- Insert the created authorization under its own instance
+                                -- address so a later call in the same batch can target it.
+                                let authorizationAddr = RawInstanceAddress.makeText params.authorizationId feeOwner
+                                pure (Map.insert authorizationAddr (coerceContractId authorizationCid) contractIds)
                     _ -> abort $ "E_UNKNOWN_FUNCTION: " <> functionName
 
 

@@ -84,8 +84,6 @@ testFeeTreasuryMCMSEntrypoint_AuthorizeFeeWithdrawal = script do
             operationData = encoded
             contractIds   = Map.fromList [(instAddr, coerceContractId treasuryCid)]
 
-    -- AuthorizeFeeWithdrawal is nonconsuming: the entrypoint returns the map unchanged,
-    -- so the treasury CID still resolves to the (still-active) treasury.
     let Some selfCidBack = Map.lookup instAddr updatedMap
     Some _ <- queryContractId feeOwner (coerceContractId selfCidBack : ContractId MCMSFeeTreasury)
 
@@ -566,3 +564,49 @@ testFeeTreasury_ExecuteFeeWithdrawal_TransferFailed = script do
             amount             = 50.0
             extraArgs          = ExtraArgs emptyChoiceContext emptyMetadata
             requestedAt        = now
+
+testFeeTreasuryMCMSEntrypoint_AuthorizeThenWithdrawSameBatch : Script ()
+testFeeTreasuryMCMSEntrypoint_AuthorizeThenWithdrawSameBatch = script do
+    feeOwner  <- allocateParty "fee_owner"
+    recipient <- allocateParty "recipient"
+
+    let treasuryInstanceId = "fee-treasury-batch-test"
+        authorizationId    = "fee-withdrawal-batch-test"
+        instrumentId       = InstrumentId feeOwner "FeeToken"
+        treasuryAddr       = RawInstanceAddress.makeText treasuryInstanceId feeOwner
+        authAddr           = RawInstanceAddress.makeText authorizationId feeOwner
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId = treasuryInstanceId
+            feeOwner; mcmsController = feeOwner
+
+    let params = AuthorizeFeeWithdrawalParams with
+            authorizationId
+            recipient
+            instrumentId
+            maxAmount    = 300.0
+            validitySecs = 3600
+
+    batchMap <- submit feeOwner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver treasuryCid) MCMSReceiver_Entrypoint with
+            functionName  = "AuthorizeFeeWithdrawal"
+            operationData = encodeAuthorizeFeeWithdrawalParams params
+            contractIds   = Map.fromList [(treasuryAddr, coerceContractId treasuryCid)]
+
+    authCid <- case Map.lookup authAddr batchMap of
+        None -> abort $ "mcms: no contract ID for instance: " <> authAddr
+        Some cid -> pure (coerceContractId cid : ContractId FeeWithdrawalAuthorization)
+
+    updatedMap <- submit feeOwner do
+        exerciseCmd (toInterfaceContractId @MCMSReceiver authCid) MCMSReceiver_Entrypoint with
+            functionName  = "WithdrawAuthorization"
+            operationData = ""
+            contractIds   = batchMap
+
+    case Map.lookup authAddr updatedMap of
+        None -> pure ()
+        Some _ -> abort "Expected withdrawn authorization to be removed from map"
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 0
