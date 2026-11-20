@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.3.0...eds/v1.4.0) (2026-11-20)
+
+
+### Features
+
+* Add Global Token Sender Receiver contract ([#1235](https://github.com/smartcontractkit/chainlink-canton/issues/1235)) ([a66a3e2](https://github.com/smartcontractkit/chainlink-canton/commit/a66a3e29320943ded68a15d3564e9659efcabfb7))
+
 ## [1.3.0](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.2.1...eds/v1.3.0) (2026-11-17)
 
 
