@@ -16,6 +16,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/exercisechoice"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
@@ -65,6 +66,8 @@ func runInspect(cmd *cobra.Command, args []string) error {
 		return runInspectAddParticipant(ceremonyDir, workflowID, workflowType, asJSON)
 	case ceremony.WorkflowTypeContractDeploy:
 		return runInspectContractDeploy(ceremonyDir, workflowID, workflowType, asJSON)
+	case ceremony.WorkflowTypeExerciseChoice:
+		return runInspectExerciseChoice(ceremonyDir, workflowID, workflowType, asJSON)
 	case ceremony.WorkflowTypeKeyRotation:
 		return runInspectKeyRotation(ceremonyDir, workflowID, workflowType, asJSON)
 	case ceremony.WorkflowTypeAddParticipantWithAcs:
@@ -482,6 +485,57 @@ func contractDeployPhaseLabel(p contractdeploy.Phase) string {
 	default:
 		return string(p)
 	}
+}
+
+// ── Exercise Choice ──────────────────────────────────────────────────────────
+
+func runInspectExerciseChoice(ceremonyDir, workflowID, workflowType string, asJSON bool) error {
+	wf, err := ceremony.LoadWorkflow[exercisechoice.ExerciseChoiceInput](ceremonyDir)
+	if err != nil {
+		return fmt.Errorf("loading workflow: %w", err)
+	}
+
+	reports, err := ceremony.LoadReports(ceremonyDir)
+	if err != nil {
+		return fmt.Errorf("loading reports: %w", err)
+	}
+
+	reporter := operations.NewMemoryReporter(operations.WithReports(reports))
+	out, found := exercisechoice.QueryState(reporter, wf.Input)
+
+	if asJSON {
+		return emitJSON(workflowID, workflowType, found, string(out.State.Phase), &out)
+	}
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	defer w.Flush()
+
+	fmt.Fprintf(w, "Ceremony ID:\t%s\n", workflowID)
+	fmt.Fprintf(w, "Type:\t%s\n", workflowType)
+	fmt.Fprintf(w, "Choice:\t%s:%s.%s on %s\n", wf.Input.TemplateModule, wf.Input.TemplateEntity, wf.Input.Choice, wf.Input.ContractID)
+
+	if !found {
+		fmt.Fprintf(w, "Phase:\tinit  (no runs recorded yet)\n")
+		return nil
+	}
+
+	s := out.State
+	fmt.Fprintf(w, "Phase:\t%s\n", s.Phase)
+	fmt.Fprintf(w, "Rights granted:\t%d / %d  (%s)\n", len(s.Granted), s.SignRequired, strings.Join(s.Granted, ", "))
+	fmt.Fprintf(w, "Signed:\t%d / %d  (%s)\n", len(s.Signed), s.SignRequired, strings.Join(s.Signed, ", "))
+	if s.PreparedTxHash != "" {
+		fmt.Fprintf(w, "Prepared TX hash:\t%s\n", s.PreparedTxHash)
+	}
+
+	if out.UpdateID != "" {
+		fmt.Fprintln(w)
+		fmt.Fprintf(w, "Update ID:\t%s\n", out.UpdateID)
+		for _, c := range out.CreatedContracts {
+			fmt.Fprintf(w, "Created:\t%s %s\n", c.TemplateID, c.ContractID)
+		}
+	}
+
+	return nil
 }
 
 // ── Key Rotation ─────────────────────────────────────────────────────────────

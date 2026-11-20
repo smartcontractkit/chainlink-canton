@@ -115,7 +115,7 @@ func (s *CeremonyTestSuite) submitCommandsAsParty(
 		}},
 	}
 
-	createdCID, err := submitterLedger.ExecuteSubmission(
+	result, err := submitterLedger.ExecuteSubmission(
 		ctx,
 		prep.GetPreparedTransaction(),
 		partySigs,
@@ -123,7 +123,7 @@ func (s *CeremonyTestSuite) submitCommandsAsParty(
 	)
 	require.NoError(t, err, "ExecuteSubmission")
 
-	return createdCID
+	return result.FirstContractID()
 }
 
 // signHashAs builds a signer for one participant using its KMS config (or

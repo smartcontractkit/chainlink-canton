@@ -26,46 +26,9 @@ func (s *CeremonyTestSuite) runContractDeployFlow(
 	kmsCfgs []client.KMSConfig,
 ) (operations.SequenceReport[contractdeploy.ContractDeployInput, contractdeploy.ContractDeployOutput], []*recordingKMSAPI) {
 	t.Helper()
-	require.Len(t, kmsCfgs, len(s.chain.Participants), "one KMS config per participant")
 
-	ledgerClients := make([]client.LedgerClient, len(s.chain.Participants))
-	for i, p := range s.chain.Participants {
-		lc, conn := s.NewLedgerClient(p)
-		t.Cleanup(func() { _ = conn.Close() })
-		ledgerClients[i] = lc
-	}
-
-	darDir := filepath.Join("..", "..", "..", "contracts", "dars")
-	darLoader := ledger.FileDARLoader(darDir)
-
-	recorders := make([]*recordingKMSAPI, len(s.chain.Participants))
-	deps := make([]ledger.ContractDeployDeps, len(s.chain.Participants))
-	for i, p := range s.chain.Participants {
-		adminConn := s.NewAdminConn(p)
-		t.Cleanup(func() { _ = adminConn.Close() })
-
-		var kmsAPI client.AWSKMSAPI
-		if kmsCfgs[i].ProtocolKeyID != "" {
-			require.NotNil(t, s.KMS, "KMS registry is required for contract deploy KMS signing")
-			recorders[i] = newRecordingKMSAPI(s.KMS.AWSClient())
-			kmsAPI = recorders[i]
-		}
-
-		deps[i] = ledger.ContractDeployDeps{
-			AdminClient:  s.Actors[i].deps.Client,
-			LedgerClient: ledgerClients[i],
-			DARLoader:    darLoader,
-			SignerFactory: client.NewTransactionSignerFactory(
-				s.Actors[i].deps.Client,
-				cryptoadminv30.NewVaultServiceClient(adminConn),
-				kmsCfgs[i],
-				kmsAPI,
-			),
-			Logger: logger.Test(t),
-			UserID: s.chain.Participants[i].UserID,
-		}
-		t.Logf("Participant %d contract deploy signer ready (%s)", i+1, label)
-	}
+	darLoader := ledger.FileDARLoader(filepath.Join("..", "..", "..", "contracts", "dars"))
+	deps, recorders := s.ledgerCeremonyDeps(t, label, kmsCfgs, darLoader)
 
 	input := contractdeploy.ContractDeployInput{
 		DecentralizedPartyID: partyID,
@@ -113,6 +76,51 @@ func (s *CeremonyTestSuite) runContractDeployFlow(
 	s.assertReportsDoNotContainKMS(sharedReporter)
 
 	return sr, recorders
+}
+
+// ledgerCeremonyDeps builds one [ledger.ContractDeployDeps] per participant,
+// each signing with its own KMS key (or the vault when no key is configured).
+func (s *CeremonyTestSuite) ledgerCeremonyDeps(
+	t *testing.T,
+	label string,
+	kmsCfgs []client.KMSConfig,
+	darLoader ledger.DARLoader,
+) ([]ledger.ContractDeployDeps, []*recordingKMSAPI) {
+	t.Helper()
+	require.Len(t, kmsCfgs, len(s.chain.Participants), "one KMS config per participant")
+
+	recorders := make([]*recordingKMSAPI, len(s.chain.Participants))
+	deps := make([]ledger.ContractDeployDeps, len(s.chain.Participants))
+	for i, p := range s.chain.Participants {
+		lc, conn := s.NewLedgerClient(p)
+		t.Cleanup(func() { _ = conn.Close() })
+		adminConn := s.NewAdminConn(p)
+		t.Cleanup(func() { _ = adminConn.Close() })
+
+		var kmsAPI client.AWSKMSAPI
+		if kmsCfgs[i].ProtocolKeyID != "" {
+			require.NotNil(t, s.KMS, "KMS registry is required for KMS signing")
+			recorders[i] = newRecordingKMSAPI(s.KMS.AWSClient())
+			kmsAPI = recorders[i]
+		}
+
+		deps[i] = ledger.ContractDeployDeps{
+			AdminClient:  s.Actors[i].deps.Client,
+			LedgerClient: lc,
+			DARLoader:    darLoader,
+			SignerFactory: client.NewTransactionSignerFactory(
+				s.Actors[i].deps.Client,
+				cryptoadminv30.NewVaultServiceClient(adminConn),
+				kmsCfgs[i],
+				kmsAPI,
+			),
+			Logger: logger.Test(t),
+			UserID: s.chain.Participants[i].UserID,
+		}
+		t.Logf("Participant %d ledger ceremony signer ready (%s)", i+1, label)
+	}
+
+	return deps, recorders
 }
 
 func assertRecordersMatchKMSConfig(t *testing.T, kmsCfgs []client.KMSConfig, recorders []*recordingKMSAPI) {

@@ -17,6 +17,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/addparticipantwithacs"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/contractdeploy"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/example"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/exercisechoice"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
@@ -316,10 +317,8 @@ func executeKickSequence(
 	return nil
 }
 
-// executeContractDeploySequence is the execution kernel for the contract
-// deployment ceremony. It dials both the Admin gRPC (for DAR uploads) and
-// Ledger gRPC (for interactive submission) connections, runs
-// ContractDeploySequence, and persists the ceremony state.
+// executeContractDeploySequence runs ContractDeploySequence and persists the
+// ceremony state.
 func executeContractDeploySequence(
 	ctx context.Context,
 	cfg client.ClientConfig,
@@ -328,9 +327,81 @@ func executeContractDeploySequence(
 	workflowId string,
 	confirmer ceremony.Confirmer,
 ) error {
+	_, err := executeLedgerSequence(ctx, cfg, ledgerCeremony[contractdeploy.ContractDeployInput, contractdeploy.ContractDeployOutput]{
+		sequence:     contractdeploy.ContractDeploySequence,
+		workflowType: ceremony.WorkflowTypeContractDeploy,
+		thresholdErr: contractdeploy.ErrThresholdNotMet,
+		pendingHint:  "Run `resume` again after more participants have uploaded DARs.",
+		logFields: []any{
+			"party", input.DecentralizedPartyID,
+			"package_count", len(input.Packages),
+			"template", input.TemplateModule + ":" + input.TemplateEntity,
+		},
+	}, input, stateDir, workflowId, confirmer)
+
+	return err
+}
+
+// executeExerciseChoiceSequence runs ExerciseChoiceSequence, persists the
+// ceremony state, and prints the committed update on completion.
+func executeExerciseChoiceSequence(
+	ctx context.Context,
+	cfg client.ClientConfig,
+	input exercisechoice.ExerciseChoiceInput,
+	stateDir string,
+	workflowId string,
+	confirmer ceremony.Confirmer,
+) error {
+	out, err := executeLedgerSequence(ctx, cfg, ledgerCeremony[exercisechoice.ExerciseChoiceInput, exercisechoice.ExerciseChoiceOutput]{
+		sequence:     exercisechoice.ExerciseChoiceSequence,
+		workflowType: ceremony.WorkflowTypeExerciseChoice,
+		thresholdErr: exercisechoice.ErrThresholdNotMet,
+		pendingHint:  "Run `resume` again after more participants have granted rights and signed.",
+		logFields: []any{
+			"party", input.DecentralizedPartyID,
+			"template", input.TemplateModule + ":" + input.TemplateEntity,
+			"contract_id", input.ContractID,
+			"choice", input.Choice,
+		},
+	}, input, stateDir, workflowId, confirmer)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Update ID: %s\n", out.UpdateID)
+	for _, c := range out.CreatedContracts {
+		fmt.Printf("Created: %s %s\n", c.TemplateID, c.ContractID)
+	}
+
+	return nil
+}
+
+// ledgerCeremony describes a ceremony that runs on the Ledger API with
+// [ledger.ContractDeployDeps].
+type ledgerCeremony[I, O any] struct {
+	sequence     *operations.Sequence[I, O, ledger.ContractDeployDeps]
+	workflowType string
+	thresholdErr error
+	pendingHint  string
+	logFields    []any
+}
+
+// executeLedgerSequence dials the Admin gRPC (for DAR uploads and topology)
+// and Ledger gRPC (for interactive submission) connections, runs the
+// ceremony's sequence, and persists the ceremony state even on error.
+func executeLedgerSequence[I, O any](
+	ctx context.Context,
+	cfg client.ClientConfig,
+	lc ledgerCeremony[I, O],
+	input I,
+	stateDir string,
+	workflowId string,
+	confirmer ceremony.Confirmer,
+) (O, error) {
+	var zero O
 	lggr, err := newCLILogger()
 	if err != nil {
-		return fmt.Errorf("creating logger: %w", err)
+		return zero, fmt.Errorf("creating logger: %w", err)
 	}
 
 	var previousReports []operations.Report[any, any]
@@ -338,7 +409,7 @@ func executeContractDeploySequence(
 		ceremonyDir := calculateCeremonyDir(stateDir, workflowId)
 		previousReports, err = ceremony.LoadReports(ceremonyDir)
 		if err != nil {
-			return fmt.Errorf("loading previous reports: %w", err)
+			return zero, fmt.Errorf("loading previous reports: %w", err)
 		}
 	}
 	initialRun := workflowId == ""
@@ -350,17 +421,15 @@ func executeContractDeploySequence(
 		reporter,
 	)
 
-	// ── Build Admin gRPC client (for DAR uploads) ─────────────────────
 	adminConn, err := client.Dial(cfg)
 	if err != nil {
-		return fmt.Errorf("connecting to Canton admin API: %w", err)
+		return zero, fmt.Errorf("connecting to Canton admin API: %w", err)
 	}
 	defer adminConn.Close()
 
-	// ── Build Ledger gRPC client (for interactive submission) ─────────
 	ledgerConn, err := client.DialLedger(cfg)
 	if err != nil {
-		return fmt.Errorf("connecting to Canton ledger API: %w", err)
+		return zero, fmt.Errorf("connecting to Canton ledger API: %w", err)
 	}
 	defer ledgerConn.Close()
 
@@ -369,7 +438,7 @@ func executeContractDeploySequence(
 	if cfg.KmsProtocolKeyID != "" {
 		awsCfg, cfgErr := awsconfig.LoadDefaultConfig(ctx)
 		if cfgErr != nil {
-			return fmt.Errorf("loading AWS config for KMS signing: %w", cfgErr)
+			return zero, fmt.Errorf("loading AWS config for KMS signing: %w", cfgErr)
 		}
 		kmsAPI = awskms.NewFromConfig(awsCfg)
 	}
@@ -391,17 +460,13 @@ func executeContractDeploySequence(
 		UserID:    cfg.UserID,
 	}
 
-	lggr.Infow("Running contract-deploy sequence",
-		"party", input.DecentralizedPartyID,
+	lggr.Infow("Running "+lc.workflowType+" sequence", append(lc.logFields,
 		"participant", cfg.ParticipantID,
-		"package_count", len(input.Packages),
-		"template", input.TemplateModule+":"+input.TemplateEntity,
 		"kms_protocol_key", cfg.KmsProtocolKeyID != "",
-	)
+	)...)
 
-	sr, seqErr := operations.ExecuteSequence(bundle, contractdeploy.ContractDeploySequence, deps, input)
+	sr, seqErr := operations.ExecuteSequence(bundle, lc.sequence, deps, input)
 
-	// ── Persist reports (always, even on error) ───────────────────────
 	if workflowId == "" {
 		workflowId = sr.ID
 	}
@@ -418,9 +483,9 @@ func executeContractDeploySequence(
 	}
 
 	if initialRun {
-		state := ceremony.WorkflowState[contractdeploy.ContractDeployInput]{
+		state := ceremony.WorkflowState[I]{
 			CeremonyID: workflowId,
-			Type:       ceremony.WorkflowTypeContractDeploy,
+			Type:       lc.workflowType,
 			Input:      input,
 		}
 		if saveErr := ceremony.SaveWorkflow(ceremonyDir, state); saveErr != nil {
@@ -429,16 +494,16 @@ func executeContractDeploySequence(
 	}
 
 	if seqErr != nil {
-		if strings.Contains(seqErr.Error(), contractdeploy.ErrThresholdNotMet.Error()) {
-			fmt.Fprintf(os.Stderr, "contract-deploy ceremony not yet complete: %v\n", seqErr)
-			fmt.Fprintln(os.Stderr, "Run `resume` again after more participants have uploaded DARs.")
+		if strings.Contains(seqErr.Error(), lc.thresholdErr.Error()) {
+			fmt.Fprintf(os.Stderr, "%s ceremony not yet complete: %v\n", lc.workflowType, seqErr)
+			fmt.Fprintln(os.Stderr, lc.pendingHint)
 			os.Exit(2) //nolint:gocritic // intentional early exit for UX
 		}
 
-		return seqErr
+		return zero, seqErr
 	}
 
-	return nil
+	return sr.Output, nil
 }
 
 // executeAddParticipantSequence is the execution kernel for the real gRPC-backed
