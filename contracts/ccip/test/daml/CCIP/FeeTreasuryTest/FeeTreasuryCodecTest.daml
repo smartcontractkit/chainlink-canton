@@ -1,0 +1,34 @@
+module CCIP.FeeTreasuryTest.FeeTreasuryCodecTest where
+
+import Daml.Script
+import DA.Assert ((===))
+import DA.Optional (fromSome)
+
+import Splice.Api.Token.HoldingV1 (InstrumentId(..))
+
+import CCIP.FeeTreasuryTypes (AuthorizeFeeWithdrawalParams(..))
+import CCIP.FeeTreasuryCodecGen (
+    encodeAuthorizeFeeWithdrawalParams,
+    decodeAuthorizeFeeWithdrawalParamsAt,
+    )
+
+testAuthorizeFeeWithdrawalParamsRoundtrip : Script ()
+testAuthorizeFeeWithdrawalParamsRoundtrip = script do
+    recipient <- allocateParty "recipient"
+    admin     <- allocateParty "admin"
+
+    let instrumentId = InstrumentId admin "FeeToken"
+        params = AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-codec-test"
+            recipient
+            instrumentId
+            maxAmount    = 1000.0
+            validitySecs = 3600
+
+        encoded = encodeAuthorizeFeeWithdrawalParams params
+        decoded = fst (fromSome (decodeAuthorizeFeeWithdrawalParamsAt encoded 0))
+
+    decoded === params
+
+    -- Trailing-bytes check: decoding at wrong offset returns None
+    decodeAuthorizeFeeWithdrawalParamsAt encoded 1 === None

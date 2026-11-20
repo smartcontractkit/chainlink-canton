@@ -54,6 +54,7 @@ const (
 	CCIPFactoryV2                   = Package("ccip-factory-v2")
 	CCIPUserV1                      = Package("ccip-user-v1")
 	CCIPGlobalTokenSenderReceiverV1 = Package("ccip-global-token-sender-receiver-v1")
+	CCIPFeeTreasury                 = Package("ccip-fee-treasury")
 
 	// CCIP - Registry pools (EDS auto-detection observer field; separate template
 	// family from the production/LINK pools above, kept isolated so a bug or spam on
@@ -213,6 +214,7 @@ var Versions map[Package][]string = map[Package][]string{
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
 	MCMSTest:                              []string{DevVersion},
+	CCIPFeeTreasury:                       []string{DevVersion},
 	SpliceApiFeaturedAppV1:                []string{"1.0.0"},
 	SpliceApiTokenAllocationV1:            []string{"1.0.0"},
 	SpliceApiTokenAllocationInstructionV1: []string{"1.0.0"},
@@ -409,6 +411,7 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2: []string{"ccip", "lockreleasetokenpool"},
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
+	CCIPFeeTreasury:            []string{"ccip", "feetreasury"},
 
 	CCIPUserV1:                      []string{"ccip", "user"},
 	CCIPGlobalTokenSenderReceiverV1: []string{"ccip", "globaltokensenderreceiver"},
