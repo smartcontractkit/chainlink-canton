@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.4.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.3.0...contracts/v2.4.0) (2026-11-20)
+
+
+### Features
+
+* **contracts:** Add JS/TypeScript bindings ([#1265](https://github.com/smartcontractkit/chainlink-canton/issues/1265)) ([d6b739e](https://github.com/smartcontractkit/chainlink-canton/commit/d6b739e938382ecd0939d4b43bb810966f14047f))
+
+
+### Bug Fixes
+
+* **contracts:** Keep the lock-release pool's change labelled on release ([#1266](https://github.com/smartcontractkit/chainlink-canton/issues/1266)) ([6ccedfd](https://github.com/smartcontractkit/chainlink-canton/commit/6ccedfd213a3b3dd1aca85a74c8d17f62d23c582))
+
 ## [2.3.0](https://github.com/smartcontractkit/chainlink-canton/compare/contracts/v2.2.0...contracts/v2.3.0) (2026-11-18)
 
 
