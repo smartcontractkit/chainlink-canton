@@ -3,6 +3,7 @@ package tests
 import (
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -114,11 +115,12 @@ func TestFeeTreasury_WithdrawFeesEndToEndViaMCMS(t *testing.T) {
 	require.NoError(t, err)
 	mcmsCid = scheduleBatch(t, participant, ccipOwner, mcmsCid, proposal.Operations[0], opProof)
 
-	executeScheduledFeeWithdrawal(t, participant, ccipOwner, mcmsCid, opID, calls, salt, map[string]string{
+	mcmsCid, _, err = executeScheduledFeeWithdrawal(t, participant, ccipOwner, mcmsCid, opID, calls, salt, map[string]string{
 		feeInstanceAddr: treasuryCid,
-	})
+	}, nil)
+	require.NoError(t, err)
 
-	authCid, auth := queryFeeWithdrawalAuthorization(t, participant, ccipOwner)
+	authCid, auth := queryFeeWithdrawalAuthorization(t, participant, ccipOwner, authorizationID)
 	require.NotNil(t, auth, "FeeWithdrawalAuthorization should exist after MCMS execution")
 	require.Equal(t, authorizationID, string(auth.InstanceId))
 	require.Equal(t, recipient, string(auth.Recipient))
@@ -160,6 +162,164 @@ func TestFeeTreasury_WithdrawFeesEndToEndViaMCMS(t *testing.T) {
 	recipientBalanceAfter := holdingsBalance(t, recipientParticipant, &instrumentID, recipient)
 	delta, _ := new(big.Float).SetRat(new(big.Rat).Sub(recipientBalanceAfter, recipientBalanceBefore)).Float64()
 	require.InDelta(t, 100.0, delta, 0.01, "recipient should receive the withdrawn fee amount")
+
+	// ---- Phase 3: recover a pending transfer whose recipient never acts ----
+	feeOwnerBalanceBefore := holdingsBalance(t, participant, &instrumentID, ccipOwner)
+
+	recoveryHoldingCid, err := testhelpers.MintAMT(t.Context(), participant, tokenMetadataClient, transferInstructionClient, scanProxyClient, ccipOwner, "150.0")
+	require.NoError(t, err)
+
+	const recoveryAmount = "100.0"
+	const recoveryValiditySecs = 60
+	shortAuthID := "fee-withdrawal-recovery-itest-" + uuid.New().String()[:8]
+	shortEncoded, err := feeContract.Encoder().AuthorizeFeeWithdrawalParams(feetreasury.AuthorizeFeeWithdrawalParams{
+		AuthorizationId: types.TEXT(shortAuthID),
+		Recipient:       types.PARTY(recipient),
+		InstrumentId:    instrumentID,
+		MaxAmount:       types.NUMERIC(recoveryAmount),
+		ValiditySecs:    types.INT64(recoveryValiditySecs),
+	})
+	require.NoError(t, err)
+
+	shortCalls := []mcmsApi.TimelockCall{{
+		TargetInstanceAddress: types.TEXT(feeInstanceAddr),
+		FunctionName:          types.TEXT("AuthorizeFeeWithdrawal"),
+		OperationData:         types.TEXT(shortEncoded.OperationData),
+	}}
+	shortSalt := uuid.New().String()[:8]
+	shortSchedule := MustEncodeScheduleBatch(t, mcmsEncoder, mcmsApi.ScheduleBatchParams{
+		Calls:       shortCalls,
+		Predecessor: types.TEXT(ZeroHash),
+		Salt:        types.TEXT(shortSalt),
+		DelaySecs:   types.INT64(0),
+	})
+	shortProposal := NewMCMSProposal(int(chainID), proposerMultisigID, int(queryProposerOpCount(t, participant, ccipOwner, mcmsCid)), false).
+		AddOperation(mcmsInstanceAddr, shortSchedule.Choice, shortSchedule.OperationData).
+		Build()
+	shortValidUntil := time.Now().Add(1 * time.Hour)
+	shortSignatures, err := shortProposal.Sign(shortValidUntil, sortedSigners[:2])
+	require.NoError(t, err)
+	mcmsCid = setRootWithRole(t, participant, ccipOwner, mcmsCid, "Proposer", shortProposal, shortValidUntil, shortSignatures)
+
+	shortOpID := HashTimelockOpId(UnwrapTimelockCalls(shortCalls), ZeroHash, shortSalt)
+	shortOpProof, err := shortProposal.GetOpProof(0)
+	require.NoError(t, err)
+	mcmsCid = scheduleBatch(t, participant, ccipOwner, mcmsCid, shortProposal.Operations[0], shortOpProof)
+
+	var shortRes *apiv2.SubmitAndWaitForTransactionResponse
+	mcmsCid, shortRes, err = executeScheduledFeeWithdrawal(t, participant, ccipOwner, mcmsCid, shortOpID, shortCalls, shortSalt, map[string]string{
+		feeInstanceAddr: treasuryCid,
+	}, nil)
+	require.NoError(t, err)
+
+	shortAuthCid, shortAuth := queryFeeWithdrawalAuthorization(t, participant, ccipOwner, shortAuthID)
+	require.NotNil(t, shortAuth, "short-lived FeeWithdrawalAuthorization should exist after MCMS execution")
+
+	recoveryTf, err := testhelpers.GetTransferFactoryV2(t.Context(), transferInstructionClient, registryAdmin, transferv1.Transfer{
+		Sender:           types.PARTY(ccipOwner),
+		Receiver:         types.PARTY(recipient),
+		Amount:           types.NUMERIC(recoveryAmount),
+		InstrumentId:     instrumentID,
+		RequestedAt:      types.TIMESTAMP(time.Now().Add(-time.Hour)),
+		ExecuteBefore:    types.TIMESTAMP(time.Now().Add(time.Duration(recoveryValiditySecs) * time.Second)),
+		InputHoldingCids: []types.CONTRACT_ID{types.CONTRACT_ID(recoveryHoldingCid)},
+		Meta:             metadatav1.Metadata{Values: map[string]types.TEXT{}},
+	})
+	require.NoError(t, err)
+
+	recoveryExecRes := exerciseExecuteFeeWithdrawal(t, participant, ccipOwner, shortAuthCid, recoveryHoldingCid, recoveryAmount, recoveryTf)
+
+	var pendingRecoveryInstructionCid string
+	for _, event := range recoveryExecRes.GetTransaction().GetEvents() {
+		if e, ok := event.GetEvent().(*apiv2.Event_Created); ok {
+			if e.Created.GetTemplateId().GetEntityName() == "AmuletTransferInstruction" {
+				pendingRecoveryInstructionCid = e.Created.GetContractId()
+			}
+		}
+	}
+	require.NotEmpty(t, pendingRecoveryInstructionCid, "expected a pending AmuletTransferInstruction for the recovery leg")
+
+	// The withdraw needs the instruction past its executeBefore, which is the
+	// authorization's expiry: the authorize batch's ledger time plus validity.
+	authorizeAt := shortRes.GetTransaction().GetEffectiveAt().AsTime()
+	require.False(t, authorizeAt.IsZero(), "authorize batch should carry a ledger time")
+	executeBefore := authorizeAt.Add(time.Duration(recoveryValiditySecs)*time.Second + 5*time.Second)
+	if wait := time.Until(executeBefore); wait > 0 {
+		time.Sleep(wait)
+	}
+
+	expireLock, withdrawDisclosures, err := testhelpers.GetWithdrawContext(t.Context(), transferInstructionClient, pendingRecoveryInstructionCid)
+	require.NoError(t, err)
+	require.True(t, expireLock, "the scan should report an expirable lock for a pending instruction")
+
+	recoveryCid, recovery := queryFeeTransferRecoveryForInstruction(t, participant, ccipOwner, pendingRecoveryInstructionCid)
+	require.NotNil(t, recovery, "FeeTransferRecovery should exist while the transfer is pending")
+	recoveryAddr := fmt.Sprintf("%s@%s", string(recovery.InstanceId), ccipOwner)
+
+	withdrawData := "00"
+	if expireLock {
+		withdrawData = "01"
+	}
+	withdrawCalls := []mcmsApi.TimelockCall{{
+		TargetInstanceAddress: types.TEXT(recoveryAddr),
+		FunctionName:          types.TEXT("Withdraw"),
+		OperationData:         types.TEXT(withdrawData),
+	}}
+	withdrawSalt := uuid.New().String()[:8]
+	withdrawSchedule := MustEncodeScheduleBatch(t, mcmsEncoder, mcmsApi.ScheduleBatchParams{
+		Calls:       withdrawCalls,
+		Predecessor: types.TEXT(ZeroHash),
+		Salt:        types.TEXT(withdrawSalt),
+		DelaySecs:   types.INT64(0),
+	})
+	withdrawProposal := NewMCMSProposal(int(chainID), proposerMultisigID, int(queryProposerOpCount(t, participant, ccipOwner, mcmsCid)), false).
+		AddOperation(mcmsInstanceAddr, withdrawSchedule.Choice, withdrawSchedule.OperationData).
+		Build()
+	withdrawValidUntil := time.Now().Add(1 * time.Hour)
+	withdrawSignatures, err := withdrawProposal.Sign(withdrawValidUntil, sortedSigners[:2])
+	require.NoError(t, err)
+	mcmsCid = setRootWithRole(t, participant, ccipOwner, mcmsCid, "Proposer", withdrawProposal, withdrawValidUntil, withdrawSignatures)
+
+	withdrawOpID := HashTimelockOpId(UnwrapTimelockCalls(withdrawCalls), ZeroHash, withdrawSalt)
+	withdrawOpProof, err := withdrawProposal.GetOpProof(0)
+	require.NoError(t, err)
+	mcmsCid = scheduleBatch(t, participant, ccipOwner, mcmsCid, withdrawProposal.Operations[0], withdrawOpProof)
+
+	// The ledger can give the execute an effective time that still trails the
+	// deadline even after wall time has passed it, so retry the scheduled op.
+	var withdrawRes *apiv2.SubmitAndWaitForTransactionResponse
+	for attempt := 1; ; attempt++ {
+		var execErr error
+		mcmsCid, withdrawRes, execErr = executeScheduledFeeWithdrawal(t, participant, ccipOwner, mcmsCid, withdrawOpID, withdrawCalls, withdrawSalt, map[string]string{
+			recoveryAddr: recoveryCid,
+		}, withdrawDisclosures)
+		if execErr == nil {
+			break
+		}
+		if attempt >= 12 || !strings.Contains(execErr.Error(), "executeBefore has not passed") {
+			require.NoError(t, execErr)
+		}
+		time.Sleep(10 * time.Second)
+	}
+
+	var instructionArchived bool
+	for _, event := range withdrawRes.GetTransaction().GetEvents() {
+		if a, ok := event.GetEvent().(*apiv2.Event_Archived); ok {
+			if a.Archived.GetContractId() == pendingRecoveryInstructionCid {
+				instructionArchived = true
+			}
+		}
+	}
+	require.True(t, instructionArchived, "the withdraw should archive the pending instruction")
+
+	balanceAfter := holdingsBalance(t, participant, &instrumentID, ccipOwner)
+	deltaAfter, _ := new(big.Float).SetRat(new(big.Rat).Sub(balanceAfter, feeOwnerBalanceBefore)).Float64()
+	require.InDelta(t, 150.0, deltaAfter, 0.01, "feeOwner should keep the minted amount with nothing lost")
+
+	// Phase 2's accepted transfer leaves its own recovery behind for governance
+	// cleanup, so only this leg's recovery must be gone.
+	remainingCid, remaining := queryFeeTransferRecoveryForInstruction(t, participant, ccipOwner, pendingRecoveryInstructionCid)
+	require.Nil(t, remaining, "the recovery should be consumed by the withdraw, found %s", remainingCid)
 }
 
 func holdingsBalance(t *testing.T, participant canton.Participant, instrument *splice.InstrumentId, owner string) *big.Rat {
@@ -260,7 +420,8 @@ func executeScheduledFeeWithdrawal(
 	calls []mcmsApi.TimelockCall,
 	salt string,
 	targetCids map[string]string,
-) {
+	disclosedContracts []*apiv2.DisclosedContract,
+) (string, *apiv2.SubmitAndWaitForTransactionResponse, error) {
 	t.Helper()
 
 	executeArgs := mcmsCore.ExecuteScheduledBatch{
@@ -272,7 +433,7 @@ func executeScheduledFeeWithdrawal(
 		TargetCids:  toContractIDMap(targetCids),
 	}
 
-	_, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
+	res, err := participant.LedgerServices.Command.SubmitAndWaitForTransaction(t.Context(), &apiv2.SubmitAndWaitForTransactionRequest{
 		Commands: &apiv2.Commands{
 			CommandId: uuid.New().String(),
 			Commands: []*apiv2.Command{{
@@ -285,16 +446,27 @@ func executeScheduledFeeWithdrawal(
 					},
 				},
 			}},
-			ActAs: []string{owner},
+			ActAs:              []string{owner},
+			DisclosedContracts: disclosedContracts,
 		},
 	})
-	require.NoError(t, err)
+	if err != nil {
+		return mcmsCid, nil, fmt.Errorf("execute scheduled batch: %w", err)
+	}
+	for _, event := range res.GetTransaction().GetEvents() {
+		if created := event.GetCreated(); created != nil && created.GetTemplateId().GetEntityName() == "MCMS" {
+			return created.GetContractId(), res, nil
+		}
+	}
+
+	return mcmsCid, res, fmt.Errorf("no MCMS contract created after ExecuteScheduledBatch")
 }
 
 func queryFeeWithdrawalAuthorization(
 	t *testing.T,
 	participant canton.Participant,
 	owner string,
+	instanceID string,
 ) (string, *feetreasury.FeeWithdrawalAuthorization) {
 	t.Helper()
 
@@ -304,10 +476,72 @@ func queryFeeWithdrawalAuthorization(
 	for _, c := range activeContracts {
 		auth, err := bindings.UnmarshalCreatedEvent[feetreasury.FeeWithdrawalAuthorization](c.GetCreatedEvent())
 		require.NoError(t, err)
-		if string(auth.FeeOwner) == owner {
+		if string(auth.FeeOwner) == owner && string(auth.InstanceId) == instanceID {
 			return c.GetCreatedEvent().GetContractId(), auth
 		}
 	}
 
 	return "", nil
+}
+
+func queryFeeTransferRecoveryForInstruction(
+	t *testing.T,
+	participant canton.Participant,
+	owner string,
+	instructionCid string,
+) (string, *feetreasury.FeeTransferRecovery) {
+	t.Helper()
+
+	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), participant, contracts.IdentifierFromBinding(feetreasury.FeeTransferRecovery{}))
+	require.NoError(t, err)
+
+	for _, c := range activeContracts {
+		recovery, err := bindings.UnmarshalCreatedEvent[feetreasury.FeeTransferRecovery](c.GetCreatedEvent())
+		require.NoError(t, err)
+		if string(recovery.FeeOwner) == owner && string(recovery.TransferInstructionCid) == instructionCid {
+			return c.GetCreatedEvent().GetContractId(), recovery
+		}
+	}
+
+	return "", nil
+}
+
+func queryProposerOpCount(
+	t *testing.T,
+	participant canton.Participant,
+	party string,
+	mcmsCid string,
+) int64 {
+	t.Helper()
+
+	queryParticipant := participant
+	queryParticipant.PartyID = party
+
+	activeContracts, err := testhelpers.ListActiveContractsByTemplateId(t.Context(), queryParticipant, contracts.IdentifierFromBinding(mcmsCore.MCMS{}))
+	require.NoError(t, err)
+
+	for _, ac := range activeContracts {
+		if ac.GetCreatedEvent().GetContractId() != mcmsCid {
+			continue
+		}
+		for _, field := range ac.GetCreatedEvent().GetCreateArguments().GetFields() {
+			if field.GetLabel() != "proposer" {
+				continue
+			}
+			for _, innerField := range field.GetValue().GetRecord().GetFields() {
+				if innerField.GetLabel() != "expiringRoot" {
+					continue
+				}
+				for _, rootField := range innerField.GetValue().GetRecord().GetFields() {
+					if rootField.GetLabel() == "opCount" {
+						return rootField.GetValue().GetInt64()
+					}
+				}
+			}
+		}
+	}
+
+	t.Fatalf("MCMS contract not found or proposer op count missing: %s", mcmsCid)
+
+	return 0
 }

@@ -10,10 +10,11 @@ module CCIP.FeeTreasury where
 import DA.Action (when)
 import DA.Crypto.Text (byteCount)
 import DA.Map qualified as Map
+import DA.TextMap qualified as TextMap
 import DA.Time (addRelTime, seconds)
 
 import Splice.Api.Token.HoldingV1 (Holding, InstrumentId(..))
-import Splice.Api.Token.MetadataV1 (ExtraArgs(..), emptyChoiceContext, emptyMetadata)
+import Splice.Api.Token.MetadataV1 (AnyValue(..), ChoiceContext(..), ExtraArgs(..), emptyMetadata)
 import Splice.Api.Token.TransferInstructionV1 (
     Transfer(..),
     TransferFactory,
@@ -27,6 +28,7 @@ import Splice.Api.Token.TransferInstructionV1 (
 import Chainlink.InstanceAddress qualified as RawInstanceAddress
 import Chainlink.InstanceAddress (assertValidInstanceId)
 
+import MCMS.Codec (extractBytes)
 import MCMS.MCMSReceiver (MCMSReceiver(..), MCMSReceiverView(..))
 
 import CCIP.FeeTreasuryTypes (AuthorizeFeeWithdrawalParams(..))
@@ -149,12 +151,13 @@ template FeeWithdrawalAuthorization
                         abort "feetreasury: token transfer failed"
                     _ -> do
                         -- A pending instruction locks feeOwner holdings and its Withdraw is
-                        -- sender-controlled, so MCMS needs its own way to reach it. The id
-                        -- separates it from the authorization and earlier recoveries.
+                        -- sender-controlled, so MCMS needs its own way to reach it. Ledger
+                        -- time keeps retries at distinct addresses; a same-tick double
+                        -- execution would still collide, visibly and one batch at a time.
                         case result.output of
                             TransferInstructionResult_Pending transferInstructionCid -> do
                                 _ <- create FeeTransferRecovery with
-                                    instanceId = instanceId <> "-recovery-" <> show maxAmount
+                                    instanceId = instanceId <> "-recovery-" <> show now
                                     feeOwner
                                     mcmsController
                                     transferInstructionCid
@@ -219,13 +222,16 @@ template FeeTransferRecovery
         -- | Only once executeBefore has passed: until then the recipient keeps sole
         -- | control of the outcome, matching the instruction's own accept deadline.
         choice WithdrawInstruction : TransferInstructionResult
+            with
+                expireLock : Bool
             controller feeOwner
             do
                 now <- getTime
                 assertMsg "feetreasury: executeBefore has not passed" (now >= executeBefore)
                 exercise transferInstructionCid TransferInstruction_Withdraw with
                     extraArgs = ExtraArgs with
-                        context = emptyChoiceContext
+                        context = ChoiceContext with
+                            values = TextMap.fromList [("expire-lock", AV_Bool expireLock)]
                         meta = emptyMetadata
 
         -- | Cleanup once the instruction is archived. The ledger cannot prove from
@@ -247,8 +253,15 @@ template FeeTransferRecovery
 
                 case functionName of
                     "Withdraw" -> do
-                        assertMsg "E_TRAILING_BYTES: Withdraw" (byteCount operationData == 0)
-                        _ <- exercise selfCid WithdrawInstruction
+                        -- One byte from the proposal side, taken from the scan's withdraw
+                        -- context: 01 breaks the lock, 00 confirms it expired on its own.
+                        expireLock <- case extractBytes operationData 0 1 of
+                            Some tag | byteCount operationData == 1 ->
+                                if tag == "01" then pure True
+                                else if tag == "00" then pure False
+                                else abort "E_INVALID_PARAMS: Withdraw"
+                            _ -> abort "E_INVALID_PARAMS: Withdraw"
+                        _ <- exercise selfCid WithdrawInstruction with expireLock
                         pure (Map.delete instAddr contractIds)
                     "Discard" -> do
                         assertMsg "E_TRAILING_BYTES: Discard" (byteCount operationData == 0)

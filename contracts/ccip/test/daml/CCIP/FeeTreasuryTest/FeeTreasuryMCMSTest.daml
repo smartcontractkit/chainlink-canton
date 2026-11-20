@@ -5,10 +5,11 @@ module CCIP.FeeTreasuryTest.FeeTreasuryMCMSTest where
 
 import Daml.Script
 import DA.Assert ((===))
-import DA.List (head)
+import DA.List (head, tail)
 import DA.Time (addRelTime, seconds)
 import DA.Map qualified as Map
 import DA.Optional (fromSome)
+import DA.Text qualified as Text
 import DA.TextMap qualified as TextMap
 import Splice.Api.Token.HoldingV1 (InstrumentId(..))
 import Splice.Api.Token.MetadataV1 (AnyValue(..), ChoiceContext(..), ExtraArgs(..), emptyChoiceContext, emptyMetadata)
@@ -791,13 +792,12 @@ testFeeTreasury_PendingTransferRecoveredViaMCMS = script do
     recoveries <- query @FeeTransferRecovery feeOwner
     length recoveries === 1
     let (recoveryCid, recovery) = head recoveries
-        recoveryId   = "fee-withdrawal-recovery-test-recovery-100.0"
-        recoveryAddr = RawInstanceAddress.makeText recoveryId feeOwner
+        recoveryAddr = RawInstanceAddress.makeText recovery.instanceId feeOwner
         withdrawViaMCMS = exerciseCmd (toInterfaceContractId @MCMSReceiver recoveryCid) MCMSReceiver_Entrypoint with
             functionName  = "Withdraw"
-            operationData = ""
+            operationData = "01"
             contractIds   = Map.fromList [(recoveryAddr, coerceContractId recoveryCid)]
-    recovery.instanceId === recoveryId
+    Text.isPrefixOf "fee-withdrawal-recovery-test-recovery-" recovery.instanceId === True
 
     -- The token admin holds the locked funds; the registry discloses them, as with Amulet.
     lockedHoldings <- query @TestToken.TestHolding tokenAdmin
@@ -816,3 +816,109 @@ testFeeTreasury_PendingTransferRecoveredViaMCMS = script do
     length remaining === 0
     balanceBack <- ownBalance
     balanceBack === 100.0
+
+-- ========================================================
+-- |   Two pending transfers keep distinct recovery ids    |
+-- ========================================================
+
+testFeeTreasury_TwoPendingTransfersGetDistinctRecoveryAddresses : Script ()
+testFeeTreasury_TwoPendingTransfersGetDistinctRecoveryAddresses = script do
+    feeOwner   <- allocateParty "fee_owner"
+    recipient  <- allocateParty "recipient"
+    tokenAdmin <- allocateParty "token_admin"
+
+    let instrumentId = InstrumentId tokenAdmin "FeeToken"
+
+    holding1 <- submit (actAs feeOwner <> actAs tokenAdmin) do
+        createCmd TestToken.TestHolding with
+            owner = feeOwner; admin = tokenAdmin; instrumentId; amount = 100.0
+    holding2 <- submit (actAs feeOwner <> actAs tokenAdmin) do
+        createCmd TestToken.TestHolding with
+            owner = feeOwner; admin = tokenAdmin; instrumentId; amount = 100.0
+
+    factoryCid <- submit tokenAdmin do
+        createCmd TestToken.TestTransferFactory with admin = tokenAdmin
+
+    treasuryCid <- submit feeOwner do
+        createCmd MCMSFeeTreasury with
+            instanceId = "fee-treasury-two-recoveries-test"
+            feeOwner; mcmsController = feeOwner
+
+    -- The same authorization id and cap twice, the natural retry, while the
+    -- first transfer is still pending.
+    _ <- authorizeViaEntrypoint feeOwner "fee-treasury-two-recoveries-test" treasuryCid
+        AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-two-recoveries-test"
+            recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
+    _ <- authorizeViaEntrypoint feeOwner "fee-treasury-two-recoveries-test" treasuryCid
+        AuthorizeFeeWithdrawalParams with
+            authorizationId = "fee-withdrawal-two-recoveries-test"
+            recipient; instrumentId; maxAmount = 100.0; validitySecs = 3600
+
+    auths <- query @FeeWithdrawalAuthorization feeOwner
+    length auths === 2
+    let [(authCid1, _), (authCid2, _)] = auths
+
+    now <- getTime
+    disclosedFactory <- fromSome <$> queryDisclosure tokenAdmin factoryCid
+    disclosedHolding1 <- fromSome <$> queryDisclosure feeOwner holding1
+    disclosedHolding2 <- fromSome <$> queryDisclosure feeOwner holding2
+
+    let executePending authCid disclosedHolding inputHoldingCid = submit (actAs recipient <> disclose disclosedFactory <> disclose disclosedHolding) do
+            exerciseCmd authCid ExecuteFeeWithdrawal with
+                submitter          = recipient
+                transferFactoryCid = toInterfaceContractId @TransferFactory factoryCid
+                inputHoldingCids   = [toInterfaceContractId inputHoldingCid]
+                amount             = 100.0
+                extraArgs          = ExtraArgs emptyChoiceContext emptyMetadata
+                requestedAt        = now
+
+    result1 <- executePending authCid1 disclosedHolding1 holding1
+    passTime (seconds 1)
+    result2 <- executePending authCid2 disclosedHolding2 holding2
+
+    let expectPending r = case r.output of
+            TransferInstructionResult_Pending _ -> pure ()
+            _ -> abort "Expected TransferInstructionResult_Pending"
+    expectPending result1
+    expectPending result2
+
+    recoveries <- query @FeeTransferRecovery feeOwner
+    length recoveries === 2
+    let [(recoveryCid1, recovery1), (recoveryCid2, recovery2)] = recoveries
+    if recovery1.instanceId == recovery2.instanceId
+        then abort "Expected distinct recovery instanceIds"
+        else pure ()
+
+    -- One batch map carries both addresses, so both recoveries are reachable.
+    let addr1 = RawInstanceAddress.makeText recovery1.instanceId feeOwner
+        addr2 = RawInstanceAddress.makeText recovery2.instanceId feeOwner
+        batchMap = Map.fromList
+            [ (addr1, coerceContractId recoveryCid1)
+            , (addr2, coerceContractId recoveryCid2)
+            ]
+        withdraw recoveryCid = exerciseCmd (toInterfaceContractId @MCMSReceiver recoveryCid) MCMSReceiver_Entrypoint with
+            functionName  = "Withdraw"
+            operationData = "01"
+            contractIds   = batchMap
+
+    lockedHoldings <- query @TestToken.TestHolding tokenAdmin
+    let locked = filter (\(_, h) -> h.owner == tokenAdmin) lockedHoldings
+    length locked === 2
+    disclosedLocked1 <- fromSome <$> queryDisclosure tokenAdmin (fst (head locked))
+    disclosedLocked2 <- fromSome <$> queryDisclosure tokenAdmin (fst (head (tail locked)))
+
+    passTime (seconds 3601)
+
+    updatedMap1 <- submit (actAs feeOwner <> disclose disclosedLocked1 <> disclose disclosedLocked2) (withdraw recoveryCid1)
+    Map.lookup addr1 updatedMap1 === None
+
+    remainingLocked <- query @TestToken.TestHolding tokenAdmin
+    let [(stillLockedCid, _)] = filter (\(_, h) -> h.owner == tokenAdmin) remainingLocked
+    disclosedStillLocked <- fromSome <$> queryDisclosure tokenAdmin stillLockedCid
+
+    updatedMap2 <- submit (actAs feeOwner <> disclose disclosedStillLocked) (withdraw recoveryCid2)
+    Map.lookup addr2 updatedMap2 === None
+
+    remaining <- query @FeeTransferRecovery feeOwner
+    length remaining === 0
