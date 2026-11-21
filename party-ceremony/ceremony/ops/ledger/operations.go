@@ -519,8 +519,10 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 		return fmt.Errorf("%w: root node is not an exercise", ErrPreparedTxMismatch)
 	}
 
-	tid := exercise.GetTemplateId()
-	if tid.GetModuleName() != e.TemplateModule || tid.GetEntityName() != e.TemplateEntity {
+	tid, iid := exercise.GetTemplateId(), exercise.GetInterfaceId()
+	tplMatch := tid.GetModuleName() == e.TemplateModule && tid.GetEntityName() == e.TemplateEntity
+	ifaceMatch := iid.GetModuleName() == e.TemplateModule && iid.GetEntityName() == e.TemplateEntity
+	if !tplMatch && !ifaceMatch {
 		return fmt.Errorf("%w: template %s:%s, want %s:%s", ErrPreparedTxMismatch,
 			tid.GetModuleName(), tid.GetEntityName(), e.TemplateModule, e.TemplateEntity)
 	}
