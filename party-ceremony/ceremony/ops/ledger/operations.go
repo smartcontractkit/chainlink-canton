@@ -1,19 +1,24 @@
 package ledger
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/avast/retry-go/v4"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
+	v1 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive/transaction/v1"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 )
@@ -28,8 +33,28 @@ var GrantPartyRightsOp = operations.NewOperation(
 	"canton-ceremony/ledger/grant-party-rights",
 	semver.MustParse("1.0.0"),
 	"Grant actAs and readAs Ledger API rights for the decentralized party to the configured user",
-	func(b operations.Bundle, deps ContractDeployDeps, in GrantPartyRightsInput) (GrantPartyRightsOutput, error) {
-		// No-auth environments: skip the grant entirely.
+	grantRights("actAs and readAs", client.LedgerClient.GrantPartyRights),
+)
+
+var GrantReadAsOp = operations.NewOperation(
+	"canton-ceremony/ledger/grant-read-as",
+	semver.MustParse("1.0.0"),
+	"Grant readAs Ledger API rights for the decentralized party to the configured user",
+	grantRights("readAs", client.LedgerClient.GrantReadAs),
+)
+
+var GrantActAsOp = operations.NewOperation(
+	"canton-ceremony/ledger/grant-act-as",
+	semver.MustParse("1.0.0"),
+	"Grant actAs Ledger API rights for the decentralized party to the configured user",
+	grantRights("actAs", client.LedgerClient.GrantActAs),
+)
+
+func grantRights(
+	rights string,
+	grant func(client.LedgerClient, context.Context, string, string) error,
+) func(operations.Bundle, ContractDeployDeps, GrantPartyRightsInput) (GrantPartyRightsOutput, error) {
+	return func(b operations.Bundle, deps ContractDeployDeps, in GrantPartyRightsInput) (GrantPartyRightsOutput, error) {
 		if deps.UserID == "" {
 			return GrantPartyRightsOutput{ParticipantID: in.ParticipantID, Granted: false}, nil
 		}
@@ -45,11 +70,12 @@ var GrantPartyRightsOp = operations.NewOperation(
 				in.ParticipantID, uid)
 		}
 
-		if err := deps.LedgerClient.GrantPartyRights(ctx, deps.UserID, in.DecentralizedPartyID); err != nil {
-			return GrantPartyRightsOutput{}, fmt.Errorf("granting party rights for user %q: %w", deps.UserID, err)
+		if err := grant(deps.LedgerClient, ctx, deps.UserID, in.DecentralizedPartyID); err != nil {
+			return GrantPartyRightsOutput{}, fmt.Errorf("granting %s for user %q: %w", rights, deps.UserID, err)
 		}
 
 		deps.Logger.Infow("Party rights granted",
+			"rights", rights,
 			"participant", in.ParticipantID,
 			"user", deps.UserID,
 			"party", in.DecentralizedPartyID,
@@ -60,8 +86,8 @@ var GrantPartyRightsOp = operations.NewOperation(
 			UserID:        deps.UserID,
 			Granted:       true,
 		}, nil
-	},
-)
+	}
+}
 
 // FetchParticipantsOp queries the Canton topology store for the participant UIDs
 // that currently host the decentralized party.
@@ -216,7 +242,7 @@ var PrepareSubmissionOp = operations.NewOperation(
 			},
 		}
 
-		return prepare(b, deps, command, in.DecentralizedPartyID, in.SynchronizerID, in.TemplateModule+":"+in.TemplateEntity)
+		return prepare(b, deps, command, in.DecentralizedPartyID, in.SynchronizerID, nil, in.TemplateModule+":"+in.TemplateEntity)
 	},
 )
 
@@ -230,6 +256,15 @@ var PrepareExerciseOp = operations.NewOperation(
 		var arg apiv2.Value
 		if err := protojson.Unmarshal([]byte(in.ChoiceArgument), &arg); err != nil {
 			return PrepareSubmissionOutput{}, fmt.Errorf("parsing choice argument: %w", err)
+		}
+
+		disclosed := make([]*apiv2.DisclosedContract, 0, len(in.DisclosedContracts))
+		for i, d := range in.DisclosedContracts {
+			dc, err := d.Proto()
+			if err != nil {
+				return PrepareSubmissionOutput{}, fmt.Errorf("disclosed contract %d: %w", i, err)
+			}
+			disclosed = append(disclosed, dc)
 		}
 
 		command := &apiv2.Command{
@@ -247,7 +282,7 @@ var PrepareExerciseOp = operations.NewOperation(
 			},
 		}
 
-		return prepare(b, deps, command, in.DecentralizedPartyID, in.SynchronizerID, in.TemplateModule+":"+in.TemplateEntity+"."+in.Choice)
+		return prepare(b, deps, command, in.DecentralizedPartyID, in.SynchronizerID, disclosed, in.TemplateModule+":"+in.TemplateEntity+"."+in.Choice)
 	},
 )
 
@@ -257,6 +292,7 @@ func prepare(
 	command *apiv2.Command,
 	partyID string,
 	synchronizerID string,
+	disclosed []*apiv2.DisclosedContract,
 	action string,
 ) (PrepareSubmissionOutput, error) {
 	resp, err := deps.LedgerClient.PrepareSubmission(
@@ -265,6 +301,7 @@ func prepare(
 		[]string{partyID},
 		[]string{partyID},
 		synchronizerID,
+		disclosed,
 	)
 	if err != nil {
 		return PrepareSubmissionOutput{}, fmt.Errorf("preparing submission: %w", err)
@@ -312,10 +349,22 @@ var SignSubmissionOp = operations.NewOperation(
 			return SignSubmissionOutput{}, fmt.Errorf("decoding prepared transaction hash: %w", err)
 		}
 
+		if in.Expected != nil {
+			if err := in.Expected.Check(in.PreparedTxB64); err != nil {
+				return SignSubmissionOutput{}, operations.NewUnrecoverableError(err)
+			}
+		}
+
 		if deps.Confirmer != nil {
 			detail := ceremony.DAMLSignDetail{
 				TransactionHash: in.PreparedTransactionHash,
 				SignerIdentity:  in.ParticipantID,
+			}
+			if in.Expected != nil {
+				detail.Template = in.Expected.TemplateModule + ":" + in.Expected.TemplateEntity
+				detail.ContractID = in.Expected.ContractID
+				detail.Choice = in.Expected.Choice
+				detail.ChoiceArgument = in.Expected.ChoiceArgument
 			}
 			if cErr := deps.Confirmer.ConfirmDAMLSign(ctx, detail); cErr != nil {
 				return SignSubmissionOutput{}, operations.NewUnrecoverableError(cErr)
@@ -440,3 +489,207 @@ var VerifyContractOp = operations.NewOperation(
 		}, nil
 	},
 )
+
+// ErrPreparedTxMismatch is returned when the prepared transaction is not the expected exercise.
+var ErrPreparedTxMismatch = errors.New("prepared transaction does not match the workflow")
+
+// Check returns an error wrapping [ErrPreparedTxMismatch] unless preparedTxB64 is exactly the expected exercise.
+func (e *ExpectedExercise) Check(preparedTxB64 string) error {
+	txBytes, err := base64.StdEncoding.DecodeString(preparedTxB64)
+	if err != nil {
+		return fmt.Errorf("%w: decoding prepared transaction: %w", ErrPreparedTxMismatch, err)
+	}
+	var preparedTx interactive.PreparedTransaction
+	if err := proto.Unmarshal(txBytes, &preparedTx); err != nil {
+		return fmt.Errorf("%w: unmarshalling prepared transaction: %w", ErrPreparedTxMismatch, err)
+	}
+
+	tx := preparedTx.GetTransaction()
+	roots := tx.GetRoots()
+	if len(roots) != 1 {
+		return fmt.Errorf("%w: %d root nodes, want 1", ErrPreparedTxMismatch, len(roots))
+	}
+	var exercise *v1.Exercise
+	for _, n := range tx.GetNodes() {
+		if n.GetNodeId() == roots[0] {
+			exercise = n.GetV1().GetExercise()
+		}
+	}
+	if exercise == nil {
+		return fmt.Errorf("%w: root node is not an exercise", ErrPreparedTxMismatch)
+	}
+
+	tid := exercise.GetTemplateId()
+	if tid.GetModuleName() != e.TemplateModule || tid.GetEntityName() != e.TemplateEntity {
+		return fmt.Errorf("%w: template %s:%s, want %s:%s", ErrPreparedTxMismatch,
+			tid.GetModuleName(), tid.GetEntityName(), e.TemplateModule, e.TemplateEntity)
+	}
+	if exercise.GetContractId() != e.ContractID {
+		return fmt.Errorf("%w: contract %s, want %s", ErrPreparedTxMismatch, exercise.GetContractId(), e.ContractID)
+	}
+	if exercise.GetChoiceId() != e.Choice {
+		return fmt.Errorf("%w: choice %s, want %s", ErrPreparedTxMismatch, exercise.GetChoiceId(), e.Choice)
+	}
+	var wantArg apiv2.Value
+	if err := protojson.Unmarshal([]byte(e.ChoiceArgument), &wantArg); err != nil {
+		return fmt.Errorf("%w: parsing choice argument: %w", ErrPreparedTxMismatch, err)
+	}
+	gotArg := proto.Clone(exercise.GetChosenValue()).(*apiv2.Value)
+	alignLabelledFields(&wantArg, gotArg)
+	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(gotArg)) {
+		return fmt.Errorf("%w: choice argument %s, want %s", ErrPreparedTxMismatch,
+			protojson.Format(exercise.GetChosenValue()), e.ChoiceArgument)
+	}
+
+	return nil
+}
+
+// normalizeValue drops what the ledger may add or strip: type IDs, labels, trailing Nones, numeric padding.
+func normalizeValue(v *apiv2.Value) *apiv2.Value {
+	if v == nil {
+		return nil
+	}
+	out := proto.Clone(v).(*apiv2.Value)
+	normalizeInPlace(out)
+
+	return out
+}
+
+func normalizeInPlace(v *apiv2.Value) {
+	switch s := v.GetSum().(type) {
+	case *apiv2.Value_Numeric:
+		if strings.Contains(s.Numeric, ".") {
+			s.Numeric = strings.TrimSuffix(strings.TrimRight(s.Numeric, "0"), ".")
+		}
+	case *apiv2.Value_Record:
+		s.Record.RecordId = nil
+		fields := s.Record.GetFields()
+		for len(fields) > 0 && isNone(fields[len(fields)-1].GetValue()) {
+			fields = fields[:len(fields)-1]
+		}
+		s.Record.Fields = fields
+		for _, f := range fields {
+			f.Label = ""
+			normalizeInPlace(f.GetValue())
+		}
+	case *apiv2.Value_Variant:
+		s.Variant.VariantId = nil
+		normalizeInPlace(s.Variant.GetValue())
+	case *apiv2.Value_Enum:
+		s.Enum.EnumId = nil
+	case *apiv2.Value_Optional:
+		if s.Optional.GetValue() != nil {
+			normalizeInPlace(s.Optional.GetValue())
+		}
+	case *apiv2.Value_List:
+		for _, e := range s.List.GetElements() {
+			normalizeInPlace(e)
+		}
+	case *apiv2.Value_TextMap:
+		for _, e := range s.TextMap.GetEntries() {
+			normalizeInPlace(e.GetValue())
+		}
+	case *apiv2.Value_GenMap:
+		for _, e := range s.GenMap.GetEntries() {
+			normalizeInPlace(e.GetKey())
+			normalizeInPlace(e.GetValue())
+		}
+	}
+}
+
+// alignLabelledFields puts got's labelled record fields in want's label order: the ledger accepts labelled fields in any order.
+func alignLabelledFields(want, got *apiv2.Value) {
+	switch w := want.GetSum().(type) {
+	case *apiv2.Value_Record:
+		g := got.GetRecord()
+		if g == nil {
+			return
+		}
+		if allLabelled(w.Record) && allLabelled(g) {
+			byLabel := make(map[string]*apiv2.RecordField, len(g.GetFields()))
+			for _, f := range g.GetFields() {
+				byLabel[f.GetLabel()] = f
+			}
+			ordered := make([]*apiv2.RecordField, 0, len(g.GetFields()))
+			for _, f := range w.Record.GetFields() {
+				if gf, ok := byLabel[f.GetLabel()]; ok {
+					ordered = append(ordered, gf)
+					delete(byLabel, f.GetLabel())
+				}
+			}
+			for _, f := range g.GetFields() {
+				if _, ok := byLabel[f.GetLabel()]; ok {
+					ordered = append(ordered, f)
+				}
+			}
+			g.Fields = ordered
+		}
+		for i := range min(len(w.Record.GetFields()), len(g.GetFields())) {
+			alignLabelledFields(w.Record.GetFields()[i].GetValue(), g.GetFields()[i].GetValue())
+		}
+	case *apiv2.Value_Variant:
+		alignLabelledFields(w.Variant.GetValue(), got.GetVariant().GetValue())
+	case *apiv2.Value_Optional:
+		alignLabelledFields(w.Optional.GetValue(), got.GetOptional().GetValue())
+	case *apiv2.Value_List:
+		gl := got.GetList().GetElements()
+		for i := range min(len(w.List.GetElements()), len(gl)) {
+			alignLabelledFields(w.List.GetElements()[i], gl[i])
+		}
+	case *apiv2.Value_TextMap:
+		ge := got.GetTextMap().GetEntries()
+		for i := range min(len(w.TextMap.GetEntries()), len(ge)) {
+			alignLabelledFields(w.TextMap.GetEntries()[i].GetValue(), ge[i].GetValue())
+		}
+	case *apiv2.Value_GenMap:
+		ge := got.GetGenMap().GetEntries()
+		for i := range min(len(w.GenMap.GetEntries()), len(ge)) {
+			alignLabelledFields(w.GenMap.GetEntries()[i].GetKey(), ge[i].GetKey())
+			alignLabelledFields(w.GenMap.GetEntries()[i].GetValue(), ge[i].GetValue())
+		}
+	}
+}
+
+func allLabelled(r *apiv2.Record) bool {
+	for _, f := range r.GetFields() {
+		if f.GetLabel() == "" {
+			return false
+		}
+	}
+
+	return len(r.GetFields()) > 0
+}
+
+func isNone(v *apiv2.Value) bool {
+	o, ok := v.GetSum().(*apiv2.Value_Optional)
+
+	return ok && o.Optional.GetValue() == nil
+}
+
+func (d DisclosedContract) Proto() (*apiv2.DisclosedContract, error) {
+	if d.ContractID == "" {
+		return nil, errors.New("contractId is empty")
+	}
+	blob, err := base64.StdEncoding.DecodeString(d.CreatedEventBlob)
+	if err != nil {
+		return nil, fmt.Errorf("createdEventBlob of %s is not base64: %w", d.ContractID, err)
+	}
+	if len(blob) == 0 {
+		return nil, fmt.Errorf("createdEventBlob of %s is empty", d.ContractID)
+	}
+
+	out := &apiv2.DisclosedContract{
+		ContractId:       d.ContractID,
+		CreatedEventBlob: blob,
+		SynchronizerId:   d.SynchronizerID,
+	}
+	if d.TemplateID != "" {
+		parts := strings.Split(d.TemplateID, ":")
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("templateId %q of %s is not <package>:<module>:<entity>", d.TemplateID, d.ContractID)
+		}
+		out.TemplateId = &apiv2.Identifier{PackageId: parts[0], ModuleName: parts[1], EntityName: parts[2]}
+	}
+
+	return out, nil
+}

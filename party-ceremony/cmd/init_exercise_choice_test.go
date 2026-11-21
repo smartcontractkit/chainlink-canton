@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
 )
 
 func TestParseTemplateID(t *testing.T) {
@@ -52,4 +54,31 @@ func TestReadChoiceArgument(t *testing.T) {
 
 	_, err = readChoiceArgument(filepath.Join(dir, "missing.json"))
 	require.ErrorContains(t, err, "reading choice args file")
+}
+
+func TestReadDisclosedContracts(t *testing.T) {
+	t.Parallel()
+
+	disclosed, err := readDisclosedContracts("")
+	require.NoError(t, err)
+	assert.Nil(t, disclosed, "no file means no disclosed contracts")
+
+	dir := t.TempDir()
+	good := filepath.Join(dir, "good.json")
+	require.NoError(t, os.WriteFile(good, []byte(`[{"templateId":"#pkg:Mod:Ent","contractId":"cid-1","createdEventBlob":"YmxvYg==","synchronizerId":"global"}]`), 0o600))
+	disclosed, err = readDisclosedContracts(good)
+	require.NoError(t, err)
+	assert.Equal(t, []ledger.DisclosedContract{{TemplateID: "#pkg:Mod:Ent", ContractID: "cid-1", CreatedEventBlob: "YmxvYg==", SynchronizerID: "global"}}, disclosed)
+
+	for name, body := range map[string]string{
+		"no-contract-id.json": `[{"createdEventBlob":"YmxvYg=="}]`,
+		"no-blob.json":        `[{"contractId":"cid-1"}]`,
+		"bad-blob.json":       `[{"contractId":"cid-1","createdEventBlob":"not base64!"}]`,
+		"not-a-list.json":     `{"contractId":"cid-1","createdEventBlob":"YmxvYg=="}`,
+	} {
+		path := filepath.Join(dir, name)
+		require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+		_, err = readDisclosedContracts(path)
+		assert.Error(t, err, "%s is rejected before the ceremony starts", name)
+	}
 }

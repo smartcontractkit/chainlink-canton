@@ -145,6 +145,7 @@ func (m *mockLedgerClient) PrepareSubmission(
 	_ []string,
 	_ []string,
 	_ string,
+	_ []*apiv2.DisclosedContract,
 ) (*interactive.PrepareSubmissionResponse, error) {
 	return &interactive.PrepareSubmissionResponse{
 		PreparedTransactionHash: []byte{0xab, 0xcd, 0xef, 0x12},
@@ -174,6 +175,12 @@ func (m *mockLedgerClient) GetActiveContractsByTemplateForParty(
 	return []*apiv2.CreatedEvent{{ContractId: "fake-contract-0xdeadbeef"}}, nil
 }
 func (m *mockLedgerClient) GrantPartyRights(_ context.Context, _, _ string) error {
+	return nil
+}
+func (m *mockLedgerClient) GrantActAs(_ context.Context, _, _ string) error {
+	return nil
+}
+func (m *mockLedgerClient) GrantReadAs(_ context.Context, _, _ string) error {
 	return nil
 }
 

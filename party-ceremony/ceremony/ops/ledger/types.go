@@ -92,7 +92,15 @@ type PrepareExerciseInput struct {
 	ContractID     string `json:"contract_id"`
 	Choice         string `json:"choice"`
 	// ChoiceArgument is a Ledger API Value in proto JSON.
-	ChoiceArgument string `json:"choice_argument"`
+	ChoiceArgument     string              `json:"choice_argument"`
+	DisclosedContracts []DisclosedContract `json:"disclosed_contracts,omitempty"`
+}
+
+type DisclosedContract struct {
+	TemplateID       string `json:"templateId,omitempty"`
+	ContractID       string `json:"contractId"`
+	CreatedEventBlob string `json:"createdEventBlob"`
+	SynchronizerID   string `json:"synchronizerId,omitempty"`
 }
 
 // PrepareSubmissionOutput is the output of [PrepareSubmissionOp] and
@@ -107,10 +115,19 @@ type PrepareSubmissionOutput struct {
 
 // SignSubmissionInput is the input to [SignSubmissionOp].
 type SignSubmissionInput struct {
-	ParticipantID           string   `json:"participant_id"`
-	PreparedTransactionHash string   `json:"prepared_transaction_hash"`
-	PreparedTxB64           string   `json:"prepared_tx_b64"`
-	KnownSigningKeysB64     []string `json:"known_signing_keys_b64,omitempty"`
+	ParticipantID           string            `json:"participant_id"`
+	PreparedTransactionHash string            `json:"prepared_transaction_hash"`
+	PreparedTxB64           string            `json:"prepared_tx_b64"`
+	KnownSigningKeysB64     []string          `json:"known_signing_keys_b64,omitempty"`
+	Expected                *ExpectedExercise `json:"expected,omitempty"`
+}
+
+type ExpectedExercise struct {
+	TemplateModule string `json:"template_module"`
+	TemplateEntity string `json:"template_entity"`
+	ContractID     string `json:"contract_id"`
+	Choice         string `json:"choice"`
+	ChoiceArgument string `json:"choice_argument"`
 }
 
 // SignSubmissionOutput is the output of [SignSubmissionOp].

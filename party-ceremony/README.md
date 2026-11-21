@@ -299,19 +299,30 @@ setup uses it for the `ccipOwner` provider and registrar choices.
 | --- | --------------------- | ---------------- | ---------------------------------------------------------------- |
 | 1   | `VerifyPartyOp`       | Any              | Verify the party is visible on the Ledger API                    |
 | 2   | `FetchParticipantsOp` | Any              | Fetch hosting participant UIDs from topology                     |
-| 3   | `GrantPartyRightsOp`  | Each participant | Grant the participant's Ledger API user rights for the party     |
-| 4   | `PrepareExerciseOp`   | Coordinator      | Prepare the exercise command via `PrepareSubmission`             |
-| 5   | `SignSubmissionOp`    | Each participant | Sign the prepared transaction hash with their DAML signing key   |
-| 6   | `ExecuteSubmissionOp` | Coordinator      | Submit with all signatures; record the update ID and new contracts |
+| 3   | `GrantReadAsOp`       | Each participant | Grant the participant's Ledger API user readAs for the party     |
+| 4   | `PrepareExerciseOp`   | Coordinator      | Grant the connected user actAs, then prepare via `PrepareSubmission` |
+| 5   | `SignSubmissionOp`    | Each participant | Check the prepared transaction, then sign its hash               |
+| 6   | `ExecuteSubmissionOp` | Coordinator      | Grant the connected user actAs, then submit with all signatures; record the update ID and new contracts |
 
 **Threshold gates:**
 
-- Step 4 requires all participants to have granted rights in step 3.
 - Step 6 requires all participants to have signed in step 5.
 
+Step 3 does not gate the ceremony. Only the run that prepares and the run that
+submits grant actAs, each to its own user. A run that only signs grants none.
+Whoever resumes last submits. If the connected operator declines to sign, the
+run stops with that rejection instead of waiting for more signers.
+
+Before signing, each participant decodes the prepared transaction. It refuses
+to sign unless the single root node exercises the workflow's choice on the
+workflow's contract and template. The confirm prompt shows the template,
+contract ID and choice. This checks what the transaction says, not that the
+hash was computed from it.
+
 The last signer prints the update ID, then `<template-id> <contract-id>` for
-each created contract that is still active and visible to the party. `inspect`
-shows the same after completion.
+each created contract that is still active and visible to the party. Contracts
+the same transaction archives are left out. `inspect` shows the same after
+completion.
 
 ### Example (Mock)
 
@@ -550,6 +561,7 @@ canton-party-ceremony init exercise-choice \
   --contract-id <contract-id> \
   --choice <choice> \
   [--choice-args-file <path>] \
+  [--disclosed-contracts <path>] \
   [--config <path>] \
   [--state-dir <dir>]
 ```
@@ -562,6 +574,7 @@ canton-party-ceremony init exercise-choice \
 | `--contract-id`            | Yes      | —                         | Contract to exercise the choice on                                       |
 | `--choice`                 | Yes      | —                         | Choice name                                                              |
 | `--choice-args-file`       | No       | Empty record              | JSON file with the choice argument as a Ledger API `Value` in proto JSON |
+| `--disclosed-contracts`    | No       | None                      | JSON list of disclosed contracts sent with every prepare                 |
 | `--config`                 | No       | `participant-config.json` | Path to participant config JSON                                          |
 | `--state-dir`              | No       | `ceremonies`              | Root directory for ceremony state                                        |
 
@@ -578,6 +591,24 @@ Example choice argument for `RegistrarService_CreateInstrumentConfiguration`:
     ]
   }
 }
+```
+
+Use `--disclosed-contracts` when the choice reads a contract the party is not a
+stakeholder of, such as a Registry configuration. Get the entries from the
+contract operator's disclosure API. Each entry has the Ledger JSON API
+`DisclosedContract` shape. `contractId` and `createdEventBlob` (base64) are
+required. The list is stored in `workflow.json`, so every resume prepares the
+same transaction.
+
+```json
+[
+  {
+    "templateId": "<package>:<module>:<entity>",
+    "contractId": "00abc...",
+    "createdEventBlob": "CgMyLjES...",
+    "synchronizerId": "global-domain::1220..."
+  }
+]
 ```
 
 ### resume

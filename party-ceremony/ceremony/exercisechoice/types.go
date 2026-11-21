@@ -1,6 +1,9 @@
 package exercisechoice
 
-import "github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
+import (
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
+)
 
 // ExerciseChoiceInput is the top-level input to [ExerciseChoiceSequence].
 type ExerciseChoiceInput struct {
@@ -29,6 +32,9 @@ type ExerciseChoiceInput struct {
 
 	// ChoiceArgument is the choice argument as a Ledger API Value in proto JSON.
 	ChoiceArgument string `json:"choice_argument"`
+
+	// DisclosedContracts are sent with every prepare, for contracts the party cannot see.
+	DisclosedContracts []ledger.DisclosedContract `json:"disclosed_contracts,omitempty"`
 }
 
 // Phase represents the current execution phase of the exercise choice ceremony.
@@ -49,7 +55,6 @@ const (
 type CeremonyState struct {
 	Phase          Phase    `json:"phase"`
 	Participants   []string `json:"participants,omitempty"`
-	Granted        []string `json:"granted"`
 	Signed         []string `json:"signed"`
 	SignRequired   int      `json:"sign_required"`
 	PreparedTxHash string   `json:"prepared_tx_hash,omitempty"`
