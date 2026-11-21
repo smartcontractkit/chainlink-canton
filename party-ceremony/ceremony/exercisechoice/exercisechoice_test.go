@@ -238,6 +238,28 @@ func TestExerciseChoiceSequence_SendsDisclosedContractsWithThePrepare(t *testing
 	assert.True(t, proto.Equal(want[0], lc.disclosed[0][0]), "got %v", lc.disclosed[0][0])
 }
 
+func TestQueryState_FindsARunWithDisclosedContracts(t *testing.T) {
+	t.Parallel()
+
+	in := input()
+	in.DisclosedContracts = []ledger.DisclosedContract{{
+		TemplateID:       "#utility-registry-v0:Utility.Registry.V0.Configuration.Registry:RegistryConfiguration",
+		ContractID:       "registry-config-cid",
+		CreatedEventBlob: base64.StdEncoding.EncodeToString([]byte("registry-config-blob")),
+		SynchronizerID:   "global-domain::1220",
+	}}
+	lc := &fakeLedger{}
+	reporter := operations.NewMemoryReporter()
+	for _, pid := range []string{"p1", "p2"} {
+		_, _ = operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), reporter), exercisechoice.ExerciseChoiceSequence, deps(pid, lc), in)
+	}
+
+	inspected, found := exercisechoice.QueryState(reporter, in)
+
+	require.True(t, found)
+	assert.Equal(t, "update-1", inspected.UpdateID)
+}
+
 func TestExerciseChoiceSequence_GrantsActAsOnlyToTheRunningParticipant(t *testing.T) {
 	t.Parallel()
 
