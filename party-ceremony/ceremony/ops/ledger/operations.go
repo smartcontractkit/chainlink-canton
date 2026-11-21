@@ -618,6 +618,14 @@ func alignLabelledFields(want, got *apiv2.Value) {
 			for _, f := range g.GetFields() {
 				byLabel[f.GetLabel()] = f
 			}
+			// The ledger drops labelled None fields, wherever they sit.
+			kept := w.Record.GetFields()[:0]
+			for _, f := range w.Record.GetFields() {
+				if _, ok := byLabel[f.GetLabel()]; ok || !isNone(f.GetValue()) {
+					kept = append(kept, f)
+				}
+			}
+			w.Record.Fields = kept
 			ordered := make([]*apiv2.RecordField, 0, len(g.GetFields()))
 			for _, f := range w.Record.GetFields() {
 				if gf, ok := byLabel[f.GetLabel()]; ok {
