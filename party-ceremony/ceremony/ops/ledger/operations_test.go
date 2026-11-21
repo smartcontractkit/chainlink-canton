@@ -84,3 +84,30 @@ func TestExpectedExerciseCheck_MatchesTheTemplateOrTheInterface(t *testing.T) {
 		})
 	}
 }
+
+func TestExpectedExerciseCheck_ExplainsFieldOrderWhenTheLedgerDropsLabels(t *testing.T) {
+	t.Parallel()
+
+	expected := &ledger.ExpectedExercise{
+		TemplateModule: "M",
+		TemplateEntity: "T",
+		ContractID:     "c",
+		Choice:         "C",
+		ChoiceArgument: `{"record":{"fields":[` +
+			`{"label":"terms","value":{"text":"t"}},` +
+			`{"label":"cid","value":{"contractId":"request-cid"}}]}}`,
+	}
+
+	err := expected.Check(preparedExercise(t, &v1.Exercise{
+		TemplateId: &apiv2.Identifier{ModuleName: "M", EntityName: "T"},
+		ContractId: "c",
+		ChoiceId:   "C",
+		ChosenValue: &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{Fields: []*apiv2.RecordField{
+			{Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: "request-cid"}}},
+			{Value: &apiv2.Value{Sum: &apiv2.Value_Text{Text: "t"}}},
+		}}}},
+	}))
+
+	require.ErrorIs(t, err, ledger.ErrPreparedTxMismatch)
+	require.ErrorContains(t, err, "declaration order")
+}

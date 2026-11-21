@@ -539,8 +539,13 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 	gotArg := proto.Clone(exercise.GetChosenValue()).(*apiv2.Value)
 	alignLabelledFields(&wantArg, gotArg)
 	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(gotArg)) {
-		return fmt.Errorf("%w: choice argument %s, want %s", ErrPreparedTxMismatch,
-			protojson.Format(exercise.GetChosenValue()), e.ChoiceArgument)
+		hint := ""
+		if w, g := wantArg.GetRecord(), gotArg.GetRecord(); w != nil && g != nil && allLabelled(w) && !allLabelled(g) {
+			hint = " (the ledger returns record fields unlabelled in Daml declaration order: " +
+				"list fields in that order and include every Optional field before the last one you set)"
+		}
+		return fmt.Errorf("%w: choice argument %s, want %s%s", ErrPreparedTxMismatch,
+			protojson.Format(exercise.GetChosenValue()), e.ChoiceArgument, hint)
 	}
 
 	return nil
