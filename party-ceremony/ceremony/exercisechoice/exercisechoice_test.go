@@ -3,6 +3,7 @@ package exercisechoice_test
 import (
 	"context"
 	"encoding/base64"
+	"strings"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
@@ -51,6 +52,8 @@ type fakeLedger struct {
 	actAs, readAs []string
 	executions    int
 	tamper        func(*interactive.PreparedTransaction)
+	// hashOnly changes the transaction that is hashed but not the one returned.
+	hashOnly func(*interactive.PreparedTransaction)
 }
 
 func (f *fakeLedger) PartyExists(context.Context, string) (bool, error) { return true, nil }
@@ -62,8 +65,20 @@ func (f *fakeLedger) PrepareSubmission(_ context.Context, commands []*apiv2.Comm
 	if f.tamper != nil {
 		f.tamper(tx)
 	}
+	hashed := proto.Clone(tx).(*interactive.PreparedTransaction)
+	if f.hashOnly != nil {
+		f.hashOnly(hashed)
+	}
+	hash, err := ledger.HashPreparedTransactionV2(hashed)
+	if err != nil {
+		hash = []byte{0xab, 0xcd}
+	}
 
-	return &interactive.PrepareSubmissionResponse{PreparedTransactionHash: []byte{0xab, 0xcd}, PreparedTransaction: tx}, nil
+	return &interactive.PrepareSubmissionResponse{
+		PreparedTransactionHash: hash,
+		PreparedTransaction:     tx,
+		HashingSchemeVersion:    interactive.HashingSchemeVersion_HASHING_SCHEME_VERSION_V2,
+	}, nil
 }
 
 func (f *fakeLedger) GrantActAs(_ context.Context, userID, _ string) error {
@@ -84,18 +99,28 @@ func exerciseTx(cmd *apiv2.ExerciseCommand) *interactive.PreparedTransaction {
 		f.Label = ""
 	}
 
-	return &interactive.PreparedTransaction{Transaction: &interactive.DamlTransaction{
-		Roots: []string{"0"},
-		Nodes: []*interactive.DamlTransaction_Node{{
-			NodeId: "0",
-			VersionedNode: &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Exercise{Exercise: &v1.Exercise{
-				TemplateId:  cmd.GetTemplateId(),
-				ContractId:  cmd.GetContractId(),
-				ChoiceId:    cmd.GetChoice(),
-				ChosenValue: chosen,
-			}}}},
-		}},
-	}}
+	// The ledger resolves a "#<package-name>" reference to a package ID.
+	templateID := proto.Clone(cmd.GetTemplateId()).(*apiv2.Identifier)
+	packageName := strings.TrimPrefix(templateID.GetPackageId(), "#")
+	templateID.PackageId = "resolved-" + packageName
+
+	return &interactive.PreparedTransaction{
+		Transaction: &interactive.DamlTransaction{
+			Roots: []string{"0"},
+			Nodes: []*interactive.DamlTransaction_Node{{
+				NodeId: "0",
+				VersionedNode: &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Exercise{Exercise: &v1.Exercise{
+					PackageName: packageName,
+					TemplateId:  templateID,
+					ContractId:  cmd.GetContractId(),
+					ChoiceId:    cmd.GetChoice(),
+					ChosenValue: chosen,
+				}}}},
+			}},
+			NodeSeeds: []*interactive.DamlTransaction_NodeSeed{{NodeId: 0, Seed: make([]byte, 32)}},
+		},
+		Metadata: &interactive.Metadata{SubmitterInfo: &interactive.Metadata_SubmitterInfo{ActAs: []string{"ccipOwner::1220abcd"}}},
+	}
 }
 
 func (f *fakeLedger) ExecuteSubmission(context.Context, *interactive.PreparedTransaction, *interactive.PartySignatures, interactive.HashingSchemeVersion) (client.SubmissionResult, error) {
@@ -136,9 +161,9 @@ func input() exercisechoice.ExerciseChoiceInput {
 		PackageID:            "#utility-registry-app-v0",
 		TemplateModule:       "Utility.Registry.App.V0.Service.Provider",
 		TemplateEntity:       "ProviderService",
-		ContractID:           "provider-service-cid",
+		ContractID:           "00c1",
 		Choice:               "ProviderService_AcceptRegistrarServiceRequest",
-		ChoiceArgument:       `{"record":{"fields":[{"label":"cid","value":{"contractId":"request-cid"}}]}}`,
+		ChoiceArgument:       `{"record":{"fields":[{"label":"cid","value":{"contractId":"00c2"}}]}}`,
 	}
 }
 
@@ -170,7 +195,7 @@ func TestExerciseChoiceSequence_CollectsEverySignatureThenSubmitsTheExercise(t *
 	assert.Equal(t, "#utility-registry-app-v0", exercise.GetTemplateId().GetPackageId())
 	assert.Equal(t, "Utility.Registry.App.V0.Service.Provider", exercise.GetTemplateId().GetModuleName())
 	assert.Equal(t, "ProviderService", exercise.GetTemplateId().GetEntityName())
-	assert.Equal(t, "provider-service-cid", exercise.GetContractId())
+	assert.Equal(t, "00c1", exercise.GetContractId())
 	assert.Equal(t, "ProviderService_AcceptRegistrarServiceRequest", exercise.GetChoice())
 	wantArg := &apiv2.Value{}
 	require.NoError(t, protojson.Unmarshal([]byte(input().ChoiceArgument), wantArg))
@@ -334,10 +359,11 @@ func TestExerciseChoiceSequence_RefusesToSignAPreparedTransactionThatDoesNotMatc
 	}
 	for name, tamper := range map[string]func(*interactive.PreparedTransaction){
 		"other choice":   func(tx *interactive.PreparedTransaction) { exercise(tx).ChoiceId = "Archive" },
-		"other contract": func(tx *interactive.PreparedTransaction) { exercise(tx).ContractId = "other-cid" },
+		"other contract": func(tx *interactive.PreparedTransaction) { exercise(tx).ContractId = "00c3" },
 		"other template": func(tx *interactive.PreparedTransaction) { exercise(tx).TemplateId.EntityName = "RegistrarService" },
+		"other package":  func(tx *interactive.PreparedTransaction) { exercise(tx).PackageName = "other-package" },
 		"other argument": func(tx *interactive.PreparedTransaction) {
-			exercise(tx).ChosenValue.GetRecord().Fields[0].Value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: "other-request-cid"}}
+			exercise(tx).ChosenValue.GetRecord().Fields[0].Value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: "00c4"}}
 		},
 		"two roots": func(tx *interactive.PreparedTransaction) {
 			tx.Transaction.Roots = append(tx.Transaction.Roots, "1")
@@ -358,6 +384,58 @@ func TestExerciseChoiceSequence_RefusesToSignAPreparedTransactionThatDoesNotMatc
 			require.ErrorContains(t, err, ledger.ErrPreparedTxMismatch.Error())
 			assert.NotContains(t, err.Error(), exercisechoice.ErrThresholdNotMet.Error(), "a refusal is not reported as pending signers")
 			assert.Zero(t, signed, "the signer is never called")
+		})
+	}
+}
+
+func TestExerciseChoiceSequence_RefusesToSignAHashOfAnotherTransaction(t *testing.T) {
+	t.Parallel()
+
+	signed := 0
+	d := deps("p1", &fakeLedger{hashOnly: func(tx *interactive.PreparedTransaction) {
+		tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().ChoiceId = "Archive"
+	}})
+	d.Signer = fakeSigner{signed: &signed}
+	_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+		exercisechoice.ExerciseChoiceSequence, d, input())
+
+	require.ErrorContains(t, err, ledger.ErrPreparedTxHashMismatch.Error())
+	assert.Zero(t, signed, "the signer is never called")
+}
+
+func TestExerciseChoiceSequence_TreatsAnOmittedLabelledFieldAsNone(t *testing.T) {
+	t.Parallel()
+
+	keepOnlyCid := func(tx *interactive.PreparedTransaction) {
+		rec := tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord()
+		rec.Fields = []*apiv2.RecordField{{Label: "cid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: "00c2"}}}}
+	}
+	for name, tc := range map[string]struct {
+		note  string
+		signs bool
+	}{
+		"None":    {note: `{"optional":{}}`, signs: true},
+		"Some(x)": {note: `{"optional":{"value":{"text":"x"}}}`, signs: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			in := input()
+			in.ChoiceArgument = `{"record":{"fields":[{"label":"note","value":` + tc.note + `},` +
+				`{"label":"cid","value":{"contractId":"00c2"}}]}}`
+			signed := 0
+			d := deps("p1", &fakeLedger{tamper: keepOnlyCid})
+			d.Signer = fakeSigner{signed: &signed}
+			_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+				exercisechoice.ExerciseChoiceSequence, d, in)
+
+			if tc.signs {
+				require.ErrorContains(t, err, "1/2 participants have signed")
+				assert.Equal(t, 1, signed)
+			} else {
+				require.ErrorContains(t, err, ledger.ErrPreparedTxMismatch.Error())
+				assert.Zero(t, signed)
+			}
 		})
 	}
 }
@@ -385,7 +463,7 @@ func TestExerciseChoiceSequence_ShowsTheChoiceWhenConfirmingTheSignature(t *test
 
 	require.Len(t, confirmer.got, 1)
 	assert.Equal(t, "Utility.Registry.App.V0.Service.Provider:ProviderService", confirmer.got[0].Template)
-	assert.Equal(t, "provider-service-cid", confirmer.got[0].ContractID)
+	assert.Equal(t, "00c1", confirmer.got[0].ContractID)
 	assert.Equal(t, "ProviderService_AcceptRegistrarServiceRequest", confirmer.got[0].Choice)
 	assert.Equal(t, input().ChoiceArgument, confirmer.got[0].ChoiceArgument)
 }
@@ -395,7 +473,7 @@ func TestExerciseChoiceSequence_ComparesTheChoiceArgumentByValue(t *testing.T) {
 
 	in := input()
 	in.ChoiceArgument = `{"record":{"fields":[` +
-		`{"label":"cid","value":{"contractId":"request-cid"}},` +
+		`{"label":"cid","value":{"contractId":"00c2"}},` +
 		`{"label":"terms","value":{"record":{"fields":[{"label":"fee","value":{"numeric":"1.50"}}]}}}]}}`
 	fields := func(tx *interactive.PreparedTransaction) []*apiv2.RecordField {
 		return tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord().GetFields()

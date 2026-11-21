@@ -266,7 +266,7 @@ deploy the MCMS contract.
 | 2   | `FetchParticipantsOp` | Any              | Fetch hosting participant UIDs from topology                                       |
 | 3   | `UploadDarsOp`        | Each participant | Upload DAML package archives (DARs) via Admin `PackageService`                     |
 | 4   | `PrepareSubmissionOp` | Coordinator      | Prepare the contract creation via `InteractiveSubmissionService.PrepareSubmission` |
-| 5   | `SignSubmissionOp`    | Each participant | Sign the prepared transaction hash with their DAML signing key                     |
+| 5   | `SignSubmissionOp`    | Each participant | Recompute the prepared transaction hash, then sign it with their DAML signing key  |
 | 6   | `ExecuteSubmissionOp` | Coordinator      | Aggregate all signatures and call `ExecuteSubmission`                              |
 | 7   | `VerifyContractOp`    | Any              | Query the Active Contract Set and verify the contract was created                  |
 
@@ -301,7 +301,7 @@ setup uses it for the `ccipOwner` provider and registrar choices.
 | 2   | `FetchParticipantsOp` | Any              | Fetch hosting participant UIDs from topology                     |
 | 3   | `GrantReadAsOp`       | Each participant | Grant the participant's Ledger API user readAs for the party     |
 | 4   | `PrepareExerciseOp`   | Coordinator      | Grant the connected user actAs, then prepare via `PrepareSubmission` |
-| 5   | `SignSubmissionOp`    | Each participant | Check the prepared transaction, then sign its hash               |
+| 5   | `SignSubmissionOp`    | Each participant | Check the prepared transaction, recompute its hash, then sign    |
 | 6   | `ExecuteSubmissionOp` | Coordinator      | Grant the connected user actAs, then submit with all signatures; record the update ID and new contracts |
 
 **Threshold gates:**
@@ -315,9 +315,13 @@ run stops with that rejection instead of waiting for more signers.
 
 Before signing, each participant decodes the prepared transaction. It refuses
 to sign unless the single root node exercises the workflow's choice on the
-workflow's contract and template. The confirm prompt shows the template,
-contract ID and choice. This checks what the transaction says, not that the
-hash was computed from it.
+workflow's contract, template and package. The confirm prompt shows the
+template, contract ID and choice. A labelled record field that is `None` may be
+left out: the ledger omits it.
+
+Both ceremonies then recompute the hash from the prepared transaction, using
+Canton's hashing scheme V2, and sign only that hash. They refuse a hash that
+does not match the transaction, or any other hashing scheme.
 
 The last signer prints the update ID, then `<template-id> <contract-id>` for
 each created contract that is still active and visible to the party. Contracts

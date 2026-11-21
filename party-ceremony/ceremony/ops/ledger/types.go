@@ -119,10 +119,13 @@ type SignSubmissionInput struct {
 	PreparedTransactionHash string            `json:"prepared_transaction_hash"`
 	PreparedTxB64           string            `json:"prepared_tx_b64"`
 	KnownSigningKeysB64     []string          `json:"known_signing_keys_b64,omitempty"`
+	HashingSchemeVersion    int32             `json:"hashing_scheme_version"`
 	Expected                *ExpectedExercise `json:"expected,omitempty"`
 }
 
 type ExpectedExercise struct {
+	// PackageID is a package ID or a "#<package-name>" reference.
+	PackageID      string `json:"package_id"`
 	TemplateModule string `json:"template_module"`
 	TemplateEntity string `json:"template_entity"`
 	ContractID     string `json:"contract_id"`

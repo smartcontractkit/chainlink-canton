@@ -76,6 +76,7 @@ var ExerciseChoiceSequence = operations.NewSequence(
 
 		out.State.Phase = PhaseSigning
 		expected := &ledger.ExpectedExercise{
+			PackageID:      in.PackageID,
 			TemplateModule: in.TemplateModule,
 			TemplateEntity: in.TemplateEntity,
 			ContractID:     in.ContractID,
@@ -97,6 +98,7 @@ var ExerciseChoiceSequence = operations.NewSequence(
 				PreparedTransactionHash: prep.PreparedTransactionHash,
 				PreparedTxB64:           prep.PreparedTxB64,
 				KnownSigningKeysB64:     fetchReport.Output.PartySigningKeysB64,
+				HashingSchemeVersion:    prep.HashingSchemeVersion,
 				Expected:                expected,
 			})
 			if signErr != nil {

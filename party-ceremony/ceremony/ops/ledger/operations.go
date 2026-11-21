@@ -1,11 +1,13 @@
 package ledger
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -344,15 +346,14 @@ var SignSubmissionOp = operations.NewOperation(
 				in.ParticipantID, uid)
 		}
 
-		hashBytes, err := hex.DecodeString(in.PreparedTransactionHash)
-		if err != nil {
-			return SignSubmissionOutput{}, fmt.Errorf("decoding prepared transaction hash: %w", err)
-		}
-
 		if in.Expected != nil {
 			if err := in.Expected.Check(in.PreparedTxB64); err != nil {
 				return SignSubmissionOutput{}, operations.NewUnrecoverableError(err)
 			}
+		}
+		hashBytes, err := verifyPreparedTxHash(in)
+		if err != nil {
+			return SignSubmissionOutput{}, operations.NewUnrecoverableError(err)
 		}
 
 		if deps.Confirmer != nil {
@@ -493,15 +494,52 @@ var VerifyContractOp = operations.NewOperation(
 // ErrPreparedTxMismatch is returned when the prepared transaction is not the expected exercise.
 var ErrPreparedTxMismatch = errors.New("prepared transaction does not match the workflow")
 
-// Check returns an error wrapping [ErrPreparedTxMismatch] unless preparedTxB64 is exactly the expected exercise.
-func (e *ExpectedExercise) Check(preparedTxB64 string) error {
+// ErrPreparedTxHashMismatch is returned when the hash to sign is not the hash of the prepared transaction.
+var ErrPreparedTxHashMismatch = errors.New("prepared transaction hash does not match the transaction")
+
+// verifyPreparedTxHash recomputes the hash from the prepared transaction so a
+// signer never signs a hash it was only told about.
+func verifyPreparedTxHash(in SignSubmissionInput) ([]byte, error) {
+	if v := interactive.HashingSchemeVersion(in.HashingSchemeVersion); v != interactive.HashingSchemeVersion_HASHING_SCHEME_VERSION_V2 {
+		return nil, fmt.Errorf("%w: hashing scheme %s is not supported", ErrPreparedTxHashMismatch, v)
+	}
+	preparedTx, err := decodePreparedTx(in.PreparedTxB64)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrPreparedTxHashMismatch, err)
+	}
+	computed, err := HashPreparedTransactionV2(preparedTx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrPreparedTxHashMismatch, err)
+	}
+	given, err := hex.DecodeString(in.PreparedTransactionHash)
+	if err != nil {
+		return nil, fmt.Errorf("%w: decoding prepared transaction hash: %w", ErrPreparedTxHashMismatch, err)
+	}
+	if !bytes.Equal(computed, given) {
+		return nil, fmt.Errorf("%w: computed %x, given %x", ErrPreparedTxHashMismatch, computed, given)
+	}
+
+	return computed, nil
+}
+
+func decodePreparedTx(preparedTxB64 string) (*interactive.PreparedTransaction, error) {
 	txBytes, err := base64.StdEncoding.DecodeString(preparedTxB64)
 	if err != nil {
-		return fmt.Errorf("%w: decoding prepared transaction: %w", ErrPreparedTxMismatch, err)
+		return nil, fmt.Errorf("decoding prepared transaction: %w", err)
 	}
 	var preparedTx interactive.PreparedTransaction
 	if err := proto.Unmarshal(txBytes, &preparedTx); err != nil {
-		return fmt.Errorf("%w: unmarshalling prepared transaction: %w", ErrPreparedTxMismatch, err)
+		return nil, fmt.Errorf("unmarshalling prepared transaction: %w", err)
+	}
+
+	return &preparedTx, nil
+}
+
+// Check returns an error wrapping [ErrPreparedTxMismatch] unless preparedTxB64 is exactly the expected exercise.
+func (e *ExpectedExercise) Check(preparedTxB64 string) error {
+	preparedTx, err := decodePreparedTx(preparedTxB64)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrPreparedTxMismatch, err)
 	}
 
 	tx := preparedTx.GetTransaction()
@@ -524,6 +562,11 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 		return fmt.Errorf("%w: template %s:%s, want %s:%s", ErrPreparedTxMismatch,
 			tid.GetModuleName(), tid.GetEntityName(), e.TemplateModule, e.TemplateEntity)
 	}
+	if name, isRef := strings.CutPrefix(e.PackageID, "#"); isRef && exercise.GetPackageName() != name {
+		return fmt.Errorf("%w: package name %s, want %s", ErrPreparedTxMismatch, exercise.GetPackageName(), name)
+	} else if !isRef && tid.GetPackageId() != e.PackageID {
+		return fmt.Errorf("%w: package %s, want %s", ErrPreparedTxMismatch, tid.GetPackageId(), e.PackageID)
+	}
 	if exercise.GetContractId() != e.ContractID {
 		return fmt.Errorf("%w: contract %s, want %s", ErrPreparedTxMismatch, exercise.GetContractId(), e.ContractID)
 	}
@@ -535,6 +578,8 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 		return fmt.Errorf("%w: parsing choice argument: %w", ErrPreparedTxMismatch, err)
 	}
 	gotArg := proto.Clone(exercise.GetChosenValue()).(*apiv2.Value)
+	dropLabelledNones(&wantArg)
+	dropLabelledNones(gotArg)
 	alignLabelledFields(&wantArg, gotArg)
 	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(gotArg)) {
 		return fmt.Errorf("%w: choice argument %s, want %s", ErrPreparedTxMismatch,
@@ -542,6 +587,37 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 	}
 
 	return nil
+}
+
+// dropLabelledNones removes None fields from fully labelled records: by label,
+// a missing optional field and a None field are the same value.
+func dropLabelledNones(v *apiv2.Value) {
+	switch s := v.GetSum().(type) {
+	case *apiv2.Value_Record:
+		if allLabelled(s.Record) {
+			s.Record.Fields = slices.DeleteFunc(s.Record.Fields, func(f *apiv2.RecordField) bool { return isNone(f.GetValue()) })
+		}
+		for _, f := range s.Record.GetFields() {
+			dropLabelledNones(f.GetValue())
+		}
+	case *apiv2.Value_Variant:
+		dropLabelledNones(s.Variant.GetValue())
+	case *apiv2.Value_Optional:
+		dropLabelledNones(s.Optional.GetValue())
+	case *apiv2.Value_List:
+		for _, el := range s.List.GetElements() {
+			dropLabelledNones(el)
+		}
+	case *apiv2.Value_TextMap:
+		for _, entry := range s.TextMap.GetEntries() {
+			dropLabelledNones(entry.GetValue())
+		}
+	case *apiv2.Value_GenMap:
+		for _, entry := range s.GenMap.GetEntries() {
+			dropLabelledNones(entry.GetKey())
+			dropLabelledNones(entry.GetValue())
+		}
+	}
 }
 
 // normalizeValue drops what the ledger may add or strip: type IDs, labels, trailing Nones, numeric padding.
