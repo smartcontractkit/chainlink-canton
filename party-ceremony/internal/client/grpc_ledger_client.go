@@ -89,13 +89,15 @@ func (c *GRPCLedgerClient) PrepareSubmission(
 	actAs []string,
 	readAs []string,
 	synchronizerID string,
+	disclosed []*apiv2.DisclosedContract,
 ) (*interactive.PrepareSubmissionResponse, error) {
 	resp, err := c.interactive.PrepareSubmission(ctx, &interactive.PrepareSubmissionRequest{
-		CommandId:      uuid.New().String(),
-		Commands:       commands,
-		ActAs:          actAs,
-		ReadAs:         readAs,
-		SynchronizerId: LogicalSynchronizerID(synchronizerID),
+		CommandId:          uuid.New().String(),
+		Commands:           commands,
+		ActAs:              actAs,
+		ReadAs:             readAs,
+		SynchronizerId:     LogicalSynchronizerID(synchronizerID),
+		DisclosedContracts: disclosed,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("PrepareSubmission: %w", err)
@@ -254,9 +256,18 @@ func (c *GRPCLedgerClient) ExecuteSubmission(
 
 	tx := resp.GetTransaction()
 	result := SubmissionResult{UpdateID: tx.GetUpdateId()}
+	archived := make(map[string]struct{})
+	for _, event := range tx.GetEvents() {
+		if ae := event.GetArchived(); ae != nil && ae.GetContractId() != "" {
+			archived[ae.GetContractId()] = struct{}{}
+		}
+	}
 	for _, event := range tx.GetEvents() {
 		ce := event.GetCreated()
 		if ce == nil || ce.GetContractId() == "" {
+			continue
+		}
+		if _, ok := archived[ce.GetContractId()]; ok {
 			continue
 		}
 		tid := ce.GetTemplateId()
@@ -270,12 +281,29 @@ func (c *GRPCLedgerClient) ExecuteSubmission(
 }
 
 func (c *GRPCLedgerClient) GrantPartyRights(ctx context.Context, userID, partyID string) error {
+	return c.grantRights(ctx, userID, partyID, actAsRight(partyID), readAsRight(partyID))
+}
+
+func (c *GRPCLedgerClient) GrantActAs(ctx context.Context, userID, partyID string) error {
+	return c.grantRights(ctx, userID, partyID, actAsRight(partyID))
+}
+
+func (c *GRPCLedgerClient) GrantReadAs(ctx context.Context, userID, partyID string) error {
+	return c.grantRights(ctx, userID, partyID, readAsRight(partyID))
+}
+
+func actAsRight(partyID string) *apiv2admin.Right {
+	return &apiv2admin.Right{Kind: &apiv2admin.Right_CanActAs_{CanActAs: &apiv2admin.Right_CanActAs{Party: partyID}}}
+}
+
+func readAsRight(partyID string) *apiv2admin.Right {
+	return &apiv2admin.Right{Kind: &apiv2admin.Right_CanReadAs_{CanReadAs: &apiv2admin.Right_CanReadAs{Party: partyID}}}
+}
+
+func (c *GRPCLedgerClient) grantRights(ctx context.Context, userID, partyID string, rights ...*apiv2admin.Right) error {
 	_, err := c.userManagement.GrantUserRights(ctx, &apiv2admin.GrantUserRightsRequest{
 		UserId: userID,
-		Rights: []*apiv2admin.Right{
-			{Kind: &apiv2admin.Right_CanActAs_{CanActAs: &apiv2admin.Right_CanActAs{Party: partyID}}},
-			{Kind: &apiv2admin.Right_CanReadAs_{CanReadAs: &apiv2admin.Right_CanReadAs{Party: partyID}}},
-		},
+		Rights: rights,
 	})
 	if err != nil {
 		return fmt.Errorf("GrantUserRights for user %q party %q: %w", userID, partyID, err)

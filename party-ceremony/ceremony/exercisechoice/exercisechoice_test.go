@@ -2,10 +2,12 @@ package exercisechoice_test
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
+	v1 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive/transaction/v1"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +15,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/exercisechoice"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
@@ -37,16 +40,50 @@ func (f *fakeAdmin) GetP2P(context.Context, string, string) (*client.P2PState, e
 // fakeLedger records submitted commands and executions.
 type fakeLedger struct {
 	client.LedgerClient
-	prepared   [][]*apiv2.Command
-	executions int
+	prepared      [][]*apiv2.Command
+	disclosed     [][]*apiv2.DisclosedContract
+	actAs, readAs []string
+	executions    int
+	tamper        func(*interactive.PreparedTransaction)
 }
 
 func (f *fakeLedger) PartyExists(context.Context, string) (bool, error) { return true, nil }
 
-func (f *fakeLedger) PrepareSubmission(_ context.Context, commands []*apiv2.Command, _, _ []string, _ string) (*interactive.PrepareSubmissionResponse, error) {
+func (f *fakeLedger) PrepareSubmission(_ context.Context, commands []*apiv2.Command, _, _ []string, _ string, disclosed []*apiv2.DisclosedContract) (*interactive.PrepareSubmissionResponse, error) {
 	f.prepared = append(f.prepared, commands)
+	f.disclosed = append(f.disclosed, disclosed)
+	tx := exerciseTx(commands[0].GetExercise())
+	if f.tamper != nil {
+		f.tamper(tx)
+	}
 
-	return &interactive.PrepareSubmissionResponse{PreparedTransactionHash: []byte{0xab, 0xcd}}, nil
+	return &interactive.PrepareSubmissionResponse{PreparedTransactionHash: []byte{0xab, 0xcd}, PreparedTransaction: tx}, nil
+}
+
+func (f *fakeLedger) GrantActAs(_ context.Context, userID, _ string) error {
+	f.actAs = append(f.actAs, userID)
+
+	return nil
+}
+
+func (f *fakeLedger) GrantReadAs(_ context.Context, userID, _ string) error {
+	f.readAs = append(f.readAs, userID)
+
+	return nil
+}
+
+func exerciseTx(cmd *apiv2.ExerciseCommand) *interactive.PreparedTransaction {
+	return &interactive.PreparedTransaction{Transaction: &interactive.DamlTransaction{
+		Roots: []string{"0"},
+		Nodes: []*interactive.DamlTransaction_Node{{
+			NodeId: "0",
+			VersionedNode: &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Exercise{Exercise: &v1.Exercise{
+				TemplateId: cmd.GetTemplateId(),
+				ContractId: cmd.GetContractId(),
+				ChoiceId:   cmd.GetChoice(),
+			}}}},
+		}},
+	}}
 }
 
 func (f *fakeLedger) ExecuteSubmission(context.Context, *interactive.PreparedTransaction, *interactive.PartySignatures, interactive.HashingSchemeVersion) (client.SubmissionResult, error) {
@@ -61,9 +98,13 @@ func (f *fakeLedger) ExecuteSubmission(context.Context, *interactive.PreparedTra
 	}, nil
 }
 
-type fakeSigner struct{}
+type fakeSigner struct{ signed *int }
 
-func (fakeSigner) Sign(_ context.Context, hash []byte) (*apiv2.Signature, error) {
+func (s fakeSigner) Sign(_ context.Context, hash []byte) (*apiv2.Signature, error) {
+	if s.signed != nil {
+		*s.signed++
+	}
+
 	return &apiv2.Signature{Signature: hash, SignedBy: "fp"}, nil
 }
 
@@ -153,4 +194,119 @@ func TestExerciseChoiceSequence_RejectsMalformedChoiceArgument(t *testing.T) {
 
 	require.ErrorContains(t, run("p1"), "parsing choice argument")
 	assert.Empty(t, lc.prepared, "nothing reaches the ledger")
+}
+
+func TestExerciseChoiceSequence_SendsDisclosedContractsWithThePrepare(t *testing.T) {
+	t.Parallel()
+
+	in := input()
+	in.DisclosedContracts = []ledger.DisclosedContract{{
+		TemplateID:       "#utility-registry-v0:Utility.Registry.V0.Configuration.Registry:RegistryConfiguration",
+		ContractID:       "registry-config-cid",
+		CreatedEventBlob: base64.StdEncoding.EncodeToString([]byte("registry-config-blob")),
+		SynchronizerID:   "global-domain::1220",
+	}}
+	lc := &fakeLedger{}
+	_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+		exercisechoice.ExerciseChoiceSequence, deps("p1", lc), in)
+	require.ErrorContains(t, err, exercisechoice.ErrThresholdNotMet.Error())
+
+	want := []*apiv2.DisclosedContract{{
+		TemplateId: &apiv2.Identifier{
+			PackageId:  "#utility-registry-v0",
+			ModuleName: "Utility.Registry.V0.Configuration.Registry",
+			EntityName: "RegistryConfiguration",
+		},
+		ContractId:       "registry-config-cid",
+		CreatedEventBlob: []byte("registry-config-blob"),
+		SynchronizerId:   "global-domain::1220",
+	}}
+	require.Len(t, lc.disclosed, 1)
+	require.Len(t, lc.disclosed[0], 1)
+	assert.True(t, proto.Equal(want[0], lc.disclosed[0][0]), "got %v", lc.disclosed[0][0])
+}
+
+func TestExerciseChoiceSequence_GrantsActAsOnlyToTheRunningParticipant(t *testing.T) {
+	t.Parallel()
+
+	reporter := operations.NewMemoryReporter()
+	ledgers := map[string]*fakeLedger{"p1": {}, "p2": {}}
+	run := func(pid string) error {
+		d := deps(pid, ledgers[pid])
+		d.UserID = pid + "-user"
+		_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), reporter), exercisechoice.ExerciseChoiceSequence, d, input())
+
+		return err
+	}
+
+	require.ErrorContains(t, run("p1"), "1/2 participants have signed", "p1 prepares and signs without waiting for p2's grant")
+	assert.Len(t, ledgers["p1"].prepared, 1)
+	assert.Equal(t, []string{"p1-user"}, ledgers["p1"].actAs)
+	assert.Empty(t, ledgers["p2"].actAs)
+
+	require.NoError(t, run("p2"))
+	assert.Equal(t, 1, ledgers["p2"].executions, "p2 resumes last and submits")
+	assert.Equal(t, []string{"p1-user"}, ledgers["p1"].actAs)
+	assert.Equal(t, []string{"p2-user"}, ledgers["p2"].actAs)
+	assert.Equal(t, []string{"p1-user"}, ledgers["p1"].readAs)
+	assert.Equal(t, []string{"p2-user"}, ledgers["p2"].readAs)
+}
+
+func TestExerciseChoiceSequence_RefusesToSignAPreparedTransactionThatDoesNotMatch(t *testing.T) {
+	t.Parallel()
+
+	exercise := func(tx *interactive.PreparedTransaction) *v1.Exercise {
+		return tx.GetTransaction().GetNodes()[0].GetV1().GetExercise()
+	}
+	for name, tamper := range map[string]func(*interactive.PreparedTransaction){
+		"other choice":   func(tx *interactive.PreparedTransaction) { exercise(tx).ChoiceId = "Archive" },
+		"other contract": func(tx *interactive.PreparedTransaction) { exercise(tx).ContractId = "other-cid" },
+		"other template": func(tx *interactive.PreparedTransaction) { exercise(tx).TemplateId.EntityName = "RegistrarService" },
+		"two roots": func(tx *interactive.PreparedTransaction) {
+			tx.Transaction.Roots = append(tx.Transaction.Roots, "1")
+		},
+		"root is a create": func(tx *interactive.PreparedTransaction) {
+			tx.Transaction.Nodes[0].VersionedNode = &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Create{Create: &v1.Create{}}}}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			signed := 0
+			d := deps("p1", &fakeLedger{tamper: tamper})
+			d.Signer = fakeSigner{signed: &signed}
+			_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+				exercisechoice.ExerciseChoiceSequence, d, input())
+
+			require.ErrorContains(t, err, "0/2 participants have signed")
+			assert.Zero(t, signed, "the signer is never called")
+		})
+	}
+}
+
+type recordingConfirmer struct {
+	ceremony.Confirmer
+	got []ceremony.DAMLSignDetail
+}
+
+func (r *recordingConfirmer) ConfirmDAMLSign(_ context.Context, d ceremony.DAMLSignDetail) error {
+	r.got = append(r.got, d)
+
+	return nil
+}
+
+func TestExerciseChoiceSequence_ShowsTheChoiceWhenConfirmingTheSignature(t *testing.T) {
+	t.Parallel()
+
+	confirmer := &recordingConfirmer{}
+	d := deps("p1", &fakeLedger{})
+	d.Confirmer = confirmer
+	_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+		exercisechoice.ExerciseChoiceSequence, d, input())
+	require.ErrorContains(t, err, exercisechoice.ErrThresholdNotMet.Error())
+
+	require.Len(t, confirmer.got, 1)
+	assert.Equal(t, "Utility.Registry.App.V0.Service.Provider:ProviderService", confirmer.got[0].Template)
+	assert.Equal(t, "provider-service-cid", confirmer.got[0].ContractID)
+	assert.Equal(t, "ProviderService_AcceptRegistrarServiceRequest", confirmer.got[0].Choice)
 }

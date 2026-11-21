@@ -21,7 +21,7 @@ var ErrThresholdNotMet = errors.New("threshold not met: more participants must c
 var ExerciseChoiceSequence = operations.NewSequence(
 	"exercise-choice/canton-ceremony/exercise-choice",
 	semver.MustParse("1.0.0"),
-	"Exercise a choice through a decentralized party (verify → fetch participants → grant rights → prepare → sign → execute)",
+	"Exercise a choice through a decentralized party (verify → fetch participants → grant readAs → prepare → sign → execute)",
 	func(b operations.Bundle, deps ledger.ContractDeployDeps, in ExerciseChoiceInput) (ExerciseChoiceOutput, error) {
 		out := ExerciseChoiceOutput{
 			State: CeremonyState{Phase: PhaseVerifyParty},
@@ -48,19 +48,15 @@ var ExerciseChoiceSequence = operations.NewSequence(
 
 		out.State.Phase = PhaseGrantRights
 		for _, pid := range participants {
-			if _, grantErr := operations.ExecuteOperation(b, ledger.GrantPartyRightsOp, deps, ledger.GrantPartyRightsInput{
+			if _, grantErr := operations.ExecuteOperation(b, ledger.GrantReadAsOp, deps, ledger.GrantPartyRightsInput{
 				ParticipantID:        pid,
 				DecentralizedPartyID: in.DecentralizedPartyID,
 			}); grantErr != nil {
-				deps.Logger.Infow("Party rights grant pending", "participant", pid, "err", grantErr)
-
-				continue
+				deps.Logger.Infow("readAs grant pending", "participant", pid, "err", grantErr)
 			}
-			out.State.Granted = append(out.State.Granted, pid)
 		}
-		if len(out.State.Granted) < len(participants) {
-			return out, fmt.Errorf("%w: %d/%d participants have granted party rights",
-				ErrThresholdNotMet, len(out.State.Granted), len(participants))
+		if err := grantActAs(b, deps, in.DecentralizedPartyID); err != nil {
+			return out, err
 		}
 
 		out.State.Phase = PhasePrepare
@@ -73,6 +69,7 @@ var ExerciseChoiceSequence = operations.NewSequence(
 			ContractID:           in.ContractID,
 			Choice:               in.Choice,
 			ChoiceArgument:       in.ChoiceArgument,
+			DisclosedContracts:   in.DisclosedContracts,
 		})
 		if err != nil {
 			return out, fmt.Errorf("prepare-exercise: %w", err)
@@ -89,6 +86,12 @@ var ExerciseChoiceSequence = operations.NewSequence(
 				PreparedTransactionHash: prep.PreparedTransactionHash,
 				PreparedTxB64:           prep.PreparedTxB64,
 				KnownSigningKeysB64:     fetchReport.Output.PartySigningKeysB64,
+				Expected: &ledger.ExpectedExercise{
+					TemplateModule: in.TemplateModule,
+					TemplateEntity: in.TemplateEntity,
+					ContractID:     in.ContractID,
+					Choice:         in.Choice,
+				},
 			})
 			if signErr != nil {
 				deps.Logger.Infow("Signing pending", "participant", pid, "err", signErr)
@@ -127,3 +130,22 @@ var ExerciseChoiceSequence = operations.NewSequence(
 		return out, nil
 	},
 )
+
+// grantActAs grants actAs to this run's user only: whoever resumes last submits.
+func grantActAs(b operations.Bundle, deps ledger.ContractDeployDeps, partyID string) error {
+	if deps.UserID == "" {
+		return nil
+	}
+	uid, err := deps.AdminClient.GetParticipantUID(b.GetContext())
+	if err != nil {
+		return fmt.Errorf("grant-act-as: getting participant UID: %w", err)
+	}
+	if _, err := operations.ExecuteOperation(b, ledger.GrantActAsOp, deps, ledger.GrantPartyRightsInput{
+		ParticipantID:        uid,
+		DecentralizedPartyID: partyID,
+	}); err != nil {
+		return fmt.Errorf("grant-act-as: %w", err)
+	}
+
+	return nil
+}

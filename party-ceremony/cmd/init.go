@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
@@ -18,6 +19,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/keyrotation"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/kick"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/onboarding"
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
 )
 
@@ -603,14 +605,16 @@ var initExerciseChoiceCmd = &cobra.Command{
 	Use:   "exercise-choice",
 	Short: "Initialise a ceremony that exercises a choice as the decentralized party",
 	Long: `Create the ceremony directory, write workflow.json, and run the first
-sequence step. Every hosting participant then runs resume to grant party rights
-and sign. The last signer submits the transaction and prints the update ID and
+sequence step. Every hosting participant then runs resume to sign. The last
+signer submits the transaction and prints the update ID and
 the created contracts.
 
 --template-id is <package>:<module>:<entity>, where <package> is a package ID or
 a #<package-name> reference. The package must already be vetted on every
 hosting participant. --choice-args-file holds the choice argument as a Ledger
-API Value in proto JSON; omit it for a choice without fields.`,
+API Value in proto JSON; omit it for a choice without fields.
+--disclosed-contracts is a JSON list of disclosed contracts, each with
+contractId and a base64 createdEventBlob, sent with every prepare.`,
 	RunE: runInitExerciseChoice,
 }
 
@@ -623,6 +627,7 @@ func init() {
 	f.String("contract-id", "", "Contract to exercise the choice on (required)")
 	f.String("choice", "", "Choice name (required)")
 	f.String("choice-args-file", "", "Path to a JSON file holding the choice argument as a Ledger API Value in proto JSON")
+	f.String("disclosed-contracts", "", "Path to a JSON list of disclosed contracts to send with the exercise")
 	f.String("config", "participant-config.json", "Path to participant config JSON file")
 	f.String("state-dir", "ceremonies", "Root directory under which ceremony state is stored")
 
@@ -642,6 +647,7 @@ func runInitExerciseChoice(cmd *cobra.Command, _ []string) error {
 	contractID, _ := f.GetString("contract-id")
 	choice, _ := f.GetString("choice")
 	argsFile, _ := f.GetString("choice-args-file")
+	disclosedFile, _ := f.GetString("disclosed-contracts")
 	configPath, _ := f.GetString("config")
 	stateDir, _ := f.GetString("state-dir")
 
@@ -660,6 +666,11 @@ func runInitExerciseChoice(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	disclosed, err := readDisclosedContracts(disclosedFile)
+	if err != nil {
+		return err
+	}
+
 	input := exercisechoice.ExerciseChoiceInput{
 		DecentralizedPartyID: partyID,
 		SynchronizerID:       synchronizerID,
@@ -669,6 +680,7 @@ func runInitExerciseChoice(cmd *cobra.Command, _ []string) error {
 		ContractID:           contractID,
 		Choice:               choice,
 		ChoiceArgument:       choiceArg,
+		DisclosedContracts:   disclosed,
 	}
 
 	return executeExerciseChoiceSequence(cmd.Context(), cfg, input, stateDir, "", confirmerFromFlags(cmd))
@@ -697,6 +709,30 @@ func readChoiceArgument(path string) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+func readDisclosedContracts(path string) ([]ledger.DisclosedContract, error) {
+	if path == "" {
+		return nil, nil
+	}
+	data, err := readFileBytes(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading disclosed contracts file %q: %w", path, err)
+	}
+	var disclosed []ledger.DisclosedContract
+	if err := json.Unmarshal(data, &disclosed); err != nil {
+		return nil, fmt.Errorf("disclosed contracts file %q is not a JSON list of disclosed contracts: %w", path, err)
+	}
+	for i, d := range disclosed {
+		if _, err := d.Proto(); err != nil {
+			return nil, fmt.Errorf("disclosed contracts file %q entry %d: %w", path, i, err)
+		}
+	}
+	if len(disclosed) == 0 {
+		return nil, nil
+	}
+
+	return disclosed, nil
 }
 
 // parseTemplateID splits "<package>:<module>:<entity>" into its parts.

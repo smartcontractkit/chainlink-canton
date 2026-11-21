@@ -521,7 +521,6 @@ func runInspectExerciseChoice(ceremonyDir, workflowID, workflowType string, asJS
 
 	s := out.State
 	fmt.Fprintf(w, "Phase:\t%s\n", s.Phase)
-	fmt.Fprintf(w, "Rights granted:\t%d / %d  (%s)\n", len(s.Granted), s.SignRequired, strings.Join(s.Granted, ", "))
 	fmt.Fprintf(w, "Signed:\t%d / %d  (%s)\n", len(s.Signed), s.SignRequired, strings.Join(s.Signed, ", "))
 	if s.PreparedTxHash != "" {
 		fmt.Fprintf(w, "Prepared TX hash:\t%s\n", s.PreparedTxHash)

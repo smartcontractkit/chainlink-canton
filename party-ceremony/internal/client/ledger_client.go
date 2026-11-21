@@ -29,6 +29,7 @@ type LedgerClient interface {
 		actAs []string,
 		readAs []string,
 		synchronizerID string,
+		disclosed []*apiv2.DisclosedContract,
 	) (*interactive.PrepareSubmissionResponse, error)
 
 	// GetActiveContractsByTemplate queries the Active Contract Set for contracts
@@ -73,6 +74,9 @@ type LedgerClient interface {
 	// decentralized parties created via topology are not automatically visible
 	// to any user. It is idempotent: granting an already-granted right is safe.
 	GrantPartyRights(ctx context.Context, userID, partyID string) error
+
+	GrantActAs(ctx context.Context, userID, partyID string) error
+	GrantReadAs(ctx context.Context, userID, partyID string) error
 }
 
 // SubmissionResult is the committed transaction returned by

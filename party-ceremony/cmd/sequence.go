@@ -356,7 +356,7 @@ func executeExerciseChoiceSequence(
 		sequence:     exercisechoice.ExerciseChoiceSequence,
 		workflowType: ceremony.WorkflowTypeExerciseChoice,
 		thresholdErr: exercisechoice.ErrThresholdNotMet,
-		pendingHint:  "Run `resume` again after more participants have granted rights and signed.",
+		pendingHint:  "Run `resume` again after more participants have signed.",
 		logFields: []any{
 			"party", input.DecentralizedPartyID,
 			"template", input.TemplateModule + ":" + input.TemplateEntity,
