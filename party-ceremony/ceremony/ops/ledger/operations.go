@@ -350,7 +350,7 @@ var SignSubmissionOp = operations.NewOperation(
 		}
 
 		if in.Expected != nil {
-			if err := in.Expected.check(in.PreparedTxB64); err != nil {
+			if err := in.Expected.Check(in.PreparedTxB64); err != nil {
 				return SignSubmissionOutput{}, operations.NewUnrecoverableError(err)
 			}
 		}
@@ -493,14 +493,15 @@ var VerifyContractOp = operations.NewOperation(
 // ErrPreparedTxMismatch is returned when the prepared transaction is not the expected exercise.
 var ErrPreparedTxMismatch = errors.New("prepared transaction does not match the workflow")
 
-func (e *ExpectedExercise) check(preparedTxB64 string) error {
+// Check returns an error wrapping [ErrPreparedTxMismatch] unless preparedTxB64 is exactly the expected exercise.
+func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 	txBytes, err := base64.StdEncoding.DecodeString(preparedTxB64)
 	if err != nil {
-		return fmt.Errorf("decoding prepared transaction: %w", err)
+		return fmt.Errorf("%w: decoding prepared transaction: %w", ErrPreparedTxMismatch, err)
 	}
 	var preparedTx interactive.PreparedTransaction
 	if err := proto.Unmarshal(txBytes, &preparedTx); err != nil {
-		return fmt.Errorf("unmarshalling prepared transaction: %w", err)
+		return fmt.Errorf("%w: unmarshalling prepared transaction: %w", ErrPreparedTxMismatch, err)
 	}
 
 	tx := preparedTx.GetTransaction()
@@ -531,7 +532,7 @@ func (e *ExpectedExercise) check(preparedTxB64 string) error {
 	}
 	var wantArg apiv2.Value
 	if err := protojson.Unmarshal([]byte(e.ChoiceArgument), &wantArg); err != nil {
-		return fmt.Errorf("parsing choice argument: %w", err)
+		return fmt.Errorf("%w: parsing choice argument: %w", ErrPreparedTxMismatch, err)
 	}
 	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(exercise.GetChosenValue())) {
 		return fmt.Errorf("%w: choice argument %s, want %s", ErrPreparedTxMismatch,

@@ -321,3 +321,49 @@ func TestExerciseChoiceSequence_ShowsTheChoiceWhenConfirmingTheSignature(t *test
 	assert.Equal(t, "ProviderService_AcceptRegistrarServiceRequest", confirmer.got[0].Choice)
 	assert.Equal(t, input().ChoiceArgument, confirmer.got[0].ChoiceArgument)
 }
+
+func TestExerciseChoiceSequence_ComparesTheChoiceArgumentByValue(t *testing.T) {
+	t.Parallel()
+
+	in := input()
+	in.ChoiceArgument = `{"record":{"fields":[` +
+		`{"label":"cid","value":{"contractId":"request-cid"}},` +
+		`{"label":"terms","value":{"record":{"fields":[{"label":"fee","value":{"numeric":"1.50"}}]}}}]}}`
+	fields := func(tx *interactive.PreparedTransaction) []*apiv2.RecordField {
+		return tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord().GetFields()
+	}
+	setFee := func(fee string) func(*interactive.PreparedTransaction) {
+		return func(tx *interactive.PreparedTransaction) {
+			fields(tx)[1].GetValue().GetRecord().GetFields()[0].Value = &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: fee}}
+		}
+	}
+	for name, tc := range map[string]struct {
+		tamper func(*interactive.PreparedTransaction)
+		signs  bool
+	}{
+		"numeric padding": {tamper: setFee("1.5000000000"), signs: true},
+		"trailing None": {tamper: func(tx *interactive.PreparedTransaction) {
+			rec := tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord()
+			rec.Fields = append(rec.Fields, &apiv2.RecordField{Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}})
+		}, signs: true},
+		"other nested numeric": {tamper: setFee("2.5000000000"), signs: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			signed := 0
+			d := deps("p1", &fakeLedger{tamper: tc.tamper})
+			d.Signer = fakeSigner{signed: &signed}
+			_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+				exercisechoice.ExerciseChoiceSequence, d, in)
+
+			if tc.signs {
+				require.ErrorContains(t, err, "1/2 participants have signed")
+				assert.Equal(t, 1, signed)
+			} else {
+				require.ErrorContains(t, err, ledger.ErrPreparedTxMismatch.Error())
+				assert.Zero(t, signed, "the signer is never called")
+			}
+		})
+	}
+}

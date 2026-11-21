@@ -5,7 +5,6 @@ package exercisechoice
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -80,6 +79,17 @@ var ExerciseChoiceSequence = operations.NewSequence(
 		out.State.PreparedTxHash = prep.PreparedTransactionHash
 
 		out.State.Phase = PhaseSigning
+		expected := &ledger.ExpectedExercise{
+			TemplateModule: in.TemplateModule,
+			TemplateEntity: in.TemplateEntity,
+			ContractID:     in.ContractID,
+			Choice:         in.Choice,
+			ChoiceArgument: in.ChoiceArgument,
+		}
+		// Checked here too because operation errors reach the sequence as text only.
+		if err := expected.Check(prep.PreparedTxB64); err != nil {
+			return out, fmt.Errorf("sign-submission: %w", err)
+		}
 		sigsB64 := make([]string, 0, len(participants))
 		for _, pid := range participants {
 			r, signErr := operations.ExecuteOperation(b, ledger.SignSubmissionOp, deps, ledger.SignSubmissionInput{
@@ -87,17 +97,8 @@ var ExerciseChoiceSequence = operations.NewSequence(
 				PreparedTransactionHash: prep.PreparedTransactionHash,
 				PreparedTxB64:           prep.PreparedTxB64,
 				KnownSigningKeysB64:     fetchReport.Output.PartySigningKeysB64,
-				Expected: &ledger.ExpectedExercise{
-					TemplateModule: in.TemplateModule,
-					TemplateEntity: in.TemplateEntity,
-					ContractID:     in.ContractID,
-					Choice:         in.Choice,
-					ChoiceArgument: in.ChoiceArgument,
-				},
+				Expected:                expected,
 			})
-			if signErr != nil && strings.Contains(signErr.Error(), ledger.ErrPreparedTxMismatch.Error()) {
-				return out, fmt.Errorf("sign-submission: %w", signErr)
-			}
 			if signErr != nil {
 				deps.Logger.Infow("Signing pending", "participant", pid, "err", signErr)
 
