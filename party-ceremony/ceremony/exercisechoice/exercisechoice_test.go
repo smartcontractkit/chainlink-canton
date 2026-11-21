@@ -425,9 +425,9 @@ func TestExerciseChoiceSequence_ComparesTheChoiceArgumentByValue(t *testing.T) {
 			rec := tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord()
 			rec.Fields = append(rec.Fields, &apiv2.RecordField{Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}})
 		}, signs: true},
-		"other nested numeric":             {tamper: setFee("2.5000000000"), signs: false},
-		"labelled fields in another order": {tamper: labelTopFields("terms", "cid", true), signs: true},
-		"labels on the wrong values":       {tamper: labelTopFields("terms", "cid", false), signs: false},
+		"other nested numeric":                      {tamper: setFee("2.5000000000"), signs: false},
+		"unlabelled ledger fields in another order": {tamper: labelTopFields("", "", true), signs: false},
+		"labels on the wrong values":                {tamper: labelTopFields("terms", "cid", false), signs: false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

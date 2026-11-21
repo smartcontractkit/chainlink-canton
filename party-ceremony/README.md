@@ -319,6 +319,9 @@ workflow's contract and template. The confirm prompt shows the template,
 contract ID and choice. This checks what the transaction says, not that the
 hash was computed from it.
 
+List choice-argument record fields in Daml declaration order, including any
+Optional field before the last one you set. The check compares fields by position.
+
 The last signer prints the update ID, then `<template-id> <contract-id>` for
 each created contract that is still active and visible to the party. Contracts
 the same transaction archives are left out. `inspect` shows the same after
