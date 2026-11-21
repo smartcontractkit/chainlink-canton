@@ -53,6 +53,7 @@ type DAMLSignDetail struct {
 	Template       string
 	ContractID     string
 	Choice         string
+	ChoiceArgument string
 }
 
 // Confirmer is called before signing operations to give the user an

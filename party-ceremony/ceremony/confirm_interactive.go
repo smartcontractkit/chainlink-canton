@@ -76,6 +76,7 @@ func (c *InteractiveConfirmer) ConfirmDAMLSign(_ context.Context, d DAMLSignDeta
 		printField(c.Out, "Template", d.Template)
 		printField(c.Out, "Contract ID", d.ContractID)
 		printField(c.Out, "Choice", d.Choice)
+		printField(c.Out, "Choice Argument", d.ChoiceArgument)
 	}
 	printField(c.Out, "Your Identity", d.SignerIdentity)
 

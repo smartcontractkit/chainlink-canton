@@ -5,6 +5,7 @@ package exercisechoice
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
 
@@ -91,8 +92,12 @@ var ExerciseChoiceSequence = operations.NewSequence(
 					TemplateEntity: in.TemplateEntity,
 					ContractID:     in.ContractID,
 					Choice:         in.Choice,
+					ChoiceArgument: in.ChoiceArgument,
 				},
 			})
+			if signErr != nil && strings.Contains(signErr.Error(), ledger.ErrPreparedTxMismatch.Error()) {
+				return out, fmt.Errorf("sign-submission: %w", signErr)
+			}
 			if signErr != nil {
 				deps.Logger.Infow("Signing pending", "participant", pid, "err", signErr)
 

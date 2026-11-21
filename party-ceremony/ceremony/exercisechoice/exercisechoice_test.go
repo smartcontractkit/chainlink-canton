@@ -73,14 +73,20 @@ func (f *fakeLedger) GrantReadAs(_ context.Context, userID, _ string) error {
 }
 
 func exerciseTx(cmd *apiv2.ExerciseCommand) *interactive.PreparedTransaction {
+	chosen := proto.Clone(cmd.GetChoiceArgument()).(*apiv2.Value)
+	for _, f := range chosen.GetRecord().GetFields() {
+		f.Label = ""
+	}
+
 	return &interactive.PreparedTransaction{Transaction: &interactive.DamlTransaction{
 		Roots: []string{"0"},
 		Nodes: []*interactive.DamlTransaction_Node{{
 			NodeId: "0",
 			VersionedNode: &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Exercise{Exercise: &v1.Exercise{
-				TemplateId: cmd.GetTemplateId(),
-				ContractId: cmd.GetContractId(),
-				ChoiceId:   cmd.GetChoice(),
+				TemplateId:  cmd.GetTemplateId(),
+				ContractId:  cmd.GetContractId(),
+				ChoiceId:    cmd.GetChoice(),
+				ChosenValue: chosen,
 			}}}},
 		}},
 	}}
@@ -262,6 +268,9 @@ func TestExerciseChoiceSequence_RefusesToSignAPreparedTransactionThatDoesNotMatc
 		"other choice":   func(tx *interactive.PreparedTransaction) { exercise(tx).ChoiceId = "Archive" },
 		"other contract": func(tx *interactive.PreparedTransaction) { exercise(tx).ContractId = "other-cid" },
 		"other template": func(tx *interactive.PreparedTransaction) { exercise(tx).TemplateId.EntityName = "RegistrarService" },
+		"other argument": func(tx *interactive.PreparedTransaction) {
+			exercise(tx).ChosenValue.GetRecord().Fields[0].Value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: "other-request-cid"}}
+		},
 		"two roots": func(tx *interactive.PreparedTransaction) {
 			tx.Transaction.Roots = append(tx.Transaction.Roots, "1")
 		},
@@ -278,7 +287,8 @@ func TestExerciseChoiceSequence_RefusesToSignAPreparedTransactionThatDoesNotMatc
 			_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
 				exercisechoice.ExerciseChoiceSequence, d, input())
 
-			require.ErrorContains(t, err, "0/2 participants have signed")
+			require.ErrorContains(t, err, ledger.ErrPreparedTxMismatch.Error())
+			assert.NotContains(t, err.Error(), exercisechoice.ErrThresholdNotMet.Error(), "a refusal is not reported as pending signers")
 			assert.Zero(t, signed, "the signer is never called")
 		})
 	}
@@ -309,4 +319,5 @@ func TestExerciseChoiceSequence_ShowsTheChoiceWhenConfirmingTheSignature(t *test
 	assert.Equal(t, "Utility.Registry.App.V0.Service.Provider:ProviderService", confirmer.got[0].Template)
 	assert.Equal(t, "provider-service-cid", confirmer.got[0].ContractID)
 	assert.Equal(t, "ProviderService_AcceptRegistrarServiceRequest", confirmer.got[0].Choice)
+	assert.Equal(t, input().ChoiceArgument, confirmer.got[0].ChoiceArgument)
 }

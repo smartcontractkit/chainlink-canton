@@ -127,6 +127,7 @@ type ExpectedExercise struct {
 	TemplateEntity string `json:"template_entity"`
 	ContractID     string `json:"contract_id"`
 	Choice         string `json:"choice"`
+	ChoiceArgument string `json:"choice_argument"`
 }
 
 // SignSubmissionOutput is the output of [SignSubmissionOp].

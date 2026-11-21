@@ -364,6 +364,7 @@ var SignSubmissionOp = operations.NewOperation(
 				detail.Template = in.Expected.TemplateModule + ":" + in.Expected.TemplateEntity
 				detail.ContractID = in.Expected.ContractID
 				detail.Choice = in.Expected.Choice
+				detail.ChoiceArgument = in.Expected.ChoiceArgument
 			}
 			if cErr := deps.Confirmer.ConfirmDAMLSign(ctx, detail); cErr != nil {
 				return SignSubmissionOutput{}, operations.NewUnrecoverableError(cErr)
@@ -489,7 +490,8 @@ var VerifyContractOp = operations.NewOperation(
 	},
 )
 
-var errPreparedTxMismatch = errors.New("prepared transaction does not match the workflow")
+// ErrPreparedTxMismatch is returned when the prepared transaction is not the expected exercise.
+var ErrPreparedTxMismatch = errors.New("prepared transaction does not match the workflow")
 
 func (e *ExpectedExercise) check(preparedTxB64 string) error {
 	txBytes, err := base64.StdEncoding.DecodeString(preparedTxB64)
@@ -504,7 +506,7 @@ func (e *ExpectedExercise) check(preparedTxB64 string) error {
 	tx := preparedTx.GetTransaction()
 	roots := tx.GetRoots()
 	if len(roots) != 1 {
-		return fmt.Errorf("%w: %d root nodes, want 1", errPreparedTxMismatch, len(roots))
+		return fmt.Errorf("%w: %d root nodes, want 1", ErrPreparedTxMismatch, len(roots))
 	}
 	var exercise *v1.Exercise
 	for _, n := range tx.GetNodes() {
@@ -513,22 +515,89 @@ func (e *ExpectedExercise) check(preparedTxB64 string) error {
 		}
 	}
 	if exercise == nil {
-		return fmt.Errorf("%w: root node is not an exercise", errPreparedTxMismatch)
+		return fmt.Errorf("%w: root node is not an exercise", ErrPreparedTxMismatch)
 	}
 
 	tid := exercise.GetTemplateId()
 	if tid.GetModuleName() != e.TemplateModule || tid.GetEntityName() != e.TemplateEntity {
-		return fmt.Errorf("%w: template %s:%s, want %s:%s", errPreparedTxMismatch,
+		return fmt.Errorf("%w: template %s:%s, want %s:%s", ErrPreparedTxMismatch,
 			tid.GetModuleName(), tid.GetEntityName(), e.TemplateModule, e.TemplateEntity)
 	}
 	if exercise.GetContractId() != e.ContractID {
-		return fmt.Errorf("%w: contract %s, want %s", errPreparedTxMismatch, exercise.GetContractId(), e.ContractID)
+		return fmt.Errorf("%w: contract %s, want %s", ErrPreparedTxMismatch, exercise.GetContractId(), e.ContractID)
 	}
 	if exercise.GetChoiceId() != e.Choice {
-		return fmt.Errorf("%w: choice %s, want %s", errPreparedTxMismatch, exercise.GetChoiceId(), e.Choice)
+		return fmt.Errorf("%w: choice %s, want %s", ErrPreparedTxMismatch, exercise.GetChoiceId(), e.Choice)
+	}
+	var wantArg apiv2.Value
+	if err := protojson.Unmarshal([]byte(e.ChoiceArgument), &wantArg); err != nil {
+		return fmt.Errorf("parsing choice argument: %w", err)
+	}
+	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(exercise.GetChosenValue())) {
+		return fmt.Errorf("%w: choice argument %s, want %s", ErrPreparedTxMismatch,
+			protojson.Format(exercise.GetChosenValue()), e.ChoiceArgument)
 	}
 
 	return nil
+}
+
+// normalizeValue drops what the ledger may add or strip: type IDs, labels, trailing Nones, numeric padding.
+func normalizeValue(v *apiv2.Value) *apiv2.Value {
+	if v == nil {
+		return nil
+	}
+	out := proto.Clone(v).(*apiv2.Value)
+	normalizeInPlace(out)
+
+	return out
+}
+
+func normalizeInPlace(v *apiv2.Value) {
+	switch s := v.GetSum().(type) {
+	case *apiv2.Value_Numeric:
+		if strings.Contains(s.Numeric, ".") {
+			s.Numeric = strings.TrimSuffix(strings.TrimRight(s.Numeric, "0"), ".")
+		}
+	case *apiv2.Value_Record:
+		s.Record.RecordId = nil
+		fields := s.Record.GetFields()
+		for len(fields) > 0 && isNone(fields[len(fields)-1].GetValue()) {
+			fields = fields[:len(fields)-1]
+		}
+		s.Record.Fields = fields
+		for _, f := range fields {
+			f.Label = ""
+			normalizeInPlace(f.GetValue())
+		}
+	case *apiv2.Value_Variant:
+		s.Variant.VariantId = nil
+		normalizeInPlace(s.Variant.GetValue())
+	case *apiv2.Value_Enum:
+		s.Enum.EnumId = nil
+	case *apiv2.Value_Optional:
+		if s.Optional.GetValue() != nil {
+			normalizeInPlace(s.Optional.GetValue())
+		}
+	case *apiv2.Value_List:
+		for _, e := range s.List.GetElements() {
+			normalizeInPlace(e)
+		}
+	case *apiv2.Value_TextMap:
+		for _, e := range s.TextMap.GetEntries() {
+			normalizeInPlace(e.GetValue())
+		}
+	case *apiv2.Value_GenMap:
+		for _, e := range s.GenMap.GetEntries() {
+			normalizeInPlace(e.GetKey())
+			normalizeInPlace(e.GetValue())
+		}
+	}
+}
+
+func isNone(v *apiv2.Value) bool {
+	o, ok := v.GetSum().(*apiv2.Value_Optional)
+
+	return ok && o.Optional.GetValue() == nil
 }
 
 func (d DisclosedContract) Proto() (*apiv2.DisclosedContract, error) {
