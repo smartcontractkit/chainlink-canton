@@ -135,7 +135,7 @@ func TestExpectedExerciseCheck_AcceptsAChoiceExercisedThroughTheExpectedInterfac
 		PackageID: "pkg", TemplateModule: "M", TemplateEntity: "Iface",
 		ContractID: "00c1", Choice: "Do", ChoiceArgument: `{"unit":{}}`,
 	}
-	concrete := &apiv2.Identifier{PackageId: "pkg", ModuleName: "M", EntityName: "Concrete"}
+	concrete := &apiv2.Identifier{PackageId: "concretePkg", ModuleName: "M", EntityName: "Concrete"}
 	for name, tc := range map[string]struct {
 		interfaceID *apiv2.Identifier
 		matches     bool

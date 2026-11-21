@@ -564,10 +564,14 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 		return fmt.Errorf("%w: template %s:%s, want %s:%s", ErrPreparedTxMismatch,
 			tid.GetModuleName(), tid.GetEntityName(), e.TemplateModule, e.TemplateEntity)
 	}
+	matched := tid
+	if !tplMatch {
+		matched = iid
+	}
 	if name, isRef := strings.CutPrefix(e.PackageID, "#"); isRef && exercise.GetPackageName() != name {
 		return fmt.Errorf("%w: package name %s, want %s", ErrPreparedTxMismatch, exercise.GetPackageName(), name)
-	} else if !isRef && tid.GetPackageId() != e.PackageID {
-		return fmt.Errorf("%w: package %s, want %s", ErrPreparedTxMismatch, tid.GetPackageId(), e.PackageID)
+	} else if !isRef && matched.GetPackageId() != e.PackageID {
+		return fmt.Errorf("%w: package %s, want %s", ErrPreparedTxMismatch, matched.GetPackageId(), e.PackageID)
 	}
 	if exercise.GetContractId() != e.ContractID {
 		return fmt.Errorf("%w: contract %s, want %s", ErrPreparedTxMismatch, exercise.GetContractId(), e.ContractID)
