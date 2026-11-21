@@ -26,13 +26,19 @@ import (
 type fakeAdmin struct {
 	client.CantonClient
 	participantID string
+	participants  []string
 }
 
 func (f *fakeAdmin) GetParticipantUID(context.Context) (string, error) { return f.participantID, nil }
 
 func (f *fakeAdmin) GetP2P(context.Context, string, string) (*client.P2PState, error) {
+	infos := make([]client.P2PParticipantInfo, 0, len(f.participants))
+	for _, pid := range f.participants {
+		infos = append(infos, client.P2PParticipantInfo{ParticipantUID: pid})
+	}
+
 	return &client.P2PState{
-		Participants:     []client.P2PParticipantInfo{{ParticipantUID: "p1"}, {ParticipantUID: "p2"}},
+		Participants:     infos,
 		PartySigningKeys: &client.P2PSigningKeysInfo{Keys: []string{"k1", "k2"}, Threshold: 2},
 	}, nil
 }
@@ -116,7 +122,7 @@ func (s fakeSigner) Sign(_ context.Context, hash []byte) (*apiv2.Signature, erro
 
 func deps(participantID string, lc *fakeLedger) ledger.ContractDeployDeps {
 	return ledger.ContractDeployDeps{
-		AdminClient:  &fakeAdmin{participantID: participantID},
+		AdminClient:  &fakeAdmin{participantID: participantID, participants: []string{"p1", "p2"}},
 		LedgerClient: lc,
 		Signer:       fakeSigner{},
 		Logger:       logger.Nop(),
@@ -256,6 +262,46 @@ func TestExerciseChoiceSequence_GrantsActAsOnlyToTheRunningParticipant(t *testin
 	assert.Equal(t, []string{"p2-user"}, ledgers["p2"].actAs)
 	assert.Equal(t, []string{"p1-user"}, ledgers["p1"].readAs)
 	assert.Equal(t, []string{"p2-user"}, ledgers["p2"].readAs)
+}
+
+func TestExerciseChoiceSequence_GrantsActAsOnlyToThePreparerAndTheSubmitter(t *testing.T) {
+	t.Parallel()
+
+	reporter := operations.NewMemoryReporter()
+	ledgers := map[string]*fakeLedger{"p1": {}, "p2": {}, "p3": {}}
+	run := func(pid string) error {
+		d := deps(pid, ledgers[pid])
+		d.AdminClient = &fakeAdmin{participantID: pid, participants: []string{"p1", "p2", "p3"}}
+		d.UserID = pid + "-user"
+		_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), reporter), exercisechoice.ExerciseChoiceSequence, d, input())
+
+		return err
+	}
+
+	require.ErrorContains(t, run("p1"), "1/3 participants have signed")
+	require.ErrorContains(t, run("p2"), "2/3 participants have signed")
+	require.NoError(t, run("p3"))
+
+	assert.Equal(t, 1, ledgers["p3"].executions)
+	assert.Equal(t, []string{"p1-user"}, ledgers["p1"].actAs, "p1 prepares")
+	assert.Empty(t, ledgers["p2"].actAs, "p2 only signs")
+	assert.Equal(t, []string{"p3-user"}, ledgers["p3"].actAs, "p3 submits")
+	assert.Equal(t, []string{"p2-user"}, ledgers["p2"].readAs)
+}
+
+func TestExerciseChoiceSequence_ReturnsTheOperatorsRejectionInsteadOfWaiting(t *testing.T) {
+	t.Parallel()
+
+	signed := 0
+	d := deps("p1", &fakeLedger{})
+	d.Signer = fakeSigner{signed: &signed}
+	d.Confirmer = ceremony.AlwaysRejectConfirmer{}
+	_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+		exercisechoice.ExerciseChoiceSequence, d, input())
+
+	require.ErrorContains(t, err, ceremony.ErrUserRejected.Error())
+	assert.NotContains(t, err.Error(), exercisechoice.ErrThresholdNotMet.Error())
+	assert.Zero(t, signed)
 }
 
 func TestExerciseChoiceSequence_RefusesToSignAPreparedTransactionThatDoesNotMatch(t *testing.T) {

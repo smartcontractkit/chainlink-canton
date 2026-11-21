@@ -302,15 +302,16 @@ setup uses it for the `ccipOwner` provider and registrar choices.
 | 3   | `GrantReadAsOp`       | Each participant | Grant the participant's Ledger API user readAs for the party     |
 | 4   | `PrepareExerciseOp`   | Coordinator      | Grant the connected user actAs, then prepare via `PrepareSubmission` |
 | 5   | `SignSubmissionOp`    | Each participant | Check the prepared transaction, then sign its hash               |
-| 6   | `ExecuteSubmissionOp` | Coordinator      | Submit with all signatures; record the update ID and new contracts |
+| 6   | `ExecuteSubmissionOp` | Coordinator      | Grant the connected user actAs, then submit with all signatures; record the update ID and new contracts |
 
 **Threshold gates:**
 
 - Step 6 requires all participants to have signed in step 5.
 
-Step 3 does not gate the ceremony. Only the run that prepares or submits needs
-actAs, so each run grants actAs to its own user only. Whoever resumes last
-submits.
+Step 3 does not gate the ceremony. Only the run that prepares and the run that
+submits grant actAs, each to its own user. A run that only signs grants none.
+Whoever resumes last submits. If the connected operator declines to sign, the
+run stops with that rejection instead of waiting for more signers.
 
 Before signing, each participant decodes the prepared transaction. It refuses
 to sign unless the single root node exercises the workflow's choice on the
