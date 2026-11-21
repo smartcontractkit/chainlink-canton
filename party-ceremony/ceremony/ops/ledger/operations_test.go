@@ -33,6 +33,12 @@ func TestExpectedExerciseCheck_RefusesAPreparedTransactionItCannotRead(t *testin
 
 func preparedExerciseB64(t *testing.T, e ledger.ExpectedExercise, chosenJSON string) string {
 	t.Helper()
+
+	return preparedViaB64(t, e, chosenJSON, &apiv2.Identifier{PackageId: e.PackageID, ModuleName: e.TemplateModule, EntityName: e.TemplateEntity}, nil)
+}
+
+func preparedViaB64(t *testing.T, e ledger.ExpectedExercise, chosenJSON string, templateID, interfaceID *apiv2.Identifier) string {
+	t.Helper()
 	var chosen apiv2.Value
 	require.NoError(t, protojson.Unmarshal([]byte(chosenJSON), &chosen))
 	tx := &interactive.PreparedTransaction{Transaction: &interactive.DamlTransaction{
@@ -40,7 +46,8 @@ func preparedExerciseB64(t *testing.T, e ledger.ExpectedExercise, chosenJSON str
 		Nodes: []*interactive.DamlTransaction_Node{{
 			NodeId: "0",
 			VersionedNode: &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Exercise{Exercise: &v1.Exercise{
-				TemplateId:  &apiv2.Identifier{PackageId: e.PackageID, ModuleName: e.TemplateModule, EntityName: e.TemplateEntity},
+				TemplateId:  templateID,
+				InterfaceId: interfaceID,
 				ContractId:  e.ContractID,
 				ChoiceId:    e.Choice,
 				ChosenValue: &chosen,
@@ -88,6 +95,15 @@ func TestExpectedExerciseCheck_ComparesTheChoiceArgument(t *testing.T) {
 			got:     textMap("a", "2", "b", "1"),
 			matches: true,
 		},
+		"text map record values in another key order": {
+			want: `{"textMap":{"entries":[` +
+				`{"key":"b","value":{"record":{"fields":[{"label":"x","value":` + cid + `}]}}},` +
+				`{"key":"a","value":{"record":{"fields":[{"value":` + none + `},{"value":` + some5 + `}]}}}]}}`,
+			got: `{"textMap":{"entries":[` +
+				`{"key":"a","value":{"record":{"fields":[{"label":"p","value":` + none + `},{"label":"q","value":` + some5 + `}]}}},` +
+				`{"key":"b","value":{"record":{"fields":[{"label":"note","value":` + none + `},{"label":"x","value":` + cid + `}]}}}]}}`,
+			matches: true,
+		},
 		"text map entries with other values": {
 			want:    textMap("a", "1", "b", "2"),
 			got:     textMap("a", "2", "b", "1"),
@@ -102,6 +118,36 @@ func TestExpectedExerciseCheck_ComparesTheChoiceArgument(t *testing.T) {
 				ContractID: "00c1", Choice: "Do", ChoiceArgument: tc.want,
 			}
 			err := e.Check(preparedExerciseB64(t, e, tc.got))
+
+			if tc.matches {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, ledger.ErrPreparedTxMismatch)
+			}
+		})
+	}
+}
+
+func TestExpectedExerciseCheck_AcceptsAChoiceExercisedThroughTheExpectedInterface(t *testing.T) {
+	t.Parallel()
+
+	e := ledger.ExpectedExercise{
+		PackageID: "pkg", TemplateModule: "M", TemplateEntity: "Iface",
+		ContractID: "00c1", Choice: "Do", ChoiceArgument: `{"unit":{}}`,
+	}
+	concrete := &apiv2.Identifier{PackageId: "pkg", ModuleName: "M", EntityName: "Concrete"}
+	for name, tc := range map[string]struct {
+		interfaceID *apiv2.Identifier
+		matches     bool
+	}{
+		"interface matches":   {interfaceID: &apiv2.Identifier{PackageId: "pkg", ModuleName: "M", EntityName: "Iface"}, matches: true},
+		"interface differs":   {interfaceID: &apiv2.Identifier{PackageId: "pkg", ModuleName: "M", EntityName: "Other"}, matches: false},
+		"no interface is set": {interfaceID: nil, matches: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			err := e.Check(preparedViaB64(t, e, `{"unit":{}}`, concrete, tc.interfaceID))
 
 			if tc.matches {
 				require.NoError(t, err)

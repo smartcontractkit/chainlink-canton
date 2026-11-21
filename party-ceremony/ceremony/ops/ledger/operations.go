@@ -557,8 +557,10 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 		return fmt.Errorf("%w: root node is not an exercise", ErrPreparedTxMismatch)
 	}
 
-	tid := exercise.GetTemplateId()
-	if tid.GetModuleName() != e.TemplateModule || tid.GetEntityName() != e.TemplateEntity {
+	tid, iid := exercise.GetTemplateId(), exercise.GetInterfaceId()
+	tplMatch := tid.GetModuleName() == e.TemplateModule && tid.GetEntityName() == e.TemplateEntity
+	ifaceMatch := iid.GetModuleName() == e.TemplateModule && iid.GetEntityName() == e.TemplateEntity
+	if !tplMatch && !ifaceMatch {
 		return fmt.Errorf("%w: template %s:%s, want %s:%s", ErrPreparedTxMismatch,
 			tid.GetModuleName(), tid.GetEntityName(), e.TemplateModule, e.TemplateEntity)
 	}
@@ -625,10 +627,7 @@ func dropPairedLabelledNones(want, got *apiv2.Value) {
 			dropPairedLabelledNones(w.List.GetElements()[i], gl[i])
 		}
 	case *apiv2.Value_TextMap:
-		ge := got.GetTextMap().GetEntries()
-		for i := range min(len(w.TextMap.GetEntries()), len(ge)) {
-			dropPairedLabelledNones(w.TextMap.GetEntries()[i].GetValue(), ge[i].GetValue())
-		}
+		forEachTextMapPair(w.TextMap, got.GetTextMap(), dropPairedLabelledNones)
 	case *apiv2.Value_GenMap:
 		ge := got.GetGenMap().GetEntries()
 		for i := range min(len(w.GenMap.GetEntries()), len(ge)) {
@@ -734,15 +733,25 @@ func alignLabelledFields(want, got *apiv2.Value) {
 			alignLabelledFields(w.List.GetElements()[i], gl[i])
 		}
 	case *apiv2.Value_TextMap:
-		ge := got.GetTextMap().GetEntries()
-		for i := range min(len(w.TextMap.GetEntries()), len(ge)) {
-			alignLabelledFields(w.TextMap.GetEntries()[i].GetValue(), ge[i].GetValue())
-		}
+		forEachTextMapPair(w.TextMap, got.GetTextMap(), alignLabelledFields)
 	case *apiv2.Value_GenMap:
 		ge := got.GetGenMap().GetEntries()
 		for i := range min(len(w.GenMap.GetEntries()), len(ge)) {
 			alignLabelledFields(w.GenMap.GetEntries()[i].GetKey(), ge[i].GetKey())
 			alignLabelledFields(w.GenMap.GetEntries()[i].GetValue(), ge[i].GetValue())
+		}
+	}
+}
+
+// forEachTextMapPair pairs entries by key: the ledger returns a TextMap sorted by key, not in the args file's order.
+func forEachTextMapPair(want, got *apiv2.TextMap, f func(want, got *apiv2.Value)) {
+	byKey := make(map[string]*apiv2.Value, len(got.GetEntries()))
+	for _, e := range got.GetEntries() {
+		byKey[e.GetKey()] = e.GetValue()
+	}
+	for _, e := range want.GetEntries() {
+		if g, ok := byKey[e.GetKey()]; ok {
+			f(e.GetValue(), g)
 		}
 	}
 }
