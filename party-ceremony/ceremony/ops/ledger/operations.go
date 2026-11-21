@@ -544,6 +544,7 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 			hint = " (the ledger returns record fields unlabelled in Daml declaration order: " +
 				"list fields in that order and include every Optional field before the last one you set)"
 		}
+
 		return fmt.Errorf("%w: choice argument %s, want %s%s", ErrPreparedTxMismatch,
 			protojson.Format(exercise.GetChosenValue()), e.ChoiceArgument, hint)
 	}
