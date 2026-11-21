@@ -383,6 +383,17 @@ func TestExerciseChoiceSequence_ComparesTheChoiceArgumentByValue(t *testing.T) {
 			fields(tx)[1].GetValue().GetRecord().GetFields()[0].Value = &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: fee}}
 		}
 	}
+	labelTopFields := func(first, second string, swapValues bool) func(*interactive.PreparedTransaction) {
+		return func(tx *interactive.PreparedTransaction) {
+			rec := tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord()
+			a, b := rec.Fields[0], rec.Fields[1]
+			if swapValues {
+				a, b = b, a
+			}
+			a.Label, b.Label = first, second
+			rec.Fields = []*apiv2.RecordField{a, b}
+		}
+	}
 	for name, tc := range map[string]struct {
 		tamper func(*interactive.PreparedTransaction)
 		signs  bool
@@ -392,7 +403,9 @@ func TestExerciseChoiceSequence_ComparesTheChoiceArgumentByValue(t *testing.T) {
 			rec := tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord()
 			rec.Fields = append(rec.Fields, &apiv2.RecordField{Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}})
 		}, signs: true},
-		"other nested numeric": {tamper: setFee("2.5000000000"), signs: false},
+		"other nested numeric":             {tamper: setFee("2.5000000000"), signs: false},
+		"labelled fields in another order": {tamper: labelTopFields("terms", "cid", true), signs: true},
+		"labels on the wrong values":       {tamper: labelTopFields("terms", "cid", false), signs: false},
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()

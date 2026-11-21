@@ -534,7 +534,9 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 	if err := protojson.Unmarshal([]byte(e.ChoiceArgument), &wantArg); err != nil {
 		return fmt.Errorf("%w: parsing choice argument: %w", ErrPreparedTxMismatch, err)
 	}
-	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(exercise.GetChosenValue())) {
+	gotArg := proto.Clone(exercise.GetChosenValue()).(*apiv2.Value)
+	alignLabelledFields(&wantArg, gotArg)
+	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(gotArg)) {
 		return fmt.Errorf("%w: choice argument %s, want %s", ErrPreparedTxMismatch,
 			protojson.Format(exercise.GetChosenValue()), e.ChoiceArgument)
 	}
@@ -593,6 +595,69 @@ func normalizeInPlace(v *apiv2.Value) {
 			normalizeInPlace(e.GetValue())
 		}
 	}
+}
+
+// alignLabelledFields puts got's labelled record fields in want's label order: the ledger accepts labelled fields in any order.
+func alignLabelledFields(want, got *apiv2.Value) {
+	switch w := want.GetSum().(type) {
+	case *apiv2.Value_Record:
+		g := got.GetRecord()
+		if g == nil {
+			return
+		}
+		if allLabelled(w.Record) && allLabelled(g) {
+			byLabel := make(map[string]*apiv2.RecordField, len(g.GetFields()))
+			for _, f := range g.GetFields() {
+				byLabel[f.GetLabel()] = f
+			}
+			ordered := make([]*apiv2.RecordField, 0, len(g.GetFields()))
+			for _, f := range w.Record.GetFields() {
+				if gf, ok := byLabel[f.GetLabel()]; ok {
+					ordered = append(ordered, gf)
+					delete(byLabel, f.GetLabel())
+				}
+			}
+			for _, f := range g.GetFields() {
+				if _, ok := byLabel[f.GetLabel()]; ok {
+					ordered = append(ordered, f)
+				}
+			}
+			g.Fields = ordered
+		}
+		for i := range min(len(w.Record.GetFields()), len(g.GetFields())) {
+			alignLabelledFields(w.Record.GetFields()[i].GetValue(), g.GetFields()[i].GetValue())
+		}
+	case *apiv2.Value_Variant:
+		alignLabelledFields(w.Variant.GetValue(), got.GetVariant().GetValue())
+	case *apiv2.Value_Optional:
+		alignLabelledFields(w.Optional.GetValue(), got.GetOptional().GetValue())
+	case *apiv2.Value_List:
+		gl := got.GetList().GetElements()
+		for i := range min(len(w.List.GetElements()), len(gl)) {
+			alignLabelledFields(w.List.GetElements()[i], gl[i])
+		}
+	case *apiv2.Value_TextMap:
+		ge := got.GetTextMap().GetEntries()
+		for i := range min(len(w.TextMap.GetEntries()), len(ge)) {
+			alignLabelledFields(w.TextMap.GetEntries()[i].GetValue(), ge[i].GetValue())
+		}
+	case *apiv2.Value_GenMap:
+		ge := got.GetGenMap().GetEntries()
+		for i := range min(len(w.GenMap.GetEntries()), len(ge)) {
+			alignLabelledFields(w.GenMap.GetEntries()[i].GetKey(), ge[i].GetKey())
+			alignLabelledFields(w.GenMap.GetEntries()[i].GetValue(), ge[i].GetValue())
+		}
+	}
+}
+
+func allLabelled(r *apiv2.Record) bool {
+	for _, f := range r.GetFields() {
+		if f.GetLabel() == "" {
+			return false
+		}
+	}
+
+	return len(r.GetFields()) > 0
 }
 
 func isNone(v *apiv2.Value) bool {
