@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -31,7 +32,7 @@ func HashPreparedTransactionV2(tx *interactive.PreparedTransaction) ([]byte, err
 
 	txEnc := &encoder{}
 	txEnc.string(tx.GetTransaction().GetVersion())
-	txEnc.int32(int32(len(tx.GetTransaction().GetRoots())))
+	txEnc.length(len(tx.GetTransaction().GetRoots()))
 	for _, root := range tx.GetTransaction().GetRoots() {
 		txEnc.raw(h.nodeHash(root, txEnc))
 	}
@@ -123,7 +124,7 @@ func (h txHasher) nodeHash(id string, parent *encoder) []byte {
 }
 
 func (h txHasher) children(e *encoder, ids []string) {
-	e.int32(int32(len(ids)))
+	e.length(len(ids))
 	for _, id := range ids {
 		e.raw(h.nodeHash(id, e))
 	}
@@ -185,12 +186,36 @@ func (e *encoder) present(set bool) bool {
 	return set
 }
 
-func (e *encoder) int32(v int32) { e.buf = binary.BigEndian.AppendUint32(e.buf, uint32(v)) }
+// Canton encodes unsigned protobuf integers as Java's signed type, which has the same bytes.
+func (e *encoder) uint32(v uint32) { e.buf = binary.BigEndian.AppendUint32(e.buf, v) }
 
-func (e *encoder) int64(v int64) { e.buf = binary.BigEndian.AppendUint64(e.buf, uint64(v)) }
+func (e *encoder) uint64(v uint64) { e.buf = binary.BigEndian.AppendUint64(e.buf, v) }
+
+func (e *encoder) int32(v int32) { e.signed(v) }
+
+func (e *encoder) int64(v int64) { e.signed(v) }
+
+func (e *encoder) signed(v any) {
+	buf, err := binary.Append(e.buf, binary.BigEndian, v)
+	if err != nil {
+		e.fail(err)
+
+		return
+	}
+	e.buf = buf
+}
+
+func (e *encoder) length(n int) {
+	if n < 0 || n > math.MaxInt32 {
+		e.fail(fmt.Errorf("length %d does not fit in int32", n))
+
+		return
+	}
+	e.uint32(uint32(n))
+}
 
 func (e *encoder) bytes(b []byte) {
-	e.int32(int32(len(b)))
+	e.length(len(b))
 	e.raw(b)
 }
 
@@ -205,7 +230,7 @@ func (e *encoder) hexString(s string) {
 }
 
 func (e *encoder) strings(ss []string) {
-	e.int32(int32(len(ss)))
+	e.length(len(ss))
 	for _, s := range ss {
 		e.string(s)
 	}
@@ -252,16 +277,16 @@ func (e *encoder) metadata(m *interactive.Metadata) {
 	e.strings(m.GetSubmitterInfo().GetActAs())
 	e.string(m.GetSubmitterInfo().GetCommandId())
 	e.string(m.GetTransactionUuid())
-	e.int32(int32(m.GetMediatorGroup()))
+	e.uint32(m.GetMediatorGroup())
 	e.string(m.GetSynchronizerId())
 	if e.present(m.MinLedgerEffectiveTime != nil) {
-		e.int64(int64(m.GetMinLedgerEffectiveTime()))
+		e.uint64(m.GetMinLedgerEffectiveTime())
 	}
 	if e.present(m.MaxLedgerEffectiveTime != nil) {
-		e.int64(int64(m.GetMaxLedgerEffectiveTime()))
+		e.uint64(m.GetMaxLedgerEffectiveTime())
 	}
-	e.int64(int64(m.GetPreparationTime()))
-	e.int32(int32(len(m.GetInputContracts())))
+	e.uint64(m.GetPreparationTime())
+	e.length(len(m.GetInputContracts()))
 	for _, c := range m.GetInputContracts() {
 		create := c.GetV1()
 		if create == nil {
@@ -269,7 +294,7 @@ func (e *encoder) metadata(m *interactive.Metadata) {
 
 			return
 		}
-		e.int64(int64(c.GetCreatedAt()))
+		e.uint64(c.GetCreatedAt())
 		inner := &encoder{}
 		inner.create(create, nil, false)
 		if inner.err != nil {
@@ -315,13 +340,13 @@ func (e *encoder) value(v *apiv2.Value) {
 		}
 	case *apiv2.Value_List:
 		e.byte(0x0a)
-		e.int32(int32(len(s.List.GetElements())))
+		e.length(len(s.List.GetElements()))
 		for _, el := range s.List.GetElements() {
 			e.value(el)
 		}
 	case *apiv2.Value_TextMap:
 		e.byte(0x0b)
-		e.int32(int32(len(s.TextMap.GetEntries())))
+		e.length(len(s.TextMap.GetEntries()))
 		for _, entry := range s.TextMap.GetEntries() {
 			e.string(entry.GetKey())
 			e.value(entry.GetValue())
@@ -331,7 +356,7 @@ func (e *encoder) value(v *apiv2.Value) {
 		if e.present(s.Record.GetRecordId() != nil) {
 			e.identifier(s.Record.GetRecordId())
 		}
-		e.int32(int32(len(s.Record.GetFields())))
+		e.length(len(s.Record.GetFields()))
 		for _, f := range s.Record.GetFields() {
 			// The spec always encodes the label as set, even when empty.
 			e.present(true)
@@ -353,7 +378,7 @@ func (e *encoder) value(v *apiv2.Value) {
 		e.string(s.Enum.GetConstructor())
 	case *apiv2.Value_GenMap:
 		e.byte(0x0f)
-		e.int32(int32(len(s.GenMap.GetEntries())))
+		e.length(len(s.GenMap.GetEntries()))
 		for _, entry := range s.GenMap.GetEntries() {
 			e.value(entry.GetKey())
 			e.value(entry.GetValue())
