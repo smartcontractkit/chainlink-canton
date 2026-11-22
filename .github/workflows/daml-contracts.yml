@@ -102,6 +102,43 @@ jobs:
             echo "### Dev bindings are up-to-date" >> $GITHUB_STEP_SUMMARY
           fi
 
+  generate-bindings-js:
+    name: Generate JS Bindings
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Install DPM
+        uses: ./.github/actions/install-dpm
+      - name: Generate JS bindings
+        run: make generate-bindings-js
+      - name: Verify JS bindings are up-to-date
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet HEAD -- contracts/bindings/damljs/; then
+            echo "### JS bindings are out of date!" >> $GITHUB_STEP_SUMMARY
+            echo "The bindings under \`contracts/bindings/damljs/\` do not match \`make generate-bindings-js\`." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "#### To fix:" >> $GITHUB_STEP_SUMMARY
+            echo '```bash' >> $GITHUB_STEP_SUMMARY
+            echo 'make generate-bindings-js' >> $GITHUB_STEP_SUMMARY
+            echo 'git add contracts/bindings/damljs/' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "#### Drifted files:" >> $GITHUB_STEP_SUMMARY
+            echo '```text' >> $GITHUB_STEP_SUMMARY
+            git diff --name-only -- contracts/bindings/damljs/ >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            git diff -- contracts/bindings/damljs/
+            exit 1
+          else
+            echo "### JS bindings are up-to-date" >> $GITHUB_STEP_SUMMARY
+          fi
+
   test-contracts:
     name: Test Contracts
     runs-on: ubuntu-latest
