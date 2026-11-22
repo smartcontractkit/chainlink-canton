@@ -26,7 +26,7 @@ var (
 
 const (
 	PackageName = "ccip-fee-treasury"
-	PackageID   = "1f19a8029957a63364bdccc8ddfaaef3cd3f986d02ffb6ad15ad1a093355cb57"
+	PackageID   = "4f453b58eeabfb37aeb633e7053ca548d4ac05838feb9a39d376b3cb19017f58"
 	SDKVersion  = "3.4.11"
 )
 
@@ -842,11 +842,15 @@ func (t *WithdrawAuthorization) UnmarshalHex(data string) error {
 
 // WithdrawInstruction is a Record type
 type WithdrawInstruction struct {
+	ExpireLock types.BOOL `json:"expireLock"`
 }
 
 // ToMap converts WithdrawInstruction to a map for DAML arguments
 func (t WithdrawInstruction) ToMap() map[string]any {
 	m := make(map[string]any)
+
+	m["expireLock"] = bool(t.ExpireLock)
+
 	return m
 }
 
