@@ -95,9 +95,6 @@ func (f *fakeLedger) GrantReadAs(_ context.Context, userID, _ string) error {
 
 func exerciseTx(cmd *apiv2.ExerciseCommand) *interactive.PreparedTransaction {
 	chosen := proto.Clone(cmd.GetChoiceArgument()).(*apiv2.Value)
-	for _, f := range chosen.GetRecord().GetFields() {
-		f.Label = ""
-	}
 
 	// The ledger resolves a "#<package-name>" reference to a package ID.
 	templateID := proto.Clone(cmd.GetTemplateId()).(*apiv2.Identifier)
@@ -501,7 +498,7 @@ func TestExerciseChoiceSequence_ComparesTheChoiceArgumentByValue(t *testing.T) {
 		"numeric padding": {tamper: setFee("1.5000000000"), signs: true},
 		"trailing None": {tamper: func(tx *interactive.PreparedTransaction) {
 			rec := tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord()
-			rec.Fields = append(rec.Fields, &apiv2.RecordField{Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}})
+			rec.Fields = append(rec.Fields, &apiv2.RecordField{Label: "note", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}})
 		}, signs: true},
 		"other nested numeric":             {tamper: setFee("2.5000000000"), signs: false},
 		"labelled fields in another order": {tamper: labelTopFields("terms", "cid", true), signs: true},
