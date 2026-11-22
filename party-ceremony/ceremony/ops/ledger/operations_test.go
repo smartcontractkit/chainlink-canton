@@ -34,10 +34,10 @@ func TestExpectedExerciseCheck_RefusesAPreparedTransactionItCannotRead(t *testin
 func preparedExerciseB64(t *testing.T, e ledger.ExpectedExercise, chosenJSON string) string {
 	t.Helper()
 
-	return preparedViaB64(t, e, chosenJSON, &apiv2.Identifier{PackageId: e.PackageID, ModuleName: e.TemplateModule, EntityName: e.TemplateEntity}, nil)
+	return preparedViaB64(t, e, chosenJSON, &apiv2.Identifier{PackageId: e.PackageID, ModuleName: e.TemplateModule, EntityName: e.TemplateEntity}, nil, "")
 }
 
-func preparedViaB64(t *testing.T, e ledger.ExpectedExercise, chosenJSON string, templateID, interfaceID *apiv2.Identifier) string {
+func preparedViaB64(t *testing.T, e ledger.ExpectedExercise, chosenJSON string, templateID, interfaceID *apiv2.Identifier, packageName string) string {
 	t.Helper()
 	var chosen apiv2.Value
 	require.NoError(t, protojson.Unmarshal([]byte(chosenJSON), &chosen))
@@ -48,6 +48,7 @@ func preparedViaB64(t *testing.T, e ledger.ExpectedExercise, chosenJSON string, 
 			VersionedNode: &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Exercise{Exercise: &v1.Exercise{
 				TemplateId:  templateID,
 				InterfaceId: interfaceID,
+				PackageName: packageName,
 				ContractId:  e.ContractID,
 				ChoiceId:    e.Choice,
 				ChosenValue: &chosen,
@@ -67,6 +68,8 @@ func TestExpectedExerciseCheck_ComparesTheChoiceArgument(t *testing.T) {
 		none  = `{"optional":{}}`
 		some5 = `{"optional":{"value":{"int64":"5"}}}`
 		cid   = `{"contractId":"00c2"}`
+		someX = `{"optional":{"value":{"text":"X"}}}`
+		some1 = `{"optional":{"value":{"int64":"1"}}}`
 	)
 	textMap := func(k1, v1, k2, v2 string) string {
 		return `{"textMap":{"entries":[{"key":"` + k1 + `","value":{"text":"` + v1 + `"}},{"key":"` + k2 + `","value":{"text":"` + v2 + `"}}]}}`
@@ -89,6 +92,16 @@ func TestExpectedExerciseCheck_ComparesTheChoiceArgument(t *testing.T) {
 			want:    `{"record":{"fields":[{"value":` + some5 + `}]}}`,
 			got:     `{"record":{"fields":[{"label":"a","value":` + none + `},{"label":"b","value":` + some5 + `}]}}`,
 			matches: false,
+		},
+		"value moved to another label": {
+			want:    `{"record":{"fields":[{"label":"newOperator","value":` + someX + `}]}}`,
+			got:     `{"record":{"fields":[{"label":"newOwner","value":` + someX + `},{"label":"newOperator","value":` + none + `}]}}`,
+			matches: false,
+		},
+		"labelled fields in another order": {
+			want:    `{"record":{"fields":[{"label":"a","value":` + some1 + `},{"label":"b","value":` + some5 + `}]}}`,
+			got:     `{"record":{"fields":[{"label":"b","value":` + some5 + `},{"label":"a","value":` + some1 + `}]}}`,
+			matches: true,
 		},
 		"text map entries in another key order": {
 			want:    textMap("b", "1", "a", "2"),
@@ -147,7 +160,41 @@ func TestExpectedExerciseCheck_AcceptsAChoiceExercisedThroughTheExpectedInterfac
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			err := e.Check(preparedViaB64(t, e, `{"unit":{}}`, concrete, tc.interfaceID))
+			err := e.Check(preparedViaB64(t, e, `{"unit":{}}`, concrete, tc.interfaceID, ""))
+
+			if tc.matches {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, ledger.ErrPreparedTxMismatch)
+			}
+		})
+	}
+}
+
+func TestExpectedExerciseCheck_PackageNameRef(t *testing.T) {
+	t.Parallel()
+
+	for name, tc := range map[string]struct {
+		module, entity string
+		interfaceID    *apiv2.Identifier
+		matches        bool
+	}{
+		"interface named by the interface's package": {
+			module: "I", entity: "Iface",
+			interfaceID: &apiv2.Identifier{PackageId: "pkgB", ModuleName: "I", EntityName: "Iface"},
+			matches:     true,
+		},
+		"template named by another package": {module: "M", entity: "T", matches: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			e := ledger.ExpectedExercise{
+				PackageID: "#iface-pkg", TemplateModule: tc.module, TemplateEntity: tc.entity,
+				ContractID: "00c1", Choice: "Do", ChoiceArgument: `{"unit":{}}`,
+			}
+			template := &apiv2.Identifier{PackageId: "pkgA", ModuleName: "M", EntityName: "T"}
+			err := e.Check(preparedViaB64(t, e, `{"unit":{}}`, template, tc.interfaceID, "amulet"))
 
 			if tc.matches {
 				require.NoError(t, err)

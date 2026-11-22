@@ -568,7 +568,7 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 	if !tplMatch {
 		matched = iid
 	}
-	if name, isRef := strings.CutPrefix(e.PackageID, "#"); isRef && exercise.GetPackageName() != name {
+	if name, isRef := strings.CutPrefix(e.PackageID, "#"); isRef && tplMatch && exercise.GetPackageName() != name {
 		return fmt.Errorf("%w: package name %s, want %s", ErrPreparedTxMismatch, exercise.GetPackageName(), name)
 	} else if !isRef && matched.GetPackageId() != e.PackageID {
 		return fmt.Errorf("%w: package %s, want %s", ErrPreparedTxMismatch, matched.GetPackageId(), e.PackageID)
@@ -585,6 +585,9 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 	}
 	gotArg := proto.Clone(exercise.GetChosenValue()).(*apiv2.Value)
 	dropPairedLabelledNones(&wantArg, gotArg)
+	if label, bad := firstUnpairedLabel(&wantArg, gotArg); bad {
+		return fmt.Errorf("%w: choice argument field %q is set on one side only", ErrPreparedTxMismatch, label)
+	}
 	alignLabelledFields(&wantArg, gotArg)
 	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(gotArg)) {
 		return fmt.Errorf("%w: choice argument %s, want %s", ErrPreparedTxMismatch,
@@ -639,6 +642,75 @@ func dropPairedLabelledNones(want, got *apiv2.Value) {
 			dropPairedLabelledNones(w.GenMap.GetEntries()[i].GetValue(), ge[i].GetValue())
 		}
 	}
+}
+
+// firstUnpairedLabel finds a non-None field that sits under a label only one side has, once Nones are dropped.
+func firstUnpairedLabel(want, got *apiv2.Value) (string, bool) {
+	switch w := want.GetSum().(type) {
+	case *apiv2.Value_Record:
+		g := got.GetRecord()
+		if g == nil {
+			return "", false
+		}
+		if allLabelled(w.Record) && allLabelled(g) {
+			gotByLabel := make(map[string]*apiv2.Value, len(g.GetFields()))
+			for _, f := range g.GetFields() {
+				gotByLabel[f.GetLabel()] = f.GetValue()
+			}
+			for _, f := range w.Record.GetFields() {
+				gv, ok := gotByLabel[f.GetLabel()]
+				if !ok {
+					return f.GetLabel(), true
+				}
+				delete(gotByLabel, f.GetLabel())
+				if l, bad := firstUnpairedLabel(f.GetValue(), gv); bad {
+					return l, true
+				}
+			}
+			for l := range gotByLabel {
+				return l, true
+			}
+
+			return "", false
+		}
+		for i := range min(len(w.Record.GetFields()), len(g.GetFields())) {
+			if l, bad := firstUnpairedLabel(w.Record.GetFields()[i].GetValue(), g.GetFields()[i].GetValue()); bad {
+				return l, true
+			}
+		}
+	case *apiv2.Value_Variant:
+		return firstUnpairedLabel(w.Variant.GetValue(), got.GetVariant().GetValue())
+	case *apiv2.Value_Optional:
+		return firstUnpairedLabel(w.Optional.GetValue(), got.GetOptional().GetValue())
+	case *apiv2.Value_List:
+		gl := got.GetList().GetElements()
+		for i := range min(len(w.List.GetElements()), len(gl)) {
+			if l, bad := firstUnpairedLabel(w.List.GetElements()[i], gl[i]); bad {
+				return l, true
+			}
+		}
+	case *apiv2.Value_TextMap:
+		var label string
+		forEachTextMapPair(w.TextMap, got.GetTextMap(), func(wv, gv *apiv2.Value) {
+			if l, bad := firstUnpairedLabel(wv, gv); bad && label == "" {
+				label = l
+			}
+		})
+
+		return label, label != ""
+	case *apiv2.Value_GenMap:
+		ge := got.GetGenMap().GetEntries()
+		for i := range min(len(w.GenMap.GetEntries()), len(ge)) {
+			if l, bad := firstUnpairedLabel(w.GenMap.GetEntries()[i].GetKey(), ge[i].GetKey()); bad {
+				return l, true
+			}
+			if l, bad := firstUnpairedLabel(w.GenMap.GetEntries()[i].GetValue(), ge[i].GetValue()); bad {
+				return l, true
+			}
+		}
+	}
+
+	return "", false
 }
 
 // normalizeValue drops what the ledger may add or strip: type IDs, labels, trailing Nones, numeric padding.
