@@ -708,6 +708,9 @@ func alignLabelledFields(want, got *apiv2.Value) error {
 		if g == nil {
 			return nil
 		}
+		if allLabelled(w.Record) && len(w.Record.GetFields()) > 1 && !allLabelled(g) {
+			return fmt.Errorf("prepared transaction has no field labels, so field order cannot be checked")
+		}
 		if allLabelled(w.Record) && allLabelled(g) {
 			byLabel := make(map[string]*apiv2.RecordField, len(g.GetFields()))
 			for _, f := range g.GetFields() {

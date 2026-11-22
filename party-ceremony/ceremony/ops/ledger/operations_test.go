@@ -110,6 +110,16 @@ func TestExpectedExerciseCheck_ComparesTheChoiceArgument(t *testing.T) {
 			got:     `{"record":{"fields":[{"value":` + some5 + `},{"value":` + none + `}]}}`,
 			matches: false,
 		},
+		"labelled fields against an unlabelled record in the same order": {
+			want:    `{"record":{"fields":[{"label":"a","value":` + cid + `},{"label":"b","value":` + some5 + `}]}}`,
+			got:     `{"record":{"fields":[{"value":` + cid + `},{"value":` + some5 + `}]}}`,
+			matches: false,
+		},
+		"labelled fields against an unlabelled record in another order": {
+			want:    `{"record":{"fields":[{"label":"a","value":` + cid + `},{"label":"b","value":` + some5 + `}]}}`,
+			got:     `{"record":{"fields":[{"value":` + some5 + `},{"value":` + cid + `}]}}`,
+			matches: false,
+		},
 		"text map entries in another key order": {
 			want:    textMap("b", "1", "a", "2"),
 			got:     textMap("a", "2", "b", "1"),
