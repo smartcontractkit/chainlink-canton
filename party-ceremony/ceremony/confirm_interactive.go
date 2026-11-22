@@ -72,6 +72,12 @@ func (c *InteractiveConfirmer) ConfirmDAMLSign(_ context.Context, d DAMLSignDeta
 		hash = hash[:32] + "…"
 	}
 	printField(c.Out, "Transaction Hash", hash)
+	if d.Choice != "" {
+		printField(c.Out, "Template", d.Template)
+		printField(c.Out, "Contract ID", d.ContractID)
+		printField(c.Out, "Choice", d.Choice)
+		printField(c.Out, "Choice Argument", d.ChoiceArgument)
+	}
 	printField(c.Out, "Your Identity", d.SignerIdentity)
 
 	fmt.Fprintln(c.Out, "╚══════════════════════════════════════════════════════════════╝")

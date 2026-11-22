@@ -50,6 +50,10 @@ type DAMLSignDetail struct {
 	TransactionHash string
 	// SignerIdentity is the participant UID that will sign.
 	SignerIdentity string
+	Template       string
+	ContractID     string
+	Choice         string
+	ChoiceArgument string
 }
 
 // Confirmer is called before signing operations to give the user an

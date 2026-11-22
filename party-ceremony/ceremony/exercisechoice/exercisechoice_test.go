@@ -2,10 +2,13 @@ package exercisechoice_test
 
 import (
 	"context"
+	"encoding/base64"
+	"strings"
 	"testing"
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
+	v1 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive/transaction/v1"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 	"github.com/smartcontractkit/chainlink-deployments-framework/pkg/logger"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +16,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/exercisechoice"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony/ops/ledger"
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
@@ -23,13 +27,19 @@ import (
 type fakeAdmin struct {
 	client.CantonClient
 	participantID string
+	participants  []string
 }
 
 func (f *fakeAdmin) GetParticipantUID(context.Context) (string, error) { return f.participantID, nil }
 
 func (f *fakeAdmin) GetP2P(context.Context, string, string) (*client.P2PState, error) {
+	infos := make([]client.P2PParticipantInfo, 0, len(f.participants))
+	for _, pid := range f.participants {
+		infos = append(infos, client.P2PParticipantInfo{ParticipantUID: pid})
+	}
+
 	return &client.P2PState{
-		Participants:     []client.P2PParticipantInfo{{ParticipantUID: "p1"}, {ParticipantUID: "p2"}},
+		Participants:     infos,
 		PartySigningKeys: &client.P2PSigningKeysInfo{Keys: []string{"k1", "k2"}, Threshold: 2},
 	}, nil
 }
@@ -37,16 +47,77 @@ func (f *fakeAdmin) GetP2P(context.Context, string, string) (*client.P2PState, e
 // fakeLedger records submitted commands and executions.
 type fakeLedger struct {
 	client.LedgerClient
-	prepared   [][]*apiv2.Command
-	executions int
+	prepared      [][]*apiv2.Command
+	disclosed     [][]*apiv2.DisclosedContract
+	actAs, readAs []string
+	executions    int
+	tamper        func(*interactive.PreparedTransaction)
+	// hashOnly changes the transaction that is hashed but not the one returned.
+	hashOnly func(*interactive.PreparedTransaction)
 }
 
 func (f *fakeLedger) PartyExists(context.Context, string) (bool, error) { return true, nil }
 
-func (f *fakeLedger) PrepareSubmission(_ context.Context, commands []*apiv2.Command, _, _ []string, _ string) (*interactive.PrepareSubmissionResponse, error) {
+func (f *fakeLedger) PrepareSubmission(_ context.Context, commands []*apiv2.Command, _, _ []string, _ string, disclosed []*apiv2.DisclosedContract) (*interactive.PrepareSubmissionResponse, error) {
 	f.prepared = append(f.prepared, commands)
+	f.disclosed = append(f.disclosed, disclosed)
+	tx := exerciseTx(commands[0].GetExercise())
+	if f.tamper != nil {
+		f.tamper(tx)
+	}
+	hashed := proto.Clone(tx).(*interactive.PreparedTransaction)
+	if f.hashOnly != nil {
+		f.hashOnly(hashed)
+	}
+	hash, err := ledger.HashPreparedTransactionV2(hashed)
+	if err != nil {
+		hash = []byte{0xab, 0xcd}
+	}
 
-	return &interactive.PrepareSubmissionResponse{PreparedTransactionHash: []byte{0xab, 0xcd}}, nil
+	return &interactive.PrepareSubmissionResponse{
+		PreparedTransactionHash: hash,
+		PreparedTransaction:     tx,
+		HashingSchemeVersion:    interactive.HashingSchemeVersion_HASHING_SCHEME_VERSION_V2,
+	}, nil
+}
+
+func (f *fakeLedger) GrantActAs(_ context.Context, userID, _ string) error {
+	f.actAs = append(f.actAs, userID)
+
+	return nil
+}
+
+func (f *fakeLedger) GrantReadAs(_ context.Context, userID, _ string) error {
+	f.readAs = append(f.readAs, userID)
+
+	return nil
+}
+
+func exerciseTx(cmd *apiv2.ExerciseCommand) *interactive.PreparedTransaction {
+	chosen := proto.Clone(cmd.GetChoiceArgument()).(*apiv2.Value)
+
+	// The ledger resolves a "#<package-name>" reference to a package ID.
+	templateID := proto.Clone(cmd.GetTemplateId()).(*apiv2.Identifier)
+	packageName := strings.TrimPrefix(templateID.GetPackageId(), "#")
+	templateID.PackageId = "resolved-" + packageName
+
+	return &interactive.PreparedTransaction{
+		Transaction: &interactive.DamlTransaction{
+			Roots: []string{"0"},
+			Nodes: []*interactive.DamlTransaction_Node{{
+				NodeId: "0",
+				VersionedNode: &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Exercise{Exercise: &v1.Exercise{
+					PackageName: packageName,
+					TemplateId:  templateID,
+					ContractId:  cmd.GetContractId(),
+					ChoiceId:    cmd.GetChoice(),
+					ChosenValue: chosen,
+				}}}},
+			}},
+			NodeSeeds: []*interactive.DamlTransaction_NodeSeed{{NodeId: 0, Seed: make([]byte, 32)}},
+		},
+		Metadata: &interactive.Metadata{SubmitterInfo: &interactive.Metadata_SubmitterInfo{ActAs: []string{"ccipOwner::1220abcd"}}},
+	}
 }
 
 func (f *fakeLedger) ExecuteSubmission(context.Context, *interactive.PreparedTransaction, *interactive.PartySignatures, interactive.HashingSchemeVersion) (client.SubmissionResult, error) {
@@ -61,15 +132,19 @@ func (f *fakeLedger) ExecuteSubmission(context.Context, *interactive.PreparedTra
 	}, nil
 }
 
-type fakeSigner struct{}
+type fakeSigner struct{ signed *int }
 
-func (fakeSigner) Sign(_ context.Context, hash []byte) (*apiv2.Signature, error) {
+func (s fakeSigner) Sign(_ context.Context, hash []byte) (*apiv2.Signature, error) {
+	if s.signed != nil {
+		*s.signed++
+	}
+
 	return &apiv2.Signature{Signature: hash, SignedBy: "fp"}, nil
 }
 
 func deps(participantID string, lc *fakeLedger) ledger.ContractDeployDeps {
 	return ledger.ContractDeployDeps{
-		AdminClient:  &fakeAdmin{participantID: participantID},
+		AdminClient:  &fakeAdmin{participantID: participantID, participants: []string{"p1", "p2"}},
 		LedgerClient: lc,
 		Signer:       fakeSigner{},
 		Logger:       logger.Nop(),
@@ -83,9 +158,9 @@ func input() exercisechoice.ExerciseChoiceInput {
 		PackageID:            "#utility-registry-app-v0",
 		TemplateModule:       "Utility.Registry.App.V0.Service.Provider",
 		TemplateEntity:       "ProviderService",
-		ContractID:           "provider-service-cid",
+		ContractID:           "00c1",
 		Choice:               "ProviderService_AcceptRegistrarServiceRequest",
-		ChoiceArgument:       `{"record":{"fields":[{"label":"cid","value":{"contractId":"request-cid"}}]}}`,
+		ChoiceArgument:       `{"record":{"fields":[{"label":"cid","value":{"contractId":"00c2"}}]}}`,
 	}
 }
 
@@ -117,7 +192,7 @@ func TestExerciseChoiceSequence_CollectsEverySignatureThenSubmitsTheExercise(t *
 	assert.Equal(t, "#utility-registry-app-v0", exercise.GetTemplateId().GetPackageId())
 	assert.Equal(t, "Utility.Registry.App.V0.Service.Provider", exercise.GetTemplateId().GetModuleName())
 	assert.Equal(t, "ProviderService", exercise.GetTemplateId().GetEntityName())
-	assert.Equal(t, "provider-service-cid", exercise.GetContractId())
+	assert.Equal(t, "00c1", exercise.GetContractId())
 	assert.Equal(t, "ProviderService_AcceptRegistrarServiceRequest", exercise.GetChoice())
 	wantArg := &apiv2.Value{}
 	require.NoError(t, protojson.Unmarshal([]byte(input().ChoiceArgument), wantArg))
@@ -153,4 +228,298 @@ func TestExerciseChoiceSequence_RejectsMalformedChoiceArgument(t *testing.T) {
 
 	require.ErrorContains(t, run("p1"), "parsing choice argument")
 	assert.Empty(t, lc.prepared, "nothing reaches the ledger")
+}
+
+func TestExerciseChoiceSequence_SendsDisclosedContractsWithThePrepare(t *testing.T) {
+	t.Parallel()
+
+	in := input()
+	in.DisclosedContracts = []ledger.DisclosedContract{{
+		TemplateID:       "#utility-registry-v0:Utility.Registry.V0.Configuration.Registry:RegistryConfiguration",
+		ContractID:       "registry-config-cid",
+		CreatedEventBlob: base64.StdEncoding.EncodeToString([]byte("registry-config-blob")),
+		SynchronizerID:   "global-domain::1220",
+	}}
+	lc := &fakeLedger{}
+	_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+		exercisechoice.ExerciseChoiceSequence, deps("p1", lc), in)
+	require.ErrorContains(t, err, exercisechoice.ErrThresholdNotMet.Error())
+
+	want := []*apiv2.DisclosedContract{{
+		TemplateId: &apiv2.Identifier{
+			PackageId:  "#utility-registry-v0",
+			ModuleName: "Utility.Registry.V0.Configuration.Registry",
+			EntityName: "RegistryConfiguration",
+		},
+		ContractId:       "registry-config-cid",
+		CreatedEventBlob: []byte("registry-config-blob"),
+		SynchronizerId:   "global-domain::1220",
+	}}
+	require.Len(t, lc.disclosed, 1)
+	require.Len(t, lc.disclosed[0], 1)
+	assert.True(t, proto.Equal(want[0], lc.disclosed[0][0]), "got %v", lc.disclosed[0][0])
+}
+
+func TestQueryState_FindsARunWithDisclosedContracts(t *testing.T) {
+	t.Parallel()
+
+	in := input()
+	in.DisclosedContracts = []ledger.DisclosedContract{{
+		TemplateID:       "#utility-registry-v0:Utility.Registry.V0.Configuration.Registry:RegistryConfiguration",
+		ContractID:       "registry-config-cid",
+		CreatedEventBlob: base64.StdEncoding.EncodeToString([]byte("registry-config-blob")),
+		SynchronizerID:   "global-domain::1220",
+	}}
+	lc := &fakeLedger{}
+	reporter := operations.NewMemoryReporter()
+	for _, pid := range []string{"p1", "p2"} {
+		_, _ = operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), reporter), exercisechoice.ExerciseChoiceSequence, deps(pid, lc), in)
+	}
+
+	inspected, found := exercisechoice.QueryState(reporter, in)
+
+	require.True(t, found)
+	assert.Equal(t, "update-1", inspected.UpdateID)
+}
+
+func TestExerciseChoiceSequence_GrantsActAsOnlyToTheRunningParticipant(t *testing.T) {
+	t.Parallel()
+
+	reporter := operations.NewMemoryReporter()
+	ledgers := map[string]*fakeLedger{"p1": {}, "p2": {}}
+	run := func(pid string) error {
+		d := deps(pid, ledgers[pid])
+		d.UserID = pid + "-user"
+		_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), reporter), exercisechoice.ExerciseChoiceSequence, d, input())
+
+		return err
+	}
+
+	require.ErrorContains(t, run("p1"), "1/2 participants have signed", "p1 prepares and signs without waiting for p2's grant")
+	assert.Len(t, ledgers["p1"].prepared, 1)
+	assert.Equal(t, []string{"p1-user"}, ledgers["p1"].actAs)
+	assert.Empty(t, ledgers["p2"].actAs)
+
+	require.NoError(t, run("p2"))
+	assert.Equal(t, 1, ledgers["p2"].executions, "p2 resumes last and submits")
+	assert.Equal(t, []string{"p1-user"}, ledgers["p1"].actAs)
+	assert.Equal(t, []string{"p2-user"}, ledgers["p2"].actAs)
+	assert.Equal(t, []string{"p1-user"}, ledgers["p1"].readAs)
+	assert.Equal(t, []string{"p2-user"}, ledgers["p2"].readAs)
+}
+
+func TestExerciseChoiceSequence_GrantsActAsOnlyToThePreparerAndTheSubmitter(t *testing.T) {
+	t.Parallel()
+
+	reporter := operations.NewMemoryReporter()
+	ledgers := map[string]*fakeLedger{"p1": {}, "p2": {}, "p3": {}}
+	run := func(pid string) error {
+		d := deps(pid, ledgers[pid])
+		d.AdminClient = &fakeAdmin{participantID: pid, participants: []string{"p1", "p2", "p3"}}
+		d.UserID = pid + "-user"
+		_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), reporter), exercisechoice.ExerciseChoiceSequence, d, input())
+
+		return err
+	}
+
+	require.ErrorContains(t, run("p1"), "1/3 participants have signed")
+	require.ErrorContains(t, run("p2"), "2/3 participants have signed")
+	require.NoError(t, run("p3"))
+
+	assert.Equal(t, 1, ledgers["p3"].executions)
+	assert.Equal(t, []string{"p1-user"}, ledgers["p1"].actAs, "p1 prepares")
+	assert.Empty(t, ledgers["p2"].actAs, "p2 only signs")
+	assert.Equal(t, []string{"p3-user"}, ledgers["p3"].actAs, "p3 submits")
+	assert.Equal(t, []string{"p2-user"}, ledgers["p2"].readAs)
+}
+
+func TestExerciseChoiceSequence_ReturnsTheOperatorsRejectionInsteadOfWaiting(t *testing.T) {
+	t.Parallel()
+
+	signed := 0
+	d := deps("p1", &fakeLedger{})
+	d.Signer = fakeSigner{signed: &signed}
+	d.Confirmer = ceremony.AlwaysRejectConfirmer{}
+	_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+		exercisechoice.ExerciseChoiceSequence, d, input())
+
+	require.ErrorContains(t, err, ceremony.ErrUserRejected.Error())
+	assert.NotContains(t, err.Error(), exercisechoice.ErrThresholdNotMet.Error())
+	assert.Zero(t, signed)
+}
+
+func TestExerciseChoiceSequence_RefusesToSignAPreparedTransactionThatDoesNotMatch(t *testing.T) {
+	t.Parallel()
+
+	exercise := func(tx *interactive.PreparedTransaction) *v1.Exercise {
+		return tx.GetTransaction().GetNodes()[0].GetV1().GetExercise()
+	}
+	for name, tamper := range map[string]func(*interactive.PreparedTransaction){
+		"other choice":   func(tx *interactive.PreparedTransaction) { exercise(tx).ChoiceId = "Archive" },
+		"other contract": func(tx *interactive.PreparedTransaction) { exercise(tx).ContractId = "00c3" },
+		"other template": func(tx *interactive.PreparedTransaction) { exercise(tx).TemplateId.EntityName = "RegistrarService" },
+		"other package":  func(tx *interactive.PreparedTransaction) { exercise(tx).PackageName = "other-package" },
+		"other argument": func(tx *interactive.PreparedTransaction) {
+			exercise(tx).ChosenValue.GetRecord().Fields[0].Value = &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: "00c4"}}
+		},
+		"two roots": func(tx *interactive.PreparedTransaction) {
+			tx.Transaction.Roots = append(tx.Transaction.Roots, "1")
+		},
+		"root is a create": func(tx *interactive.PreparedTransaction) {
+			tx.Transaction.Nodes[0].VersionedNode = &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Create{Create: &v1.Create{}}}}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			signed := 0
+			d := deps("p1", &fakeLedger{tamper: tamper})
+			d.Signer = fakeSigner{signed: &signed}
+			_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+				exercisechoice.ExerciseChoiceSequence, d, input())
+
+			require.ErrorContains(t, err, ledger.ErrPreparedTxMismatch.Error())
+			assert.NotContains(t, err.Error(), exercisechoice.ErrThresholdNotMet.Error(), "a refusal is not reported as pending signers")
+			assert.Zero(t, signed, "the signer is never called")
+		})
+	}
+}
+
+func TestExerciseChoiceSequence_RefusesToSignAHashOfAnotherTransaction(t *testing.T) {
+	t.Parallel()
+
+	signed := 0
+	d := deps("p1", &fakeLedger{hashOnly: func(tx *interactive.PreparedTransaction) {
+		tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().ChoiceId = "Archive"
+	}})
+	d.Signer = fakeSigner{signed: &signed}
+	_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+		exercisechoice.ExerciseChoiceSequence, d, input())
+
+	require.ErrorContains(t, err, ledger.ErrPreparedTxHashMismatch.Error())
+	assert.Zero(t, signed, "the signer is never called")
+}
+
+func TestExerciseChoiceSequence_TreatsAnOmittedLabelledFieldAsNone(t *testing.T) {
+	t.Parallel()
+
+	keepOnlyCid := func(tx *interactive.PreparedTransaction) {
+		rec := tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord()
+		rec.Fields = []*apiv2.RecordField{{Label: "cid", Value: &apiv2.Value{Sum: &apiv2.Value_ContractId{ContractId: "00c2"}}}}
+	}
+	for name, tc := range map[string]struct {
+		note  string
+		signs bool
+	}{
+		"None":    {note: `{"optional":{}}`, signs: true},
+		"Some(x)": {note: `{"optional":{"value":{"text":"x"}}}`, signs: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			in := input()
+			in.ChoiceArgument = `{"record":{"fields":[{"label":"note","value":` + tc.note + `},` +
+				`{"label":"cid","value":{"contractId":"00c2"}}]}}`
+			signed := 0
+			d := deps("p1", &fakeLedger{tamper: keepOnlyCid})
+			d.Signer = fakeSigner{signed: &signed}
+			_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+				exercisechoice.ExerciseChoiceSequence, d, in)
+
+			if tc.signs {
+				require.ErrorContains(t, err, "1/2 participants have signed")
+				assert.Equal(t, 1, signed)
+			} else {
+				require.ErrorContains(t, err, ledger.ErrPreparedTxMismatch.Error())
+				assert.Zero(t, signed)
+			}
+		})
+	}
+}
+
+type recordingConfirmer struct {
+	ceremony.Confirmer
+	got []ceremony.DAMLSignDetail
+}
+
+func (r *recordingConfirmer) ConfirmDAMLSign(_ context.Context, d ceremony.DAMLSignDetail) error {
+	r.got = append(r.got, d)
+
+	return nil
+}
+
+func TestExerciseChoiceSequence_ShowsTheChoiceWhenConfirmingTheSignature(t *testing.T) {
+	t.Parallel()
+
+	confirmer := &recordingConfirmer{}
+	d := deps("p1", &fakeLedger{})
+	d.Confirmer = confirmer
+	_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+		exercisechoice.ExerciseChoiceSequence, d, input())
+	require.ErrorContains(t, err, exercisechoice.ErrThresholdNotMet.Error())
+
+	require.Len(t, confirmer.got, 1)
+	assert.Equal(t, "Utility.Registry.App.V0.Service.Provider:ProviderService", confirmer.got[0].Template)
+	assert.Equal(t, "00c1", confirmer.got[0].ContractID)
+	assert.Equal(t, "ProviderService_AcceptRegistrarServiceRequest", confirmer.got[0].Choice)
+	assert.Equal(t, input().ChoiceArgument, confirmer.got[0].ChoiceArgument)
+}
+
+func TestExerciseChoiceSequence_ComparesTheChoiceArgumentByValue(t *testing.T) {
+	t.Parallel()
+
+	in := input()
+	in.ChoiceArgument = `{"record":{"fields":[` +
+		`{"label":"cid","value":{"contractId":"00c2"}},` +
+		`{"label":"terms","value":{"record":{"fields":[{"label":"fee","value":{"numeric":"1.50"}}]}}}]}}`
+	fields := func(tx *interactive.PreparedTransaction) []*apiv2.RecordField {
+		return tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord().GetFields()
+	}
+	setFee := func(fee string) func(*interactive.PreparedTransaction) {
+		return func(tx *interactive.PreparedTransaction) {
+			fields(tx)[1].GetValue().GetRecord().GetFields()[0].Value = &apiv2.Value{Sum: &apiv2.Value_Numeric{Numeric: fee}}
+		}
+	}
+	labelTopFields := func(first, second string, swapValues bool) func(*interactive.PreparedTransaction) {
+		return func(tx *interactive.PreparedTransaction) {
+			rec := tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord()
+			a, b := rec.Fields[0], rec.Fields[1]
+			if swapValues {
+				a, b = b, a
+			}
+			a.Label, b.Label = first, second
+			rec.Fields = []*apiv2.RecordField{a, b}
+		}
+	}
+	for name, tc := range map[string]struct {
+		tamper func(*interactive.PreparedTransaction)
+		signs  bool
+	}{
+		"numeric padding": {tamper: setFee("1.5000000000"), signs: true},
+		"trailing None": {tamper: func(tx *interactive.PreparedTransaction) {
+			rec := tx.GetTransaction().GetNodes()[0].GetV1().GetExercise().GetChosenValue().GetRecord()
+			rec.Fields = append(rec.Fields, &apiv2.RecordField{Label: "note", Value: &apiv2.Value{Sum: &apiv2.Value_Optional{Optional: &apiv2.Optional{}}}})
+		}, signs: true},
+		"other nested numeric":             {tamper: setFee("2.5000000000"), signs: false},
+		"labelled fields in another order": {tamper: labelTopFields("terms", "cid", true), signs: true},
+		"labels on the wrong values":       {tamper: labelTopFields("terms", "cid", false), signs: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			signed := 0
+			d := deps("p1", &fakeLedger{tamper: tc.tamper})
+			d.Signer = fakeSigner{signed: &signed}
+			_, err := operations.ExecuteSequence(operations.NewBundle(t.Context, logger.Nop(), operations.NewMemoryReporter()),
+				exercisechoice.ExerciseChoiceSequence, d, in)
+
+			if tc.signs {
+				require.ErrorContains(t, err, "1/2 participants have signed")
+				assert.Equal(t, 1, signed)
+			} else {
+				require.ErrorContains(t, err, ledger.ErrPreparedTxMismatch.Error())
+				assert.Zero(t, signed, "the signer is never called")
+			}
+		})
+	}
 }

@@ -1,6 +1,8 @@
 package exercisechoice
 
 import (
+	"reflect"
+
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
 
 	"github.com/smartcontractkit/chainlink-canton/party-ceremony/ceremony"
@@ -21,7 +23,7 @@ func QueryState(reporter operations.Reporter, input ExerciseChoiceInput) (Exerci
 			continue
 		}
 		inp, ok := ceremony.Rehydrate[ExerciseChoiceInput](r.Input)
-		if !ok || inp != input {
+		if !ok || !reflect.DeepEqual(inp, input) {
 			continue
 		}
 		if latest == nil || r.Timestamp.After(*latest.Timestamp) {

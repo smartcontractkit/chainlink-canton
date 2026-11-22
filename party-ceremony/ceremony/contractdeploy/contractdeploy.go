@@ -171,6 +171,10 @@ var ContractDeploySequence = operations.NewSequence(
 
 		// ── Step 5: Sign submission ──────────────────────────────────────────
 		out.State.Phase = PhaseSigning
+		runner, err := deps.AdminClient.GetParticipantUID(b.GetContext())
+		if err != nil {
+			return out, fmt.Errorf("sign-submission: getting participant UID: %w", err)
+		}
 		signs := make([]ledger.SignSubmissionOutput, 0, len(participants))
 		for _, pid := range participants {
 			r, signErr := operations.ExecuteOperation(b, ledger.SignSubmissionOp, deps, ledger.SignSubmissionInput{
@@ -178,8 +182,12 @@ var ContractDeploySequence = operations.NewSequence(
 				PreparedTransactionHash: prep.PreparedTransactionHash,
 				PreparedTxB64:           prep.PreparedTxB64,
 				KnownSigningKeysB64:     fetchReport.Output.PartySigningKeysB64,
+				HashingSchemeVersion:    prep.HashingSchemeVersion,
 			})
 			if signErr != nil {
+				if pid == runner {
+					return out, fmt.Errorf("sign-submission: %w", signErr)
+				}
 				deps.Logger.Infow("Signing pending", "participant", pid, "err", signErr)
 
 				continue
