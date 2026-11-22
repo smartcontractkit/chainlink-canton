@@ -585,7 +585,9 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 	}
 	gotArg := proto.Clone(exercise.GetChosenValue()).(*apiv2.Value)
 	dropPairedLabelledNones(&wantArg, gotArg)
-	alignLabelledFields(&wantArg, gotArg)
+	if err := alignLabelledFields(&wantArg, gotArg); err != nil {
+		return fmt.Errorf("%w: choice argument: %w", ErrPreparedTxMismatch, err)
+	}
 	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(gotArg)) {
 		return fmt.Errorf("%w: choice argument %s, want %s", ErrPreparedTxMismatch,
 			protojson.Format(exercise.GetChosenValue()), e.ChoiceArgument)
@@ -698,12 +700,13 @@ func normalizeInPlace(v *apiv2.Value) {
 }
 
 // alignLabelledFields puts got's labelled record fields in want's label order: the ledger accepts labelled fields in any order.
-func alignLabelledFields(want, got *apiv2.Value) {
+// It fails when the labels differ, since the later comparison drops labels and would match a value under another label.
+func alignLabelledFields(want, got *apiv2.Value) error {
 	switch w := want.GetSum().(type) {
 	case *apiv2.Value_Record:
 		g := got.GetRecord()
 		if g == nil {
-			return
+			return nil
 		}
 		if allLabelled(w.Record) && allLabelled(g) {
 			byLabel := make(map[string]*apiv2.RecordField, len(g.GetFields()))
@@ -712,39 +715,56 @@ func alignLabelledFields(want, got *apiv2.Value) {
 			}
 			ordered := make([]*apiv2.RecordField, 0, len(g.GetFields()))
 			for _, f := range w.Record.GetFields() {
-				if gf, ok := byLabel[f.GetLabel()]; ok {
-					ordered = append(ordered, gf)
-					delete(byLabel, f.GetLabel())
+				gf, ok := byLabel[f.GetLabel()]
+				if !ok {
+					return fmt.Errorf("field %q is not in the prepared transaction", f.GetLabel())
 				}
+				ordered = append(ordered, gf)
+				delete(byLabel, f.GetLabel())
 			}
-			for _, f := range g.GetFields() {
-				if _, ok := byLabel[f.GetLabel()]; ok {
-					ordered = append(ordered, f)
-				}
+			for label := range byLabel {
+				return fmt.Errorf("field %q is not in the workflow", label)
 			}
 			g.Fields = ordered
 		}
 		for i := range min(len(w.Record.GetFields()), len(g.GetFields())) {
-			alignLabelledFields(w.Record.GetFields()[i].GetValue(), g.GetFields()[i].GetValue())
+			if err := alignLabelledFields(w.Record.GetFields()[i].GetValue(), g.GetFields()[i].GetValue()); err != nil {
+				return err
+			}
 		}
 	case *apiv2.Value_Variant:
-		alignLabelledFields(w.Variant.GetValue(), got.GetVariant().GetValue())
+		return alignLabelledFields(w.Variant.GetValue(), got.GetVariant().GetValue())
 	case *apiv2.Value_Optional:
-		alignLabelledFields(w.Optional.GetValue(), got.GetOptional().GetValue())
+		return alignLabelledFields(w.Optional.GetValue(), got.GetOptional().GetValue())
 	case *apiv2.Value_List:
 		gl := got.GetList().GetElements()
 		for i := range min(len(w.List.GetElements()), len(gl)) {
-			alignLabelledFields(w.List.GetElements()[i], gl[i])
+			if err := alignLabelledFields(w.List.GetElements()[i], gl[i]); err != nil {
+				return err
+			}
 		}
 	case *apiv2.Value_TextMap:
-		forEachTextMapPair(w.TextMap, got.GetTextMap(), alignLabelledFields)
+		var err error
+		forEachTextMapPair(w.TextMap, got.GetTextMap(), func(wv, gv *apiv2.Value) {
+			if err == nil {
+				err = alignLabelledFields(wv, gv)
+			}
+		})
+
+		return err
 	case *apiv2.Value_GenMap:
 		ge := got.GetGenMap().GetEntries()
 		for i := range min(len(w.GenMap.GetEntries()), len(ge)) {
-			alignLabelledFields(w.GenMap.GetEntries()[i].GetKey(), ge[i].GetKey())
-			alignLabelledFields(w.GenMap.GetEntries()[i].GetValue(), ge[i].GetValue())
+			if err := alignLabelledFields(w.GenMap.GetEntries()[i].GetKey(), ge[i].GetKey()); err != nil {
+				return err
+			}
+			if err := alignLabelledFields(w.GenMap.GetEntries()[i].GetValue(), ge[i].GetValue()); err != nil {
+				return err
+			}
 		}
 	}
+
+	return nil
 }
 
 // forEachTextMapPair pairs entries by key: the ledger returns a TextMap sorted by key, not in the args file's order.

@@ -90,6 +90,26 @@ func TestExpectedExerciseCheck_ComparesTheChoiceArgument(t *testing.T) {
 			got:     `{"record":{"fields":[{"label":"a","value":` + none + `},{"label":"b","value":` + some5 + `}]}}`,
 			matches: false,
 		},
+		"labelled fields in another order": {
+			want:    `{"record":{"fields":[{"label":"a","value":` + cid + `},{"label":"b","value":` + some5 + `}]}}`,
+			got:     `{"record":{"fields":[{"label":"b","value":` + some5 + `},{"label":"a","value":` + cid + `}]}}`,
+			matches: true,
+		},
+		"value moved to another label": {
+			want:    `{"record":{"fields":[{"label":"newOperator","value":` + some5 + `}]}}`,
+			got:     `{"record":{"fields":[{"label":"newOwner","value":` + some5 + `},{"label":"newOperator","value":` + none + `}]}}`,
+			matches: false,
+		},
+		"same value under another label": {
+			want:    `{"record":{"fields":[{"label":"a","value":` + some5 + `}]}}`,
+			got:     `{"record":{"fields":[{"label":"b","value":` + some5 + `}]}}`,
+			matches: false,
+		},
+		"labelled None and Some swapped in an unlabelled record": {
+			want:    `{"record":{"fields":[{"label":"x","value":` + none + `},{"label":"y","value":` + some5 + `}]}}`,
+			got:     `{"record":{"fields":[{"value":` + some5 + `},{"value":` + none + `}]}}`,
+			matches: false,
+		},
 		"text map entries in another key order": {
 			want:    textMap("b", "1", "a", "2"),
 			got:     textMap("a", "2", "b", "1"),
