@@ -38,6 +38,8 @@ var GrantPartyRightsOp = operations.NewOperation(
 	grantRights("actAs and readAs", client.LedgerClient.GrantPartyRights),
 )
 
+// GrantReadAsOp grants readAs Ledger API rights for the decentralized party
+// to the configured user, with [GrantPartyRightsOp]'s auth behavior.
 var GrantReadAsOp = operations.NewOperation(
 	"canton-ceremony/ledger/grant-read-as",
 	semver.MustParse("1.0.0"),
@@ -45,6 +47,8 @@ var GrantReadAsOp = operations.NewOperation(
 	grantRights("readAs", client.LedgerClient.GrantReadAs),
 )
 
+// GrantActAsOp grants actAs Ledger API rights for the decentralized party
+// to the configured user, with [GrantPartyRightsOp]'s auth behavior.
 var GrantActAsOp = operations.NewOperation(
 	"canton-ceremony/ledger/grant-act-as",
 	semver.MustParse("1.0.0"),
@@ -328,8 +332,9 @@ func prepare(
 	}, nil
 }
 
-// SignSubmissionOp signs the prepared transaction hash with the participant's
-// signing key via [ContractDeployDeps.Signer].
+// SignSubmissionOp checks the prepared transaction against the workflow's
+// expectation when one is set, recomputes its hash, and signs that hash with
+// the participant's signing key via [ContractDeployDeps.Signer].
 var SignSubmissionOp = operations.NewOperation(
 	"canton-ceremony/ledger/sign-submission",
 	semver.MustParse("1.0.0"),

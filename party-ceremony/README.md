@@ -275,6 +275,10 @@ deploy the MCMS contract.
 - Step 4 requires all participants to have uploaded DARs in step 3.
 - Step 6 requires all participants to have signed in step 5.
 
+If the connected operator's own signature fails in step 5, the run stops with
+that error instead of reporting it as pending. Another participant's signing
+failure is reported as pending.
+
 **Known contracts:** The CLI has built-in profiles for known contract packages.
 When a known package name is used with `--packages`, the template module,
 entity, and args file are auto-populated:
@@ -315,9 +319,12 @@ run stops with that rejection instead of waiting for more signers.
 
 Before signing, each participant decodes the prepared transaction. It refuses
 to sign unless the single root node exercises the workflow's choice on the
-workflow's contract, template and package. The confirm prompt shows the
-template, contract ID and choice. A labelled record field that is `None` may be
-left out: the ledger omits it.
+workflow's contract, template and package, with the workflow's choice
+argument. The confirm prompt shows the template, contract ID, choice and
+choice argument. Labelled record fields are matched by label, so their order
+does not matter, and a labelled argument is refused when the prepared
+transaction has no field labels. A labelled record field that is `None` may
+be left out: the ledger omits it.
 
 Both ceremonies then recompute the hash from the prepared transaction, using
 Canton's hashing scheme V2, and sign only that hash. They refuse a hash that
@@ -581,6 +588,10 @@ canton-party-ceremony init exercise-choice \
 | `--disclosed-contracts`    | No       | None                      | JSON list of disclosed contracts sent with every prepare                 |
 | `--config`                 | No       | `participant-config.json` | Path to participant config JSON                                          |
 | `--state-dir`              | No       | `ceremonies`              | Root directory for ceremony state                                        |
+
+For an interface choice, `--template-id` may name the interface instead of the
+template. The signing check accepts a match on either the exercising template
+or the interface.
 
 Example choice argument for `RegistrarService_CreateInstrumentConfiguration`:
 

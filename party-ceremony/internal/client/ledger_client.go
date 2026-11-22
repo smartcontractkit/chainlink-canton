@@ -75,7 +75,12 @@ type LedgerClient interface {
 	// to any user. It is idempotent: granting an already-granted right is safe.
 	GrantPartyRights(ctx context.Context, userID, partyID string) error
 
+	// GrantActAs grants actAs Ledger API rights for partyID to the given
+	// userID, with GrantPartyRights' semantics.
 	GrantActAs(ctx context.Context, userID, partyID string) error
+
+	// GrantReadAs grants readAs Ledger API rights for partyID to the given
+	// userID, with GrantPartyRights' semantics.
 	GrantReadAs(ctx context.Context, userID, partyID string) error
 }
 
