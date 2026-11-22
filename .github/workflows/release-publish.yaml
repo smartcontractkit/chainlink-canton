@@ -7,6 +7,10 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
       # Sub-module release tags, e.g. eds/v1.0.0, contracts/v1.0.0
       - '*/v[0-9]+.[0-9]+.[0-9]+'
+  # Allows manually (re-)publishing from the dispatched ref, e.g. the first
+  # publish of the npm package from the default branch (job-level conditions
+  # decide what to publish).
+  workflow_dispatch:
 
 jobs:
   publish-eds:
@@ -36,3 +40,53 @@ jobs:
     secrets:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID_SDLC }}
       AWS_ROLE_PUBLISH_ARN: ${{ secrets.CANTON_IAM_ROLE_SDLC_EDS }}
+
+  publish-npm-bindings:
+    name: Publish @chainlink/canton-contracts to npm
+    # Publishes the generated TypeScript bindings on contracts/ release tags
+    # via npm trusted publishing (workflow + job + 'publish' environment are
+    # registered as the trusted publisher in the npm settings). Manual
+    # dispatch publishes whatever the dispatched ref contains (e.g. the
+    # default branch for the initial publish).
+    if: (github.event_name == 'push' && startsWith(github.ref_name, 'contracts/')) || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Required for OIDC trusted publishing
+    environment: publish
+    defaults:
+      run:
+        working-directory: contracts/bindings/damljs
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.0.0
+        with:
+          # Publishes with node 24's bundled npm, >= 11.5.1 (required for
+          # trusted publishing). Don't upgrade it to npm@latest.
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+        env:
+          # setup-node v7 no longer exports a placeholder NODE_AUTH_TOKEN when
+          # none is set (v6 did), while the registry npmrc it writes still
+          # references ${NODE_AUTH_TOKEN}. Restore v6 behavior: the real token
+          # when a secret exists, else a dummy placeholder.
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || 'XXXXX-XXXXX-XXXXX-XXXXX' }}
+      - name: Stamp version from release tag
+        # Safeguard on tag pushes: release-please already bumps the committed
+        # package.json version via the extra-files JSON updater, so this is
+        # normally a no-op (contracts/vX.Y.Z -> X.Y.Z). On manual dispatch
+        # from a non-tag ref, the committed version is published as-is.
+        run: |
+          set -euo pipefail
+          case "$GITHUB_REF_NAME" in
+            contracts/v*) npm version "${GITHUB_REF_NAME#contracts/v}" --no-git-tag-version --allow-same-version ;;
+            *) echo "Not a contracts release tag; publishing committed version" ;;
+          esac
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Smoke test bindings
+        run: node -e "const b = require('.'); console.log('Publishing', Object.keys(b).length, 'binding packages')"
+      - name: Publish to npm
+        run: npm publish --access public --verbose

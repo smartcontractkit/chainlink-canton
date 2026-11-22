@@ -168,6 +168,8 @@ testInitializeLockReleasePool_SelfIssued = script do
                 poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 poolReceiveMetadata = Splice.Api.Token.MetadataV1.Metadata with
                     values = TextMap.fromList [("cip-112/receiver.id", "ccip-public")]
+                poolReleaseMetadata = Some (Splice.Api.Token.MetadataV1.Metadata with
+                    values = TextMap.fromList [("cip-112/sender.id", "ccip-public")])
                 transferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.Indefinite
                 deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
                     -- Must match the TAR instance below: Initialize binds the
@@ -192,9 +194,68 @@ testInitializeLockReleasePool_SelfIssued = script do
         [(_, pool)] -> do
             pool.observers === [observerParty]
             Map.size pool.remoteChainConfigs === 1
+            -- Release metadata set at deploy is stored on the pool as given.
+            pool.poolReleaseMetadata === Some (Splice.Api.Token.MetadataV1.Metadata with
+                values = TextMap.fromList [("cip-112/sender.id", "ccip-public")])
         got -> abort ("expected exactly one deployed LockReleaseTokenPool, got " <> show (length got))
 
     length result.rateLimiterCids === 3
+
+    pure ()
+
+-- The release metadata (sender label for ReleaseFromTicket) starts unset, only the pool
+-- owner can set it, and setting it replaces the stored value.
+testSetPoolReleaseMetadata : Script ()
+testSetPoolReleaseMetadata = script do
+    poolOwner <- allocateParty "pool_owner"
+    observerParty <- allocateParty "registry_observer"
+
+    let instrumentId = Splice.Api.Token.HoldingV1.InstrumentId poolOwner "RELMETATOKEN"
+        dummyAddr label = Chainlink.InstanceAddress.make label poolOwner
+        senderLabel = Splice.Api.Token.MetadataV1.Metadata with
+            values = TextMap.fromList [("cip-112/sender.id", "ccip-public")]
+        otherLabel = Splice.Api.Token.MetadataV1.Metadata with
+            values = TextMap.fromList [("cip-112/sender.id", "other-label")]
+
+    poolCid <- submit poolOwner do
+        createCmd CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPool with
+            instanceId = "rel-meta-pool"
+            poolOwner
+            ccipOwner = poolOwner
+            instrumentId
+            decimals = 18
+            rateLimitAdmin = None
+            observers = [observerParty]
+            remoteChainConfigs = Map.empty
+            tokenTransferFeeConfigs = Map.empty
+            poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
+            poolReceiveMetadata = Splice.Api.Token.MetadataV1.emptyMetadata
+            poolReleaseMetadata = None
+            transferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.Indefinite
+            deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
+                tokenAdminRegistry = dummyAddr "dummy-tar"
+                feeQuoter = dummyAddr "dummy-fq"
+                rmnRemote = dummyAddr "dummy-rmn"
+
+    Some unset <- queryContractId poolOwner poolCid
+    unset.poolReleaseMetadata === None
+
+    -- Only the pool owner controls the choice; the observer cannot set it.
+    submitMustFail observerParty do
+        exerciseCmd poolCid CCIP.Registry.LockReleaseTokenPoolV2.SetPoolReleaseMetadata with
+            metadata = senderLabel
+
+    setCid <- submit poolOwner do
+        exerciseCmd poolCid CCIP.Registry.LockReleaseTokenPoolV2.SetPoolReleaseMetadata with
+            metadata = senderLabel
+    Some withLabel <- queryContractId poolOwner setCid
+    withLabel.poolReleaseMetadata === Some senderLabel
+
+    replacedCid <- submit poolOwner do
+        exerciseCmd setCid CCIP.Registry.LockReleaseTokenPoolV2.SetPoolReleaseMetadata with
+            metadata = otherLabel
+    Some replaced <- queryContractId poolOwner replacedCid
+    replaced.poolReleaseMetadata === Some otherLabel
 
     pure ()
 
@@ -256,6 +317,7 @@ testInitializeLockReleasePool_ReusesExistingAcceptedConfig = script do
                 poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 poolReceiveMetadata = Splice.Api.Token.MetadataV1.Metadata with
                     values = TextMap.empty
+                poolReleaseMetadata = None
                 transferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.Indefinite
                 deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
                     -- Must match the TAR instance below: Initialize binds the
@@ -316,6 +378,7 @@ testInitializeLockReleasePool_RejectsWrongRegistry = script do
                 poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 poolReceiveMetadata = Splice.Api.Token.MetadataV1.Metadata with
                     values = TextMap.empty
+                poolReleaseMetadata = None
                 transferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.Indefinite
                 deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
                     tokenAdminRegistry = dummyAddr "dummy-tar"
@@ -376,6 +439,7 @@ testInitializeLockReleasePool_RejectsAdminMismatch = script do
                 poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
                 poolReceiveMetadata = Splice.Api.Token.MetadataV1.Metadata with
                     values = TextMap.empty
+                poolReleaseMetadata = None
                 transferTimeout = CCIP.Registry.LockReleaseTokenPoolV2.Indefinite
                 deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
                     -- Matches the TAR so the rejection comes from the admin-mismatch
@@ -411,6 +475,7 @@ testTransferTimeoutValidation = script do
             poolReceiveContext = Splice.Api.Token.MetadataV1.emptyChoiceContext
             poolReceiveMetadata = Splice.Api.Token.MetadataV1.Metadata with
                 values = TextMap.empty
+            poolReleaseMetadata = None
             transferTimeout = timeout
             deps = CCIP.Registry.LockReleaseTokenPoolV2.LockReleaseTokenPoolDeps with
                 tokenAdminRegistry = dummyAddr "dummy-tar"
