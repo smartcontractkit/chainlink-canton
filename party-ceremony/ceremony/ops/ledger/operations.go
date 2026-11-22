@@ -557,15 +557,21 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 		return fmt.Errorf("%w: root node is not an exercise", ErrPreparedTxMismatch)
 	}
 
-	tid := exercise.GetTemplateId()
-	if tid.GetModuleName() != e.TemplateModule || tid.GetEntityName() != e.TemplateEntity {
+	tid, iid := exercise.GetTemplateId(), exercise.GetInterfaceId()
+	tplMatch := tid.GetModuleName() == e.TemplateModule && tid.GetEntityName() == e.TemplateEntity
+	ifaceMatch := iid.GetModuleName() == e.TemplateModule && iid.GetEntityName() == e.TemplateEntity
+	if !tplMatch && !ifaceMatch {
 		return fmt.Errorf("%w: template %s:%s, want %s:%s", ErrPreparedTxMismatch,
 			tid.GetModuleName(), tid.GetEntityName(), e.TemplateModule, e.TemplateEntity)
 	}
+	matched := tid
+	if !tplMatch {
+		matched = iid
+	}
 	if name, isRef := strings.CutPrefix(e.PackageID, "#"); isRef && exercise.GetPackageName() != name {
 		return fmt.Errorf("%w: package name %s, want %s", ErrPreparedTxMismatch, exercise.GetPackageName(), name)
-	} else if !isRef && tid.GetPackageId() != e.PackageID {
-		return fmt.Errorf("%w: package %s, want %s", ErrPreparedTxMismatch, tid.GetPackageId(), e.PackageID)
+	} else if !isRef && matched.GetPackageId() != e.PackageID {
+		return fmt.Errorf("%w: package %s, want %s", ErrPreparedTxMismatch, matched.GetPackageId(), e.PackageID)
 	}
 	if exercise.GetContractId() != e.ContractID {
 		return fmt.Errorf("%w: contract %s, want %s", ErrPreparedTxMismatch, exercise.GetContractId(), e.ContractID)
@@ -578,8 +584,7 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 		return fmt.Errorf("%w: parsing choice argument: %w", ErrPreparedTxMismatch, err)
 	}
 	gotArg := proto.Clone(exercise.GetChosenValue()).(*apiv2.Value)
-	dropLabelledNones(&wantArg)
-	dropLabelledNones(gotArg)
+	dropPairedLabelledNones(&wantArg, gotArg)
 	alignLabelledFields(&wantArg, gotArg)
 	if !proto.Equal(normalizeValue(&wantArg), normalizeValue(gotArg)) {
 		return fmt.Errorf("%w: choice argument %s, want %s", ErrPreparedTxMismatch,
@@ -589,33 +594,49 @@ func (e *ExpectedExercise) Check(preparedTxB64 string) error {
 	return nil
 }
 
-// dropLabelledNones removes None fields from fully labelled records: by label,
-// a missing optional field and a None field are the same value.
-func dropLabelledNones(v *apiv2.Value) {
-	switch s := v.GetSum().(type) {
+// dropPairedLabelledNones drops None fields only where both records are labelled, so positional fields stay aligned.
+func dropPairedLabelledNones(want, got *apiv2.Value) {
+	isNoneField := func(f *apiv2.RecordField) bool { return isNone(f.GetValue()) }
+	switch w := want.GetSum().(type) {
 	case *apiv2.Value_Record:
-		if allLabelled(s.Record) {
-			s.Record.Fields = slices.DeleteFunc(s.Record.Fields, func(f *apiv2.RecordField) bool { return isNone(f.GetValue()) })
+		g := got.GetRecord()
+		if g == nil {
+			return
 		}
-		for _, f := range s.Record.GetFields() {
-			dropLabelledNones(f.GetValue())
+		if allLabelled(w.Record) && allLabelled(g) {
+			w.Record.Fields = slices.DeleteFunc(w.Record.Fields, isNoneField)
+			g.Fields = slices.DeleteFunc(g.Fields, isNoneField)
+			byLabel := make(map[string]*apiv2.RecordField, len(g.GetFields()))
+			for _, f := range g.GetFields() {
+				byLabel[f.GetLabel()] = f
+			}
+			for _, f := range w.Record.GetFields() {
+				if gf, ok := byLabel[f.GetLabel()]; ok {
+					dropPairedLabelledNones(f.GetValue(), gf.GetValue())
+				}
+			}
+
+			return
+		}
+		for i := range min(len(w.Record.GetFields()), len(g.GetFields())) {
+			dropPairedLabelledNones(w.Record.GetFields()[i].GetValue(), g.GetFields()[i].GetValue())
 		}
 	case *apiv2.Value_Variant:
-		dropLabelledNones(s.Variant.GetValue())
+		dropPairedLabelledNones(w.Variant.GetValue(), got.GetVariant().GetValue())
 	case *apiv2.Value_Optional:
-		dropLabelledNones(s.Optional.GetValue())
+		dropPairedLabelledNones(w.Optional.GetValue(), got.GetOptional().GetValue())
 	case *apiv2.Value_List:
-		for _, el := range s.List.GetElements() {
-			dropLabelledNones(el)
+		gl := got.GetList().GetElements()
+		for i := range min(len(w.List.GetElements()), len(gl)) {
+			dropPairedLabelledNones(w.List.GetElements()[i], gl[i])
 		}
 	case *apiv2.Value_TextMap:
-		for _, entry := range s.TextMap.GetEntries() {
-			dropLabelledNones(entry.GetValue())
-		}
+		forEachTextMapPair(w.TextMap, got.GetTextMap(), dropPairedLabelledNones)
 	case *apiv2.Value_GenMap:
-		for _, entry := range s.GenMap.GetEntries() {
-			dropLabelledNones(entry.GetKey())
-			dropLabelledNones(entry.GetValue())
+		ge := got.GetGenMap().GetEntries()
+		for i := range min(len(w.GenMap.GetEntries()), len(ge)) {
+			dropPairedLabelledNones(w.GenMap.GetEntries()[i].GetKey(), ge[i].GetKey())
+			dropPairedLabelledNones(w.GenMap.GetEntries()[i].GetValue(), ge[i].GetValue())
 		}
 	}
 }
@@ -662,6 +683,9 @@ func normalizeInPlace(v *apiv2.Value) {
 			normalizeInPlace(e)
 		}
 	case *apiv2.Value_TextMap:
+		slices.SortFunc(s.TextMap.Entries, func(a, b *apiv2.TextMap_Entry) int {
+			return strings.Compare(a.GetKey(), b.GetKey())
+		})
 		for _, e := range s.TextMap.GetEntries() {
 			normalizeInPlace(e.GetValue())
 		}
@@ -713,15 +737,25 @@ func alignLabelledFields(want, got *apiv2.Value) {
 			alignLabelledFields(w.List.GetElements()[i], gl[i])
 		}
 	case *apiv2.Value_TextMap:
-		ge := got.GetTextMap().GetEntries()
-		for i := range min(len(w.TextMap.GetEntries()), len(ge)) {
-			alignLabelledFields(w.TextMap.GetEntries()[i].GetValue(), ge[i].GetValue())
-		}
+		forEachTextMapPair(w.TextMap, got.GetTextMap(), alignLabelledFields)
 	case *apiv2.Value_GenMap:
 		ge := got.GetGenMap().GetEntries()
 		for i := range min(len(w.GenMap.GetEntries()), len(ge)) {
 			alignLabelledFields(w.GenMap.GetEntries()[i].GetKey(), ge[i].GetKey())
 			alignLabelledFields(w.GenMap.GetEntries()[i].GetValue(), ge[i].GetValue())
+		}
+	}
+}
+
+// forEachTextMapPair pairs entries by key: the ledger returns a TextMap sorted by key, not in the args file's order.
+func forEachTextMapPair(want, got *apiv2.TextMap, f func(want, got *apiv2.Value)) {
+	byKey := make(map[string]*apiv2.Value, len(got.GetEntries()))
+	for _, e := range got.GetEntries() {
+		byKey[e.GetKey()] = e.GetValue()
+	}
+	for _, e := range want.GetEntries() {
+		if g, ok := byKey[e.GetKey()]; ok {
+			f(e.GetValue(), g)
 		}
 	}
 }
