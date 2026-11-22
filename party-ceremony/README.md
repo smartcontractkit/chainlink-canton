@@ -322,9 +322,9 @@ to sign unless the single root node exercises the workflow's choice on the
 workflow's contract, template and package, with the workflow's choice
 argument. The confirm prompt shows the template, contract ID, choice and
 choice argument. Labelled record fields are matched by label, so their order
-does not matter, and a labelled argument is refused when the prepared
-transaction has no field labels. A labelled record field that is `None` may
-be left out: the ledger omits it.
+does not matter, and a labelled argument of two or more fields is refused
+when the prepared record is not fully labelled. A labelled record field that
+is `None` may be left out: the ledger omits it.
 
 Both ceremonies then recompute the hash from the prepared transaction, using
 Canton's hashing scheme V2, and sign only that hash. They refuse a hash that
@@ -591,7 +591,8 @@ canton-party-ceremony init exercise-choice \
 
 For an interface choice, `--template-id` may name the interface instead of the
 template. The signing check accepts a match on either the exercising template
-or the interface.
+or the interface. If the interface is in another package than the template,
+give the interface's package ID, not `#<package-name>`.
 
 Example choice argument for `RegistrarService_CreateInstrumentConfiguration`:
 
