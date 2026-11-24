@@ -108,7 +108,7 @@ services:
       - 2205:2205  # Participant 5
 
   nginx:
-    image: "nginx:1.27.0"
+    image: "nginx:1.31.10"
     container_name: nginx
     env_file:
       - ./env/common.env
