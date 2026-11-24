@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.3.0](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.2.1...eds/v1.3.0) (2026-11-17)
+
+
+### Features
+
+* **contracts:** Accept pending lock transfers in LRTP ([#1199](https://github.com/smartcontractkit/chainlink-canton/issues/1199)) ([fa58b01](https://github.com/smartcontractkit/chainlink-canton/commit/fa58b016268b20fcbe7b9e459d58cbb70e059add))
+* **eds:** Add DA dependency request metrics ([#1262](https://github.com/smartcontractkit/chainlink-canton/issues/1262)) ([e42fcd9](https://github.com/smartcontractkit/chainlink-canton/commit/e42fcd9de910090e6c49ef649b95c953faa5a399))
+
+## [1.2.1](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.2.0...eds/v1.2.1) (2026-10-29)
+
+
+### Bug Fixes
+
+* **eds:** Count subscription uptime while the stream is live, not only on updates ([#1176](https://github.com/smartcontractkit/chainlink-canton/issues/1176)) ([35986fe](https://github.com/smartcontractkit/chainlink-canton/commit/35986fe13af066591a51919a2e10e6a05d97d75e))
+
+## [1.2.0](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.1.1...eds/v1.2.0) (2026-10-27)
+
+
+### Features
+
+* **eds:** Fail closed when the update stream reconnects without progress ([#1165](https://github.com/smartcontractkit/chainlink-canton/issues/1165)) ([dbba982](https://github.com/smartcontractkit/chainlink-canton/commit/dbba9829e07973694266ea24fa61a80d476108b5))
+
+
+### Bug Fixes
+
+* Update alpine and go docker images ([#1172](https://github.com/smartcontractkit/chainlink-canton/issues/1172)) ([7fba94d](https://github.com/smartcontractkit/chainlink-canton/commit/7fba94d6663e929308ea3eaa2177f2b1f7e669eb))
+
 ## [1.1.1](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.1.0...eds/v1.1.1) (2026-10-19)
 
 

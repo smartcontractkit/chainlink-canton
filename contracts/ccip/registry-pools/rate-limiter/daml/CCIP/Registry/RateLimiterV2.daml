@@ -118,6 +118,8 @@ template RateLimiter
             && capacity >= 0.0
             && rate >= 0.0
             && tokens >= 0.0
+            -- Match SetConfig: enabled limiters need rate <= capacity.
+            && (not isEnabled || rate <= capacity)
 
         choice SetConfig : ContractId RateLimiter
             with

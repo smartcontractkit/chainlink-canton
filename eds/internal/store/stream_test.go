@@ -65,7 +65,7 @@ func TestStreamFailsClosedAfterEmptyReconnects(t *testing.T) {
 
 	err := s.stream(context.Background(), 0, FiltersByParty{}, cfg, nil, nil, nil)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "without receiving any update")
+	assert.Contains(t, err.Error(), "without becoming live")
 	assert.Equal(t, int32(3), calls.Load(), "must stop after exactly MaxEmptyReconnects reconnects")
 }
 
@@ -107,6 +107,39 @@ func TestStreamBudgetResetsOnUpdates(t *testing.T) {
 	assert.Equal(t, int32(10), served.Load(), "budget must reset on every update")
 }
 
+// Reconnects that stay open longer than the liveness grace must not drain
+// the empty-reconnect budget, even without any updates: the stream was
+// demonstrably live. This is what keeps quiet ledgers (e.g. reconnects on
+// token rotation) from tripping the fail-closed policy.
+func TestStreamBudgetResetsOnQuietLiveStreams(t *testing.T) {
+	t.Parallel()
+	var calls atomic.Int32
+	svc := &fakeUpdateService{getUpdates: func(ctx context.Context, in *apiv2.GetUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
+		calls.Add(1)
+		return &fakeStream{recv: func() (*apiv2.GetUpdatesResponse, error) {
+			// Stay open (and quiet) beyond the liveness grace, then the
+			// server closes the stream.
+			time.Sleep(200 * time.Millisecond)
+			return nil, io.EOF
+		}}, nil
+	}}
+	s := &BackfilledStream{logger: zerolog.Nop(), metrics: monitoring.NoopEDSMetricLabeler{}, updateService: svc}
+
+	cfg := DefaultStreamConfig()
+	cfg.MaxEmptyReconnects = 3
+	cfg.MaxDisconnected = 0 // keep the connect retry loop running until the context expires
+	cfg.BackoffMin = time.Millisecond
+	cfg.BackoffMax = 5 * time.Millisecond
+	cfg.LivenessGrace = 100 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	err := s.stream(ctx, 0, FiltersByParty{}, cfg, nil, nil, nil)
+	require.ErrorIs(t, err, context.DeadlineExceeded) // stopped by the test, not by the budget
+	assert.GreaterOrEqual(t, calls.Load(), int32(4), "budget must reset when incarnations survive the liveness grace")
+}
+
 // A participant that refuses all connections must fail closed after
 // MaxDisconnected of retrying, not retry forever.
 func TestStreamFailsClosedAfterDisconnected(t *testing.T) {
@@ -127,4 +160,65 @@ func TestStreamFailsClosedAfterDisconnected(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "disconnected for")
 	assert.LessOrEqual(t, time.Since(start), 5*time.Second, "must not retry forever")
+}
+
+// countingMetrics counts uptime increments on top of the noop labeler.
+type countingMetrics struct {
+	monitoring.NoopEDSMetricLabeler
+	uptime atomic.Int64
+}
+
+func (m *countingMetrics) IncrementStoreSubscriptionUptime(ctx context.Context) { m.uptime.Add(1) }
+
+// A live but quiet stream (no updates at all) must still increase the uptime
+// metric once it has survived the liveness grace.
+func TestStreamUptimeIncrementsOnQuietLiveStream(t *testing.T) {
+	t.Parallel()
+	svc := &fakeUpdateService{getUpdates: func(ctx context.Context, in *apiv2.GetUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
+		return &fakeStream{recv: func() (*apiv2.GetUpdatesResponse, error) {
+			// Stream stays open and quiet until the context is cancelled.
+			<-ctx.Done()
+			return nil, ctx.Err()
+		}}, nil
+	}}
+	metrics := &countingMetrics{}
+	s := &BackfilledStream{logger: zerolog.Nop(), metrics: metrics, updateService: svc}
+
+	cfg := DefaultStreamConfig()
+	cfg.LivenessGrace = 100 * time.Millisecond
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2500*time.Millisecond)
+	defer cancel()
+
+	err := s.stream(ctx, 0, FiltersByParty{}, cfg, nil, nil, nil)
+	require.ErrorIs(t, err, context.DeadlineExceeded) // stopped by the test
+	assert.GreaterOrEqual(t, metrics.uptime.Load(), int64(2), "quiet live stream must count uptime")
+}
+
+// A stream that is rejected immediately after creation (like the production
+// 404) must never increase the uptime metric: it never survives the liveness
+// grace, and the reconnect backoff keeps most time outside incarnations.
+func TestStreamUptimeNotIncrementedByInstantlyRejectedStream(t *testing.T) {
+	t.Parallel()
+	svc := &fakeUpdateService{getUpdates: func(ctx context.Context, in *apiv2.GetUpdatesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[apiv2.GetUpdatesResponse], error) {
+		return &fakeStream{recv: func() (*apiv2.GetUpdatesResponse, error) {
+			return nil, status.Error(codes.Unimplemented, `unexpected HTTP status code received from server: 404 (Not Found)`)
+		}}, nil
+	}}
+	metrics := &countingMetrics{}
+	s := &BackfilledStream{logger: zerolog.Nop(), metrics: metrics, updateService: svc}
+
+	cfg := DefaultStreamConfig()
+	cfg.MaxEmptyReconnects = 0 // never fail closed, keep reconnecting until the test stops
+	cfg.MaxDisconnected = 0
+	cfg.BackoffMin = time.Millisecond
+	cfg.BackoffMax = 5 * time.Millisecond
+	cfg.LivenessGrace = time.Second
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+	defer cancel()
+
+	err := s.stream(ctx, 0, FiltersByParty{}, cfg, nil, nil, nil)
+	require.ErrorIs(t, err, context.DeadlineExceeded) // stopped by the test
+	assert.Zero(t, metrics.uptime.Load(), "instantly rejected streams must not count uptime")
 }

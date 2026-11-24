@@ -25,7 +25,8 @@ const (
 
 	// LINK Token
 
-	Link = Package("link")
+	Link           = Package("link")
+	LinkTokenAdmin = Package("link-token-admin")
 
 	// MCMS
 
@@ -34,31 +35,42 @@ const (
 
 	// CCIP - V2
 
-	CCIPAPIV2                  = Package("ccip-api-v2")
-	CCIPCodecV2                = Package("ccip-codec-v2")
-	CCIPTicketsV2              = Package("ccip-tickets-v2")
-	CCIPEventsV2               = Package("ccip-events-v2")
-	CCIPRateLimiterV2          = Package("ccip-rate-limiter-v2")
-	CCIPClientAPIV2            = Package("ccip-client-api-v2")
-	CCIPUtilsV2                = Package("ccip-utils-v2")
-	CCIPCoreV2                 = Package("ccip-core-v2")
-	CCIPExtensionAPIV2         = Package("ccip-extension-api-v2")
-	CCIPRuntimeV2              = Package("ccip-runtime-v2")
-	CCIPSenderV2               = Package("ccip-sender-v2")
-	CCIPReceiverV2             = Package("ccip-receiver-v2")
-	CCIPCommitteeVerifierV2    = Package("ccip-committee-verifier-v2")
-	CCIPExecutorV2             = Package("ccip-executor-v2")
-	CCIPLockReleaseTokenPoolV2 = Package("ccip-lock-release-token-pool-v2")
-	CCIPBurnMintTokenPoolV2    = Package("ccip-burn-mint-token-pool-v2")
-	CCIPFactoryV2              = Package("ccip-factory-v2")
+	CCIPAPIV2                       = Package("ccip-api-v2")
+	CCIPCodecV2                     = Package("ccip-codec-v2")
+	CCIPTicketsV2                   = Package("ccip-tickets-v2")
+	CCIPEventsV2                    = Package("ccip-events-v2")
+	CCIPRateLimiterV2               = Package("ccip-rate-limiter-v2")
+	CCIPClientAPIV2                 = Package("ccip-client-api-v2")
+	CCIPUtilsV2                     = Package("ccip-utils-v2")
+	CCIPCoreV2                      = Package("ccip-core-v2")
+	CCIPExtensionAPIV2              = Package("ccip-extension-api-v2")
+	CCIPRuntimeV2                   = Package("ccip-runtime-v2")
+	CCIPSenderV2                    = Package("ccip-sender-v2")
+	CCIPReceiverV2                  = Package("ccip-receiver-v2")
+	CCIPCommitteeVerifierV2         = Package("ccip-committee-verifier-v2")
+	CCIPExecutorV2                  = Package("ccip-executor-v2")
+	CCIPLockReleaseTokenPoolV2      = Package("ccip-lock-release-token-pool-v2")
+	CCIPBurnMintTokenPoolV2         = Package("ccip-burn-mint-token-pool-v2")
+	CCIPFactoryV2                   = Package("ccip-factory-v2")
+	CCIPUserV1                      = Package("ccip-user-v1")
+	CCIPGlobalTokenSenderReceiverV1 = Package("ccip-global-token-sender-receiver-v1")
 
 	// CCIP - Registry pools (EDS auto-detection observer field; separate template
 	// family from the production/LINK pools above, kept isolated so a bug or spam on
 	// the registry-discovery side can never affect production pool serving).
 
-	CCIPRegistryBurnMintTokenPoolV2    = Package("ccip-registry-burn-mint-token-pool")
-	CCIPRegistryLockReleaseTokenPoolV2 = Package("ccip-registry-lock-release-token-pool")
-	CCIPRegistryRateLimiterV2          = Package("ccip-registry-rate-limiter")
+	// Superseded 1.0.0 lineage: core-coupled, frozen in dars/released, not to be
+	// deployed. Kept so the released artifacts and their bindings stay resolvable.
+	CCIPRegistryBurnMintTokenPool    = Package("ccip-registry-burn-mint-token-pool")
+	CCIPRegistryLockReleaseTokenPool = Package("ccip-registry-lock-release-token-pool")
+	CCIPRegistryRateLimiter          = Package("ccip-registry-rate-limiter")
+
+	// Fresh 2.0.0 lineage: core-decoupled (APIV2 interfaces only). The -v2 name
+	// starts a new lineage — Canton infers upgrades by package name, so the
+	// decoupled choice signatures cannot live under the 1.0.0 names.
+	CCIPRegistryBurnMintTokenPoolV2    = Package("ccip-registry-burn-mint-token-pool-v2")
+	CCIPRegistryLockReleaseTokenPoolV2 = Package("ccip-registry-lock-release-token-pool-v2")
+	CCIPRegistryRateLimiterV2          = Package("ccip-registry-rate-limiter-v2")
 
 	// CCIP - Legacy
 
@@ -78,7 +90,7 @@ const (
 	Coin                                  = Package("coin")
 	GlobalConfig                          = Package("globalconfig")
 	MCMSTest                              = Package("mcms-test")
-	CCIPTest                              = Package("ccip-test")
+	CCIPTest                              = Package("ccip-test-v2")
 	SpliceApiFeaturedAppV1                = Package("splice-api-featured-app-v1")
 	SpliceApiTokenAllocationV1            = Package("splice-api-token-allocation-v1")
 	SpliceApiTokenAllocationInstructionV1 = Package("splice-api-token-allocation-instruction-v1")
@@ -140,9 +152,12 @@ var ReleasedVersions map[Package][]string = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2:         []string{"2.0.0", "2.1.0", "2.1.1", "2.1.2"},
 	CCIPRateLimiterV2:                  []string{"2.0.0", "2.0.1", "2.0.2"},
 	CCIPReceiverV2:                     []string{"2.0.0", "2.1.0"},
-	CCIPRegistryBurnMintTokenPoolV2:    []string{"1.0.0"},
-	CCIPRegistryLockReleaseTokenPoolV2: []string{"1.0.0"},
-	CCIPRegistryRateLimiterV2:          []string{"1.0.0"},
+	CCIPRegistryBurnMintTokenPool:      []string{"1.0.0"},
+	CCIPRegistryLockReleaseTokenPool:   []string{"1.0.0"},
+	CCIPRegistryRateLimiter:            []string{"1.0.0"},
+	CCIPRegistryBurnMintTokenPoolV2:    []string{"2.0.0"},
+	CCIPRegistryLockReleaseTokenPoolV2: []string{"2.0.0"},
+	CCIPRegistryRateLimiterV2:          []string{"2.0.0"},
 	CCIPRuntimeV2:                      []string{"2.0.0", "2.1.0", "2.1.1"},
 	CCIPSenderV2:                       []string{"2.0.0", "2.1.0"},
 	CCIPTicketsV2:                      []string{"2.0.0"},
@@ -163,30 +178,37 @@ var Versions map[Package][]string = map[Package][]string{
 
 	Link: append(ReleasedVersions[Link], DevVersion),
 
+	// Unreleased: ships as a dev DAR until the migration is green-lit.
+	LinkTokenAdmin: []string{DevVersion},
+
 	MCMSAPI:  append(ReleasedVersions[MCMSAPI], DevVersion),
 	MCMSCore: append(ReleasedVersions[MCMSCore], DevVersion),
 
-	CCIPAPIV2:                  append(ReleasedVersions[CCIPAPIV2], DevVersion),
-	CCIPCodecV2:                append(ReleasedVersions[CCIPCodecV2], DevVersion),
-	CCIPTicketsV2:              append(ReleasedVersions[CCIPTicketsV2], DevVersion),
-	CCIPEventsV2:               append(ReleasedVersions[CCIPEventsV2], DevVersion),
-	CCIPRateLimiterV2:          append(ReleasedVersions[CCIPRateLimiterV2], DevVersion),
-	CCIPClientAPIV2:            append(ReleasedVersions[CCIPClientAPIV2], DevVersion),
-	CCIPUtilsV2:                append(ReleasedVersions[CCIPUtilsV2], DevVersion),
-	CCIPCoreV2:                 append(ReleasedVersions[CCIPCoreV2], DevVersion),
-	CCIPExtensionAPIV2:         append(ReleasedVersions[CCIPExtensionAPIV2], DevVersion),
-	CCIPRuntimeV2:              append(ReleasedVersions[CCIPRuntimeV2], DevVersion),
-	CCIPSenderV2:               append(ReleasedVersions[CCIPSenderV2], DevVersion),
-	CCIPReceiverV2:             append(ReleasedVersions[CCIPReceiverV2], DevVersion),
-	CCIPCommitteeVerifierV2:    append(ReleasedVersions[CCIPCommitteeVerifierV2], DevVersion),
-	CCIPExecutorV2:             append(ReleasedVersions[CCIPExecutorV2], DevVersion),
-	CCIPLockReleaseTokenPoolV2: append(ReleasedVersions[CCIPLockReleaseTokenPoolV2], DevVersion),
-	CCIPBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
-	CCIPFactoryV2:              append(ReleasedVersions[CCIPFactoryV2], DevVersion),
+	CCIPAPIV2:                       append(ReleasedVersions[CCIPAPIV2], DevVersion),
+	CCIPCodecV2:                     append(ReleasedVersions[CCIPCodecV2], DevVersion),
+	CCIPTicketsV2:                   append(ReleasedVersions[CCIPTicketsV2], DevVersion),
+	CCIPEventsV2:                    append(ReleasedVersions[CCIPEventsV2], DevVersion),
+	CCIPRateLimiterV2:               append(ReleasedVersions[CCIPRateLimiterV2], DevVersion),
+	CCIPClientAPIV2:                 append(ReleasedVersions[CCIPClientAPIV2], DevVersion),
+	CCIPUtilsV2:                     append(ReleasedVersions[CCIPUtilsV2], DevVersion),
+	CCIPCoreV2:                      append(ReleasedVersions[CCIPCoreV2], DevVersion),
+	CCIPExtensionAPIV2:              append(ReleasedVersions[CCIPExtensionAPIV2], DevVersion),
+	CCIPRuntimeV2:                   append(ReleasedVersions[CCIPRuntimeV2], DevVersion),
+	CCIPSenderV2:                    append(ReleasedVersions[CCIPSenderV2], DevVersion),
+	CCIPReceiverV2:                  append(ReleasedVersions[CCIPReceiverV2], DevVersion),
+	CCIPCommitteeVerifierV2:         append(ReleasedVersions[CCIPCommitteeVerifierV2], DevVersion),
+	CCIPExecutorV2:                  append(ReleasedVersions[CCIPExecutorV2], DevVersion),
+	CCIPLockReleaseTokenPoolV2:      append(ReleasedVersions[CCIPLockReleaseTokenPoolV2], DevVersion),
+	CCIPBurnMintTokenPoolV2:         append(ReleasedVersions[CCIPBurnMintTokenPoolV2], DevVersion),
+	CCIPFactoryV2:                   append(ReleasedVersions[CCIPFactoryV2], DevVersion),
+	CCIPUserV1:                      append(ReleasedVersions[CCIPUserV1], DevVersion),
+	CCIPGlobalTokenSenderReceiverV1: append(ReleasedVersions[CCIPGlobalTokenSenderReceiverV1], DevVersion),
 
 	CCIPRegistryBurnMintTokenPoolV2:    append(ReleasedVersions[CCIPRegistryBurnMintTokenPoolV2], DevVersion),
 	CCIPRegistryLockReleaseTokenPoolV2: append(ReleasedVersions[CCIPRegistryLockReleaseTokenPoolV2], DevVersion),
 	CCIPRegistryRateLimiterV2:          append(ReleasedVersions[CCIPRegistryRateLimiterV2], DevVersion),
+
+	CCIPTest: []string{DevVersion},
 
 	Coin:                                  []string{DevVersion},
 	GlobalConfig:                          []string{DevVersion},
@@ -362,8 +384,9 @@ func GetLegacyDar(packageName Package, version string) ([]byte, error) {
 }
 
 var BindingsOutputDirs = map[Package][]string{
-	Coin: []string{"coin"},
-	Link: []string{"link"},
+	Coin:           []string{"coin"},
+	Link:           []string{"link"},
+	LinkTokenAdmin: []string{"link", "tokenadmin"},
 
 	ChainlinkAPI: []string{"chainlink", "chainlinkapi"},
 	MCMSAPI:      []string{"mcms", "api"},
@@ -386,6 +409,9 @@ var BindingsOutputDirs = map[Package][]string{
 	CCIPLockReleaseTokenPoolV2: []string{"ccip", "lockreleasetokenpool"},
 	CCIPBurnMintTokenPoolV2:    []string{"ccip", "burnminttokenpool"},
 	CCIPFactoryV2:              []string{"ccip", "factory"},
+
+	CCIPUserV1:                      []string{"ccip", "user"},
+	CCIPGlobalTokenSenderReceiverV1: []string{"ccip", "globaltokensenderreceiver"},
 
 	CCIPRegistryBurnMintTokenPoolV2:    []string{"ccip", "registry", "burnminttokenpool"},
 	CCIPRegistryLockReleaseTokenPoolV2: []string{"ccip", "registry", "lockreleasetokenpool"},

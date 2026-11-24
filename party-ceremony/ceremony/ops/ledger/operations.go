@@ -4,9 +4,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
-	retry "github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v4"
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -148,6 +149,12 @@ var UploadDarsOp = operations.NewOperation(
 )
 
 // VerifyPartyOp checks that the decentralized party is visible on the Ledger API.
+//
+// After the P2P mapping is confirmed in the topology state, the party may take
+// a moment to become visible on the deploy runner's Ledger API (each
+// participant materializes the party asynchronously). We therefore poll until
+// the party shows up, using the same bounds as the P2P confirmation loop in
+// the onboarding ceremony.
 var VerifyPartyOp = operations.NewOperation(
 	"canton-ceremony/ledger/verify-party",
 	semver.MustParse("1.0.0"),
@@ -155,12 +162,23 @@ var VerifyPartyOp = operations.NewOperation(
 	func(b operations.Bundle, deps ContractDeployDeps, in VerifyPartyInput) (VerifyPartyOutput, error) {
 		ctx := b.GetContext()
 
-		exists, err := deps.LedgerClient.PartyExists(ctx, in.DecentralizedPartyID)
-		if err != nil {
-			return VerifyPartyOutput{}, fmt.Errorf("checking party %q: %w", in.DecentralizedPartyID, err)
-		}
+		err := retry.Do(
+			func() error {
+				exists, qErr := deps.LedgerClient.PartyExists(ctx, in.DecentralizedPartyID)
+				if qErr != nil {
+					return retry.Unrecoverable(fmt.Errorf("checking party %q: %w", in.DecentralizedPartyID, qErr))
+				}
+				if !exists {
+					return fmt.Errorf("party %q not yet visible on ledger", in.DecentralizedPartyID)
+				}
 
-		if !exists {
+				return nil
+			},
+			retry.Context(ctx),
+			retry.Attempts(30),
+			retry.Delay(500*time.Millisecond),
+		)
+		if err != nil {
 			return VerifyPartyOutput{}, fmt.Errorf("party %q not found on ledger; ensure onboarding is complete", in.DecentralizedPartyID)
 		}
 

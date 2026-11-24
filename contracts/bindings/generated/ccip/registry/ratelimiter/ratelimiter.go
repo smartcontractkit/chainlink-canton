@@ -23,8 +23,8 @@ var (
 )
 
 const (
-	PackageName = "ccip-registry-rate-limiter"
-	PackageID   = "825482996c962c7a6ae24e375745d5cb0e2c75ff013a960fa0fe7636eb4b6f9a"
+	PackageName = "ccip-registry-rate-limiter-v2"
+	PackageID   = "b720326e9b947af65e8d43a82210183505b5ad9227f1a4a9cb37cf76f50fbea3"
 	SDKVersion  = "3.4.11"
 )
 
@@ -179,6 +179,36 @@ func (e *RateLimitDirection) UnmarshalHex(data string) error {
 
 var _ types.ENUM = RateLimitDirection("")
 
+// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
+func (e RateLimitDirection) GetEnumTagByte() byte {
+
+	if string(e) == "RateLimitDirection_Outbound" {
+		return 0
+	}
+
+	if string(e) == "RateLimitDirection_Inbound" {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown constructor
+}
+
+// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
+func (e RateLimitDirection) EnumConstructorForTagByte(tag byte) (string, bool) {
+
+	if tag == 0 {
+		return "RateLimitDirection_Outbound", true
+	}
+
+	if tag == 1 {
+		return "RateLimitDirection_Inbound", true
+	}
+
+	return "", false
+}
+
+var _ types.EnumWithTagByte = RateLimitDirection("")
+
 // RateLimitMode is an enum type
 type RateLimitMode string
 
@@ -222,6 +252,36 @@ func (e *RateLimitMode) UnmarshalHex(data string) error {
 }
 
 var _ types.ENUM = RateLimitMode("")
+
+// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
+func (e RateLimitMode) GetEnumTagByte() byte {
+
+	if string(e) == "RateLimitMode_DefaultFinality" {
+		return 0
+	}
+
+	if string(e) == "RateLimitMode_CustomFinality" {
+		return 1
+	}
+
+	return 0xFF // Invalid/unknown constructor
+}
+
+// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
+func (e RateLimitMode) EnumConstructorForTagByte(tag byte) (string, bool) {
+
+	if tag == 0 {
+		return "RateLimitMode_DefaultFinality", true
+	}
+
+	if tag == 1 {
+		return "RateLimitMode_CustomFinality", true
+	}
+
+	return "", false
+}
+
+var _ types.EnumWithTagByte = RateLimitMode("")
 
 // RateLimiter is a Template type
 type RateLimiter struct {

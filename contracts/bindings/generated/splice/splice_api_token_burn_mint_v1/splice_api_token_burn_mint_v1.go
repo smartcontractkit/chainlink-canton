@@ -258,7 +258,7 @@ func (t *BurnMintFactoryPublicFetch) UnmarshalHex(data string) error {
 // BurnMintOutput is a Record type
 type BurnMintOutput struct {
 	Owner   types.PARTY                                `json:"owner"`
-	Amount  types.NUMERIC                              `json:"amount"`
+	Amount  types.NUMERIC                              `json:"amount" hex:"decimal"`
 	Context splice_api_token_metadata_v1.ChoiceContext `json:"context"`
 }
 

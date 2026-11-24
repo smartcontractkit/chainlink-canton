@@ -10,6 +10,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
+	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/globaltokensenderreceiver"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/parse"
 )
 
@@ -26,6 +27,23 @@ func ParsePerPartyRouterFactory(createdEvent *apiv2.CreatedEvent) (*PerPartyRout
 	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.CcipOwner)
 
 	return &PerPartyRouterFactory{
+		Address: address,
+	}, nil
+}
+
+type GlobalTokenSenderReceiver struct {
+	Address contracts.RawInstanceAddress
+}
+
+func ParseGlobalTokenSenderReceiver(createdEvent *apiv2.CreatedEvent) (*GlobalTokenSenderReceiver, error) {
+	boundContract, err := bindings.UnmarshalCreatedEvent[globaltokensenderreceiver.GlobalTokenSenderReceiver](createdEvent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal GlobalTokenSenderReceiver: %w", err)
+	}
+
+	address := contracts.NewRawInstanceAddress(contracts.InstanceID(boundContract.InstanceId), boundContract.CcipOwner)
+
+	return &GlobalTokenSenderReceiver{
 		Address: address,
 	}, nil
 }

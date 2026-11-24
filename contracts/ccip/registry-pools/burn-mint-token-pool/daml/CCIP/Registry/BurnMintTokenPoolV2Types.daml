@@ -68,6 +68,13 @@ data TransferTimeout
     | RelativeHours Int   -- Use now + N hours - for tokens with expiry constraints
     deriving (Eq, Show)
 
+-- | RelativeHours must be strictly positive: zero/negative puts executeBefore at
+-- or before the current ledger time, and transfer factories reject those.
+isValidTransferTimeout : TransferTimeout -> Bool
+isValidTransferTimeout t = case t of
+    Indefinite -> True
+    RelativeHours hours -> hours > 0
+
 -- ===========================================================================
 -- MCMS Choice Params Types
 -- ===========================================================================
