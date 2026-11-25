@@ -28,9 +28,11 @@ import (
 
 type CantonAggregatorConfigAdapter struct{}
 
-var _ adapters.AggregatorConfigAdapter = (*CantonAggregatorConfigAdapter)(nil)
-var _ adapters.CommitteeVerifierOnchainAdapter = (*CantonCommitteeVerifierOnchain)(nil)
-var _ adapters.CommitteeVerifierChainDiscovery = (*CantonCommitteeVerifierOnchain)(nil)
+var (
+	_ adapters.AggregatorConfigAdapter         = (*CantonAggregatorConfigAdapter)(nil)
+	_ adapters.CommitteeVerifierOnchainAdapter = (*CantonCommitteeVerifierOnchain)(nil)
+	_ adapters.CommitteeVerifierChainDiscovery = (*CantonCommitteeVerifierOnchain)(nil)
+)
 
 type CantonCommitteeVerifierOnchain struct{}
 
