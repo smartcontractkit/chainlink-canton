@@ -3,7 +3,7 @@ package adapters
 import (
 	"context"
 	"encoding/hex"
-	"sort"
+	"slices"
 	"testing"
 
 	gethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -88,7 +88,7 @@ func TestDeployedCommitteeVerifierChains(t *testing.T) {
 	}
 
 	chains := (&CantonCommitteeVerifierOnchain{}).DeployedCommitteeVerifierChains(ds.Seal())
-	sort.Slice(chains, func(i, j int) bool { return chains[i] < chains[j] })
+	slices.Sort(chains)
 	assert.Equal(t, []uint64{111, 222}, chains, "every qualifier counts, other contract types do not")
 	assert.Empty(t, (&CantonCommitteeVerifierOnchain{}).DeployedCommitteeVerifierChains(nil))
 }
