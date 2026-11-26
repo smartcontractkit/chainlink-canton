@@ -28,8 +28,11 @@ import (
 
 type CantonAggregatorConfigAdapter struct{}
 
-var _ adapters.AggregatorConfigAdapter = (*CantonAggregatorConfigAdapter)(nil)
-var _ adapters.CommitteeVerifierOnchainAdapter = (*CantonCommitteeVerifierOnchain)(nil)
+var (
+	_ adapters.AggregatorConfigAdapter         = (*CantonAggregatorConfigAdapter)(nil)
+	_ adapters.CommitteeVerifierOnchainAdapter = (*CantonCommitteeVerifierOnchain)(nil)
+	_ adapters.CommitteeVerifierChainDiscovery = (*CantonCommitteeVerifierOnchain)(nil)
+)
 
 type CantonCommitteeVerifierOnchain struct{}
 
@@ -107,6 +110,29 @@ func (a *CantonCommitteeVerifierOnchain) ScanCommitteeStates(ctx context.Context
 	}
 
 	return states, nil
+}
+
+// DeployedCommitteeVerifierChains implements [adapters.CommitteeVerifierChainDiscovery].
+// Every chain holding a CommitteeVerifier ref is scanned, whether or not an aggregator config
+// lists it; no version filter, matching ScanCommitteeStates.
+func (a *CantonCommitteeVerifierOnchain) DeployedCommitteeVerifierChains(ds datastore.DataStore) []uint64 {
+	if ds == nil {
+		return nil
+	}
+	refs := ds.Addresses().Filter(
+		datastore.AddressRefByType(datastore.ContractType(committee_verifier.ContractType)),
+	)
+	seen := make(map[uint64]struct{}, len(refs))
+	chains := make([]uint64, 0, len(refs))
+	for _, ref := range refs {
+		if _, exists := seen[ref.ChainSelector]; exists {
+			continue
+		}
+		seen[ref.ChainSelector] = struct{}{}
+		chains = append(chains, ref.ChainSelector)
+	}
+
+	return chains
 }
 
 // ResolveDestinationVerifierAddress implements [adapters.AggregatorConfigAdapter].
@@ -211,12 +237,16 @@ func signatureConfigsFromCommitteeVerifier(cv *committeeverifier.CommitteeVerifi
 		}
 
 		signers := make([]string, 0, len(cfg.SignerKeys))
+		signerPubKeys := make(map[string]string, len(cfg.SignerKeys))
 		for _, key := range cfg.SignerKeys {
 			signer, err := signerKeyToAddress(string(key))
 			if err != nil {
 				return nil, fmt.Errorf("normalize signer key %q: %w", key, err)
 			}
 			signers = append(signers, signer)
+			// Keep the ledger's 65-byte key alongside its derived address: downstream
+			// inventory needs the key itself to identify Canton signers.
+			signerPubKeys[signer] = strings.ToLower(strings.TrimPrefix(normalizeSignerHex(string(key)), "0x"))
 		}
 
 		thr := cfg.Threshold
@@ -228,6 +258,7 @@ func signatureConfigsFromCommitteeVerifier(cv *committeeverifier.CommitteeVerifi
 		out = append(out, adapters.SignatureConfig{
 			SourceChainSelector: sourceSel,
 			Signers:             signers,
+			SignerPubKeys:       signerPubKeys,
 			Threshold:           thrU8,
 		})
 	}
