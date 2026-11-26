@@ -790,8 +790,8 @@ github.com/jaegertracing/jaeger-idl v0.6.0 h1:LOVQfVby9ywdMPI9n3hMwKbyLVV3BL1XH2
 github.com/jaegertracing/jaeger-idl v0.6.0/go.mod h1:mpW0lZfG907/+o5w5OlnNnig7nHJGT3SfKmRqC42HGQ=
 github.com/jarcoal/httpmock v1.4.1 h1:0Ju+VCFuARfFlhVXFc2HxlcQkfB+Xq12/EotHko+x2A=
 github.com/jarcoal/httpmock v1.4.1/go.mod h1:ftW1xULwo+j0R0JJkJIIi7UKigZUXCLLanykgjwBXL0=
-github.com/jedib0t/go-pretty/v6 v6.8.3 h1:yVSk5aemoYHCvcrtqyXklwqcgHQIQzmy/oUzFlmffSQ=
-github.com/jedib0t/go-pretty/v6 v6.8.3/go.mod h1:YwC5CE4fJ1HFUDeivSV1r//AmANFHyqczZk+U6BDALU=
+github.com/jedib0t/go-pretty/v6 v6.9.2 h1:aS5VZAJR1zSFNS45+pBywhe4CZYKU27Owl1SF/432Rs=
+github.com/jedib0t/go-pretty/v6 v6.9.2/go.mod h1:rDsMESQ3QyK0VMr1aeq/BErQLPk0tJ+ORkcjMMpnjeg=
 github.com/jessevdk/go-flags v0.0.0-20141203071132-1679536dcc89/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jhump/protoreflect v1.17.0 h1:qOEr613fac2lOuTgWN4tPAtLL7fUSbuJL5X5XumQh94=
@@ -1135,6 +1135,8 @@ github.com/redis/go-redis/v9 v9.18.0 h1:pMkxYPkEbMPwRdenAzUNyFNrDgHx9U+DrBabWNfS
 github.com/redis/go-redis/v9 v9.18.0/go.mod h1:k3ufPphLU5YXwNTUcCRXGxUoF1fqxnhFQmscfkCoDA0=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
+github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
+github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/rogpeppe/go-internal v1.3.0/go.mod h1:M8bDsm7K2OlrFYOpmOWEs/qY81heoFRclV5y23lUDJ4=
 github.com/rogpeppe/go-internal v1.9.0/go.mod h1:WtVeX8xhTBvf0smdhujwtBcq4Qrzq/fJaraNFVN+nFs=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
@@ -1267,8 +1269,8 @@ github.com/smartcontractkit/chainlink-stellar/bindings v0.0.0-20260921193419-5f9
 github.com/smartcontractkit/chainlink-stellar/bindings v0.0.0-20260921193419-5f9a9d3b335a/go.mod h1:fYWA2unezrM6+9LvEtHHMpdvwIZS7vY0gCk6iyWxSbU=
 github.com/smartcontractkit/chainlink-sui v0.0.0-20260630144638-b69f16bdddd8 h1:3exBy63KSpPPrJok93HmDzECh/iMtNv0cWyPPH8u1aw=
 github.com/smartcontractkit/chainlink-sui v0.0.0-20260630144638-b69f16bdddd8/go.mod h1:EhVSzBDITnheg03bg1TRdaoMDY5GkLjepmbuIq2+qPY=
-github.com/smartcontractkit/chainlink-testing-framework/framework v0.17.2 h1:3WV+hZxvX/j3j+5IBODUc01osEOFNKT6L3oKZz3yi4U=
-github.com/smartcontractkit/chainlink-testing-framework/framework v0.17.2/go.mod h1:0AyKX9qZxTh2yLe/wyluhMESv9LxEB5KZrqcC4jvr9c=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.17.3 h1:7YqOM8ha5Blblq3ksggCrxuYjeJZSs07dPLgHlVXvCY=
+github.com/smartcontractkit/chainlink-testing-framework/framework v0.17.3/go.mod h1:0AyKX9qZxTh2yLe/wyluhMESv9LxEB5KZrqcC4jvr9c=
 github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0 h1:VIxK8u0Jd0Q/VuhmsNm6Bls6Tb31H/sA3A/rbc5hnhg=
 github.com/smartcontractkit/chainlink-testing-framework/lib/grafana v1.50.0/go.mod h1:lyAu+oMXdNUzEDScj2DXB2IueY+SDXPPfyl/kb63tMM=
 github.com/smartcontractkit/chainlink-testing-framework/seth v1.52.0 h1:kZsB1b09QaV/SkFspT7Ao12knUEOufgunmOHaQ4pBwg=

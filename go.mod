@@ -20,7 +20,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
-	github.com/jedib0t/go-pretty/v6 v6.8.3
+	github.com/jedib0t/go-pretty/v6 v6.9.2
 	github.com/lib/pq v1.12.3
 	github.com/moby/moby/api v1.57.0
 	github.com/oapi-codegen/runtime v1.9.0
@@ -41,7 +41,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.129.1
 	github.com/smartcontractkit/chainlink-evm/gethwrappers v0.0.0-20261002202636-d1ee27b0b587
 	github.com/smartcontractkit/chainlink-protos/job-distributor v0.20.0
-	github.com/smartcontractkit/chainlink-testing-framework/framework v0.17.2
+	github.com/smartcontractkit/chainlink-testing-framework/framework v0.17.3
 	github.com/smartcontractkit/chainlink-testing-framework/wasp v1.53.0
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
 	github.com/smartcontractkit/mcms v0.56.1
@@ -379,6 +379,7 @@ require (
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.1 // indirect
 	github.com/redis/go-redis/v9 v9.18.0 // indirect
+	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
