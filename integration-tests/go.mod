@@ -22,7 +22,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/google/uuid v1.6.0
 	github.com/rs/zerolog v1.35.1
-	github.com/smartcontractkit/chain-selectors v1.0.112
+	github.com/smartcontractkit/chain-selectors v1.0.113
 	github.com/smartcontractkit/chainlink-canton v0.0.0
 	github.com/smartcontractkit/chainlink-canton/authentication v1.2.0
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.1
@@ -37,7 +37,7 @@ require (
 	github.com/smartcontractkit/chainlink-deployments-framework v0.129.1
 	github.com/smartcontractkit/freeport v0.1.3-0.20250828155247-add56fa28aad
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
-	github.com/smartcontractkit/mcms v0.56.1
+	github.com/smartcontractkit/mcms v0.56.2
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/protobuf v1.36.12
 )
@@ -165,7 +165,7 @@ require (
 	github.com/go-playground/validator/v10 v10.30.6 // indirect
 	github.com/go-resty/resty/v2 v2.17.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
-	github.com/goccy/go-json v0.11.2 // indirect
+	github.com/goccy/go-json v0.12.0 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/gofrs/flock v0.13.0 // indirect
@@ -240,7 +240,7 @@ require (
 	github.com/mr-tron/base58 v1.3.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/oapi-codegen/runtime v1.9.0 // indirect
+	github.com/oapi-codegen/runtime v1.9.1 // indirect
 	github.com/oklog/run v1.2.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
@@ -294,7 +294,7 @@ require (
 	github.com/smartcontractkit/chainlink-protos/metering/go v0.0.0-20260710151514-27b5a126dabe // indirect
 	github.com/smartcontractkit/chainlink-protos/node-platform v0.0.0-20260709145319-7782fb89eb16 // indirect
 	github.com/smartcontractkit/chainlink-protos/op-catalog v0.1.0 // indirect
-	github.com/smartcontractkit/chainlink-stellar/bindings v0.0.0-20260921193419-5f9a9d3b335a // indirect
+	github.com/smartcontractkit/chainlink-stellar/bindings v0.0.0-20261118162153-2943dff6b2b4 // indirect
 	github.com/smartcontractkit/chainlink-sui v0.0.0-20260630144638-b69f16bdddd8 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/framework v0.17.3 // indirect
 	github.com/smartcontractkit/chainlink-testing-framework/seth v1.52.0 // indirect
@@ -308,7 +308,7 @@ require (
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.21.0 // indirect
-	github.com/stellar/go-stellar-sdk v0.7.3 // indirect
+	github.com/stellar/go-stellar-sdk v0.9.0 // indirect
 	github.com/stellar/go-xdr v0.0.0-20260806060815-dc590f17552a // indirect
 	github.com/stephenlacy/go-ethereum-hdwallet v0.0.0-20230913225845-a4fa94429863 // indirect
 	github.com/streamingfast/logging v0.0.0-20230608130331-f22c91403091 // indirect

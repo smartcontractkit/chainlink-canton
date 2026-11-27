@@ -7,7 +7,7 @@ require (
 	github.com/ethereum/go-ethereum v1.17.4
 	github.com/fatih/color v1.19.0
 	github.com/google/go-cmp v0.7.0
-	github.com/nao1215/markdown v1.1.2
+	github.com/nao1215/markdown v1.1.3
 	github.com/rs/zerolog v1.35.1
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/smartcontractkit/go-daml v0.0.0-20260702101944-3a593d4e8e19
@@ -21,7 +21,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/goccy/go-json v0.11.2 // indirect
+	github.com/goccy/go-json v0.12.0 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/karrick/godirwalk v1.17.0 // indirect
 	github.com/mattn/go-colorable v0.1.16 // indirect
