@@ -158,6 +158,7 @@ For MCMS/proposal bugs, also walk sideways into **`utils/mcms/`** from the chang
 | `configure_canton_committee_verifier_for_lanes.go` | Run 2 CV-only lane configure |
 | `deploy_canton_token_expansion.go` | Token pool deploy wrapper |
 | `configure_canton_tokens_for_transfers.go` | Token transfer configure wrapper |
+| `update_canton_token_pool_finality_config.go` | Pool lane finality config update (all pool types) |
 | `canton_mcms_preconditions.go` | Shared MCMS ref checks |
 | `deploy_lock_release_token_pool.go` | Direct deploy only (devenv/tests) |
 
