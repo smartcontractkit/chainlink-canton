@@ -23,7 +23,7 @@ require (
 	github.com/jpillora/backoff v1.1.0
 	github.com/oapi-codegen/runtime v1.9.1
 	github.com/rs/zerolog v1.35.1
-	github.com/smartcontractkit/chain-selectors v1.0.112
+	github.com/smartcontractkit/chain-selectors v1.0.113
 	github.com/smartcontractkit/chainlink-canton/authentication v1.2.0
 	github.com/smartcontractkit/chainlink-canton/contracts/v2 v2.1.1
 	github.com/smartcontractkit/chainlink-ccv v0.23.0
