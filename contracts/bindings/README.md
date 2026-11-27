@@ -12,6 +12,7 @@ latest available version.
 | `contracts/dars/dev/`           | Dev DARs (`*-dev.dar`)              | `make compile-contracts` / `make contracts`              |
 | `contracts/dars/released/`      | All released DARs, grown additively | `make contracts` (when version is in `ReleasedVersions`) |
 | `contracts/bindings/generated/` | Go bindings                         | `make generate-bindings` / `make contracts`              |
+| `contracts/bindings/damljs/`    | TypeScript bindings (npm package `@chainlink/canton-contracts`, generated from **released** DARs) | `make generate-bindings-js` / `make contracts` |
 
 **Rules**
 

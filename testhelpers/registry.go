@@ -383,6 +383,56 @@ func AcceptPendingTransferInstruction(
 	return nil
 }
 
+// GetWithdrawContext fetches the scan's choice context for withdrawing a pending
+// transfer instruction. It returns the expire-lock flag the token implementation
+// reads and the contracts the withdraw command must disclose.
+func GetWithdrawContext(
+	ctx context.Context,
+	transferInstructionClient transferInstructionV1.ClientWithResponsesInterface,
+	pendingTransferInstructionCID string,
+) (bool, []*apiv2.DisclosedContract, error) {
+	withdrawContextResp, err := transferInstructionClient.GetTransferInstructionWithdrawContextWithResponse(ctx, pendingTransferInstructionCID, transferInstructionV1.GetChoiceContextRequest{})
+	if err != nil {
+		return false, nil, fmt.Errorf("get transfer instruction withdraw context: %w", err)
+	}
+	if withdrawContextResp.StatusCode() != http.StatusOK || withdrawContextResp.JSON200 == nil {
+		return false, nil, fmt.Errorf("unexpected transfer instruction withdraw context status=%d", withdrawContextResp.StatusCode())
+	}
+
+	values, ok := withdrawContextResp.JSON200.ChoiceContextData["values"].(map[string]any)
+	if !ok {
+		return false, nil, fmt.Errorf("withdraw context has no values map: %v", withdrawContextResp.JSON200.ChoiceContextData)
+	}
+	entry, ok := values["expire-lock"].(map[string]any)
+	if !ok {
+		return false, nil, fmt.Errorf("withdraw context has no expire-lock entry: %v", values)
+	}
+	if tag, _ := entry["tag"].(string); tag != "AV_Bool" {
+		return false, nil, fmt.Errorf("withdraw context expire-lock is not a bool: %v", entry)
+	}
+	expireLock, _ := entry["value"].(bool)
+
+	disclosedContracts := make([]*apiv2.DisclosedContract, 0, len(withdrawContextResp.JSON200.DisclosedContracts))
+	for _, contract := range withdrawContextResp.JSON200.DisclosedContracts {
+		id, err := TemplateIdFromString(contract.TemplateId)
+		if err != nil {
+			return false, nil, fmt.Errorf("parse withdraw-context template id: %w", err)
+		}
+		createdEventBlob, err := base64.StdEncoding.DecodeString(contract.CreatedEventBlob)
+		if err != nil {
+			return false, nil, fmt.Errorf("decode withdraw-context created event blob: %w", err)
+		}
+		disclosedContracts = append(disclosedContracts, &apiv2.DisclosedContract{
+			TemplateId:       id,
+			ContractId:       contract.ContractId,
+			CreatedEventBlob: createdEventBlob,
+			SynchronizerId:   contract.SynchronizerId,
+		})
+	}
+
+	return expireLock, disclosedContracts, nil
+}
+
 func MintAMT(
 	ctx context.Context,
 	participant canton.Participant,
