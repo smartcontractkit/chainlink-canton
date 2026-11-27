@@ -61,8 +61,11 @@ declare const packages: {
     readonly 'ghc-stdlib-DA-Internal-Template-1.0.0': typeof import('./ghc-stdlib-DA-Internal-Template-1.0.0');
     readonly 'link-2.0.0': typeof import('./link-2.0.0');
     readonly 'link-2.1.0': typeof import('./link-2.1.0');
+    readonly 'link-token-admin-1.0.0': typeof import('./link-token-admin-1.0.0');
     readonly 'mcms-api-1.0.0': typeof import('./mcms-api-1.0.0');
     readonly 'mcms-core-2.0.0': typeof import('./mcms-core-2.0.0');
+    readonly 'splice-api-token-allocation-instruction-v1-1.0.0': typeof import('./splice-api-token-allocation-instruction-v1-1.0.0');
+    readonly 'splice-api-token-allocation-v1-1.0.0': typeof import('./splice-api-token-allocation-v1-1.0.0');
     readonly 'splice-api-token-burn-mint-v1-1.0.0': typeof import('./splice-api-token-burn-mint-v1-1.0.0');
     readonly 'splice-api-token-holding-v1-1.0.0': typeof import('./splice-api-token-holding-v1-1.0.0');
     readonly 'splice-api-token-metadata-v1-1.0.0': typeof import('./splice-api-token-metadata-v1-1.0.0');
