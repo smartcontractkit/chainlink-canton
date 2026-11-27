@@ -20,7 +20,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/gin-gonic/gin v1.12.0
 	github.com/google/uuid v1.6.0
-	github.com/jedib0t/go-pretty/v6 v6.9.2
+	github.com/jedib0t/go-pretty/v6 v6.9.3
 	github.com/lib/pq v1.12.3
 	github.com/moby/moby/api v1.57.0
 	github.com/oapi-codegen/runtime v1.9.1
