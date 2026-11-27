@@ -194,7 +194,8 @@ func signingAlgorithmsForKey(keySpec awskmstypes.KeySpec) (awskmstypes.SigningAl
 		awskmstypes.KeySpecMlDsa44,
 		awskmstypes.KeySpecMlDsa65,
 		awskmstypes.KeySpecMlDsa87,
-		awskmstypes.KeySpecEccNistEdwards25519:
+		awskmstypes.KeySpecEccNistEdwards25519,
+		awskmstypes.KeySpecMlKem512, awskmstypes.KeySpecMlKem768, awskmstypes.KeySpecMlKem1024:
 		return "", apiv2.SigningAlgorithmSpec_SIGNING_ALGORITHM_SPEC_UNSPECIFIED,
 			fmt.Errorf("unsupported AWS KMS signing key spec %s; expected ECC_NIST_P256 or ECC_NIST_P384", keySpec)
 	default:
