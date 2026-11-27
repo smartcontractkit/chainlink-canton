@@ -75,6 +75,9 @@ chain_selector = "8706591216959472610"
 	[ccip_api.fee_quoter]
 		party_id = "ccipOwner"
 		instance_address = "0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"
+	[ccip_api.global_token_sender_receiver]
+		party_id = "ccipOwner"
+		instance_address = "0x1111111111111111111111111111111111111111111111111111111111111111"
 	[ccip_api.fee_tokens."CC"]
 		token_id = "Amulet"
 		admin = "ccipOwner"
@@ -170,6 +173,10 @@ chain_selector = "8706591216959472610"
 					FeeQuoter: ContractIdentifier{
 						PartyID:         "ccipOwner",
 						InstanceAddress: contracts.HexToInstanceAddress("0x9d13995ee04c3e9c441dc1abf307bdc0160119390d77dca2dd95d5604d902fc4"),
+					},
+					GlobalTokenSenderReceiver: ContractIdentifier{
+						PartyID:         "ccipOwner",
+						InstanceAddress: contracts.HexToInstanceAddress("0x1111111111111111111111111111111111111111111111111111111111111111"),
 					},
 					CcipOwner: "ccipOwner",
 					FeeTokens: map[string]FeeToken{

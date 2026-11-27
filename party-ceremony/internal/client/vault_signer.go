@@ -37,11 +37,13 @@ type VaultSigner struct {
 // vault client and extracting the Ed25519 seed from the returned proto.
 //
 // fingerprint identifies which key to export (see [FindNamespaceKeyFingerprint]).
-// protocolVersion 34 matches Canton 3.4.x node serialisation.
+// protocolVersion 36 is the minimum protocol version accepted by Canton >=3.7
+// (protocol versions <=35 are deleted there); crypto messages still serialise
+// as crypto/v30, so response parsing is unaffected.
 func NewVaultSigner(ctx context.Context, vault cryptoadminv30.VaultServiceClient, fingerprint string) (*VaultSigner, error) {
 	resp, err := vault.ExportKeyPair(ctx, &cryptoadminv30.ExportKeyPairRequest{
 		Fingerprint:     fingerprint,
-		ProtocolVersion: 34,
+		ProtocolVersion: 36,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("ExportKeyPair %q: %w", fingerprint, err)

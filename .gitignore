@@ -31,6 +31,10 @@ scripts/prod_mainnet/.env.example
 contracts/dependencies/utility/*.dar
 contracts/dependencies/utility/.cache/
 
+# Local installs of the generated TypeScript bindings package
+contracts/bindings/damljs/node_modules/
+contracts/bindings/damljs/package-lock.json
+
 # Local EDS configs with credentials (never commit)
 eds/eds-token-pools.toml
 eds/eds-token-pools_secrets.toml

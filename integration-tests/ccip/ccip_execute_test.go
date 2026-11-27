@@ -35,8 +35,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 
-	config2 "github.com/smartcontractkit/chainlink-canton/authentication/config"
-
 	chainsel "github.com/smartcontractkit/chain-selectors"
 	"github.com/smartcontractkit/chainlink-ccip/deployment/lanes"
 	devenvcommon "github.com/smartcontractkit/chainlink-ccv/build/devenv/common"
@@ -50,6 +48,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
 	"github.com/smartcontractkit/go-daml/pkg/types"
 
+	config2 "github.com/smartcontractkit/chainlink-canton/authentication/config"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipcodec"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/ccipruntime"
@@ -57,11 +56,13 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/core"
 	executorBinding "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/executor"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/receiver"
+	ccipuser "github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/ccip/user"
 	"github.com/smartcontractkit/chainlink-canton/contracts/v2/bindings/generated/splice/splice_api_token_holding_v1"
 	"github.com/smartcontractkit/chainlink-canton/deployment/changesets"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/committee_verifier"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/fee_quoter"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_config"
+	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/global_token_sender_receiver"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/offramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/onramp"
 	"github.com/smartcontractkit/chainlink-canton/deployment/operations/ccip/per_party_router_factory"
@@ -141,8 +142,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	require.NoError(t, err)
 	executorDar, err := contracts.GetDar(contracts.CCIPExecutorV2, contracts.DevVersion)
 	require.NoError(t, err)
+	globalSenderReceiverDar, err := contracts.GetDar(contracts.CCIPGlobalTokenSenderReceiverV1, contracts.DevVersion)
+	require.NoError(t, err)
 
-	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipReceiverDar, executorDar}
+	dars := [][]byte{runtimeDar, coreDar, committeeVerifierDar, ccipReceiverDar, executorDar, globalSenderReceiverDar}
 	packageIds, err := testhelpers.UploadDARstoMultipleParticipants(t.Context(), dars, ccipParticipant, receiverParticipant)
 	require.NoError(t, err)
 	t.Logf("Uploaded DARs to all participants: %v", packageIds)
@@ -164,7 +167,6 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	}
 	t.Logf("Generated %d CCV signer keys", len(ccvSignerKeys))
 
-	versionTag := "e9a05a20"
 	ccvQualifier := devenvcommon.DefaultCommitteeVerifierQualifier
 
 	// Create Scan and Registry API clients
@@ -221,7 +223,7 @@ func TestCCIPExecuteE2E(t *testing.T) {
 						Template: committeeverifier.CommitteeVerifier{
 							Owner:                        types.PARTY(partyCCIP),
 							CcipOwner:                    types.PARTY(partyCCIP),
-							VersionTag:                   types.TEXT(versionTag),
+							VersionTag:                   committeeverifier.VersionTagV200,
 							MessageSentObservers:         nil,
 							StorageLocations:             []types.TEXT{"ipfs://test-receive"},
 							StorageLocationsAdmin:        types.PARTY(partyCCIP),
@@ -289,6 +291,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	_, rmnRemoteAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), rmn_remote.ContractType, rmn_remote.Version, "")
 	require.NoError(t, err, "failed to get RMNRemote address")
 	_, perPartyRouterFactoryAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), per_party_router_factory.ContractType, per_party_router_factory.Version, "")
+	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
+	_, globalTokenSenderReceiverAddress, err := testhelpers.ResolveAddressFromDatastore(cldfEnv.DataStore, env.Chain.ChainSelector(), global_token_sender_receiver.ContractType, global_token_sender_receiver.Version, "")
+	require.NoError(t, err, "failed to get GlobalTokenSenderReceiver address")
 	require.NoError(t, err, "failed to get PerPartyRouterFactory address")
 
 	// Deploy and configure lane
@@ -413,6 +418,10 @@ func TestCCIPExecuteE2E(t *testing.T) {
 				FeeQuoter: config.ContractIdentifier{
 					PartyID:         partyCCIP,
 					InstanceAddress: feeQuoterAddress.InstanceAddress(),
+				},
+				GlobalTokenSenderReceiver: config.ContractIdentifier{
+					PartyID:         partyCCIP,
+					InstanceAddress: globalTokenSenderReceiverAddress.InstanceAddress(),
 				},
 				CcipOwner: partyCCIP,
 			},
@@ -546,12 +555,13 @@ func TestCCIPExecuteE2E(t *testing.T) {
 	ccvExecuteDisclosure, err := edsTesthelpers.GetCCVExecuteDisclosure(t.Context(), ccvAPIClient, encodedMessageHex, committeeVerifierAddress.InstanceAddress(), types.PARTY(partyReceiver))
 	require.NoError(t, err)
 
-	executeArgs := receiver.Execute{
+	executeArgs := ccipuser.ICCIPReceiverExecute{
+		ReceiverParty:  types.PARTY(partyReceiver),
 		Context:        ccipExecuteDisclosure.ChoiceContext,
 		RouterCid:      types.CONTRACT_ID(routerCid),
 		EncodedMessage: types.TEXT(encodedMessageHex),
 		TokenTransfer:  nil,
-		CcvInputs: []receiver.CCVInput{
+		CcvInputs: []ccipuser.ReceiverCCVInput{
 			{
 				CcvCid:          types.CONTRACT_ID(ccvExecuteDisclosure.ContractId),
 				VerifierResults: types.TEXT(verifierResultsHex),
@@ -567,9 +577,9 @@ func TestCCIPExecuteE2E(t *testing.T) {
 			CommandId: uuid.NewString(),
 			Commands: []*apiv2.Command{{
 				Command: &apiv2.Command_Exercise{Exercise: &apiv2.ExerciseCommand{
-					TemplateId:     contracts.IdentifierFromBinding(receiver.CCIPReceiver{}),
+					TemplateId:     &apiv2.Identifier{PackageId: "#" + ccipuser.PackageName, ModuleName: "CCIP.UserV1.Receiver", EntityName: "ICCIPReceiver"},
 					ContractId:     ccipReceiverCid,
-					Choice:         "Execute",
+					Choice:         "ICCIPReceiver_Execute",
 					ChoiceArgument: ledger.MapToValue(executeArgs),
 				}},
 			}},

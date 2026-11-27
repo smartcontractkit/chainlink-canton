@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.2.1...eds/v1.3.0) (2026-11-17)
+
+
+### Features
+
+* **contracts:** Accept pending lock transfers in LRTP ([#1199](https://github.com/smartcontractkit/chainlink-canton/issues/1199)) ([fa58b01](https://github.com/smartcontractkit/chainlink-canton/commit/fa58b016268b20fcbe7b9e459d58cbb70e059add))
+* **eds:** Add DA dependency request metrics ([#1262](https://github.com/smartcontractkit/chainlink-canton/issues/1262)) ([e42fcd9](https://github.com/smartcontractkit/chainlink-canton/commit/e42fcd9de910090e6c49ef649b95c953faa5a399))
+
 ## [1.2.1](https://github.com/smartcontractkit/chainlink-canton/compare/eds/v1.2.0...eds/v1.2.1) (2026-10-29)
 
 

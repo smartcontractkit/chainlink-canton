@@ -31,6 +31,7 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/middleware"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/token_standard"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool"
+	"github.com/smartcontractkit/chainlink-canton/eds/internal/api/tokenpool/factory"
 	oapiTokenMetadataV1 "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/tokenMetadataV1"
 	oapiTransferInstruction "github.com/smartcontractkit/chainlink-canton/eds/internal/openapi/transferInstructionV1"
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
@@ -132,7 +133,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 	var poolDiscoveryService *PoolDiscoveryService
 
 	if cfg.CCIPAPIConfig.Enabled {
-		ccipAPIServer, err := ccip.NewServer(ctx, logger, activeContractStore, cfg.CCIPAPIConfig)
+		ccipAPIServer, err := ccip.NewServer(ctx, logger, activeContractStore, cfg.CCIPAPIConfig, factory.WithMetrics(metrics))
 		if err != nil {
 			return fmt.Errorf("failed to create CCIP API: %w", err)
 		}
@@ -156,7 +157,7 @@ func RunEDS(ctx context.Context, logger zerolog.Logger, cfg *config.Config) erro
 		globalAddressFilters = append(globalAddressFilters, executorAPIServer)
 	}
 	if cfg.TokenPoolAPIConfig.Enabled {
-		tokenPoolAPIServer, err := tokenpool.NewServer(ctx, logger, activeContractStore, instrumentHoldingStore, cfg.TokenPoolAPIConfig)
+		tokenPoolAPIServer, err := tokenpool.NewServer(ctx, logger, activeContractStore, instrumentHoldingStore, cfg.TokenPoolAPIConfig, factory.WithMetrics(metrics))
 		if err != nil {
 			return fmt.Errorf("failed to create TokenPool API: %w", err)
 		}

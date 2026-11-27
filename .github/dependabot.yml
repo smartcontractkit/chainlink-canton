@@ -18,3 +18,10 @@ updates:
     open-pull-requests-limit: 20
     labels:
       - 'dependencies-go'
+  - package-ecosystem: "npm"
+    directory: "/contracts/bindings/damljs"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - 'dependencies-npm'

@@ -27,6 +27,7 @@ type PoolDiscoveryService struct {
 	tokenPoolServer     *tokenpool.Server
 	observerParty       types.PARTY
 	tokenStandardURL    string
+	bridgeHoldingsURL   string
 	// discoveredPools tracks the ledger offset of the contract currently registered for each
 	// address. InstanceIds aren't guaranteed unique, so two distinct contracts can derive the
 	// same address; the offset lets a later-created contract always win, regardless of the
@@ -76,6 +77,7 @@ func NewPoolDiscoveryService(
 		tokenPoolServer:     tokenPoolServer,
 		observerParty:       types.PARTY(cfg.PartyID),
 		tokenStandardURL:    cfg.TokenStandardURL,
+		bridgeHoldingsURL:   cfg.BridgeHoldingsURL,
 		discoveredPools:     make(map[contracts.InstanceAddress]int64),
 	}
 }
@@ -162,15 +164,19 @@ func (s *PoolDiscoveryService) registerIfNewer(ctx context.Context, rawAddress c
 // the pool's LockOrBurn/ReleaseFromTicket require the factory CID in the choice context,
 // and URL mode resolves it over HTTP, so EDS needs no ledger visibility into the factory.
 func (s *PoolDiscoveryService) registerPool(ctx context.Context, address contracts.InstanceAddress, owner string, poolType config.TokenPoolType) error {
+	factoryCfg := &config.Factory{
+		Type:             config.FactoryTypeURL,
+		TokenStandardURL: &s.tokenStandardURL,
+	}
+	if s.bridgeHoldingsURL != "" {
+		factoryCfg.BridgeHoldingsURL = &s.bridgeHoldingsURL
+	}
 	poolConfig := config.TokenPool{
 		PartyID:         string(s.observerParty),
 		InstanceAddress: address,
 		Type:            poolType,
 		PoolOwner:       owner,
-		Factory: &config.Factory{
-			Type:             config.FactoryTypeURL,
-			TokenStandardURL: &s.tokenStandardURL,
-		},
+		Factory:         factoryCfg,
 	}
 
 	if err := s.tokenPoolServer.RegisterDiscoveredPool(ctx, poolConfig); err != nil {

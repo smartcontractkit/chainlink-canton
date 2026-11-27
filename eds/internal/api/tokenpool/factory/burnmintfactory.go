@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/smartcontractkit/chainlink-ccv/protocol"
 	"github.com/smartcontractkit/go-daml/pkg/types"
@@ -18,7 +19,9 @@ import (
 	"github.com/smartcontractkit/chainlink-canton/eds/internal/store"
 )
 
-func NewBurnMintFactory(ctx context.Context, poolOwner types.PARTY, acs store.ActiveContractStoreInterface, cfg config.Factory) (DisclosureFactory, error) {
+func NewBurnMintFactory(ctx context.Context, poolOwner types.PARTY, acs store.ActiveContractStoreInterface, cfg config.Factory, opts ...Option) (DisclosureFactory, error) {
+	o := applyOptions(opts)
+
 	switch cfg.Type {
 	case config.FactoryTypeDisabled:
 		return nil, nil //nolint:nilnil
@@ -76,6 +79,7 @@ func NewBurnMintFactory(ctx context.Context, poolOwner types.PARTY, acs store.Ac
 			return URLBurnMintFactory{
 				poolOwner:        poolOwner,
 				daRegistryClient: daRegistryClient,
+				metrics:          o.metrics,
 			}, nil
 		case config.FactoryTypeURLRequests:
 			return RequestBurnMintFactory{
@@ -95,7 +99,7 @@ type AddressBurnMintFactory struct {
 	acs            store.ActiveContractStoreInterface
 }
 
-func (f AddressBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+func (f AddressBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, _ map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	activeBurnMintFactory, ok := f.acs.Get(f.factoryAddress)
 	if !ok {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no active contract found for transfer factory at address %s", f.factoryAddress)
@@ -124,9 +128,10 @@ func (f AddressBurnMintFactory) GetExecuteDisclosures(ctx context.Context,
 type URLBurnMintFactory struct {
 	poolOwner        types.PARTY
 	daRegistryClient daRegistry.ClientWithResponsesInterface
+	metrics          Metrics
 }
 
-func (f URLBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+func (f URLBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, _ map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	if message.TokenTransfer == nil {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no TokenTransfer in message")
 	}
@@ -137,6 +142,10 @@ func (f URLBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapi
 	if tokenTransfer.HoldingContractIds != nil {
 		inputHoldingCids = append(inputHoldingCids, *tokenTransfer.HoldingContractIds...)
 	}
+
+	started := time.Now()
+	success := false
+	defer func() { recordDARequest(ctx, f.metrics, OperationBurnMintFactory, started, success) }()
 
 	resp, err := f.daRegistryClient.GetBurnMintFactoryWithResponse(ctx, daRegistry.GetBurnMintFactoryRequest{
 		InstrumentId: daRegistry.InstrumentId{
@@ -175,6 +184,8 @@ func (f URLBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapi
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
 
+	success = true
+
 	return types.CONTRACT_ID(resp.JSON200.FactoryId), choiceContext, disclosedContracts, nil
 }
 
@@ -192,6 +203,10 @@ func (f URLBurnMintFactory) GetExecuteDisclosures(ctx context.Context,
 	if receiver == "" {
 		receiver = f.poolOwner
 	}
+
+	started := time.Now()
+	success := false
+	defer func() { recordDARequest(ctx, f.metrics, OperationBurnMintFactory, started, success) }()
 
 	resp, err := f.daRegistryClient.GetBurnMintFactoryWithResponse(ctx, daRegistry.GetBurnMintFactoryRequest{
 		InstrumentId: daRegistry.InstrumentId{
@@ -233,6 +248,8 @@ func (f URLBurnMintFactory) GetExecuteDisclosures(ctx context.Context,
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("failed to convert choice context: %w", err)
 	}
 
+	success = true
+
 	return types.CONTRACT_ID(resp.JSON200.FactoryId), choiceContext, disclosedContracts, nil
 }
 
@@ -246,7 +263,7 @@ type RequestBurnMintFactory struct {
 	daRegistryClient daRegistry.ClientWithResponsesInterface
 }
 
-func (f RequestBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
+func (f RequestBurnMintFactory) GetSendDisclosures(ctx context.Context, message oapiCommon.Message, _ map[string]types.TEXT) (types.CONTRACT_ID, splice_api_token_metadata_v1.ChoiceContext, []oapiCommon.DisclosedContract, error) {
 	if message.TokenTransfer == nil {
 		return "", splice_api_token_metadata_v1.ChoiceContext{}, nil, fmt.Errorf("no TokenTransfer in message")
 	}
