@@ -40,6 +40,7 @@ data-dependencies:
   - ../user/.daml/dist/ccip-user-v1-1.0.0.dar
   - ../global-token-sender-receiver/.daml/dist/ccip-global-token-sender-receiver-v1-2.0.0.dar
   - ../factory/.daml/dist/ccip-factory-v2-2.1.2.dar
+  - ../fee-treasury/.daml/dist/ccip-fee-treasury-1.0.0.dar
 dependencies:
   - daml-prim
   - daml-stdlib
