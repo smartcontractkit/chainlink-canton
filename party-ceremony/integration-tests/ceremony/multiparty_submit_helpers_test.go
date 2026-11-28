@@ -88,7 +88,7 @@ func (s *CeremonyTestSuite) submitCommandsAsParty(
 		require.NoError(t, err, "GrantPartyRights to submitter user before submit")
 	}
 
-	prep, err := submitterLedger.PrepareSubmission(ctx, commands, []string{partyID}, []string{partyID}, synchronizerID)
+	prep, err := submitterLedger.PrepareSubmission(ctx, commands, []string{partyID}, []string{partyID}, synchronizerID, nil)
 	require.NoError(t, err, "PrepareSubmission")
 	hashBytes := prep.GetPreparedTransactionHash()
 	require.NotEmpty(t, hashBytes, "prepared transaction hash should be non-empty")
@@ -115,7 +115,7 @@ func (s *CeremonyTestSuite) submitCommandsAsParty(
 		}},
 	}
 
-	createdCID, err := submitterLedger.ExecuteSubmission(
+	result, err := submitterLedger.ExecuteSubmission(
 		ctx,
 		prep.GetPreparedTransaction(),
 		partySigs,
@@ -123,7 +123,7 @@ func (s *CeremonyTestSuite) submitCommandsAsParty(
 	)
 	require.NoError(t, err, "ExecuteSubmission")
 
-	return createdCID
+	return result.FirstContractID()
 }
 
 // signHashAs builds a signer for one participant using its KMS config (or

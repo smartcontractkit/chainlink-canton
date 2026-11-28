@@ -67,6 +67,14 @@ func runCeremonySuites(t *testing.T, chain *canton.Chain, kms *integrationtests.
 		suite.Run(t, s)
 	})
 
+	t.Run("CantonExerciseChoiceFlowTestSuite", func(t *testing.T) {
+		s := new(ExerciseChoiceFlowTestSuite)
+		s.chain = chain
+		s.KMS = kms
+		s.KMSRunName = runNamePrefix + "exercise-choice"
+		suite.Run(t, s)
+	})
+
 	t.Run("CantonAddParticipantFlowTestSuite", func(t *testing.T) {
 		s := new(AddParticipantFlowTestSuite)
 		s.chain = chain

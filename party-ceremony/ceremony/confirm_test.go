@@ -69,3 +69,30 @@ func TestInteractiveConfirmer_EOF(t *testing.T) {
 	err := c.ConfirmTopologySign(context.Background(), ceremony.TopologySignDetail{})
 	require.ErrorIs(t, err, ceremony.ErrUserRejected)
 }
+
+func TestInteractiveConfirmer_DAMLSignShowsTheExercise(t *testing.T) {
+	t.Parallel()
+	out := &bytes.Buffer{}
+	c := &ceremony.InteractiveConfirmer{In: bytes.NewBufferString("y\n"), Out: out}
+	err := c.ConfirmDAMLSign(context.Background(), ceremony.DAMLSignDetail{
+		TransactionHash: "deadbeef",
+		Template:        "Registry.Service:RegistrarService",
+		ContractID:      "registrar-cid",
+		Choice:          "RegistrarService_CreateInstrumentConfiguration",
+		ChoiceArgument:  `{"record":{}}`,
+	})
+	require.NoError(t, err)
+	for _, want := range []string{"Registry.Service:RegistrarService", "registrar-cid", "RegistrarService_CreateInstrumentConfiguration", `{"record":{}}`} {
+		assert.Contains(t, out.String(), want)
+	}
+}
+
+func TestInteractiveConfirmer_DAMLSignWithoutAChoiceOmitsTheExercise(t *testing.T) {
+	t.Parallel()
+	out := &bytes.Buffer{}
+	c := &ceremony.InteractiveConfirmer{In: bytes.NewBufferString("y\n"), Out: out}
+	require.NoError(t, c.ConfirmDAMLSign(context.Background(), ceremony.DAMLSignDetail{TransactionHash: "deadbeef"}))
+	for _, label := range []string{"Template:", "Contract ID:", "Choice:", "Choice Argument:"} {
+		assert.NotContains(t, out.String(), label)
+	}
+}

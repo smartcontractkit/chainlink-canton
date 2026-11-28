@@ -11,6 +11,7 @@ import (
 
 	apiv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
+	v1 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive/transaction/v1"
 	cryptov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/crypto/v30"
 	protov30 "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/canton/protocol/v30"
 	"github.com/smartcontractkit/chainlink-deployments-framework/operations"
@@ -145,9 +146,31 @@ func (m *mockLedgerClient) PrepareSubmission(
 	_ []string,
 	_ []string,
 	_ string,
+	_ []*apiv2.DisclosedContract,
 ) (*interactive.PrepareSubmissionResponse, error) {
+	tx := &interactive.PreparedTransaction{
+		Transaction: &interactive.DamlTransaction{
+			Roots: []string{"0"},
+			Nodes: []*interactive.DamlTransaction_Node{{
+				NodeId: "0",
+				VersionedNode: &interactive.DamlTransaction_Node_V1{V1: &v1.Node{NodeType: &v1.Node_Create{Create: &v1.Create{
+					ContractId: "00de",
+					TemplateId: &apiv2.Identifier{PackageId: "pkg", ModuleName: "MCMS.Main", EntityName: "MCMS"},
+					Argument:   &apiv2.Value{Sum: &apiv2.Value_Record{Record: &apiv2.Record{}}},
+				}}}},
+			}},
+		},
+		Metadata: &interactive.Metadata{},
+	}
+	hash, err := ledger.HashPreparedTransactionV2(tx)
+	if err != nil {
+		return nil, err
+	}
+
 	return &interactive.PrepareSubmissionResponse{
-		PreparedTransactionHash: []byte{0xab, 0xcd, 0xef, 0x12},
+		PreparedTransactionHash: hash,
+		PreparedTransaction:     tx,
+		HashingSchemeVersion:    interactive.HashingSchemeVersion_HASHING_SCHEME_VERSION_V2,
 	}, nil
 }
 
@@ -156,8 +179,11 @@ func (m *mockLedgerClient) ExecuteSubmission(
 	_ *interactive.PreparedTransaction,
 	_ *interactive.PartySignatures,
 	_ interactive.HashingSchemeVersion,
-) (string, error) {
-	return "fake-contract-0xdeadbeef", nil
+) (client.SubmissionResult, error) {
+	return client.SubmissionResult{
+		UpdateID: "fake-update",
+		Created:  []client.CreatedContract{{TemplateID: "pkg:MCMS.Main:MCMS", ContractID: "fake-contract-0xdeadbeef"}},
+	}, nil
 }
 
 func (m *mockLedgerClient) GetActiveContractsByTemplate(
@@ -171,6 +197,12 @@ func (m *mockLedgerClient) GetActiveContractsByTemplateForParty(
 	return []*apiv2.CreatedEvent{{ContractId: "fake-contract-0xdeadbeef"}}, nil
 }
 func (m *mockLedgerClient) GrantPartyRights(_ context.Context, _, _ string) error {
+	return nil
+}
+func (m *mockLedgerClient) GrantActAs(_ context.Context, _, _ string) error {
+	return nil
+}
+func (m *mockLedgerClient) GrantReadAs(_ context.Context, _, _ string) error {
 	return nil
 }
 

@@ -31,6 +31,10 @@ const (
 	// WorkflowTypeContractDeploy identifies a contract deployment ceremony.
 	WorkflowTypeContractDeploy = "contract-deploy"
 
+	// WorkflowTypeExerciseChoice identifies a ceremony that exercises a choice
+	// on an existing contract as the decentralized party.
+	WorkflowTypeExerciseChoice = "exercise-choice"
+
 	// WorkflowTypeKeyRotation identifies a key rotation ceremony.
 	WorkflowTypeKeyRotation = "key-rotation"
 

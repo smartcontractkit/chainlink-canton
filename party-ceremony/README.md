@@ -17,6 +17,7 @@ A CLI tool for governing and managing **decentralized parties** on Canton distri
   - [Kick (Remove Participant)](#kick-remove-participant)
   - [Add Participant](#add-participant)
   - [Contract Deploy](#contract-deploy)
+  - [Exercise Choice](#exercise-choice)
   - [Example (Mock)](#example-mock)
 - [Configuration](#configuration)
 - [CLI Reference](#cli-reference)
@@ -24,8 +25,10 @@ A CLI tool for governing and managing **decentralized parties** on Canton distri
   - [init kick](#init-kick)
   - [init add-participant](#init-add-participant)
   - [init contract-deploy](#init-contract-deploy)
+  - [init exercise-choice](#init-exercise-choice)
   - [resume](#resume)
   - [query-parties](#query-parties)
+  - [query-contracts](#query-contracts)
 - [Quick Start](#quick-start)
 - [Development](#development)
 
@@ -55,6 +58,7 @@ reasons:
 | ------------------------------------------------------ | ----------------- |
 | **Create** the decentralized party                     | `onboarding`      |
 | **Deploy** the MCMS contract (or other DAML contracts) | `contract-deploy` |
+| **Exercise** a choice on a contract as the party       | `exercise-choice` |
 | **Add** a new participant to the party                 | `add-participant` |
 | **Remove** a compromised or decommissioned participant | `kick`            |
 
@@ -183,6 +187,7 @@ to load the correct state.
 | [`kick`](#kick-remove-participant)    | 5     | Remove a participant from an existing party           |
 | [`add-participant`](#add-participant) | 7     | Add a new participant to an existing party            |
 | [`contract-deploy`](#contract-deploy) | 7     | Deploy a DAML contract (e.g. MCMS) owned by the party |
+| [`exercise-choice`](#exercise-choice) | 6     | Exercise a choice on an existing contract as the party |
 | [`example`](#example-mock)            | 4     | Mock reference implementation for testing             |
 
 ### Onboarding
@@ -261,7 +266,7 @@ deploy the MCMS contract.
 | 2   | `FetchParticipantsOp` | Any              | Fetch hosting participant UIDs from topology                                       |
 | 3   | `UploadDarsOp`        | Each participant | Upload DAML package archives (DARs) via Admin `PackageService`                     |
 | 4   | `PrepareSubmissionOp` | Coordinator      | Prepare the contract creation via `InteractiveSubmissionService.PrepareSubmission` |
-| 5   | `SignSubmissionOp`    | Each participant | Sign the prepared transaction hash with their DAML signing key                     |
+| 5   | `SignSubmissionOp`    | Each participant | Recompute the prepared transaction hash, then sign it with their DAML signing key  |
 | 6   | `ExecuteSubmissionOp` | Coordinator      | Aggregate all signatures and call `ExecuteSubmission`                              |
 | 7   | `VerifyContractOp`    | Any              | Query the Active Contract Set and verify the contract was created                  |
 
@@ -269,6 +274,10 @@ deploy the MCMS contract.
 
 - Step 4 requires all participants to have uploaded DARs in step 3.
 - Step 6 requires all participants to have signed in step 5.
+
+If the connected operator's own signature fails in step 5, the run stops with
+that error instead of reporting it as pending. Another participant's signing
+failure is reported as pending.
 
 **Known contracts:** The CLI has built-in profiles for known contract packages.
 When a known package name is used with `--packages`, the template module,
@@ -282,6 +291,49 @@ DARs are loaded from the `dars/` directory by default (relative to the working
 directory), under versioned subdirectories such as `dars/dev/` (dev) or
 `dars/released/` (pinned release). Each participant must have the required DAR
 files available locally.
+
+### Exercise Choice
+
+Exercises a choice on an existing contract as the decentralized party. It
+follows the contract deploy workflow without the DAR upload, so the template's
+package must already be vetted on every hosting participant. The LINK Registry
+setup uses it for the `ccipOwner` provider and registrar choices.
+
+| #   | Operation             | Actor            | Description                                                      |
+| --- | --------------------- | ---------------- | ---------------------------------------------------------------- |
+| 1   | `VerifyPartyOp`       | Any              | Verify the party is visible on the Ledger API                    |
+| 2   | `FetchParticipantsOp` | Any              | Fetch hosting participant UIDs from topology                     |
+| 3   | `GrantReadAsOp`       | Each participant | Grant the participant's Ledger API user readAs for the party     |
+| 4   | `PrepareExerciseOp`   | Coordinator      | Grant the connected user actAs, then prepare via `PrepareSubmission` |
+| 5   | `SignSubmissionOp`    | Each participant | Check the prepared transaction, recompute its hash, then sign    |
+| 6   | `ExecuteSubmissionOp` | Coordinator      | Grant the connected user actAs, then submit with all signatures; record the update ID and new contracts |
+
+**Threshold gates:**
+
+- Step 6 requires all participants to have signed in step 5.
+
+Step 3 does not gate the ceremony. Only the run that prepares and the run that
+submits grant actAs, each to its own user. A run that only signs grants none.
+Whoever resumes last submits. If the connected operator declines to sign, the
+run stops with that rejection instead of waiting for more signers.
+
+Before signing, each participant decodes the prepared transaction. It refuses
+to sign unless the single root node exercises the workflow's choice on the
+workflow's contract, template and package, with the workflow's choice
+argument. The confirm prompt shows the template, contract ID, choice and
+choice argument. Labelled record fields are matched by label, so their order
+does not matter, and a labelled argument of two or more fields is refused
+when the prepared record is not fully labelled. A labelled record field that
+is `None` may be left out: the ledger omits it.
+
+Both ceremonies then recompute the hash from the prepared transaction, using
+Canton's hashing scheme V2, and sign only that hash. They refuse a hash that
+does not match the transaction, or any other hashing scheme.
+
+The last signer prints the update ID, then `<template-id> <contract-id>` for
+each created contract that is still active and visible to the party. Contracts
+the same transaction archives are left out. `inspect` shows the same after
+completion.
 
 ### Example (Mock)
 
@@ -508,6 +560,73 @@ For [known contracts](#contract-deploy), `--template-module`, `--template-entity
 and `--contract-args-file` are auto-populated. For custom contracts, all three
 must be provided explicitly.
 
+### init exercise-choice
+
+Exercise a choice on an existing contract as the decentralized party.
+
+```bash
+canton-party-ceremony init exercise-choice \
+  --decentralized-party-id <prefix::namespace> \
+  --synchronizer-id <id> \
+  --template-id <package>:<module>:<entity> \
+  --contract-id <contract-id> \
+  --choice <choice> \
+  [--choice-args-file <path>] \
+  [--disclosed-contracts <path>] \
+  [--config <path>] \
+  [--state-dir <dir>]
+```
+
+| Flag                       | Required | Default                   | Description                                                              |
+| -------------------------- | -------- | ------------------------- | ------------------------------------------------------------------------ |
+| `--decentralized-party-id` | Yes      | —                         | Full party ID (`<prefix>::<namespace>`)                                  |
+| `--synchronizer-id`        | Yes      | —                         | Canton synchronizer ID                                                   |
+| `--template-id`            | Yes      | —                         | Target template; `<package>` is a package ID or `#<package-name>`        |
+| `--contract-id`            | Yes      | —                         | Contract to exercise the choice on                                       |
+| `--choice`                 | Yes      | —                         | Choice name                                                              |
+| `--choice-args-file`       | No       | Empty record              | JSON file with the choice argument as a Ledger API `Value` in proto JSON |
+| `--disclosed-contracts`    | No       | None                      | JSON list of disclosed contracts sent with every prepare                 |
+| `--config`                 | No       | `participant-config.json` | Path to participant config JSON                                          |
+| `--state-dir`              | No       | `ceremonies`              | Root directory for ceremony state                                        |
+
+For an interface choice, `--template-id` may name the interface instead of the
+template. The signing check accepts a match on either the exercising template
+or the interface. If the interface is in another package than the template,
+give the interface's package ID, not `#<package-name>`.
+
+Example choice argument for `RegistrarService_CreateInstrumentConfiguration`:
+
+```json
+{
+  "record": {
+    "fields": [
+      { "label": "instrumentId", "value": { "text": "LINK" } },
+      { "label": "additionalIdentifiers", "value": { "list": {} } },
+      { "label": "issuerRequirements", "value": { "list": {} } },
+      { "label": "holderRequirements", "value": { "list": {} } }
+    ]
+  }
+}
+```
+
+Use `--disclosed-contracts` when the choice reads a contract the party is not a
+stakeholder of, such as a Registry configuration. Get the entries from the
+contract operator's disclosure API. Each entry has the Ledger JSON API
+`DisclosedContract` shape. `contractId` and `createdEventBlob` (base64) are
+required. The list is stored in `workflow.json`, so every resume prepares the
+same transaction.
+
+```json
+[
+  {
+    "templateId": "<package>:<module>:<entity>",
+    "contractId": "00abc...",
+    "createdEventBlob": "CgMyLjES...",
+    "synchronizerId": "global-domain::1220..."
+  }
+]
+```
+
 ### resume
 
 Resume an existing ceremony from its persisted state.
@@ -575,6 +694,28 @@ Namespace:           1220abcdef...
     - uid: PAR::p3::1220...  permission: CONFIRMATION
 ---
 ```
+
+### query-contracts
+
+List a party's active contracts of one template, as of the current ledger end.
+Use it to check what a ceremony committed when its result was lost.
+
+```bash
+canton-party-ceremony query-contracts \
+  --party <prefix::namespace> \
+  --template-id '#<package-name>:<module>:<entity>' \
+  [--config <path>]
+```
+
+It prints each contract's ID, creation offset and time, and create arguments.
+The package must be a package name; package IDs are rejected. The package name
+is the `name` field of the package's `daml.yaml`.
+The configured Ledger API user needs read rights for the party; the
+`contract-deploy` and `exercise-choice` ceremonies grant them.
+
+After a lost execute response, run it on the participant that submitted, and
+wait 10 minutes first. A transaction still in flight is not yet listed, so an
+early query can show 0 for a transaction that later commits.
 
 ---
 

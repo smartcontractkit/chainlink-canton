@@ -1,5 +1,7 @@
 package ledger
 
+import "github.com/smartcontractkit/chainlink-canton/party-ceremony/internal/client"
+
 // PackageRef identifies a DAML package by its registered name and version.
 type PackageRef struct {
 	Name    string `json:"name"`
@@ -79,7 +81,30 @@ type PrepareSubmissionInput struct {
 	ContractArgs         string `json:"contract_args"`
 }
 
-// PrepareSubmissionOutput is the output of [PrepareSubmissionOp].
+// PrepareExerciseInput is the input to [PrepareExerciseOp].
+type PrepareExerciseInput struct {
+	DecentralizedPartyID string `json:"decentralized_party_id"`
+	SynchronizerID       string `json:"synchronizer_id"`
+	// PackageID is a package ID or a "#<package-name>" reference.
+	PackageID      string `json:"package_id"`
+	TemplateModule string `json:"template_module"`
+	TemplateEntity string `json:"template_entity"`
+	ContractID     string `json:"contract_id"`
+	Choice         string `json:"choice"`
+	// ChoiceArgument is a Ledger API Value in proto JSON.
+	ChoiceArgument     string              `json:"choice_argument"`
+	DisclosedContracts []DisclosedContract `json:"disclosed_contracts,omitempty"`
+}
+
+type DisclosedContract struct {
+	TemplateID       string `json:"templateId,omitempty"`
+	ContractID       string `json:"contractId"`
+	CreatedEventBlob string `json:"createdEventBlob"`
+	SynchronizerID   string `json:"synchronizerId,omitempty"`
+}
+
+// PrepareSubmissionOutput is the output of [PrepareSubmissionOp] and
+// [PrepareExerciseOp].
 type PrepareSubmissionOutput struct {
 	PreparedTransactionHash string `json:"prepared_transaction_hash"`
 	PreparedTxB64           string `json:"prepared_tx_b64"`
@@ -90,10 +115,22 @@ type PrepareSubmissionOutput struct {
 
 // SignSubmissionInput is the input to [SignSubmissionOp].
 type SignSubmissionInput struct {
-	ParticipantID           string   `json:"participant_id"`
-	PreparedTransactionHash string   `json:"prepared_transaction_hash"`
-	PreparedTxB64           string   `json:"prepared_tx_b64"`
-	KnownSigningKeysB64     []string `json:"known_signing_keys_b64,omitempty"`
+	ParticipantID           string            `json:"participant_id"`
+	PreparedTransactionHash string            `json:"prepared_transaction_hash"`
+	PreparedTxB64           string            `json:"prepared_tx_b64"`
+	KnownSigningKeysB64     []string          `json:"known_signing_keys_b64,omitempty"`
+	HashingSchemeVersion    int32             `json:"hashing_scheme_version"`
+	Expected                *ExpectedExercise `json:"expected,omitempty"`
+}
+
+type ExpectedExercise struct {
+	// PackageID is a package ID or a "#<package-name>" reference.
+	PackageID      string `json:"package_id"`
+	TemplateModule string `json:"template_module"`
+	TemplateEntity string `json:"template_entity"`
+	ContractID     string `json:"contract_id"`
+	Choice         string `json:"choice"`
+	ChoiceArgument string `json:"choice_argument"`
 }
 
 // SignSubmissionOutput is the output of [SignSubmissionOp].
@@ -115,7 +152,10 @@ type ExecuteSubmissionInput struct {
 
 // ExecuteSubmissionOutput is the output of [ExecuteSubmissionOp].
 type ExecuteSubmissionOutput struct {
-	ContractID string `json:"contract_id"`
+	// ContractID is the first created contract, or "" when none was created.
+	ContractID       string                   `json:"contract_id"`
+	UpdateID         string                   `json:"update_id,omitempty"`
+	CreatedContracts []client.CreatedContract `json:"created_contracts,omitempty"`
 }
 
 // ── VerifyContract ───────────────────────────────────────────────────────────

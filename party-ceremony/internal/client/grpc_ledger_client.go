@@ -89,13 +89,15 @@ func (c *GRPCLedgerClient) PrepareSubmission(
 	actAs []string,
 	readAs []string,
 	synchronizerID string,
+	disclosed []*apiv2.DisclosedContract,
 ) (*interactive.PrepareSubmissionResponse, error) {
 	resp, err := c.interactive.PrepareSubmission(ctx, &interactive.PrepareSubmissionRequest{
-		CommandId:      uuid.New().String(),
-		Commands:       commands,
-		ActAs:          actAs,
-		ReadAs:         readAs,
-		SynchronizerId: LogicalSynchronizerID(synchronizerID),
+		CommandId:          uuid.New().String(),
+		Commands:           commands,
+		ActAs:              actAs,
+		ReadAs:             readAs,
+		SynchronizerId:     LogicalSynchronizerID(synchronizerID),
+		DisclosedContracts: disclosed,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("PrepareSubmission: %w", err)
@@ -236,13 +238,12 @@ func ledgerPackageNameRef(name string) string {
 
 // ExecuteSubmission calls InteractiveSubmissionService.ExecuteSubmissionAndWaitForTransaction
 // to submit the prepared transaction and block until it is committed to the ledger.
-// Returns the contract ID of the first created contract in the committed transaction.
 func (c *GRPCLedgerClient) ExecuteSubmission(
 	ctx context.Context,
 	preparedTx *interactive.PreparedTransaction,
 	partySignatures *interactive.PartySignatures,
 	hashingSchemeVersion interactive.HashingSchemeVersion,
-) (string, error) {
+) (SubmissionResult, error) {
 	resp, err := c.interactive.ExecuteSubmissionAndWaitForTransaction(ctx, &interactive.ExecuteSubmissionAndWaitForTransactionRequest{
 		PreparedTransaction:  preparedTx,
 		PartySignatures:      partySignatures,
@@ -250,25 +251,59 @@ func (c *GRPCLedgerClient) ExecuteSubmission(
 		SubmissionId:         uuid.New().String(),
 	})
 	if err != nil {
-		return "", fmt.Errorf("ExecuteSubmission: %w", err)
-	}
-	// Extract the first created contract ID from the committed transaction.
-	for _, event := range resp.GetTransaction().GetEvents() {
-		if ce := event.GetCreated(); ce != nil && ce.GetContractId() != "" {
-			return ce.GetContractId(), nil
-		}
+		return SubmissionResult{}, fmt.Errorf("ExecuteSubmission: %w", err)
 	}
 
-	return "", nil
+	tx := resp.GetTransaction()
+	result := SubmissionResult{UpdateID: tx.GetUpdateId()}
+	archived := make(map[string]struct{})
+	for _, event := range tx.GetEvents() {
+		if ae := event.GetArchived(); ae != nil && ae.GetContractId() != "" {
+			archived[ae.GetContractId()] = struct{}{}
+		}
+	}
+	for _, event := range tx.GetEvents() {
+		ce := event.GetCreated()
+		if ce == nil || ce.GetContractId() == "" {
+			continue
+		}
+		if _, ok := archived[ce.GetContractId()]; ok {
+			continue
+		}
+		tid := ce.GetTemplateId()
+		result.Created = append(result.Created, CreatedContract{
+			TemplateID: tid.GetPackageId() + ":" + tid.GetModuleName() + ":" + tid.GetEntityName(),
+			ContractID: ce.GetContractId(),
+		})
+	}
+
+	return result, nil
 }
 
 func (c *GRPCLedgerClient) GrantPartyRights(ctx context.Context, userID, partyID string) error {
+	return c.grantRights(ctx, userID, partyID, actAsRight(partyID), readAsRight(partyID))
+}
+
+func (c *GRPCLedgerClient) GrantActAs(ctx context.Context, userID, partyID string) error {
+	return c.grantRights(ctx, userID, partyID, actAsRight(partyID))
+}
+
+func (c *GRPCLedgerClient) GrantReadAs(ctx context.Context, userID, partyID string) error {
+	return c.grantRights(ctx, userID, partyID, readAsRight(partyID))
+}
+
+func actAsRight(partyID string) *apiv2admin.Right {
+	return &apiv2admin.Right{Kind: &apiv2admin.Right_CanActAs_{CanActAs: &apiv2admin.Right_CanActAs{Party: partyID}}}
+}
+
+func readAsRight(partyID string) *apiv2admin.Right {
+	return &apiv2admin.Right{Kind: &apiv2admin.Right_CanReadAs_{CanReadAs: &apiv2admin.Right_CanReadAs{Party: partyID}}}
+}
+
+func (c *GRPCLedgerClient) grantRights(ctx context.Context, userID, partyID string, rights ...*apiv2admin.Right) error {
 	_, err := c.userManagement.GrantUserRights(ctx, &apiv2admin.GrantUserRightsRequest{
 		UserId: userID,
-		Rights: []*apiv2admin.Right{
-			{Kind: &apiv2admin.Right_CanActAs_{CanActAs: &apiv2admin.Right_CanActAs{Party: partyID}}},
-			{Kind: &apiv2admin.Right_CanReadAs_{CanReadAs: &apiv2admin.Right_CanReadAs{Party: partyID}}},
-		},
+		Rights: rights,
 	})
 	if err != nil {
 		return fmt.Errorf("GrantUserRights for user %q party %q: %w", userID, partyID, err)
